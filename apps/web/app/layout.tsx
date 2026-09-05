@@ -4,7 +4,7 @@ import './globals.css';
 
 const siteUrl = new URL(
   process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://andy-japan-atlas.bonny-hippo-0800.chatgpt.site',
+    'https://andy-japan-atlas.jzhoubc.chatgpt.site',
 );
 
 const geistMono = Geist_Mono({

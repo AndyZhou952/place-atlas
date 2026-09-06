@@ -1,170 +1,138 @@
-# Product Development Roadmap
+# Product Development Roadmap v0.2
 
-Status: proposed
-Last updated: 2026-09-05
+Status: active
+Last updated: 2026-09-06
 
-The ordering optimizes for a reliable tool before the Japan stay, while keeping
-bulk historical ingestion as a parallel value experiment rather than a blocker.
-Calendar dates will be added after the trip year and departure date are confirmed.
+The roadmap prioritizes a real data and review loop before adding a 24/7 chat
+gateway. Dates are rolling; the product is not coupled to one trip window.
 
-## Milestone 0 — Decisions and evidence pilot
+## Completed — Foundation and corrective slice
 
-Estimated effort: 3–5 focused days.
+- private GitHub repository and private hosted map;
+- legacy prototype audited without code migration;
+- Map, Inbox, and Journal navigation now changes real views;
+- browser geolocation drives “Near me” and “Ask nearby” distance ordering;
+- five source-checked real records replace demo fixtures;
+- Japanese-first titles, Tabelog score/link/check date, official links,
+  reservation channel/window notes, and event dates;
+- editable title, description, and personal state;
+- durable D1 schema for item overrides, discovered items, imports, and journal;
+- HTTP and browser-Agent operations share the same application actions;
+- Web Access installed for use from the next Codex turn.
 
-Deliverables:
+## Milestone 1 — Collector proof of concept
 
-- approve product brief, architecture, accuracy definition, and privacy model;
-- reconnect GitHub and audit the previous `food-map` repository;
-- initialize the private repository and decision log;
-- define core schemas and `AgentRuntime`/connector contracts;
-- create 3–6 representative smoke cases from the named creators to validate the
-  evidence contract without delaying the product foundation;
-- prove one WeChat text/image/location round trip without broad agent tools.
+Goal: prove that a creator reference can produce a reviewable set of real posts
+without manual link-by-link input.
 
-Exit criteria:
+Work:
 
-- one message can become a sourced inbox item;
-- one known place can be confirmed and displayed on a temporary map;
-- the smoke cases prove the extraction seam and human-review fallback;
-- WeChat integration risk is known before we build around it.
-
-## Milestone 1 — Durable map core
-
-Estimated effort: 5–8 focused days.
-
-Deliverables:
-
-- Postgres/PostGIS schema and migrations;
-- private authentication/allowlist;
-- map/list/detail/inbox views;
-- place, event, source, reservation claim, visit, review, and media records;
-- manual/CSV/JSON import and complete export;
-- duplicate merge and correction history;
-- seeded Tokyo sample data.
+1. enable remote debugging in a dedicated Chrome or Edge profile;
+2. sign a secondary account into Xiaohongshu and Bilibili;
+3. connect the local collector worker to persisted `ImportJob` records;
+4. run creator discovery for:
+   - 在日本摸鱼的小超人 — Rednote ID `274834935`;
+   - 漫游东京_tokyotrip — Rednote ID `101943310`;
+   - Piggy豚豚酱 — Bilibili UID `697821`;
+5. save post metadata and evidence manifests, not just final guesses;
+6. process a small smoke batch before scheduling full history.
 
 Exit criteria:
 
-- the product remains useful with the agent and social connectors disabled;
-- nearby and map-bounds queries are tested;
-- all identity and reservation claims retain provenance.
+- one queued creator job transitions through collecting to review/completed;
+- at least ten posts are discovered without copying links manually;
+- rate limits, login expiry, and partial failure are visible;
+- no cookie or session secret leaves the dedicated local profile.
 
-## Milestone 2 — Daily WeChat assistant
+## Milestone 2 — Media extraction and review Inbox
 
-Estimated effort: 5–7 focused days plus a seven-day soak.
+Goal: turn video/image posts into fast, auditable restaurant candidates.
 
-Deliverables:
+Work:
 
-- pinned OpenClaw deployment and WeChat plugin;
-- scoped tools for capture, nearby search, confirmation, and visit logging;
-- immediate inbox receipt and asynchronous enrichment status;
-- text, image, voice, and location flows;
-- action confirmation and audit log;
-- recovery, monitoring, backup, upgrade, and rollback runbooks.
-
-Exit criteria:
-
-- runtime gates in the evaluation plan pass;
-- Andy can complete the normal daily loop without opening an admin console;
-- no unrestricted host/browser access is available from WeChat.
-
-## Milestone 3 — Identity and reservation enrichment
-
-Estimated effort: 8–12 focused days, adjusted by pilot results.
-
-Deliverables:
-
-- evidence manifests, ASR, keyframe OCR, candidate search, and entity resolver;
-- the agreed 30-item calibration batch: ten items each from `小超人`,
-  `漫游东京`, and `Piggy` where the source archives permit;
-- calibrated auto-confirm/abstain policy;
-- fast top-three review card;
-- Tabelog/official/booking-source reservation enrichment;
-- source freshness and contradiction handling;
-- 150-item gold dataset and reproducible evaluation runner.
+- caption and comment capture;
+- audio transcription;
+- scene-change/keyframe sampling rather than every-frame OCR;
+- Japanese/Chinese/English OCR for signs, menus, receipts, and addresses;
+- candidate search and exact-branch resolution;
+- side-by-side evidence review with accept, reject, merge, and edit;
+- duplicate detection and correction history.
 
 Exit criteria:
 
-- >=90% exact entity+branch precision among auto-confirmed items on holdout;
-- >=95% top-three recall for determinable reviewed items;
-- median human review <=30 seconds;
-- high-impact reservation claims are sourced and freshness-aware.
+- obvious named restaurants auto-confirm with source links;
+- uncertain videos land in review with top candidates and evidence frames;
+- auto-confirmed exact-branch precision is at least 90% on the smoke set;
+- median human review is under 30 seconds.
 
-## Milestone 4 — Historical import
+The agreed 30-item batch (10 per creator) becomes a calibration set after this
+pipeline works; it is not a prerequisite for implementation.
 
-Estimated effort: source-dependent; time-box each connector to 2–4 days before
-reviewing value.
+## Milestone 3 — Reservation and freshness service
 
-Deliverables:
+Goal: make each restaurant card actionable and time-aware.
 
-- discovery-only imports for the three named seed creators;
-- Andy's relevance-selection queue;
-- deep enrichment only for selected Tokyo-relevant posts;
-- optional X bookmarks and YouTube metadata import;
-- connector health and rate-limit reporting;
-- secondary-account/dedicated-profile operating guide.
+Work:
+
+- refresh Tabelog scores and review counts as dated snapshots;
+- discover official, TableCheck, OMAKASE, Tabelog, and phone-only channels;
+- model booking horizon, release cadence, cutoff, cancellation policy, and live
+  availability separately;
+- calculate release reminders in JST;
+- re-check high-impact facts before recommending or booking;
+- monitor event dates/cancellation and exhibition changes.
 
 Exit criteria:
 
-- bulk discovery saves more manual time than it consumes;
-- failures cannot corrupt confirmed places;
-- share-to-inbox and manual import remain fully functional fallbacks.
+- every verified restaurant has Tabelog or, outside Japan, Google Maps linkage;
+- every reservation claim has source and checked time;
+- “earliest bookable” is either computed from an explicit rule or labelled
+  unknown—never guessed;
+- stale information is visibly warned.
+
+## Milestone 4 — OpenClaw and WeChat vertical slice
+
+Goal: complete the daily loop in a private chat with Andy's main account.
+
+Work:
+
+- isolated OpenClaw deployment with the Tencent Weixin plugin;
+- verify required OpenClaw/plugin versions and main-account private chat;
+- map WeChat text, image, voice, location, and links to Atlas operations;
+- immediate receipt plus asynchronous progress messages;
+- scoped service credential, idempotency, audit log, and tool allowlist;
+- seven-day reliability/security soak.
+
+Exit criteria:
+
+- “附近有什么” returns sourced results using a shared location;
+- creator information queues an import without opening the website;
+- title/description edits and journal entries appear on the map immediately;
+- restart/retry does not duplicate jobs or writes;
+- no unrestricted shell, browser, or database access is reachable from WeChat.
+
+Only after this passes do we rent a 24/7 server. Initial planning target:
+2 vCPU, 4 GB RAM, encrypted volume, daily backups; choose region from measured
+WeChat latency rather than lowest headline price.
 
 ## Milestone 5 — Travel readiness
 
-Estimated effort: 3–5 focused days plus real-world use.
+- photo upload and media gallery;
+- phone-first review flow and PWA polish;
+- offline-tolerant last-seen data;
+- reminder delivery and timezone tests;
+- backup/restore rehearsal;
+- one-week phone-only use rehearsal.
 
-Deliverables:
+## Milestone 6 — Portfolio/generalization
 
-- reservation release calculations and reminders in JST;
-- event expiry/cancellation checks;
-- stale-hours warning before leaving;
-- mobile/PWA polish and offline-tolerant last-seen data;
-- encrypted backups and disaster-recovery rehearsal;
-- cloud region/VPS choice based on measured latency and WeChat stability.
+Not part of personal v1. Extract interfaces, configuration, generic schemas,
+and scrubbed fixtures only after the personal product is reliable. Never expose
+Andy's private sources, journal, or social sessions in the public project.
 
-Exit criteria:
+## Immediate next action
 
-- a phone-only rehearsal covers capture, recommend, navigate, and review;
-- reminders survive restart and timezone boundaries;
-- restore from backup has been tested;
-- a one-week soak produces no unexplained message loss.
-
-## Milestone 6 — Personal memory and later extraction
-
-Not required for the first travel-ready release.
-
-Deliverables:
-
-- personal taste profile derived from visits and explicit edits;
-- journal, summaries, revisit prompts, and yearly export;
-- generic configuration and onboarding model;
-- scrubbed sample dataset and architecture narrative for portfolio use;
-- assessment of extracting reusable packages into a separate public project.
-
-The public/general product is not built in v1. We only maintain boundaries that
-make later extraction possible.
-
-## Immediate next experiment
-
-After GitHub access and dates are confirmed:
-
-1. initialize the new private repository and typed project foundation;
-2. build the new map experience and domain contracts from scratch, consulting
-   the legacy prototype only for optional product lessons;
-3. implement the evidence manifest and a few smoke fixtures;
-4. run a minimal OpenClaw/WeChat proof of concept in an isolated environment;
-5. build the agreed 30-item calibration set once connector ingestion works;
-6. decide whether OpenClaw passes to Milestone 2 and which source connector gets
-   Milestone 4 priority.
-
-## Scope controls
-
-Do not let these block the travel-ready version:
-
-- importing every historical post before the map works;
-- automatic reservations or payments;
-- public signup or multi-user roles;
-- native mobile applications;
-- local large-model inference;
-- a universal scraper;
-- framework-specific memory as the only place personal data lives.
+Restart Codex so the newly installed Web Access skill is loaded, prepare a
+dedicated browser profile, and run a bounded discovery experiment against one
+creator. Do not bulk-download all history until the smoke job reports rate-limit
+behavior and evidence quality.

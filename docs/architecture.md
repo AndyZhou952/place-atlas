@@ -1,284 +1,243 @@
-# System Architecture and Agent Harness Selection
+# Japan Atlas Architecture v0.2
 
-Status: proposed
-Last updated: 2026-09-05
+Status: active design
+Last updated: 2026-09-06
 Decision owner: Andy Zhou
 
-## 1. Recommendation
+## 1. Architectural intent
 
-For v1, use **OpenClaw as the WeChat channel gateway and initial orchestration
-shell**, not as the database or permanent product core.
+Japan Atlas is one product with several interchangeable entrances. The map,
+WeChat, WebMCP, and a future CLI must call the same application operations and
+read the same durable records. The agent is a client of the product core, not
+the owner of its memory.
 
-The product core should be a small domain API and worker system that exposes
-narrow tools such as `capture_source`, `find_nearby`, `confirm_place`,
-`add_visit`, and `schedule_reminder`. The map app and every possible agent
-runtime use those same tools.
+The design uses two complementary patterns:
 
-This gives the shortest path to WeChat without making a permanent bet on one
-agent framework. If OpenClaw proves unreliable, the runtime can later move to
-the OpenAI Agents SDK, Claude Agent SDK, Hermes, or a custom Pi-based loop while
-the map, data, evaluation fixtures, and source connectors remain intact.
+- **Ports and Adapters** for the whole system, so agent runtimes, social
+  collectors, map providers, and storage can be replaced independently.
+- **MVVM at the web boundary**, so React components render state while the view
+  model owns search, selection, geolocation, edits, import jobs, and journal
+  actions.
 
-## 2. What each candidate actually is
-
-The candidates are not direct substitutes in every dimension.
-
-| Candidate | Best role here | Strength | Main gap for this project |
-|---|---|---|---|
-| OpenClaw | 24/7 channel gateway and first runtime | Existing WeChat plugin, media messages, skills/plugins, cron, many model providers | Broad host permissions unless explicitly restricted; external WeChat plugin is an operational dependency |
-| Hermes Agent | Challenger personal-agent runtime | Cross-session memory, self-improving skills, cron, portable models, VPS-oriented | No documented WeChat channel; custom bridge required |
-| OpenAI Agents SDK | Production orchestration if we own the loop | Typed tools, sessions, guardrails, tracing, approvals, resumability | No WeChat gateway; provider-oriented; more application code |
-| Claude Agent SDK | Production orchestration alternative | Tools, hooks, MCP, permissions, sessions, observability | No WeChat gateway; third-party products require API credentials rather than a consumer Claude login |
-| Pi | Embedded/custom minimal runtime | Small, extensible core and extensions | Coding-agent orientation; no ready 24/7 WeChat operations layer |
-| Codex / Claude Code | Development harness | Excellent for building, testing, migrations, and repository work | They are not the durable database or messaging gateway |
-| Codex SDK | Programmatic coding worker | Can run Codex agents from server code | Coding-agent semantics are a poor default for daily food/map conversations |
-
-Codex can participate in deployment, but mostly as the engineer that builds and
-maintains the deployed application. A server process can invoke the Codex SDK,
-yet that does not make Codex the best chat runtime for this product.
-
-## 3. Proposed topology
+## 2. Logical topology
 
 ```mermaid
 flowchart LR
-    W[Andy's WeChat] --> WP[Tencent Weixin plugin]
-    WP --> OC[OpenClaw Gateway]
-    OC --> AR[AgentRuntime adapter]
-    AR --> T[Scoped domain tools]
-    PWA[Private map PWA] --> API[Domain API]
-    T --> API
-    API --> PG[(PostgreSQL + PostGIS)]
-    API --> OBJ[(Media/object storage)]
-    API --> Q[Job queue]
-    Q --> WK[Enrichment workers]
+    subgraph Channels
+      WX[WeChat]
+      WEB[Private map]
+      WM[Browser Agent / WebMCP]
+    end
 
-    MAC[Local Mac: dedicated browser profile] --> LC[Local acquisition connector]
-    LC --> API
-    WK --> RS[Official sites / Tabelog / booking sources]
+    subgraph AgentPlane[Replaceable agent plane]
+      WXP[Tencent Weixin plugin]
+      GW[OpenClaw gateway]
+      AR[AgentRuntime adapter]
+    end
+
+    subgraph ProductCore[Framework-neutral product core]
+      API[Atlas API]
+      UC[Application use cases]
+      DB[(Structured records)]
+      OBJ[(Media objects)]
+      AUDIT[(Sources and audit trail)]
+    end
+
+    subgraph Acquisition[Replaceable acquisition plane]
+      JOB[Import queue]
+      WA[Web Access / logged-in browser]
+      MEDIA[ASR + keyframes + OCR]
+      ID[Identity resolver]
+      VERIFY[Official / Tabelog / booking checks]
+      REVIEW[Human review]
+    end
+
+    WX --> WXP --> GW --> AR --> API
+    WEB --> API
+    WM --> API
+    API --> UC --> DB
+    UC --> OBJ
+    UC --> AUDIT
+    API --> JOB --> WA --> MEDIA --> ID --> VERIFY --> REVIEW --> API
 ```
 
-### Cloud, always on
+## 3. Current implementation boundary
 
-- OpenClaw Gateway and WeChat session;
-- domain API and queue;
-- small workers for text extraction, search, reminders, and source freshness;
-- private PWA;
-- managed PostgreSQL/PostGIS and object storage, or a self-hosted pilot database;
-- monitoring, backups, and encrypted secrets.
+The private web app now provides a real vertical slice:
 
-### Local, on demand
+- source-checked bootstrap records;
+- API endpoints for listing and editing items;
+- persistent import jobs and journal entries;
+- browser geolocation and distance sorting;
+- a small WebMCP tool surface using the same view-model actions;
+- D1 schema and migrations for durable structured state.
 
-- dedicated Chrome profile logged into Xiaohongshu/Bilibili when needed;
-- `web-access`, Playwright/CDP, or another source connector behind one interface;
-- user-triggered batch discovery and upload of evidence manifests;
-- optional local video preprocessing if raw media should not leave the laptop.
+The following are intentionally not represented as complete:
 
-The local worker can be offline without breaking the map, WeChat capture,
-nearby recommendations, or reviews. It only delays bulk enrichment.
+- Web Access can create or consume no job until the local collector worker is
+  connected;
+- OpenClaw and the Tencent Weixin plugin are not deployed;
+- image/video upload and extracted media require object storage;
+- the browser WebMCP contract is source-complete but still needs validation in
+  a supported WebMCP host;
+- Sites owner-only access is suitable for the private web UI, but a 24/7
+  OpenClaw service may require a separate authenticated API edge.
 
-## 4. How the components connect
-
-### Normal link capture
-
-1. Andy sends a link, screenshot, photo, voice note, or text to the bot.
-2. The WeChat plugin turns the message into a normalized channel event.
-3. The runtime calls `capture_source` with message attachments and provenance.
-4. The API immediately writes an inbox record and returns a receipt. Capture
-   does not wait for slow analysis.
-5. A worker extracts candidate places/events and attaches evidence.
-6. High-confidence items are confirmed; ambiguous items appear as a short
-   review card with up to three candidates.
-
-### Nearby recommendation
-
-1. Andy shares location or types an area/station.
-2. The runtime calls `find_nearby`; PostGIS performs distance and deterministic
-   feasibility filters.
-3. The model ranks only the resulting shortlist and explains three choices.
-4. The response links to the PWA map and flags stale hours or booking facts.
-
-### Review capture
-
-1. Andy sends photos and a sentence/voice note after a visit.
-2. The runtime resolves the active or nearby place and asks at most one
-   disambiguation question.
-3. `add_visit` stores the review, score, spend, photos, and original message.
-4. The personal preference profile is derived later; it is never the sole copy
-   of the review.
-
-## 5. Stable contracts for decoupling
-
-The implementation should define these interfaces before adding platform code:
+## 4. Code dependency direction
 
 ```text
-ChannelAdapter       inbound messages, outbound cards, identity allowlist
-AgentRuntime         message -> tool calls -> response, session lifecycle
-SourceConnector      discover/fetch a source and return an evidence manifest
-PlaceResolver        evidence -> ranked canonical-place candidates
-ReservationProvider place -> sourced booking facts
-MapProvider          geocoding, tiles, directions links
-MediaStore           original/derived media lifecycle
-NotificationSink     reminder delivery with idempotency
+React views
+  -> Atlas view model
+    -> browser API client
+      -> route handlers
+        -> Atlas store port / D1 adapter
+          -> D1
+
+Verified catalog
+  -> server repository merge
+  -> never depends on React, OpenClaw, or Web Access
+
+WebMCP adapter
+  -> calls view-model actions
+  -> never writes browser-only shadow state
 ```
 
-Suggested repository layout:
+Current implementation locations:
 
-```text
-apps/
-  web/               map PWA and review UI
-  api/               durable domain service
-  worker/            extraction, resolution, freshness, reminders
-  eval-runner/        reproducible offline and staging evaluations
-packages/
-  domain/             entities and business rules, no framework imports
-  contracts/          schemas and interfaces
-  connectors/         Xiaohongshu/Bilibili/YouTube/Tabelog/etc. adapters
-  agent-runtime/      OpenClaw adapter plus later challengers
-  prompts/            versioned extraction/ranking prompts
-  ui/                 shared interface components
-config/
-  examples/           publishable example preferences and source definitions
-infra/                containers, deployment, backups, observability
-docs/                 product, ADRs, runbooks, evaluations
-evals/
-  fixtures/           licensed/user-provided test inputs or source references
-  expected/           human-reviewed gold labels
-  runs/               ignored generated reports
+| Layer | Responsibility | Location |
+|---|---|---|
+| Domain contracts | Place, reservation, event, import, journal types | `apps/web/features/atlas/model.ts` |
+| Verified bootstrap data | Real source-checked records only | `apps/web/features/atlas/verified-items.ts` |
+| View | Map, Inbox, Journal, edit forms | `apps/web/features/atlas/atlas-screen.tsx` |
+| ViewModel | UI state and use-case orchestration | `apps/web/features/atlas/use-atlas-view-model.ts` |
+| Browser adapter | HTTP calls | `apps/web/features/atlas/atlas-api-client.ts` |
+| Agent adapter | Browser WebMCP tool registration | `apps/web/features/atlas/use-atlas-webmcp.ts` |
+| Server adapter | D1 reads/writes and catalog merge | `apps/web/lib/server/atlas-store.ts` |
+| Delivery | Item, Inbox, Journal HTTP routes | `apps/web/app/api/**` |
+| Persistence | Schema and immutable migrations | `apps/web/db`, `apps/web/drizzle` |
+
+The next refactor should move server store interfaces into an application
+package before adding OpenClaw. That prevents the WeChat adapter from importing
+React or D1 directly.
+
+## 5. Product records
+
+### AtlasItem
+
+Canonical place/event/building identity plus Japanese-first display title,
+coordinates, address, classification, personal state, and verification state.
+
+### Source assertion
+
+Every externally derived claim must retain its URL, role, observed time, and
+eventual extraction evidence. Current bootstrap records keep the links inline;
+the acquisition milestone normalizes them into assertions.
+
+### TabelogSnapshot
+
+Stores the observed score, review count, URL, and checked date. Scores are
+snapshots, never timeless facts. The UI must show the source and checked date.
+
+### ReservationSnapshot
+
+Separates:
+
+- whether reservation is possible or required;
+- booking channel and link;
+- how far ahead inventory is normally released;
+- release notes and exceptions;
+- last checked time.
+
+Live availability is not cached as a permanent fact. When Andy asks to book or
+when a release reminder becomes due, the agent must re-check the booking page.
+
+### ImportJob
+
+A durable request to process a creator profile, channel, post, or platform ID.
+States are `queued`, `collecting`, `needs_review`, `completed`, and `failed`.
+The job stores counts and diagnostic status, never social account cookies.
+
+### JournalEntry
+
+Personal visit date, rating, note, and later photo references. Personal scores
+remain separate from Tabelog or Google ratings.
+
+## 6. Acquisition and identity pipeline
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued
+    Queued --> Collected: browser connector succeeds
+    Queued --> Failed: access / rate limit / login
+    Collected --> Extracted: caption + comments + ASR + OCR
+    Extracted --> CandidateSet: search official and discovery sources
+    CandidateSet --> Verified: decisive branch evidence
+    CandidateSet --> NeedsReview: ambiguous or conflicting evidence
+    NeedsReview --> Verified: Andy confirms
+    NeedsReview --> Rejected: not relevant / not identifiable
+    Verified --> Published: visible on map
 ```
 
-Personal sources, account IDs, trip dates, private notes, and secrets belong in
-private configuration/database records, not in reusable domain packages.
+Evidence priority for restaurant identity:
 
-### Frontend separation (MVVM-inspired)
+1. exact Japanese name, address, phone, booking page, or branch-specific URL;
+2. readable signage/menu/storefront OCR;
+3. creator caption or comment disclosure;
+4. menu/address/landmark combination matched against search candidates;
+5. visual similarity alone, which can suggest but cannot auto-confirm.
 
-MVVM is useful at the UI boundary, but it is not the architecture for the whole
-system. Apply it pragmatically:
+The 90% target means precision among auto-confirmed exact branches. The system
+may abstain. Ambiguous records must go to Inbox review and must not silently
+enter the trusted map.
 
-- **Model:** generated API contracts and immutable domain-shaped data;
-- **ViewModel:** screen-specific hooks/services that load data, coordinate
-  commands, expose view state, and contain no JSX;
-- **View:** accessible components that render state and emit user intent;
-- **Domain/application:** remains outside the frontend and uses Ports & Adapters.
+## 7. Agent contract
 
-Views must not call Supabase, OpenClaw, or source connectors directly. ViewModels
-depend on an API client interface, making them testable without a browser. Avoid
-a single global store; keep server state, URL/filter state, and short-lived UI
-state separate.
+Application operations remain narrow and auditable:
 
-### Backend engineering practices
+| Operation | Reads/writes | Confirmation |
+|---|---|---|
+| `list_atlas_items` / `find_nearby` | Read | None |
+| `get_item_details` | Read | None |
+| `queue_creator_import` | Write job | Show receipt |
+| `update_atlas_item` | Write personal fields | User-approved input only |
+| `add_journal_entry` | Write journal | Show saved entry |
+| `propose_identity` | Write review candidate | Never publish automatically below threshold |
+| `confirm_identity` | Promote to verified | Explicit human confirmation when ambiguous |
 
-- dependency direction points inward: adapters depend on application/domain;
-- domain entities do not import framework, database, model, or transport code;
-- commands and queries have explicit schemas and idempotency rules;
-- transaction boundaries live in application services;
-- external providers are accessed through ports with contract tests;
-- migrations are append-only after shared environments exist;
-- structured logs and traces carry correlation/message IDs;
-- errors are typed into retryable, user-correctable, and permanent categories;
-- configuration is validated at startup and secrets never receive defaults;
-- unit tests cover pure rules; integration tests cover database/provider
-  boundaries; end-to-end tests cover only critical user journeys.
+OpenClaw, Hermes, Pi, or another runtime implements `AgentRuntime` and maps chat
+messages to these operations. No runtime may write tables directly.
 
-## 6. Harness evaluation rubric
+## 8. Security and deployment split
 
-Restaurant recognition is excluded from this comparison. Run each candidate
-with the same model where possible, the same prompts, and the same mocked domain
-tools.
+- The map is private and currently uses the Sites owner-only access boundary.
+- Structured web state lives in D1; later photos/video use R2 or equivalent.
+- Social logins remain in a dedicated local browser profile. Cookies are never
+  uploaded to the cloud database or agent prompt.
+- The collector runs on demand and is rate-limited. A secondary social account
+  is preferred because automated browsing can trigger restrictions.
+- The 24/7 message gateway can run on a small cloud instance only after the
+  WeChat proof of concept passes. A VPS is not needed for the present web slice.
+- External agent calls need a scoped API credential, request signing, idempotency
+  keys, audit events, and per-tool authorization before deployment.
 
-| Dimension | Weight | Test |
-|---|---:|---|
-| WeChat/channel fit | 25% | Text, image, voice, location, long message, reconnection |
-| Tool reliability | 20% | Retries, duplicate messages, timeouts, invalid tool output |
-| Security/permissions | 15% | Sender allowlist, least privilege, secret isolation, prompt injection |
-| Recovery/operations | 15% | Restart mid-task, persisted session, health check, logs |
-| Extensibility | 10% | Add one tool and one source connector without core edits |
-| Observability/evaluation | 10% | Trace every tool call and replay a test scenario |
-| Cost/maintenance | 5% | Idle footprint, upgrade effort, provider portability |
+## 9. Harness selection
 
-Initial paper assessment favors OpenClaw because channel fit dominates v1.
-Hermes is the first challenger if its memory behavior is valuable enough to
-justify a custom WeChat adapter. The two SDKs become more attractive if we later
-want tighter code-owned control and are willing to build the channel service.
+Keep OpenClaw as the first WeChat candidate because Tencent maintains the
+`openclaw-weixin` plugin and it supports messages/media. Pin compatible versions
+and test the main-account private-chat flow before choosing infrastructure.
 
-## 7. Security boundaries
+Compare runtimes on channel reliability, tool execution, recovery, security,
+maintenance effort, latency, and cost. Restaurant recognition quality belongs
+to the acquisition/evidence pipeline and should not be used to select the
+harness.
 
-OpenClaw's broad execution capabilities are unnecessary for a travel assistant.
-The production WeChat agent must not receive an unrestricted shell, filesystem,
-or browser tool.
+## 10. Current architectural risks
 
-- allowlist only Andy's WeChat identity;
-- expose only scoped, validated domain tools;
-- separate read and write operations;
-- require explicit confirmation immediately before reservations, payments,
-  cancellations, or external messages;
-- make writes idempotent using the source message ID;
-- run the gateway and workers as non-root containers/users;
-- keep the database off the public network;
-- store secrets outside Git and rotate independently;
-- treat webpages, comments, OCR, and transcripts as untrusted evidence, never
-  as agent instructions;
-- retain an audit trail for every state-changing tool call;
-- pin OpenClaw and external plugin versions and test upgrades in staging.
-
-## 8. Deployment sizing and location
-
-For a one-user system that calls remote AI models and does not run a browser or
-local model on the server, start with:
-
-- 2 shared vCPU;
-- 4 GB RAM;
-- 40–80 GB SSD;
-- Ubuntu LTS;
-- remote object storage for growing photo/video assets;
-- managed database if budget permits, otherwise automated encrypted backups.
-
-One vCPU/2 GB may run a pilot but leaves little headroom for OpenClaw, the API,
-queue, and upgrades. Video frame extraction or transcription should run as
-bounded jobs, preferably locally or on temporary compute, rather than dictate a
-larger 24/7 server.
-
-Current published reference prices as of 2026-09-05:
-
-| Provider/region | Rough matching plan | Published monthly price | Comment |
-|---|---|---:|---|
-| Hetzner EU | CX23, 2 vCPU/4 GB/40 GB | EUR 6.53 incl. German VAT, excluding IPv4 | Cheapest candidate; 2026 pricing changed and low-cost capacity can be limited |
-| AWS Lightsail | 2 vCPU/4 GB/80 GB, IPv4 | USD 24 | Predictable and available in Asian AWS regions |
-| DigitalOcean | 2 vCPU/4 GB/80 GB | USD 24 | Simpler operations; Singapore region is available |
-
-Europe is technically sufficient for low-volume text traffic. It increases
-latency to Japan/Taiwan and may give the WeChat session an unusual source IP.
-The decision should therefore be empirical: run the same one-week pilot on the
-Mac, then measure an EU VPS against a Singapore/Japan option. Prefer reliability
-and stable WeChat reconnection over saving roughly USD 15–20 per month during
-the trip.
-
-Official pricing references:
-
-- https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/
-- https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bundles.html
-- https://www.digitalocean.com/pricing/droplets
-
-## 9. Production-runtime decision gate
-
-Keep OpenClaw if a seven-day soak test achieves all of the following:
-
-- at least 99% successful ingress/acknowledgement for test messages;
-- automatic reconnection after gateway restart;
-- no duplicate domain writes under message replay;
-- all media/location types needed for v1 survive normalization;
-- every tool call is attributable to a sender and source message;
-- resource use stays below 70% of the selected server;
-- upgrade and rollback can be performed from the runbook.
-
-If it fails, preserve the WeChat plugin/gateway as a channel bridge and move the
-agent loop behind `AgentRuntime`, or build the channel adapter directly around
-the selected production SDK.
-
-## 10. Primary references
-
-- OpenClaw overview, skills, plugins, and WeChat channel: https://docs.openclaw.ai/
-- Hermes Agent: https://github.com/nousresearch/hermes-agent
-- Pi: https://github.com/earendil-works/pi
-- OpenAI Agents SDK: https://developers.openai.com/api/docs/guides/agents
-- Codex SDK: https://learn.chatgpt.com/docs/codex-sdk
-- Claude Agent SDK: https://code.claude.com/docs/en/agent-sdk/overview
+| Risk | Mitigation |
+|---|---|
+| Social platform layout/login changes | Replaceable collectors, browser profile isolation, manual share fallback |
+| Wrong restaurant branch | Evidence ledger, branch keys, abstention, review queue |
+| Stale scores/hours/reservation rules | Checked timestamps, per-field freshness, live re-check before action |
+| Agent hallucinated write | Typed APIs, validation, review status, audit events |
+| Sites private auth unsuitable for cloud bot | Separate signed service API or private tunnel after PoC |
+| Framework lock-in | Agent and collectors call product use cases through adapters |

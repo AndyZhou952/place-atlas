@@ -18,6 +18,11 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-05 | UI architecture | MVVM-inspired Views/ViewModels over a framework-neutral domain API | Testable UI separation without forcing MVVM onto workers/backend |
 | 2026-09-05 | Legacy repo | Preserve `food-map` unchanged and build the new product from scratch | The prototype is optional product research, not a code or architecture baseline |
 | 2026-09-05 | Early evaluation | Begin with smoke cases; run the agreed 30-item calibration after ingestion works | Most sources are explicit; benchmarking should not delay the foundation |
+| 2026-09-06 | Product data | Remove demo fixtures; only source-checked records or explicit review candidates may appear | Prevents placeholder content from being mistaken for Andy's trusted map |
+| 2026-09-06 | Persistence | D1-backed API before OpenClaw; keep the store replaceable | Website and future agent require one durable source of truth; see ADR 0003 |
+| 2026-09-06 | Names | Japanese-first display titles with optional alternate name | Matches Andy's language preferences and avoids unnecessary translation |
+| 2026-09-06 | Ratings | Tabelog and personal ratings are separate dated facts | External scores change and must retain provenance |
+| 2026-09-06 | Acquisition | Web Access is an important first collector, not a core-domain dependency | Enables creator-level collection while containing platform/login fragility |
 
 ## Open decisions
 
@@ -27,5 +32,5 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | Main-account behavior supported by the Tencent/OpenClaw integration | WeChat proof of concept | Plugin experiment |
 | EU VPS vs Singapore/Japan | Travel deployment | One-week measured pilot |
 | First 30 source items and permission to use uploaded/local media for evals | Data pilot | Andy |
-| Initial map/geocoder and managed database vendors | Milestone 1 | Cost/licensing prototype |
+| Long-term database/API host after WeChat PoC | Before 24/7 deployment | Auth, latency, and operating-cost prototype |
 | Desired monthly infrastructure/model budget | Before cloud provisioning | Andy |

@@ -236,7 +236,7 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
       name: 'create_visit',
       title: 'Create a visit record',
       description:
-        'Record a visit to one Atlas item. Rating and note are both optional.',
+        'Record a visit to one Atlas item. Provide at least a rating or note until photo intake is available.',
       inputSchema: {
         type: 'object',
         properties: {

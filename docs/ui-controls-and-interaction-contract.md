@@ -20,7 +20,7 @@ they must preserve these meanings, confirmations, and shared operations.
 | Search | Match normalized name, alternate name, area, address, description, and tags | Deterministic view-model query | None | `search_atlas` in Agent v2 |
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |
-| Save visit | Add dated visit; note and rating optional | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
+| Save visit | Add dated visit; rating, note, or photo must provide content | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
 | Personal rating | Set any 0–5 value or clear it | `PATCH /api/items/{id}/personal` | Show persisted value | `set_personal_rating` |
 
 ## 2. Rating semantics
@@ -33,11 +33,13 @@ they must preserve these meanings, confirmations, and shared operations.
 
 ## 3. Visit and media semantics
 
-- A visit requires a place and date; note and personal rating are optional.
+- A visit requires a place and date plus at least one of rating, note, or photo.
+- A rating-only visit is valid even when it has no photo and an empty note.
 - Visit numbering is derived chronologically and never typed by the user.
 - One place has one persistent rating and any number of visits.
 - In v1, every uploaded image may have one optional one-line caption.
-- A visit may contain photos while its note and rating are both empty.
+- A visit may contain photos while its note and rating are both empty, but an
+  entirely content-free visit is invalid.
 - Media is not complete until bytes, metadata, attachment, and caption all
   survive refresh and appear in the selected-place map detail.
 

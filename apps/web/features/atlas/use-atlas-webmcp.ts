@@ -261,11 +261,15 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
         ) {
           throw new TypeError('rating must be a number from 0 to 5');
         }
+        const note = readOptionalString(input, 'note');
+        if (rating === undefined && !note) {
+          throw new TypeError('a visit requires at least a rating or note');
+        }
         return actions.addJournal({
           itemId: readString(input, 'itemId'),
           visitedAt: readString(input, 'visitedAt'),
           ...(rating === undefined ? {} : { rating }),
-          note: readOptionalString(input, 'note'),
+          note,
         });
       },
     });

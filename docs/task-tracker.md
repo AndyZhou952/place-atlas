@@ -39,7 +39,7 @@ be scheduled independently within its phase.
 | ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
 |---|---|---|---|---|---|
 | DATA-02 | Place memory | `place_assessments`: one nullable 0–5 rating per place | FND-03 | done | Experimental |
-| DATA-03 | Place memory | Rating-free repeatable `visits`; optional note | FND-03 | done | Experimental |
+| DATA-03 | Place memory | Repeatable `visits`; require at least rating, note, or photo | FND-03 | done | Experimental |
 | DATA-04 | Place memory | Visit count/order and visits-imply-visited derivation | DATA-03 | done | Experimental |
 | UX-01 | Personal controls | Persistent favourite and visited buttons | DATA-02 | done | Experimental |
 | UX-02 | Journal correction | One place card with one rating and a visit timeline | DATA-02, DATA-03 | done | Experimental |

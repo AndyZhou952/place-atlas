@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     !input.itemId ||
     typeof input.visitedAt !== 'string' ||
     !input.visitedAt ||
+    (input.rating === undefined && !input.note?.trim()) ||
     (input.rating !== undefined &&
       (typeof input.rating !== 'number' ||
         !Number.isFinite(input.rating) ||
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     (input.note !== undefined && typeof input.note !== 'string')
   ) {
     return new NextResponse(
-      'Valid place and date are required; rating must be between 0 and 5 when provided',
+      'Valid place and date are required; add at least a rating or note, and keep ratings between 0 and 5',
       {
         status: 400,
       },

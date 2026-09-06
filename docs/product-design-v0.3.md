@@ -89,7 +89,9 @@ control may use 0.5 increments without restricting manual entry.
 
 “Visited” is derived from the existence of at least one visit. The UI displays
 “1st visit / 2nd visit / 3rd visit” but does not ask the user to maintain that
-counter manually.
+counter manually. A visit must carry at least one memory payload: rating, note,
+or photo. Therefore a rating-only visit is valid; an entirely empty visit is
+not. Before media upload exists, the web/API fallback requires rating or note.
 
 ### `MediaAsset` and `VisitMedia`
 

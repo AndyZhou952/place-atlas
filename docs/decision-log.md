@@ -33,6 +33,7 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-06 | Deletion | Place deletion requires UI confirmation and removes attached personal records; bootstrap records receive tombstones | Prevents deleted bundled records from reappearing after refresh |
 | 2026-09-06 | Map layout | Evaluate floating drawer, split sidebar, and bottom-sheet variants over one shared API/view-model | Presentation experiments must never fork product behavior or create browser-only data |
 | 2026-09-06 | Map tiles | Use a no-key OpenStreetMap baseline during the experiment | CARTO showed an API-key requirement; production tile strategy remains an explicit performance task |
+| 2026-09-06 | Visit minimum | A visit needs at least one of rating, note, or photo; rating-only is valid | Keeps quick logging simple without creating empty history records |
 
 ## Open decisions
 

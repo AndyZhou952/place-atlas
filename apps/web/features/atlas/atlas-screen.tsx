@@ -842,9 +842,15 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   placeholder="What stood out? What would you order next time?"
                 />
               </label>
-              <Button type="submit" disabled={vm.busy || !itemId}>
+              <Button
+                type="submit"
+                disabled={vm.busy || !itemId || (!rating && !note.trim())}
+              >
                 <NotebookPen data-icon="inline-start" /> Save visit
               </Button>
+              <small className="field-hint">
+                目前请至少填写评分或笔记；图片上传完成后，三者有一项即可。
+              </small>
             </form>
           </CardContent>
         </Card>

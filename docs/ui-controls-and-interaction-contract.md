@@ -1,7 +1,7 @@
 # UI Controls and Interaction Contract v0.1
 
 Status: active implementation contract
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 This document prevents visual experiments from silently diverging from the
 database or Agent behavior. Layout branches may move or restyle controls, but
@@ -11,8 +11,8 @@ they must preserve these meanings, confirmations, and shared operations.
 
 | Control | User-visible result | Durable operation | Confirmation | Agent parity |
 |---|---|---|---|---|
-| `喜欢 / 已喜欢` | Toggle favourite state | `PATCH /api/items/{id}/personal` with `isFavorite` | Immediate receipt; undo by toggling | `update_item_preferences` |
-| `没去过 / 去过` | Toggle explicit visited state | Same endpoint with `hasVisited` | Immediate receipt; visits still imply visited | `update_item_preferences` |
+| Heart icon | Toggle favourite state from detail or collection row | `PATCH /api/items/{id}/personal` with `isFavorite` | Optimistic local update; rollback and notice on failure | `update_item_preferences` |
+| Circle/check icon | Toggle explicit visited state from detail or collection row | Same endpoint with `hasVisited` | Optimistic local update; visits still imply visited | `update_item_preferences` |
 | Edit | Change title, description, collection state | `PATCH /api/items/{id}` | Save/cancel form | `update_atlas_item` |
 | Delete row action | Remove place and attached private records | `DELETE /api/items/{id}`; create bootstrap tombstone | Mandatory named confirmation dialog | `delete_atlas_item`, destructive |
 | Type filter | Show food, event, architecture, or all | View-model state only | None | Structured search filter later |
@@ -29,7 +29,10 @@ they must preserve these meanings, confirmations, and shared operations.
 - Manual numeric entry accepts any finite value from 0 through 5.
 - A future slider, stars, or quick picker may step by 0.5.
 - Rating belongs to the place assessment, never to an individual visit.
-- Tabelog/Google ratings remain separate source snapshots with checked dates.
+- Personal and Tabelog/Google ratings are displayed together for comparison,
+  but remain separate values in storage.
+- Individual cards do not repeat source check times. The selected-place detail
+  shows one consolidated latest check time at the bottom.
 
 ## 3. Visit and media semantics
 
@@ -75,7 +78,31 @@ and mobile sheet live. They must all:
 All three branch from the same tested persistence/API/view-model commit. Only
 presentation code differs in the two alternatives.
 
-## 6. Known incomplete controls
+The current main build also exposes the variants against the same live API and
+database for immediate visual review:
+
+- A: `/` or `/?layout=floating`
+- B: `/?layout=split`
+- C: `/?layout=bottom`
+
+These query parameters select presentation only; they do not fork state or
+persist a user preference.
+
+## 6. Interaction performance contract
+
+- Favourite and visited controls update locally in the same interaction frame,
+  then reconcile with the durable API. A failed write restores the previous
+  value and surfaces a notice.
+- Personal-state changes must not rebuild map markers.
+- Marker selection changes marker state in place and recenters without a long
+  animated flight.
+- Full-canvas CSS filters and backdrop blur must not cover the moving tile
+  surface.
+- The current OSM raster provider is a functional baseline, not a promise of
+  Google Maps-level vector rendering. Provider evaluation remains a separate
+  production decision.
+
+## 7. Known incomplete controls
 
 | Control | Current state | Completion dependency |
 |---|---|---|

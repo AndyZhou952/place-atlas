@@ -166,8 +166,33 @@ export function useAtlasViewModel() {
 
   const saveAssessment = useCallback(
     async (id: string, patch: PlaceAssessmentPatch) => {
+      const previous = items.find((item) => item.id === id);
+      if (!previous) throw new Error('Atlas item not found');
+
       setBusy(true);
       setNotice('');
+      setItems((current) =>
+        current.map((item) => {
+          if (item.id !== id) return item;
+          return {
+            ...item,
+            ...(patch.overallRating === undefined
+              ? {}
+              : {
+                  personalRating:
+                    patch.overallRating === null
+                      ? undefined
+                      : patch.overallRating,
+                }),
+            ...(patch.isFavorite === undefined
+              ? {}
+              : { isFavorite: patch.isFavorite }),
+            ...(patch.hasVisited === undefined
+              ? {}
+              : { hasVisited: patch.hasVisited }),
+          };
+        }),
+      );
       try {
         const updated = await updateItemAssessment(id, patch);
         setItems((current) =>
@@ -176,6 +201,9 @@ export function useAtlasViewModel() {
         setNotice('Personal place status saved.');
         return updated;
       } catch (error) {
+        setItems((current) =>
+          current.map((item) => (item.id === id ? previous : item)),
+        );
         setNotice(
           error instanceof Error ? error.message : 'Could not save status.',
         );
@@ -184,7 +212,7 @@ export function useAtlasViewModel() {
         setBusy(false);
       }
     },
-    [],
+    [items],
   );
 
   const removeItem = useCallback(async (id: string) => {

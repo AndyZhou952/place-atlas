@@ -34,6 +34,10 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-06 | Map layout | Evaluate floating drawer, split sidebar, and bottom-sheet variants over one shared API/view-model | Presentation experiments must never fork product behavior or create browser-only data |
 | 2026-09-06 | Map tiles | Use a no-key OpenStreetMap baseline during the experiment | CARTO showed an API-key requirement; production tile strategy remains an explicit performance task |
 | 2026-09-06 | Visit minimum | A visit needs at least one of rating, note, or photo; rating-only is valid | Keeps quick logging simple without creating empty history records |
+| 2026-09-07 | Fast personal controls | Favourite/visited use optimistic UI with API reconciliation and rollback | Network latency must not make a personal toggle feel blocked |
+| 2026-09-07 | Map rendering | Reuse marker instances and remove map-wide filters/backdrop blur | Avoid unnecessary marker rebuilds and GPU-heavy repaints during pan/zoom |
+| 2026-09-07 | Rating presentation | Show personal and source ratings inline; show one overall checked time at detail bottom | Makes comparison immediate and removes repeated operational metadata |
+| 2026-09-07 | Layout review | Expose A/B/C through one main build using a non-persistent `layout` query | Lets Andy compare real rendering while preserving one API and one database |
 
 ## Open decisions
 

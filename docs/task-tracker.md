@@ -1,7 +1,7 @@
 # Japan Atlas Task Tracker v0.4
 
 Status: active execution board
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 ## Stage definitions
 
@@ -41,7 +41,8 @@ be scheduled independently within its phase.
 | DATA-02 | Place memory | `place_assessments`: one nullable 0–5 rating per place | FND-03 | done | Experimental |
 | DATA-03 | Place memory | Repeatable `visits`; require at least rating, note, or photo | FND-03 | done | Experimental |
 | DATA-04 | Place memory | Visit count/order and visits-imply-visited derivation | DATA-03 | done | Experimental |
-| UX-01 | Personal controls | Persistent favourite and visited buttons | DATA-02 | done | Experimental |
+| UX-01 | Personal controls | Persistent icon-only favourite and visited controls in detail and collection rows | DATA-02 | done | Experimental |
+| UX-01A | Personal controls | Optimistic local feedback with durable reconciliation and rollback | UX-01 | done | Experimental |
 | UX-02 | Journal correction | One place card with one rating and a visit timeline, also visible in map detail | DATA-02, DATA-03 | done | Experimental |
 | UX-03 | Rating input | Manual arbitrary 0–5; future quick control uses 0.5 steps | DATA-02 | done | Experimental |
 | UX-04 | Deletion | List delete, named confirmation, cascading personal cleanup, tombstone | FND-03 | done | Experimental |
@@ -49,8 +50,9 @@ be scheduled independently within its phase.
 | SEARCH-02 | Search transparency | Visible tags and all/visited/unvisited/favourite filters | SEARCH-01, DATA-04 | done | Experimental |
 | MAP-01 | Interactive map | Multi-marker pan/zoom, marker selection, fit bounds | — | done | Experimental |
 | MAP-02 | Map-dominant layout | Collection collapses by default; floating search opener | MAP-01 | done | Experimental |
-| MAP-03 | Layout selection | Compare floating drawer, split sidebar, and bottom-sheet branches | MAP-02 | in progress | Experimental |
-| MAP-04 | Map performance | Choose compliant tile/geocoder provider; caching and mobile profiling | MAP-03 | next | Experimental |
+| MAP-03 | Layout selection | Compare live floating drawer, split sidebar, and bottom-sheet variants | MAP-02 | in progress | Experimental |
+| MAP-04A | Map performance | Reuse markers, remove blocking selection animation, and eliminate moving-canvas filters/blur | MAP-01 | done | Experimental |
+| MAP-04B | Map performance | Choose compliant vector tile/geocoder provider; caching and mobile profiling | MAP-03 | next | Experimental |
 | DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
 | REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | blocked | Experimental |
 
@@ -115,6 +117,6 @@ is not a substitute for the authenticated 24/7 service boundary.
 ## Current checkpoint
 
 The next user decision is visual, not architectural: select one map layout after
-reviewing the three branches. In parallel, the next independent engineering
+reviewing the three live variants. In parallel, the next independent engineering
 slice is `MEDIA-01` through `MEDIA-03`. The dedicated-browser collector begins
 only after its separate Chrome context is prepared, as previously agreed.

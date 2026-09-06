@@ -15,10 +15,21 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const layerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const markersRef = useRef<Map<string, Leaflet.Marker>>(new Map());
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
   const fittedRef = useRef(false);
+  const previousSelectedRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const [ready, setReady] = useState(false);
+  const markerSignature = JSON.stringify(
+    items.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      latitude: item.latitude,
+      longitude: item.longitude,
+    })),
+  );
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -27,18 +38,25 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
   useEffect(() => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
+    const markers = markersRef.current;
 
     void import('leaflet').then((leaflet) => {
       if (disposed || !elementRef.current) return;
       leafletRef.current = leaflet;
       const map = leaflet.map(elementRef.current, {
         attributionControl: true,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
+        preferCanvas: true,
         zoomControl: false,
       });
       leaflet
         .tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; OpenStreetMap contributors',
+          keepBuffer: 4,
           maxZoom: 19,
+          updateWhenIdle: true,
+          updateWhenZooming: false,
         })
         .addTo(map);
       leaflet.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -56,6 +74,7 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
       mapRef.current?.remove();
       mapRef.current = null;
       layerRef.current = null;
+      markers.clear();
       leafletRef.current = null;
     };
   }, []);
@@ -66,11 +85,18 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
     const layer = layerRef.current;
     if (!ready || !leaflet || !map || !layer) return;
 
+    const markerItems = JSON.parse(markerSignature) as Array<{
+      id: string;
+      kind: AtlasItem['kind'];
+      title: string;
+      latitude: number;
+      longitude: number;
+    }>;
     layer.clearLayers();
+    markersRef.current.clear();
     const bounds: Leaflet.LatLngExpression[] = [];
     const coordinateCounts = new Map<string, number>();
-    for (const item of items) {
-      const selected = item.id === selectedId;
+    for (const item of markerItems) {
       const coordinateKey = `${item.latitude.toFixed(4)},${item.longitude.toFixed(4)}`;
       const sameLocationIndex = coordinateCounts.get(coordinateKey) ?? 0;
       coordinateCounts.set(coordinateKey, sameLocationIndex + 1);
@@ -82,7 +108,7 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
       const marker = leaflet.marker(position, {
         icon: leaflet.divIcon({
           className: 'atlas-map-marker-shell',
-          html: `<span class="atlas-map-marker marker-${item.kind}${selected ? ' is-selected' : ''}"><b>${item.kind === 'food' ? '食' : item.kind === 'event' ? '日' : '建'}</b></span>`,
+          html: `<span class="atlas-map-marker marker-${item.kind}"><b>${item.kind === 'food' ? '食' : item.kind === 'event' ? '日' : '建'}</b></span>`,
           iconAnchor: [18, 36],
           iconSize: [36, 36],
         }),
@@ -95,6 +121,7 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
       marker.bindTooltip(tooltip, { direction: 'top', offset: [0, -28] });
       marker.on('click', () => onSelectRef.current(item.id));
       marker.addTo(layer);
+      markersRef.current.set(item.id, marker);
       bounds.push(position);
     }
 
@@ -105,18 +132,27 @@ export function AtlasMap({ items, selectedId, onSelect }: AtlasMapProps) {
       });
       fittedRef.current = true;
     }
-  }, [items, ready, selectedId]);
+  }, [markerSignature, ready]);
 
   useEffect(() => {
     const item = items.find((candidate) => candidate.id === selectedId);
     if (!ready || !item || !mapRef.current) return;
-    mapRef.current.flyTo(
-      [item.latitude, item.longitude],
-      Math.max(mapRef.current.getZoom(), 13),
-      {
-        duration: 0.45,
-      },
-    );
+
+    for (const [id, marker] of markersRef.current) {
+      marker
+        .getElement()
+        ?.querySelector('.atlas-map-marker')
+        ?.classList.toggle('is-selected', id === selectedId);
+    }
+
+    if (previousSelectedRef.current !== selectedId) {
+      mapRef.current.setView(
+        [item.latitude, item.longitude],
+        Math.max(mapRef.current.getZoom(), 13),
+        { animate: false },
+      );
+      previousSelectedRef.current = selectedId;
+    }
   }, [items, ready, selectedId]);
 
   return (

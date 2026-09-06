@@ -1,7 +1,7 @@
 # Product Development Roadmap v0.3
 
 Status: active
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 The product is currently in the **experimental stage**. Its database, private
 map, source-backed records, and API are real; its intended daily Agent channel,
@@ -26,6 +26,13 @@ complete. See `task-tracker.md` for task-level status and dependencies.
   deterministic partial/tag search;
 - browser Agent tools for preferences, rating, visits, and deletion using the
   same APIs as the web UI.
+- icon-only favourite/visited controls in both place detail and the collapsible
+  collection, with immediate optimistic feedback and failure rollback;
+- marker reuse and lighter map compositing for substantially faster pan, zoom,
+  selection, and personal-state changes;
+- live A/B/C presentation URLs from one main build and one database;
+- inline personal/Tabelog rating comparison with one consolidated source-check
+  date at the bottom of place detail.
 
 ## Phase 1 — correct the personal-memory model
 
@@ -115,7 +122,7 @@ explicitly post-v1 and never exposes Andy's private sources, photos, or journal.
 
 ## Immediate sequence
 
-1. select one of the three real map-layout branches and merge the presentation;
+1. review the three live map-layout variants and select the presentation;
 2. add object storage, photo captions, and upload APIs;
 3. implement Agent v2 service security, idempotency, and audit records;
 4. prepare the dedicated browser and run the bounded 小超人 experiment;

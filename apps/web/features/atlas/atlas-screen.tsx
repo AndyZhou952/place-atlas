@@ -1,12 +1,13 @@
 'use client';
 
-import { type SyntheticEvent, useState } from 'react';
+import { type SyntheticEvent, useEffect, useState } from 'react';
 import {
   Bot,
   Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Circle,
   CircleHelp,
   Clock3,
   Coffee,
@@ -127,14 +128,39 @@ export function AtlasScreen() {
 }
 
 type AtlasViewModel = ReturnType<typeof useAtlasViewModel>;
+type LayoutVariant = 'floating' | 'split' | 'bottom';
 
 function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   const [listOpen, setListOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AtlasItem>();
+  const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>('floating');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const requested = new URLSearchParams(window.location.search).get(
+        'layout',
+      );
+      if (requested === 'split' || requested === 'bottom') {
+        setLayoutVariant(requested);
+        setListOpen(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const layoutClass =
+    layoutVariant === 'split'
+      ? 'split-sidebar-layout'
+      : layoutVariant === 'bottom'
+        ? 'bottom-sheet-layout'
+        : 'floating-drawer-layout';
 
   return (
     <section className="map-explorer" id="map">
-      <section className="map-panel" aria-label="Map and selected place">
+      <section
+        className={cn('map-panel', layoutClass, listOpen && 'is-list-open')}
+        aria-label="Map and selected place"
+      >
         <AtlasMap
           items={vm.visibleItems}
           selectedId={vm.selectedItem?.id ?? ''}
@@ -151,6 +177,12 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
           <ListFilter data-icon="inline-start" />
           {listOpen ? 'Hide places' : 'Search places'}
         </Button>
+
+        {layoutVariant !== 'floating' ? (
+          <span className="layout-chip">
+            {layoutVariant === 'split' ? '方案 B · 分栏' : '方案 C · 底部卡片'}
+          </span>
+        ) : null}
 
         <aside
           id="atlas-collection"
@@ -264,7 +296,18 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   selected={vm.selectedItem?.id === item.id}
                   distance={vm.distances[item.id]}
                   onSelect={() => vm.selectItem(item.id)}
+                  onToggleFavorite={() =>
+                    void vm.saveAssessment(item.id, {
+                      isFavorite: !item.isFavorite,
+                    })
+                  }
+                  onToggleVisited={() =>
+                    void vm.saveAssessment(item.id, {
+                      hasVisited: !item.hasVisited,
+                    })
+                  }
                   onDelete={() => setPendingDelete(item)}
+                  busy={vm.busy}
                 />
               ))
             ) : (
@@ -310,13 +353,19 @@ function PlaceRow({
   selected,
   distance,
   onSelect,
+  onToggleFavorite,
+  onToggleVisited,
   onDelete,
+  busy,
 }: {
   readonly item: AtlasItem;
   readonly selected: boolean;
   readonly distance?: number;
   readonly onSelect: () => void;
+  readonly onToggleFavorite: () => void;
+  readonly onToggleVisited: () => void;
   readonly onDelete: () => void;
+  readonly busy: boolean;
 }) {
   return (
     <div className={cn('place-row', selected && 'is-selected')}>
@@ -347,21 +396,48 @@ function PlaceRow({
             {item.area} · {item.reservation.label}
             {distance === undefined ? '' : ` · ${distance.toFixed(1)} km`}
           </span>
-          <span className="place-state-line">
-            {item.isFavorite ? '♥ 喜欢' : '♡ 未收藏'} ·{' '}
-            {item.hasVisited ? '✓ 去过' : '○ 没去过'}
-          </span>
         </span>
         <ChevronRight aria-hidden="true" />
       </button>
-      <button
-        type="button"
-        className="place-delete-button"
-        aria-label={`Delete ${item.title}`}
-        onClick={onDelete}
-      >
-        <Trash2 aria-hidden="true" />
-      </button>
+      <div className="place-row-actions">
+        <button
+          type="button"
+          className={cn('place-row-action', item.isFavorite && 'is-active')}
+          aria-label={
+            item.isFavorite ? `取消喜欢 ${item.title}` : `喜欢 ${item.title}`
+          }
+          aria-pressed={Boolean(item.isFavorite)}
+          title={item.isFavorite ? '取消喜欢' : '喜欢'}
+          onClick={onToggleFavorite}
+          disabled={busy}
+        >
+          <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
+        </button>
+        <button
+          type="button"
+          className={cn('place-row-action', item.hasVisited && 'is-active')}
+          aria-label={
+            item.hasVisited
+              ? `标记为没去过 ${item.title}`
+              : `标记为去过 ${item.title}`
+          }
+          aria-pressed={Boolean(item.hasVisited)}
+          title={item.hasVisited ? '标记为没去过' : '标记为去过'}
+          onClick={onToggleVisited}
+          disabled={busy}
+        >
+          {item.hasVisited ? <CheckCircle2 /> : <Circle />}
+        </button>
+        <button
+          type="button"
+          className="place-row-action is-delete"
+          aria-label={`Delete ${item.title}`}
+          title="删除"
+          onClick={onDelete}
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -421,6 +497,14 @@ function DeleteItemDialog({
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const item = vm.selectedItem!;
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
+  const overallCheckedAt = [
+    item.verifiedAt,
+    item.tabelog?.checkedAt,
+    item.reservation.checkedAt,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
@@ -454,7 +538,9 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
           <div className="detail-actions">
             <Button
               variant={item.isFavorite ? 'default' : 'outline'}
-              size="sm"
+              size="icon-sm"
+              aria-label={item.isFavorite ? '取消喜欢' : '喜欢'}
+              title={item.isFavorite ? '取消喜欢' : '喜欢'}
               aria-pressed={Boolean(item.isFavorite)}
               onClick={() =>
                 void vm.saveAssessment(item.id, {
@@ -463,15 +549,13 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               }
               disabled={vm.busy}
             >
-              <Heart
-                data-icon="inline-start"
-                fill={item.isFavorite ? 'currentColor' : 'none'}
-              />
-              {item.isFavorite ? '已喜欢' : '喜欢'}
+              <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
             </Button>
             <Button
               variant={item.hasVisited ? 'default' : 'outline'}
-              size="sm"
+              size="icon-sm"
+              aria-label={item.hasVisited ? '标记为没去过' : '标记为去过'}
+              title={item.hasVisited ? '标记为没去过' : '标记为去过'}
               aria-pressed={Boolean(item.hasVisited)}
               onClick={() =>
                 void vm.saveAssessment(item.id, {
@@ -480,8 +564,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               }
               disabled={vm.busy}
             >
-              <CheckCircle2 data-icon="inline-start" />
-              {item.hasVisited ? '去过' : '没去过'}
+              {item.hasVisited ? <CheckCircle2 /> : <Circle />}
             </Button>
             <Button
               variant="outline"
@@ -554,8 +637,8 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               ))}
             </div>
 
-            <div className="fact-grid">
-              <div className="fact-card personal-fact-card">
+            <div className="rating-strip" aria-label="Ratings">
+              <div className="rating-strip-item personal-rating-inline">
                 <span>我的评分</span>
                 <strong>
                   <NotebookPen aria-hidden="true" />
@@ -563,14 +646,10 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                     ? '未评分'
                     : item.personalRating.toString()}
                 </strong>
-                <small>
-                  {itemVisits.length} 次到访
-                  {itemVisits[0] ? ` · 最近 ${itemVisits[0].visitedAt}` : ''}
-                </small>
               </div>
               {item.tabelog ? (
                 <a
-                  className="fact-card rating-card"
+                  className="rating-strip-item tabelog-rating-inline"
                   href={item.tabelog.url}
                   target="_blank"
                   rel="noreferrer"
@@ -580,24 +659,31 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                     <Star aria-hidden="true" /> {item.tabelog.score.toFixed(2)}
                   </strong>
                   <small>
-                    {item.tabelog.reviewCount?.toLocaleString()} reviews ·
-                    checked {item.tabelog.checkedAt}
+                    {item.tabelog.reviewCount?.toLocaleString()} reviews
                   </small>
                 </a>
               ) : null}
+              <span className="rating-visit-count">
+                {itemVisits.length} 次到访
+                {itemVisits[0] ? ` · 最近 ${itemVisits[0].visitedAt}` : ''}
+              </span>
+            </div>
+
+            <div className="fact-grid">
               <div className="fact-card">
                 <span>Visit / booking</span>
                 <strong>{item.reservation.label}</strong>
                 <small>
                   {item.reservation.bookingWindowLabel ??
-                    `Checked ${item.reservation.checkedAt}`}
+                    item.reservation.channel ??
+                    'Details in source links'}
                 </small>
               </div>
               {item.event ? (
                 <div className="fact-card event-card">
                   <span>Exhibition dates</span>
                   <strong>{item.event.displayDate}</strong>
-                  <small>Official schedule · checked {item.verifiedAt}</small>
+                  <small>Official schedule</small>
                 </div>
               ) : null}
             </div>
@@ -636,6 +722,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                 </a>
               ))}
             </div>
+            {overallCheckedAt ? (
+              <p className="source-checked-at">
+                资料整体检查：{overallCheckedAt}
+              </p>
+            ) : null}
           </>
         )}
       </CardContent>
@@ -810,8 +901,8 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         <p className="eyebrow">Personal journal</p>
         <h2>Your own rating remains separate from Tabelog.</h2>
         <p>
-          Record a visit now; photo uploads will be added with object storage in
-          the next slice.
+          Record a visit now. A rating by itself is enough; notes are optional,
+          and photo uploads will be added with object storage in the next slice.
         </p>
       </div>
       <div className="journal-grid">
@@ -879,7 +970,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                 <NotebookPen data-icon="inline-start" /> Save visit
               </Button>
               <small className="field-hint">
-                目前请至少填写评分或笔记；图片上传完成后，三者有一项即可。
+                评分或笔记填写任意一项即可；只有评分、没有笔记也可以保存。
               </small>
             </form>
           </CardContent>

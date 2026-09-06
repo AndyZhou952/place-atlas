@@ -1,7 +1,7 @@
 # Japan Atlas Product Design v0.3
 
 Status: active product baseline
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 Supersedes: `product-design-v0.2.md`
 
 ## 1. Product definition
@@ -112,8 +112,9 @@ store bytes, finalize metadata, attach/caption, then show on the map detail.
 Selecting a marker or result opens one consolidated place record:
 
 1. Japanese-first name, type, address, tags, and visited/unvisited marker;
-2. official/Tabelog/Google/reservation information with checked dates;
-3. one persistent personal rating, or “Not rated”;
+2. personal and Tabelog/Google ratings inline for direct comparison;
+3. official and reservation information, with one consolidated latest checked
+   date at the bottom rather than repeated timestamps on each fact;
 4. visit count, last-visited date, and chronological visit timeline;
 5. a photo strip grouped by visit, each image with its caption;
 6. personal summary and source-backed place description.
@@ -131,6 +132,16 @@ Marker styling and filters distinguish:
 
 Recommendation defaults should prefer unvisited places unless Andy explicitly
 asks for favourites, revisits, or all results.
+
+Favourite and visited state use icon-only heart and circle/check controls in
+both the selected-place detail and collapsible collection. They update
+optimistically and reconcile with the durable API, so ordinary network latency
+does not block visible feedback.
+
+The map must reuse markers when only personal state changes and avoid
+full-canvas filters or blur effects during movement. The baseline OSM raster
+map is acceptable for the experiment; a vector provider is evaluated
+separately if Google Maps-class movement remains a product requirement.
 
 ## 5. Search and discovery
 

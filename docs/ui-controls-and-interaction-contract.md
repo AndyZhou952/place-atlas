@@ -62,6 +62,17 @@ and mobile sheet live. They must all:
 6. preserve accessible names, keyboard focus, and small-screen operation;
 7. contain no hard-coded demo records or browser-only saved state.
 
+### Implemented comparison branches
+
+| Branch | Presentation | Trade-off to evaluate |
+|---|---|---|
+| `codex/ui-floating-drawer` | Full map, overlay collection drawer, floating selected-place card | Most map-dominant; overlapping panels can compete on smaller laptops |
+| `codex/ui-split-sidebar` | Collection becomes a fixed left column while open; map reflows | Clearest list browsing; leaves less map width while the list is open |
+| `codex/ui-bottom-sheet` | Horizontal collection tray rises from the bottom | Fast visual scanning and mobile direction; reduces vertical detail space while open |
+
+All three branch from the same tested persistence/API/view-model commit. Only
+presentation code differs in the two alternatives.
+
 ## 6. Known incomplete controls
 
 | Control | Current state | Completion dependency |

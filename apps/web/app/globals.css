@@ -633,6 +633,45 @@
   font-weight: 700;
 }
 
+.personal-fact-card {
+  border-color: rgb(78 102 87 / 32%);
+  background: rgb(229 235 226 / 72%);
+}
+
+.detail-visit-history {
+  margin: 0.8rem 0;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-visit-history h3 {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+}
+
+.detail-visit-history ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-visit-history li > span {
+  color: var(--moss);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.detail-visit-history p {
+  margin: 0.15rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .dialog-backdrop {
   position: fixed;
   z-index: 1000;

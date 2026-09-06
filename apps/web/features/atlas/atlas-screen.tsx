@@ -420,6 +420,7 @@ function DeleteItemDialog({
 
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const item = vm.selectedItem!;
+  const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
@@ -554,6 +555,19 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             </div>
 
             <div className="fact-grid">
+              <div className="fact-card personal-fact-card">
+                <span>我的评分</span>
+                <strong>
+                  <NotebookPen aria-hidden="true" />
+                  {item.personalRating === undefined
+                    ? '未评分'
+                    : item.personalRating.toString()}
+                </strong>
+                <small>
+                  {itemVisits.length} 次到访
+                  {itemVisits[0] ? ` · 最近 ${itemVisits[0].visitedAt}` : ''}
+                </small>
+              </div>
               {item.tabelog ? (
                 <a
                   className="fact-card rating-card"
@@ -592,6 +606,22 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               <p className="reservation-note">
                 <Clock3 aria-hidden="true" /> {item.reservation.releaseNote}
               </p>
+            ) : null}
+
+            {itemVisits.length ? (
+              <section className="detail-visit-history">
+                <h3>到访记录</h3>
+                <ol>
+                  {itemVisits.slice(0, 3).map((visit, index) => (
+                    <li key={visit.id}>
+                      <span>
+                        第 {itemVisits.length - index} 次 · {visit.visitedAt}
+                      </span>
+                      {visit.note ? <p>{visit.note}</p> : null}
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ) : null}
 
             <div className="source-links">

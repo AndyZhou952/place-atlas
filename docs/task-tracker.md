@@ -42,7 +42,7 @@ be scheduled independently within its phase.
 | DATA-03 | Place memory | Repeatable `visits`; require at least rating, note, or photo | FND-03 | done | Experimental |
 | DATA-04 | Place memory | Visit count/order and visits-imply-visited derivation | DATA-03 | done | Experimental |
 | UX-01 | Personal controls | Persistent favourite and visited buttons | DATA-02 | done | Experimental |
-| UX-02 | Journal correction | One place card with one rating and a visit timeline | DATA-02, DATA-03 | done | Experimental |
+| UX-02 | Journal correction | One place card with one rating and a visit timeline, also visible in map detail | DATA-02, DATA-03 | done | Experimental |
 | UX-03 | Rating input | Manual arbitrary 0–5; future quick control uses 0.5 steps | DATA-02 | done | Experimental |
 | UX-04 | Deletion | List delete, named confirmation, cascading personal cleanup, tombstone | FND-03 | done | Experimental |
 | SEARCH-01 | Deterministic search | Partial multilingual name/description/tag matching | — | done | Experimental |

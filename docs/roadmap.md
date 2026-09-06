@@ -1,138 +1,117 @@
-# Product Development Roadmap v0.2
+# Product Development Roadmap v0.3
 
 Status: active
 Last updated: 2026-09-06
 
-The roadmap prioritizes a real data and review loop before adding a 24/7 chat
-gateway. Dates are rolling; the product is not coupled to one trip window.
+The product is currently in the **experimental stage**. Its database, private
+map, source-backed records, and API are real; its intended daily Agent channel,
+media pipeline, creator collector, and consolidated place memory are not yet
+complete. See `task-tracker.md` for task-level status and dependencies.
 
-## Completed — Foundation and corrective slice
+## Completed — durable foundation
 
-- private GitHub repository and private hosted map;
-- legacy prototype audited without code migration;
-- Map, Inbox, and Journal navigation now changes real views;
-- browser geolocation drives “Near me” and “Ask nearby” distance ordering;
-- five source-checked real records replace demo fixtures;
-- Japanese-first titles, Tabelog score/link/check date, official links,
-  reservation channel/window notes, and event dates;
-- editable title, description, and personal state;
-- durable D1 schema for item overrides, discovered items, imports, and journal;
-- HTTP and browser-Agent operations share the same application actions;
-- Web Access installed for use from the next Codex turn.
+- private GitHub repository and owner-only hosted map;
+- legacy prototype audited without becoming the new code baseline;
+- source-checked real records with Japanese-first titles;
+- dated Tabelog/reservation facts, official links, and event dates;
+- D1 persistence for edits, import jobs, and the first visit prototype;
+- shared HTTP and browser-Agent operations;
+- Web Access installed for the dedicated-browser experiment;
+- architecture split between channels, Agent, core product, and acquisition.
 
-## Milestone 1 — Collector proof of concept
+## Phase 1 — correct the personal-memory model
 
-Goal: prove that a creator reference can produce a reviewable set of real posts
-without manual link-by-link input.
+Goal: make one place remain one place across repeated visits.
 
-Work:
+- replace per-journal-entry ratings with one nullable place assessment;
+- model repeatable visits with optional notes;
+- derive visit number, count, last visit, and visited/unvisited state;
+- surface the consolidated record on the selected map item;
+- correct the compressed/repeated Journal layout during the transition;
+- add visible tags and weighted partial/fuzzy multilingual search.
 
-1. enable remote debugging in a dedicated Chrome or Edge profile;
-2. sign a secondary account into Xiaohongshu and Bilibili;
-3. connect the local collector worker to persisted `ImportJob` records;
-4. run creator discovery for:
-   - 在日本摸鱼的小超人 — Rednote ID `274834935`;
-   - 漫游东京_tokyotrip — Rednote ID `101943310`;
-   - Piggy豚豚酱 — Bilibili UID `697821`;
-5. save post metadata and evidence manifests, not just final guesses;
-6. process a small smoke batch before scheduling full history.
+Exit: a museum can have three visits, zero or one overall rating, and one place
+detail containing all notes without duplicate place cards.
 
-Exit criteria:
+## Phase 2 — photos and captions
 
-- one queued creator job transitions through collecting to review/completed;
-- at least ten posts are discovered without copying links manually;
-- rate limits, login expiry, and partial failure are visible;
-- no cookie or session secret leaves the dedicated local profile.
+Goal: make personal visual memory durable and visible on the map.
 
-## Milestone 2 — Media extraction and review Inbox
+- configure R2-compatible object storage;
+- add media metadata, upload state, visit relation, ordering, and content hash;
+- accept common phone image formats with size/type validation;
+- allow optional one-line captions per image;
+- show visit-grouped thumbnails and a gallery in map detail;
+- support web upload as a fallback and Agent upload as the primary path.
 
-Goal: turn video/image posts into fast, auditable restaurant candidates.
+Exit: images sent through either supported surface appear under the correct
+place and visit with captions after refresh.
 
-Work:
+## Phase 3 — Agent application layer
 
-- caption and comment capture;
-- audio transcription;
-- scene-change/keyframe sampling rather than every-frame OCR;
-- Japanese/Chinese/English OCR for signs, menus, receipts, and addresses;
-- candidate search and exact-branch resolution;
-- side-by-side evidence review with accept, reject, merge, and edit;
-- duplicate detection and correction history.
+Goal: make WeChat able to operate the product without direct database access.
 
-Exit criteria:
+- extract framework-neutral use cases from the current store;
+- add typed operations for search/recommendation, visits, persistent rating,
+  tags, and media;
+- require service authentication, idempotency, authorization, and audit events;
+- translate natural language into structured filters while preserving sources;
+- default nearby recommendations toward unvisited places unless asked otherwise.
 
-- obvious named restaurants auto-confirm with source links;
-- uncertain videos land in review with top candidates and evidence frames;
-- auto-confirmed exact-branch precision is at least 90% on the smoke set;
-- median human review is under 30 seconds.
+Exit: a non-WeChat test adapter can execute every daily workflow and the map
+updates immediately.
 
-The agreed 30-item batch (10 per creator) becomes a calibration set after this
-pipeline works; it is not a prerequisite for implementation.
+## Phase 4 — dedicated-browser acquisition experiment
 
-## Milestone 3 — Reservation and freshness service
+Goal: prove creator-level collection before bulk import.
 
-Goal: make each restaurant card actionable and time-aware.
+1. use an isolated Chrome/Edge profile and secondary social accounts;
+2. run a small discovery batch for 在日本摸鱼的小超人;
+3. persist post metadata and evidence rather than only final guesses;
+4. add captions/comments, ASR, sampled keyframes, and multilingual OCR;
+5. resolve exact branches with sources and send uncertainty to review;
+6. calibrate on the agreed creators only after the smoke loop works.
 
-Work:
+Exit: one creator reference yields at least ten reviewable posts, partial
+failures remain visible, and auto-confirmed exact-branch precision reaches at
+least 90% with abstention.
 
-- refresh Tabelog scores and review counts as dated snapshots;
-- discover official, TableCheck, OMAKASE, Tabelog, and phone-only channels;
-- model booking horizon, release cadence, cutoff, cancellation policy, and live
-  availability separately;
-- calculate release reminders in JST;
-- re-check high-impact facts before recommending or booking;
-- monitor event dates/cancellation and exhibition changes.
+## Phase 5 — OpenClaw and WeChat
 
-Exit criteria:
+Goal: make Andy's private chat the primary input and command surface.
 
-- every verified restaurant has Tabelog or, outside Japan, Google Maps linkage;
-- every reservation claim has source and checked time;
-- “earliest bookable” is either computed from an explicit rule or labelled
-  unknown—never guessed;
-- stale information is visibly warned.
+- verify main-account private-chat text, image, voice, link, and location flows;
+- map messages to the same Agent operations used by the test adapter;
+- return immediate receipts plus asynchronous progress;
+- deep-link ambiguous visual review to the relevant map context;
+- test retries, duplicate delivery, restarts, and seven-day reliability;
+- remove permanent Inbox/Journal navigation only after feature parity.
 
-## Milestone 4 — OpenClaw and WeChat vertical slice
+Exit: daily capture, nearby unvisited recommendations, edits, visits, photos,
+and import requests work from WeChat and appear on the map.
 
-Goal: complete the daily loop in a private chat with Andy's main account.
+Only after the message round trip is proven should a 24/7 server be rented.
+Start planning around 2 vCPU, 4 GB RAM, encrypted storage, and daily backups;
+choose region from measured latency and operating reliability.
 
-Work:
+## Phase 6 — formed product and delivery
 
-- isolated OpenClaw deployment with the Tencent Weixin plugin;
-- verify required OpenClaw/plugin versions and main-account private chat;
-- map WeChat text, image, voice, location, and links to Atlas operations;
-- immediate receipt plus asynchronous progress messages;
-- scoped service credential, idempotency, audit log, and tool allowlist;
-- seven-day reliability/security soak.
-
-Exit criteria:
-
-- “附近有什么” returns sourced results using a shared location;
-- creator information queues an import without opening the website;
-- title/description edits and journal entries appear on the map immediately;
-- restart/retry does not duplicate jobs or writes;
-- no unrestricted shell, browser, or database access is reachable from WeChat.
-
-Only after this passes do we rent a 24/7 server. Initial planning target:
-2 vCPU, 4 GB RAM, encrypted volume, daily backups; choose region from measured
-WeChat latency rather than lowest headline price.
-
-## Milestone 5 — Travel readiness
-
-- photo upload and media gallery;
-- phone-first review flow and PWA polish;
-- offline-tolerant last-seen data;
-- reminder delivery and timezone tests;
+- reservation/event freshness and JST reminders;
+- phone-first layout and offline-tolerant last-seen data;
 - backup/restore rehearsal;
-- one-week phone-only use rehearsal.
+- one-week phone-only travel rehearsal;
+- security and cost review;
+- scrubbed architecture/demo material for the later portfolio version.
 
-## Milestone 6 — Portfolio/generalization
+Exit: the personal product is dependable for the Japan stay. Generalization is
+explicitly post-v1 and never exposes Andy's private sources, photos, or journal.
 
-Not part of personal v1. Extract interfaces, configuration, generic schemas,
-and scrubbed fixtures only after the personal product is reliable. Never expose
-Andy's private sources, journal, or social sessions in the public project.
+## Immediate sequence
 
-## Immediate next action
-
-Restart Codex so the newly installed Web Access skill is loaded, prepare a
-dedicated browser profile, and run a bounded discovery experiment against one
-creator. Do not bulk-download all history until the smoke job reports rate-limit
-behavior and evidence quality.
+1. clean the current test rows and freeze the v0.3 product model;
+2. implement place assessment + visits + map integration;
+3. add object storage, photo captions, and upload APIs;
+4. implement Agent v2 operations and service security;
+5. prepare the dedicated browser and run the bounded 小超人 experiment;
+6. build the OpenClaw/WeChat adapter;
+7. select cloud hosting only after the local channel proof succeeds.

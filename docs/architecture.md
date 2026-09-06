@@ -1,4 +1,4 @@
-# Japan Atlas Architecture v0.2
+# Japan Atlas Architecture v0.3
 
 Status: active design
 Last updated: 2026-09-06
@@ -63,7 +63,7 @@ flowchart LR
 
 ## 3. Current implementation boundary
 
-The private web app now provides a real vertical slice:
+The private web app now provides a real but transitional vertical slice:
 
 - source-checked bootstrap records;
 - API endpoints for listing and editing items;
@@ -78,8 +78,8 @@ The following are intentionally not represented as complete:
   connected;
 - OpenClaw and the Tencent Weixin plugin are not deployed;
 - image/video upload and extracted media require object storage;
-- the browser WebMCP contract is source-complete but still needs validation in
-  a supported WebMCP host;
+- the browser WebMCP read contract has been validated against the deployed
+  product; the v2 write contract remains to be implemented;
 - Sites owner-only access is suitable for the private web UI, but a 24/7
   OpenClaw service may require a separate authenticated API edge.
 
@@ -157,10 +157,35 @@ A durable request to process a creator profile, channel, post, or platform ID.
 States are `queued`, `collecting`, `needs_review`, `completed`, and `failed`.
 The job stores counts and diagnostic status, never social account cookies.
 
-### JournalEntry
+### PlaceAssessment
 
-Personal visit date, rating, note, and later photo references. Personal scores
-remain separate from Tabelog or Google ratings.
+One optional, persistent personal rating and long-term summary per Atlas item.
+An absent rating is `NULL`, not zero. Collection/planning state is independent
+from whether a visit exists.
+
+### Visit
+
+An appendable visit date and optional note. Visit number, count, last visit, and
+visited/unvisited state are derived per item. A visit never duplicates an Atlas
+item or owns the place's overall rating.
+
+### MediaAsset / VisitMedia
+
+Photo bytes live in object storage while D1 retains metadata, content hash,
+caption, display order, and visit/item relations. Both web and Agent uploads use
+the same finalize-and-attach operation.
+
+## 6.1 Interface ownership
+
+WeChat is the primary command and capture interface. The private map is the
+primary read, spatial organization, and memory interface. The map shows a
+selected place's consolidated assessment, visit timeline, and media; ambiguous
+acquisition evidence opens through a contextual deep link rather than requiring
+a permanent Inbox destination.
+
+The existing Inbox and Journal routes are retained only as transitional
+fallbacks until the WeChat adapter has equivalent write operations. Removing
+them sooner would leave the product without a usable write path.
 
 ## 6. Acquisition and identity pipeline
 
@@ -200,7 +225,10 @@ Application operations remain narrow and auditable:
 | `get_item_details` | Read | None |
 | `queue_creator_import` | Write job | Show receipt |
 | `update_atlas_item` | Write personal fields | User-approved input only |
-| `add_journal_entry` | Write journal | Show saved entry |
+| `create_visit` | Write visit with optional note | Show visit receipt |
+| `set_personal_rating` | Upsert one nullable place rating | Show old/new value |
+| `attach_visit_media` | Store/attach photo and caption | Show attachment receipt |
+| `search_atlas` / `recommend_places` | Read and rank | Expose applied filters |
 | `propose_identity` | Write review candidate | Never publish automatically below threshold |
 | `confirm_identity` | Promote to verified | Explicit human confirmation when ambiguous |
 
@@ -210,7 +238,8 @@ messages to these operations. No runtime may write tables directly.
 ## 8. Security and deployment split
 
 - The map is private and currently uses the Sites owner-only access boundary.
-- Structured web state lives in D1; later photos/video use R2 or equivalent.
+- Structured web state lives in D1; photos/video use R2 or equivalent while D1
+  retains captions and relations.
 - Social logins remain in a dedicated local browser profile. Cookies are never
   uploaded to the cloud database or agent prompt.
 - The collector runs on demand and is rate-limited. A secondary social account

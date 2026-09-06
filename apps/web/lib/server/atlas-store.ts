@@ -245,6 +245,22 @@ export async function addJournalEntry(
   return entry;
 }
 
+export async function deleteJournalEntry(id: string): Promise<boolean> {
+  const result = await getD1()
+    .prepare('DELETE FROM journal_entries WHERE id = ?')
+    .bind(id)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+export async function deleteImportJob(id: string): Promise<boolean> {
+  const result = await getD1()
+    .prepare('DELETE FROM import_jobs WHERE id = ?')
+    .bind(id)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
 function toImportJob(row: ImportJobRow): ImportJob {
   return {
     id: row.id,

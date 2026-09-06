@@ -23,6 +23,11 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-06 | Names | Japanese-first display titles with optional alternate name | Matches Andy's language preferences and avoids unnecessary translation |
 | 2026-09-06 | Ratings | Tabelog and personal ratings are separate dated facts | External scores change and must retain provenance |
 | 2026-09-06 | Acquisition | Web Access is an important first collector, not a core-domain dependency | Enables creator-level collection while containing platform/login fragility |
+| 2026-09-06 | Interface ownership | WeChat Agent is the primary capture/action surface; the map is the primary browsing/memory surface | Avoids duplicating workflows while preserving a rich spatial record |
+| 2026-09-06 | Personal rating | One nullable persistent rating per Atlas item, separate from repeatable visits | Museums may be unrated and repeat visits must not create competing place scores |
+| 2026-09-06 | Visit history | Derive visit number and visited state from visit records | Prevents duplicate items and contradictory manual state |
+| 2026-09-06 | Media | Store bytes in object storage and captions/relations in D1 | Supports durable photos without bloating structured storage |
+| 2026-09-06 | Transitional UI | Keep Inbox/Journal only until Agent parity, then replace with map detail and contextual review links | Do not remove the only working write path prematurely |
 
 ## Open decisions
 

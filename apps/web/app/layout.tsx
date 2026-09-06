@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist_Mono, Noto_Serif_JP } from 'next/font/google';
+import { Geist_Mono } from 'next/font/google';
 import './globals.css';
 
 const siteUrl = new URL(
@@ -9,11 +9,6 @@ const siteUrl = new URL(
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-
-const notoSerif = Noto_Serif_JP({
-  variable: '--font-noto-serif',
   subsets: ['latin'],
 });
 
@@ -43,11 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${notoSerif.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body className={`${geistMono.variable} antialiased`}>{children}</body>
     </html>
   );
 }

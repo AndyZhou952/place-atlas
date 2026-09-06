@@ -44,7 +44,8 @@
   --moss: #4e6657;
   --indigo: #3d526a;
   --gold: #9d721b;
-  --font-display: var(--font-noto-serif), 'Yu Mincho', serif;
+  --font-display:
+    'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', serif;
   --font-ui: Inter, 'Helvetica Neue', Arial, sans-serif;
 
   --background: var(--paper);

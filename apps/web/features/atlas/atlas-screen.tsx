@@ -12,7 +12,9 @@ import {
   Coffee,
   Database,
   ExternalLink,
+  Heart,
   Inbox,
+  ListFilter,
   LocateFixed,
   MapPin,
   NotebookPen,
@@ -21,6 +23,7 @@ import {
   Send,
   Sparkles,
   Star,
+  Trash2,
   X,
 } from 'lucide-react';
 
@@ -36,6 +39,7 @@ import type {
   AtlasView,
   PersonalState,
 } from './model';
+import { AtlasMap } from './atlas-map';
 import { useAtlasViewModel } from './use-atlas-view-model';
 
 const filters: readonly {
@@ -125,27 +129,62 @@ export function AtlasScreen() {
 type AtlasViewModel = ReturnType<typeof useAtlasViewModel>;
 
 function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
-  return (
-    <>
-      <section className="command-strip" aria-label="Search Atlas">
-        <div className="search-field">
-          <Search aria-hidden="true" />
-          <Input
-            type="search"
-            value={vm.query}
-            onChange={(event) => vm.setQuery(event.target.value)}
-            placeholder="Search name, neighborhood, address, or tag"
-            aria-label="Search Atlas items"
-          />
-        </div>
-        <p>
-          <CheckCircle2 aria-hidden="true" />
-          Every visible record has a checked official or Tabelog source.
-        </p>
-      </section>
+  const [listOpen, setListOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<AtlasItem>();
 
-      <section className="atlas-workspace" id="map">
-        <aside className="collection-panel" aria-label="Atlas collection">
+  return (
+    <section className="map-explorer" id="map">
+      <section className="map-panel" aria-label="Map and selected place">
+        <AtlasMap
+          items={vm.visibleItems}
+          selectedId={vm.selectedItem?.id ?? ''}
+          onSelect={vm.selectItem}
+        />
+
+        <Button
+          className="map-search-toggle"
+          variant="outline"
+          aria-expanded={listOpen}
+          aria-controls="atlas-collection"
+          onClick={() => setListOpen((open) => !open)}
+        >
+          <ListFilter data-icon="inline-start" />
+          {listOpen ? 'Hide places' : 'Search places'}
+        </Button>
+
+        <aside
+          id="atlas-collection"
+          className={cn('collection-panel', listOpen && 'is-open')}
+          aria-label="Atlas collection"
+          aria-hidden={!listOpen}
+        >
+          <div className="collection-heading">
+            <div>
+              <p className="eyebrow">Tokyo Atlas</p>
+              <h2>Places</h2>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close place list"
+              onClick={() => setListOpen(false)}
+            >
+              <X />
+            </Button>
+          </div>
+
+          <div className="search-field">
+            <Search aria-hidden="true" />
+            <Input
+              type="search"
+              value={vm.query}
+              onChange={(event) => vm.setQuery(event.target.value)}
+              placeholder="Search name, area, description, or tag"
+              aria-label="Search Atlas items"
+              tabIndex={listOpen ? 0 : -1}
+            />
+          </div>
+
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
             <Summary
@@ -175,6 +214,30 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
             })}
           </div>
 
+          <div
+            className="filter-row personal-filter-row"
+            aria-label="Filter by personal status"
+          >
+            {(
+              [
+                ['all', '全部'],
+                ['unvisited', '没去过'],
+                ['visited', '去过'],
+                ['favorite', '喜欢'],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={vm.personalFilter === value ? 'default' : 'outline'}
+                aria-pressed={vm.personalFilter === value}
+                onClick={() => vm.setPersonalFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
           <div className="result-heading">
             <div>
               <p className="eyebrow">Tokyo · source checked 2026-09-06</p>
@@ -198,9 +261,10 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                 <PlaceRow
                   key={item.id}
                   item={item}
-                  selected={vm.selectedItem.id === item.id}
+                  selected={vm.selectedItem?.id === item.id}
                   distance={vm.distances[item.id]}
                   onSelect={() => vm.selectItem(item.id)}
+                  onDelete={() => setPendingDelete(item)}
                 />
               ))
             ) : (
@@ -212,19 +276,32 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
             )}
           </div>
         </aside>
-
-        <section className="map-panel" aria-label="Map and selected place">
-          <iframe
-            key={vm.selectedItem.id}
-            title={`Map centered on ${vm.selectedItem.title}`}
-            src={vm.mapUrl}
-            className="map-frame"
-            loading="eager"
-          />
+        {vm.selectedItem ? (
           <PlaceDetail key={vm.selectedItem.id} vm={vm} />
-        </section>
+        ) : (
+          <div className="detail-card detail-card-empty">
+            <CircleHelp aria-hidden="true" />
+            <strong>没有符合当前筛选条件的地点</strong>
+            <span>打开地点列表，调整搜索词或筛选条件。</span>
+          </div>
+        )}
       </section>
-    </>
+
+      <DeleteItemDialog
+        item={pendingDelete}
+        busy={vm.busy}
+        onCancel={() => setPendingDelete(undefined)}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          try {
+            await vm.removeItem(pendingDelete.id);
+            setPendingDelete(undefined);
+          } catch {
+            // The view model presents the error in the notice bar.
+          }
+        }}
+      />
+    </section>
   );
 }
 
@@ -233,48 +310,116 @@ function PlaceRow({
   selected,
   distance,
   onSelect,
+  onDelete,
 }: {
   readonly item: AtlasItem;
   readonly selected: boolean;
   readonly distance?: number;
   readonly onSelect: () => void;
+  readonly onDelete: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={cn('place-row', selected && 'is-selected')}
-      onClick={onSelect}
-      aria-pressed={selected}
-    >
-      <span className={`kind-mark kind-${item.kind}`} aria-hidden="true">
-        {item.kind === 'food' ? '食' : item.kind === 'event' ? '日' : '建'}
-      </span>
-      <span className="place-copy">
-        <span className="place-title-line">
-          <strong>{item.title}</strong>
-          {item.tabelog ? (
-            <span className="list-rating">
-              食べログ {item.tabelog.score.toFixed(2)}
-            </span>
-          ) : (
-            <span>{kindLabel[item.kind]}</span>
-          )}
+    <div className={cn('place-row', selected && 'is-selected')}>
+      <button
+        type="button"
+        className="place-row-main"
+        onClick={onSelect}
+        aria-pressed={selected}
+      >
+        <span className={`kind-mark kind-${item.kind}`} aria-hidden="true">
+          {item.kind === 'food' ? '食' : item.kind === 'event' ? '日' : '建'}
         </span>
-        {item.alternateTitle ? (
-          <span className="place-local">{item.alternateTitle}</span>
-        ) : null}
-        <span className="place-meta">
-          {item.area} · {item.reservation.label}
-          {distance === undefined ? '' : ` · ${distance.toFixed(1)} km`}
+        <span className="place-copy">
+          <span className="place-title-line">
+            <strong>{item.title}</strong>
+            {item.tabelog ? (
+              <span className="list-rating">
+                食べログ {item.tabelog.score.toFixed(2)}
+              </span>
+            ) : (
+              <span>{kindLabel[item.kind]}</span>
+            )}
+          </span>
+          {item.alternateTitle ? (
+            <span className="place-local">{item.alternateTitle}</span>
+          ) : null}
+          <span className="place-meta">
+            {item.area} · {item.reservation.label}
+            {distance === undefined ? '' : ` · ${distance.toFixed(1)} km`}
+          </span>
+          <span className="place-state-line">
+            {item.isFavorite ? '♥ 喜欢' : '♡ 未收藏'} ·{' '}
+            {item.hasVisited ? '✓ 去过' : '○ 没去过'}
+          </span>
         </span>
-      </span>
-      <ChevronRight aria-hidden="true" />
-    </button>
+        <ChevronRight aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="place-delete-button"
+        aria-label={`Delete ${item.title}`}
+        onClick={onDelete}
+      >
+        <Trash2 aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function DeleteItemDialog({
+  item,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  readonly item?: AtlasItem;
+  readonly busy: boolean;
+  readonly onCancel: () => void;
+  readonly onConfirm: () => Promise<void>;
+}) {
+  if (!item) return null;
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <button
+        type="button"
+        className="dialog-dismiss"
+        aria-label="Cancel deleting this place"
+        onClick={onCancel}
+      />
+      <div
+        className="delete-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <span className="delete-dialog-icon" aria-hidden="true">
+          <Trash2 />
+        </span>
+        <h2 id="delete-dialog-title">删除这个地点？</h2>
+        <p id="delete-dialog-description">
+          「{item.title}」会从你的 Atlas
+          中移除，对应的个人状态和到访记录也会删除。
+        </p>
+        <div className="form-actions">
+          <Button variant="outline" onClick={onCancel} disabled={busy}>
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => void onConfirm()}
+            disabled={busy}
+          >
+            确认删除
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
-  const item = vm.selectedItem;
+  const item = vm.selectedItem!;
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
@@ -305,9 +450,46 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               <p className="detail-local">{item.alternateTitle}</p>
             ) : null}
           </div>
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil data-icon="inline-start" /> Edit
-          </Button>
+          <div className="detail-actions">
+            <Button
+              variant={item.isFavorite ? 'default' : 'outline'}
+              size="sm"
+              aria-pressed={Boolean(item.isFavorite)}
+              onClick={() =>
+                void vm.saveAssessment(item.id, {
+                  isFavorite: !item.isFavorite,
+                })
+              }
+              disabled={vm.busy}
+            >
+              <Heart
+                data-icon="inline-start"
+                fill={item.isFavorite ? 'currentColor' : 'none'}
+              />
+              {item.isFavorite ? '已喜欢' : '喜欢'}
+            </Button>
+            <Button
+              variant={item.hasVisited ? 'default' : 'outline'}
+              size="sm"
+              aria-pressed={Boolean(item.hasVisited)}
+              onClick={() =>
+                void vm.saveAssessment(item.id, {
+                  hasVisited: !item.hasVisited,
+                })
+              }
+              disabled={vm.busy}
+            >
+              <CheckCircle2 data-icon="inline-start" />
+              {item.hasVisited ? '去过' : '没去过'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil data-icon="inline-start" /> Edit
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -365,6 +547,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             <p className="address-line">
               <MapPin aria-hidden="true" /> {item.address}
             </p>
+            <div className="tag-list" aria-label="Tags">
+              {item.tags.map((tag) => (
+                <span key={tag}>#{tag}</span>
+              ))}
+            </div>
 
             <div className="fact-grid">
               {item.tabelog ? (
@@ -556,17 +743,31 @@ function InboxWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
 }
 
 function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
-  const [itemId, setItemId] = useState(vm.selectedItem.id);
+  const [itemId, setItemId] = useState(
+    vm.selectedItem?.id ?? vm.items[0]?.id ?? '',
+  );
   const [visitedAt, setVisitedAt] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [rating, setRating] = useState('4');
+  const [rating, setRating] = useState('');
   const [note, setNote] = useState('');
+
+  const records = vm.items
+    .map((item) => ({
+      item,
+      visits: vm.visits.filter((visit) => visit.itemId === item.id),
+    }))
+    .filter((record) => record.visits.length > 0);
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      await vm.addJournal({ itemId, visitedAt, rating: Number(rating), note });
+      await vm.addVisit({
+        itemId,
+        visitedAt,
+        ...(rating === '' ? {} : { rating: Number(rating) }),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
       setNote('');
     } catch {
       // The view model presents the error in the notice bar.
@@ -597,7 +798,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   value={itemId}
                   onChange={(event) => setItemId(event.target.value)}
                 >
-                  {vm.visibleItems.map((item) => (
+                  {vm.items.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.title}
                     </option>
@@ -616,17 +817,19 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   />
                 </label>
                 <label htmlFor="journal-rating">
-                  My rating / 5
+                  My overall rating / 5 (optional)
                   <Input
                     id="journal-rating"
                     type="number"
                     min="0"
                     max="5"
-                    step="0.5"
+                    step="any"
                     value={rating}
                     onChange={(event) => setRating(event.target.value)}
-                    required
                   />
+                  <small className="field-hint">
+                    可手动输入任意 0–5 数值；未来评分条按 0.5 递增。
+                  </small>
                 </label>
               </div>
               <label htmlFor="journal-note">
@@ -637,27 +840,41 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   onChange={(event) => setNote(event.target.value)}
                   rows={5}
                   placeholder="What stood out? What would you order next time?"
-                  required
                 />
               </label>
-              <Button type="submit" disabled={vm.busy}>
+              <Button type="submit" disabled={vm.busy || !itemId}>
                 <NotebookPen data-icon="inline-start" /> Save visit
               </Button>
             </form>
           </CardContent>
         </Card>
-        <div className="journal-list">
-          {vm.journalEntries.length ? (
-            vm.journalEntries.map((entry) => (
-              <article key={entry.id} className="journal-entry">
-                <div>
-                  <strong>{entry.itemTitle}</strong>
-                  <span>{entry.visitedAt}</span>
-                </div>
-                <span className="personal-score">
-                  {entry.rating.toFixed(1)}
-                </span>
-                <p>{entry.note}</p>
+        <div className="journal-list" aria-live="polite">
+          {records.length ? (
+            records.map(({ item, visits }) => (
+              <article key={item.id} className="journal-place-record">
+                <header>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>
+                      {visits.length} visits · Last {visits[0]?.visitedAt}
+                    </span>
+                  </div>
+                  <span className="personal-score is-persistent">
+                    {item.personalRating === undefined
+                      ? '—'
+                      : item.personalRating.toString()}
+                  </span>
+                </header>
+                <ol>
+                  {visits.map((visit, index) => (
+                    <li key={visit.id}>
+                      <span>
+                        {visits.length - index}回目 · {visit.visitedAt}
+                      </span>
+                      {visit.note ? <p>{visit.note}</p> : null}
+                    </li>
+                  ))}
+                </ol>
               </article>
             ))
           ) : (

@@ -2,9 +2,11 @@ import type {
   AtlasItem,
   AtlasItemEdit,
   ImportJob,
-  JournalEntry,
   NewImportJob,
-  NewJournalEntry,
+  NewVisit,
+  PlaceAssessmentPatch,
+  VisitCreateResult,
+  VisitRecord,
 } from './model';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -37,6 +39,22 @@ export function updateAtlasItem(
   });
 }
 
+export function updateItemAssessment(
+  id: string,
+  patch: PlaceAssessmentPatch,
+): Promise<AtlasItem> {
+  return requestJson(`/api/items/${encodeURIComponent(id)}/personal`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export function deleteAtlasItem(id: string): Promise<{ deleted: true }> {
+  return requestJson(`/api/items/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 export function fetchImportJobs(): Promise<ImportJob[]> {
   return requestJson('/api/inbox');
 }
@@ -48,13 +66,11 @@ export function createImportJob(input: NewImportJob): Promise<ImportJob> {
   });
 }
 
-export function fetchJournalEntries(): Promise<JournalEntry[]> {
+export function fetchVisits(): Promise<VisitRecord[]> {
   return requestJson('/api/journal');
 }
 
-export function createJournalEntry(
-  input: NewJournalEntry,
-): Promise<JournalEntry> {
+export function createVisit(input: NewVisit): Promise<VisitCreateResult> {
   return requestJson('/api/journal', {
     method: 'POST',
     body: JSON.stringify(input),

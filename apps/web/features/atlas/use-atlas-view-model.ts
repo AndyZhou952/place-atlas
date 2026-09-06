@@ -4,41 +4,44 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   createImportJob,
-  createJournalEntry,
+  createVisit,
+  deleteAtlasItem,
   fetchAtlasItems,
   fetchImportJobs,
-  fetchJournalEntries,
+  fetchVisits,
   updateAtlasItem,
+  updateItemAssessment,
 } from './atlas-api-client';
 import { distanceInKm } from './distance';
+import { matchesAtlasQuery } from './search';
 import type {
   AtlasItem,
   AtlasItemEdit,
   AtlasKindFilter,
+  AtlasPersonalFilter,
   AtlasSummary,
   AtlasView,
   ImportJob,
-  JournalEntry,
   NewImportJob,
-  NewJournalEntry,
+  NewVisit,
+  PlaceAssessmentPatch,
+  VisitRecord,
 } from './model';
 import { useAtlasWebMcp } from './use-atlas-webmcp';
 import { verifiedAtlasItems } from './verified-items';
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
-function normalized(value: string): string {
-  return value.trim().toLocaleLowerCase();
-}
-
 export function useAtlasViewModel() {
   const [view, setView] = useState<AtlasView>('map');
   const [items, setItems] = useState<AtlasItem[]>([...verifiedAtlasItems]);
   const [kind, setKind] = useState<AtlasKindFilter>('all');
+  const [personalFilter, setPersonalFilter] =
+    useState<AtlasPersonalFilter>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [distances, setDistances] = useState<Record<string, number>>({});
   const [locationStatus, setLocationStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +51,7 @@ export function useAtlasViewModel() {
     void Promise.all([
       fetchAtlasItems().then(setItems),
       fetchImportJobs().then(setImportJobs),
-      fetchJournalEntries().then(setJournalEntries),
+      fetchVisits().then(setVisits),
     ]).catch(() => {
       setNotice(
         'Local preview is using verified source data; cloud records reconnect after publish.',
@@ -57,20 +60,15 @@ export function useAtlasViewModel() {
   }, []);
 
   const visibleItems = useMemo(() => {
-    const needle = normalized(query);
     const filtered = items.filter((item) => {
       if (item.verificationStatus !== 'verified') return false;
       const matchesKind = kind === 'all' || item.kind === kind;
-      const haystack = normalized(
-        [
-          item.title,
-          item.alternateTitle ?? '',
-          item.area,
-          item.address,
-          ...item.tags,
-        ].join(' '),
-      );
-      return matchesKind && (!needle || haystack.includes(needle));
+      const matchesPersonal =
+        personalFilter === 'all' ||
+        (personalFilter === 'unvisited' && !item.hasVisited) ||
+        (personalFilter === 'visited' && item.hasVisited) ||
+        (personalFilter === 'favorite' && item.isFavorite);
+      return matchesKind && matchesPersonal && matchesAtlasQuery(item, query);
     });
 
     return [...filtered].sort((left, right) => {
@@ -81,13 +79,10 @@ export function useAtlasViewModel() {
       if (rightDistance === undefined) return -1;
       return leftDistance - rightDistance;
     });
-  }, [distances, items, kind, query]);
+  }, [distances, items, kind, personalFilter, query]);
 
   const selectedItem =
-    visibleItems.find((item) => item.id === selectedId) ??
-    visibleItems[0] ??
-    items.find((item) => item.id === selectedId) ??
-    items[0];
+    visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0];
 
   const summary: AtlasSummary = {
     saved: items.filter((item) => item.personalState !== 'candidate').length,
@@ -144,19 +139,65 @@ export function useAtlasViewModel() {
     }
   }, []);
 
-  const addJournal = useCallback(async (input: NewJournalEntry) => {
+  const addVisit = useCallback(async (input: NewVisit) => {
     setBusy(true);
     setNotice('');
     try {
-      const entry = await createJournalEntry(input);
-      setJournalEntries((current) => [entry, ...current]);
-      setNotice('Journal entry saved.');
-      return entry;
+      const result = await createVisit(input);
+      setVisits((current) => [result.visit, ...current]);
+      setItems((current) =>
+        current.map((item) =>
+          item.id === result.item.id ? result.item : item,
+        ),
+      );
+      setNotice('Visit saved. Your place record has been updated.');
+      return result;
     } catch (error) {
       setNotice(
         error instanceof Error
           ? error.message
           : 'Could not save journal entry.',
+      );
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const saveAssessment = useCallback(
+    async (id: string, patch: PlaceAssessmentPatch) => {
+      setBusy(true);
+      setNotice('');
+      try {
+        const updated = await updateItemAssessment(id, patch);
+        setItems((current) =>
+          current.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        setNotice('Personal place status saved.');
+        return updated;
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? error.message : 'Could not save status.',
+        );
+        throw error;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  const removeItem = useCallback(async (id: string) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      await deleteAtlasItem(id);
+      setItems((current) => current.filter((item) => item.id !== id));
+      setVisits((current) => current.filter((visit) => visit.itemId !== id));
+      setNotice('Place removed from your Atlas.');
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : 'Could not remove place.',
       );
       throw error;
     } finally {
@@ -212,31 +253,46 @@ export function useAtlasViewModel() {
       items,
       selectItem,
       updateItem: saveItemEdit,
+      updateAssessment: saveAssessment,
+      removeItem,
       queueImport,
-      addJournal,
+      addJournal: addVisit,
       locateNearby,
     }),
-    [addJournal, items, locateNearby, queueImport, saveItemEdit, selectItem],
+    [
+      addVisit,
+      items,
+      locateNearby,
+      queueImport,
+      removeItem,
+      saveAssessment,
+      saveItemEdit,
+      selectItem,
+    ],
   );
 
   useAtlasWebMcp(webMcpActions);
 
   return {
-    addJournal,
+    addVisit,
     busy,
     distances,
     importJobs,
-    journalEntries,
+    items,
+    visits,
     kind,
     locationStatus,
-    mapUrl: selectedItem ? buildOpenStreetMapEmbedUrl(selectedItem) : '',
     notice,
+    personalFilter,
     query,
     queueImport,
+    removeItem,
+    saveAssessment,
     saveItemEdit,
     selectedItem,
     selectItem,
     setKind,
+    setPersonalFilter,
     setQuery,
     setView,
     summary,
@@ -244,20 +300,4 @@ export function useAtlasViewModel() {
     visibleItems,
     locateNearby,
   } as const;
-}
-
-function buildOpenStreetMapEmbedUrl(item: AtlasItem): string {
-  const delta = 0.035;
-  const bbox = [
-    item.longitude - delta,
-    item.latitude - delta,
-    item.longitude + delta,
-    item.latitude + delta,
-  ].join(',');
-  const params = new URLSearchParams({
-    bbox,
-    layer: 'mapnik',
-    marker: `${item.latitude},${item.longitude}`,
-  });
-  return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
 }

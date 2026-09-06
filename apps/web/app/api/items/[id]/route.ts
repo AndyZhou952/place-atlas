@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import type { AtlasItemEdit, PersonalState } from '@/features/atlas/model';
-import { updateAtlasItem } from '@/lib/server/atlas-store';
+import { deleteAtlasItem, updateAtlasItem } from '@/lib/server/atlas-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,4 +48,15 @@ export async function PATCH(
     }
     throw error;
   }
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  const deleted = await deleteAtlasItem(id);
+  if (!deleted)
+    return new NextResponse('Atlas item not found', { status: 404 });
+  return NextResponse.json({ id, deleted: true });
 }

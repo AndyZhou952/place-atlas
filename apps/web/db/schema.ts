@@ -28,6 +28,41 @@ export const atlasItemOverrides = sqliteTable('atlas_item_overrides', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const placeAssessments = sqliteTable('place_assessments', {
+  itemId: text('item_id').primaryKey(),
+  overallRating: real('overall_rating'),
+  isFavorite: integer('is_favorite', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  hasVisited: integer('has_visited', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  summary: text('summary'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const atlasItemTombstones = sqliteTable('atlas_item_tombstones', {
+  itemId: text('item_id').primaryKey(),
+  deletedAt: text('deleted_at').notNull(),
+});
+
+export const visits = sqliteTable(
+  'visits',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id').notNull(),
+    itemTitle: text('item_title').notNull(),
+    visitedAt: text('visited_at').notNull(),
+    note: text('note'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_visits_item_visited').on(table.itemId, table.visitedAt),
+  ],
+);
+
 export const importJobs = sqliteTable(
   'import_jobs',
   {

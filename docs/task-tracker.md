@@ -1,4 +1,4 @@
-# Japan Atlas Task Tracker
+# Japan Atlas Task Tracker v0.4
 
 Status: active execution board
 Last updated: 2026-09-06
@@ -7,125 +7,114 @@ Last updated: 2026-09-06
 
 | Stage | Meaning | Exit signal |
 |---|---|---|
-| Experimental | Resolve architecture and platform uncertainty with bounded real tests | One complete creator-to-map and visit-to-map loop works |
+| Experimental | Resolve architecture and integration uncertainty with bounded real tests | One creator-to-map and visit-with-photo-to-map loop works |
 | Demo | Core loops work end to end with manual safeguards | Agent, media, review, search, and map memory work together |
 | Formed | Reliable enough for daily personal use | Seven-day WeChat soak, backups, and stable mobile experience |
 | Delivery | Ready for the Japan stay and portfolio documentation | Phone-only rehearsal and restore test pass |
 
-**Current overall stage: Experimental.** The product has a real deployed core,
-not a fake mock-up, but its intended daily interface is not connected yet.
+**Current overall stage: Experimental.** The persistent web core is real; the
+creator collector, photo pipeline, service-secured Agent, and WeChat channel are
+not yet complete.
 
-Status vocabulary: `done`, `in progress`, `next`, `blocked by dependency`, and
-`later`.
+Status vocabulary: `done`, `in progress`, `next`, `blocked`, and `later`.
 
-## Completed foundation
+## Timeline and dependency board
 
-| ID | Task | Status | Evidence / acceptance |
-|---|---|---|---|
-| FND-01 | Private repository and owner-only hosted site | done | Source and production deployment exist |
-| FND-02 | Durable structured storage | done | D1 schema/migrations; edits, jobs, and visits survive sessions |
-| FND-03 | Framework-neutral API boundary | done | Website and browser Agent tools use the same HTTP operations |
-| DATA-01 | Remove placeholder restaurant fixtures | done | Map contains only source-checked bootstrap records |
-| PLACE-01 | Japanese-first title and source-backed details | done | Tabelog/official/reservation/event facts display with links |
-| MAP-01 | Basic map, place selection, and geolocation sort | done | Five verified records render and can be distance-sorted |
-| DOC-01 | Initial architecture, ingestion, evaluation, and ADR set | done | Repository documents decisions and open risks |
+Only genuine prerequisites are listed. A blank prerequisite means the task can
+be scheduled independently within its phase.
 
-## Current correction slice
+### 0 — Foundation and product boundary
 
-| ID | Priority | Task | Status | Acceptance |
-|---|---:|---|---|---|
-| CLEAN-01 | P0 | Remove the three test museum visits and one test import job | done | Production tables contain none of those rows |
-| DOC-02 | P0 | Establish Agent-first / map-first product boundary | done | Product design v0.3 and architecture agree |
-| UX-01 | P0 | Replace per-entry ratings with one optional place rating | next | `null` is valid; one rating per item |
-| UX-02 | P0 | Replace standalone Journal list with place-level memory | blocked by UX-01 | Repeat visits form a timeline; one place card |
-| MEDIA-01 | P0 | Add image upload and one-line per-image captions | blocked by UX-01 | Images persist, retain captions, and appear in map detail |
-| SEARCH-01 | P1 | Add partial/fuzzy multilingual and tag search | next | Misspellings/partial terms and tags return sensible records |
-| REC-01 | P1 | Add visited/unvisited filtering and recommendation default | blocked by UX-01 | “Unvisited” is derived from visits and preferred by default |
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| FND-01 | Repository | Private repository and clean new-code baseline | — | done | Experimental |
+| FND-02 | Hosting | Owner-only hosted site and preview workflow | FND-01 | done | Experimental |
+| FND-03 | Persistence | D1 schema, immutable migrations, durable API | FND-01 | done | Experimental |
+| DATA-01 | Trusted data | Remove demo/test rows and keep source-checked bootstrap records | FND-03 | done | Experimental |
+| DOC-01 | Product model | Agent-first/map-first boundary, architecture, roadmap, ADRs | — | done | Experimental |
+| DOC-02 | Interaction governance | Maintain UI control/API/Agent parity contract | DOC-01 | done | Experimental |
 
-## Ordered implementation plan
+### 1 — Correct personal memory and map interaction
 
-### 1 — Personal memory data model
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| DATA-02 | Place memory | `place_assessments`: one nullable 0–5 rating per place | FND-03 | done | Experimental |
+| DATA-03 | Place memory | Rating-free repeatable `visits`; optional note | FND-03 | done | Experimental |
+| DATA-04 | Place memory | Visit count/order and visits-imply-visited derivation | DATA-03 | done | Experimental |
+| UX-01 | Personal controls | Persistent favourite and visited buttons | DATA-02 | done | Experimental |
+| UX-02 | Journal correction | One place card with one rating and a visit timeline | DATA-02, DATA-03 | done | Experimental |
+| UX-03 | Rating input | Manual arbitrary 0–5; future quick control uses 0.5 steps | DATA-02 | done | Experimental |
+| UX-04 | Deletion | List delete, named confirmation, cascading personal cleanup, tombstone | FND-03 | done | Experimental |
+| SEARCH-01 | Deterministic search | Partial multilingual name/description/tag matching | — | done | Experimental |
+| SEARCH-02 | Search transparency | Visible tags and all/visited/unvisited/favourite filters | SEARCH-01, DATA-04 | done | Experimental |
+| MAP-01 | Interactive map | Multi-marker pan/zoom, marker selection, fit bounds | — | done | Experimental |
+| MAP-02 | Map-dominant layout | Collection collapses by default; floating search opener | MAP-01 | done | Experimental |
+| MAP-03 | Layout selection | Compare floating drawer, split sidebar, and bottom-sheet branches | MAP-02 | in progress | Experimental |
+| MAP-04 | Map performance | Choose compliant tile/geocoder provider; caching and mobile profiling | MAP-03 | next | Experimental |
+| DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
+| REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | blocked | Experimental |
 
-| ID | Task | Status |
-|---|---|---|
-| DATA-02 | Add `place_assessments` with nullable persistent rating | next |
-| DATA-03 | Migrate `journal_entries` into rating-free `visits` | next |
-| DATA-04 | Derive visit count, last visit, and visited state | next |
-| DATA-05 | Add idempotency and audit fields to personal writes | next |
+### 2 — Photo upload and captions
 
-Exit: one place supports no rating, one rating, and multiple ordered visits
-without duplicate cards.
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| MEDIA-01 | Object storage | Enable private R2 binding and media metadata tables | DATA-03 | next | Experimental |
+| MEDIA-02 | Upload safety | Validate MIME, size, dimensions, hash; create/finalize lifecycle | MEDIA-01 | blocked | Experimental |
+| MEDIA-03 | Media model | Attach ordered photos to visits; optional one-line caption | MEDIA-02 | blocked | Experimental |
+| MEDIA-04 | Web fallback | Selected-place/visit uploader and gallery | MEDIA-03, MAP-03 | blocked | Experimental |
+| MEDIA-05 | Map memory | Show visit-grouped photos and captions on place detail | MEDIA-03 | blocked | Experimental |
+| MEDIA-06 | Agent intake | Map WeChat/Agent images and captions to the same APIs | MEDIA-03, AGENT-02 | blocked | Demo |
 
-### 2 — Map-first reading and organization
+### 3 — Framework-neutral Agent application layer
 
-| ID | Task | Status |
-|---|---|---|
-| MAP-02 | Add visited/unvisited marker styles and filters | blocked by DATA-04 |
-| MAP-03 | Show personal rating, visit count, timeline, and thumbnails in selected-place detail | blocked by DATA-02/03 |
-| MAP-04 | Remove permanent Inbox/Journal top navigation after Agent parity | blocked by AGENT-03 |
-| REVIEW-01 | Add contextual evidence-review deep link/sheet | blocked by ACQ-03 |
-| SEARCH-02 | Show editable tags/aliases on result and detail cards | next |
-| SEARCH-03 | Implement weighted partial/fuzzy search | blocked by SEARCH-02 |
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| AGENT-01 | Core boundary | Extract application ports/use cases from D1 store | DATA-05 | next | Experimental |
+| AGENT-02 | Typed tools | Search, recommend, visits, rating, tags, preferences, media | AGENT-01, MEDIA-03 | blocked | Experimental |
+| AGENT-03 | Service security | Authentication, authorization, idempotency, audit receipts | AGENT-01, DATA-05 | blocked | Experimental |
+| AGENT-04 | Natural language | Convert requests to structured filters/ranking with explanations | AGENT-02 | blocked | Demo |
+| AGENT-05 | Navigation cleanup | Remove permanent Inbox/Journal only after Agent write parity | AGENT-02, MEDIA-06 | blocked | Demo |
 
-### 3 — Photo storage and captions
+Current browser Agent bridge already exposes editing, preferences, rating,
+visits, deletion, import queueing, and nearby lookup as a working precursor. It
+is not a substitute for the authenticated 24/7 service boundary.
 
-| ID | Task | Status |
-|---|---|---|
-| MEDIA-02 | Enable R2 binding and media metadata tables | blocked by DATA-03 |
-| MEDIA-03 | Validate MIME, size, dimensions, and content hash | blocked by MEDIA-02 |
-| MEDIA-04 | Upload/finalize/attach/caption API | blocked by MEDIA-03 |
-| MEDIA-05 | Web detail fallback uploader and gallery | blocked by MEDIA-04 |
-| MEDIA-06 | Agent image intake mapping | blocked by AGENT-02/MEDIA-04 |
+### 4 — Dedicated-browser creator acquisition
 
-### 4 — Agent application layer
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| ACQ-01 | Browser setup | Isolated Chrome/Edge profile and secondary-account login | — | next; user setup | Experimental |
+| ACQ-02 | Smoke collection | Fetch a bounded 小超人 batch and persist raw post evidence | ACQ-01, AGENT-01 | blocked | Experimental |
+| ACQ-03 | Extraction | Caption/comments, ASR, sampled keyframes, multilingual OCR | ACQ-02 | blocked | Experimental |
+| ACQ-04 | Identity resolution | Candidate search, exact branch evidence, abstention/review | ACQ-03 | blocked | Experimental |
+| ACQ-05 | Review UI | Contextual evidence review and confirm/reject operations | ACQ-04 | blocked | Demo |
+| ACQ-06 | Calibration | 10 小超人 + 10 漫游东京 + 10 Piggy precision set | ACQ-04 | blocked | Demo |
+| ACQ-07 | Creator import | Expand to full history only after rate-limit/duplicate checks | ACQ-06 | blocked | Demo |
 
-| ID | Task | Status |
-|---|---|---|
-| AGENT-01 | Extract application ports/use cases from the current server store | next |
-| AGENT-02 | Implement typed v2 tools for search, visits, rating, tags, and media | blocked by DATA/MEDIA |
-| AGENT-03 | Add service authentication, idempotency, authorization, and audit log | blocked by AGENT-01 |
-| AGENT-04 | Add natural-language filter/ranking adapter | blocked by AGENT-02 |
+### 5 — OpenClaw and WeChat
 
-### 5 — Dedicated-browser acquisition experiment
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| WX-01 | Channel proof | Main-account private-chat text/media/location round trip | AGENT-02 | blocked | Demo |
+| WX-02 | Command adapter | Map messages, receipts, progress, and clarification to use cases | WX-01, AGENT-03 | blocked | Demo |
+| WX-03 | Media flow | Photos and captions from WeChat appear under the right visit | WX-02, MEDIA-06 | blocked | Demo |
+| WX-04 | Reliability | Retry, duplicate delivery, restart, and seven-day soak | WX-02 | blocked | Formed |
+| CLOUD-01 | 24/7 host | Select region/provider from measured latency, cost, and reliability | WX-01 | blocked | Formed |
+| CLOUD-02 | Operations | Deploy pinned runtime, secrets, monitoring, encrypted backups | CLOUD-01, AGENT-03 | blocked | Formed |
 
-| ID | Task | Status |
-|---|---|---|
-| ACQ-01 | Create isolated Chrome/Edge profile and secondary-account login | next; user setup |
-| ACQ-02 | Run bounded creator discovery for 小超人 | blocked by ACQ-01 |
-| ACQ-03 | Persist posts, evidence, extraction states, and review candidates | blocked by AGENT-01/ACQ-02 |
-| ACQ-04 | Add captions/comments, ASR, keyframes, and OCR | blocked by ACQ-03 |
-| ACQ-05 | Calibrate exact-branch precision, then expand to the other two creators | blocked by ACQ-04 |
+### 6 — Delivery and later generalization
 
-Do not bulk-import a full history until the smoke batch exposes rate limits,
-login expiry, duplicates, and evidence quality.
+| ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
+|---|---|---|---|---|---|
+| OPS-01 | Data safety | Daily backup and tested restore | CLOUD-02 | blocked | Formed |
+| OPS-02 | Travel UX | Phone-first, weak-network, and last-seen behavior | MAP-03 | later | Formed |
+| OPS-03 | Freshness | Reservation/event re-checks and JST reminders | AGENT-03 | later | Formed |
+| QA-01 | Rehearsal | One-week phone-only travel rehearsal | WX-04, OPS-01, OPS-02 | blocked | Delivery |
+| PORT-01 | Portfolio core | Scrub private data and extract reusable adapters/config | QA-01 | later | Delivery/post-v1 |
 
-### 6 — OpenClaw / WeChat
+## Current checkpoint
 
-| ID | Task | Status |
-|---|---|---|
-| WX-01 | Prove main-account private-chat text/media/location round trip | blocked by AGENT-02 |
-| WX-02 | Map WeChat inputs and receipts to Agent operations | blocked by WX-01/AGENT-03 |
-| WX-03 | Run restart, retry, duplicate-delivery, and seven-day soak tests | blocked by WX-02 |
-| CLOUD-01 | Select and rent the 24/7 host from measured latency/cost | blocked by WX-01 |
-
-### 7 — Delivery readiness
-
-| ID | Task | Status |
-|---|---|---|
-| OPS-01 | Daily backup and tested restore | later |
-| OPS-02 | Phone-first and offline-tolerant review | later |
-| OPS-03 | Reservation/event freshness reminders in JST | later |
-| QA-01 | One-week phone-only travel rehearsal | later |
-| PORT-01 | Extract a scrubbed reusable core for portfolio use | later; post-personal-v1 |
-
-## Next checkpoint
-
-Before the next implementation slice, confirm only decisions that change the
-schema or user experience materially:
-
-1. whether the persistent personal rating uses half-star increments (assumed
-   0.5–5) or another scale;
-2. whether photo captions are plain one-line text only in v1 (recommended);
-3. whether a visit note may also be empty (recommended: yes when photos exist).
-
-All other current requirements are specific enough to proceed.
+The next user decision is visual, not architectural: select one map layout after
+reviewing the three branches. In parallel, the next independent engineering
+slice is `MEDIA-01` through `MEDIA-03`. The dedicated-browser collector begins
+only after its separate Chrome context is prepared, as previously agreed.

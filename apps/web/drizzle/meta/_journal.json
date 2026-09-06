@@ -8,6 +8,13 @@
       "when": 1788662572743,
       "tag": "0000_shallow_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788687069989,
+      "tag": "0001_dapper_stranger",
+      "breakpoints": true
     }
   ]
 }

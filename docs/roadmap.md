@@ -18,17 +18,24 @@ complete. See `task-tracker.md` for task-level status and dependencies.
 - shared HTTP and browser-Agent operations;
 - Web Access installed for the dedicated-browser experiment;
 - architecture split between channels, Agent, core product, and acquisition.
+- one persistent optional personal rating per place and repeatable rating-free
+  visit records;
+- persistent favourite and visited state, destructive place removal with a
+  confirmation boundary, and tombstones for bootstrap records;
+- interactive multi-marker map, collapsible place drawer, visible tags, and
+  deterministic partial/tag search;
+- browser Agent tools for preferences, rating, visits, and deletion using the
+  same APIs as the web UI.
 
 ## Phase 1 — correct the personal-memory model
 
 Goal: make one place remain one place across repeated visits.
 
-- replace per-journal-entry ratings with one nullable place assessment;
-- model repeatable visits with optional notes;
-- derive visit number, count, last visit, and visited/unvisited state;
-- surface the consolidated record on the selected map item;
-- correct the compressed/repeated Journal layout during the transition;
-- add visible tags and weighted partial/fuzzy multilingual search.
+- complete the selected-place timeline integration and empty-state polish;
+- make `hasVisited` derivation and manual override semantics explicit;
+- add idempotency and audit records to personal writes;
+- evaluate the three map-layout branches and select one UI direction;
+- extend deterministic fuzzy search with aliases and tested ranking fixtures.
 
 Exit: a museum can have three visits, zero or one overall rating, and one place
 detail containing all notes without duplicate place cards.
@@ -108,10 +115,9 @@ explicitly post-v1 and never exposes Andy's private sources, photos, or journal.
 
 ## Immediate sequence
 
-1. clean the current test rows and freeze the v0.3 product model;
-2. implement place assessment + visits + map integration;
-3. add object storage, photo captions, and upload APIs;
-4. implement Agent v2 operations and service security;
-5. prepare the dedicated browser and run the bounded 小超人 experiment;
-6. build the OpenClaw/WeChat adapter;
-7. select cloud hosting only after the local channel proof succeeds.
+1. select one of the three real map-layout branches and merge the presentation;
+2. add object storage, photo captions, and upload APIs;
+3. implement Agent v2 service security, idempotency, and audit records;
+4. prepare the dedicated browser and run the bounded 小超人 experiment;
+5. build the OpenClaw/WeChat adapter;
+6. select cloud hosting only after the local channel proof succeeds.

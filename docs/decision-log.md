@@ -28,6 +28,11 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-06 | Visit history | Derive visit number and visited state from visit records | Prevents duplicate items and contradictory manual state |
 | 2026-09-06 | Media | Store bytes in object storage and captions/relations in D1 | Supports durable photos without bloating structured storage |
 | 2026-09-06 | Transitional UI | Keep Inbox/Journal only until Agent parity, then replace with map detail and contextual review links | Do not remove the only working write path prematurely |
+| 2026-09-06 | Rating input | Manual entry accepts any finite 0–5 value; future quick controls use 0.5 increments | Preserves precise personal scores without making touch controls overly granular |
+| 2026-09-06 | Personal status | Favourite and visited are independent explicit controls; visits also imply visited | Supports unvisited recommendations and direct corrections without overloading collection state |
+| 2026-09-06 | Deletion | Place deletion requires UI confirmation and removes attached personal records; bootstrap records receive tombstones | Prevents deleted bundled records from reappearing after refresh |
+| 2026-09-06 | Map layout | Evaluate floating drawer, split sidebar, and bottom-sheet variants over one shared API/view-model | Presentation experiments must never fork product behavior or create browser-only data |
+| 2026-09-06 | Map tiles | Use a no-key OpenStreetMap baseline during the experiment | CARTO showed an API-key requirement; production tile strategy remains an explicit performance task |
 
 ## Open decisions
 
@@ -36,6 +41,6 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | Exact delivery deadline, if any | Roadmap scheduling only; not core behavior | Andy, optional |
 | Main-account behavior supported by the Tencent/OpenClaw integration | WeChat proof of concept | Plugin experiment |
 | EU VPS vs Singapore/Japan | Travel deployment | One-week measured pilot |
-| First 30 source items and permission to use uploaded/local media for evals | Data pilot | Andy |
+| Final map layout among the three implementation branches | Before UI component extraction | Andy after visual review |
 | Long-term database/API host after WeChat PoC | Before 24/7 deployment | Auth, latency, and operating-cost prototype |
 | Desired monthly infrastructure/model budget | Before cloud provisioning | Andy |

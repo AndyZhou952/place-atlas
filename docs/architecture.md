@@ -67,9 +67,12 @@ The private web app now provides a real but transitional vertical slice:
 
 - source-checked bootstrap records;
 - API endpoints for listing and editing items;
-- persistent import jobs and journal entries;
+- persistent import jobs, place assessments, and repeatable visits;
 - browser geolocation and distance sorting;
-- a small WebMCP tool surface using the same view-model actions;
+- an interactive multi-marker map, collapsible list, structured personal
+  filters, and deterministic partial/tag search;
+- a WebMCP tool surface for editing, preferences, rating, visits, deletion,
+  queueing imports, and nearby lookup using the same view-model actions;
 - D1 schema and migrations for durable structured state.
 
 The following are intentionally not represented as complete:
@@ -106,15 +109,23 @@ Current implementation locations:
 
 | Layer | Responsibility | Location |
 |---|---|---|
-| Domain contracts | Place, reservation, event, import, journal types | `apps/web/features/atlas/model.ts` |
+| Domain contracts | Place, reservation, event, import, assessment, and visit types | `apps/web/features/atlas/model.ts` |
 | Verified bootstrap data | Real source-checked records only | `apps/web/features/atlas/verified-items.ts` |
-| View | Map, Inbox, Journal, edit forms | `apps/web/features/atlas/atlas-screen.tsx` |
+| View | Map, transitional Inbox/Journal, detail and edit forms | `apps/web/features/atlas/atlas-screen.tsx` |
+| Map adapter | Leaflet markers, selection, pan/zoom, bounds | `apps/web/features/atlas/atlas-map.tsx` |
+| Search policy | Normalization and deterministic fuzzy/tag matching | `apps/web/features/atlas/search.ts` |
 | ViewModel | UI state and use-case orchestration | `apps/web/features/atlas/use-atlas-view-model.ts` |
 | Browser adapter | HTTP calls | `apps/web/features/atlas/atlas-api-client.ts` |
 | Agent adapter | Browser WebMCP tool registration | `apps/web/features/atlas/use-atlas-webmcp.ts` |
 | Server adapter | D1 reads/writes and catalog merge | `apps/web/lib/server/atlas-store.ts` |
 | Delivery | Item, Inbox, Journal HTTP routes | `apps/web/app/api/**` |
 | Persistence | Schema and immutable migrations | `apps/web/db`, `apps/web/drizzle` |
+
+`atlas-screen.tsx` currently contains several transitional view components.
+After one layout branch is selected, split the selected-place card, collection
+drawer, filters, and visit timeline into focused view modules. This is a
+maintainability refactor, not a reason to duplicate view-model or API logic per
+layout branch.
 
 The next refactor should move server store interfaces into an application
 package before adding OpenClaw. That prevents the WeChat adapter from importing

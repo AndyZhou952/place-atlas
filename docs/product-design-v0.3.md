@@ -69,14 +69,16 @@ replacement separates the place-level assessment from repeatable visits.
 ### `PlaceAssessment` — one per Atlas item
 
 - `itemId` — unique relation to the place/event/building;
-- `overallRating` — optional, nullable, 0.5–5 when present;
+- `overallRating` — optional, nullable, any finite number from 0–5 when present;
 - `summary` — optional long-term opinion;
 - `collectionState` — candidate, saved, planned, or archived;
 - `updatedAt`.
 
 There is only one current personal rating per item. A later rating edit replaces
 that value while the audit log records the change. A museum visit may have no
-rating at all; `null` means “not rated”, never zero.
+rating at all; `null` means “not rated”, while `0` is a valid explicit rating.
+Direct numeric entry accepts any value from 0–5. A future slider or quick-rating
+control may use 0.5 increments without restricting manual entry.
 
 ### `Visit` — many per Atlas item
 
@@ -189,4 +191,3 @@ The project is in the **experimental stage**. The durable map and API are real,
 but the primary Agent/WeChat workflow, collector worker, media storage, and the
 replacement journal model are not complete. The current Inbox and Journal are
 transitional scaffolding, not the final product navigation.
-

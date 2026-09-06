@@ -1,6 +1,7 @@
 export type AtlasItemKind = 'food' | 'event' | 'architecture';
 export type AtlasView = 'map' | 'inbox' | 'journal';
 export type AtlasKindFilter = 'all' | AtlasItemKind;
+export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited' | 'favorite';
 export type PersonalState = 'candidate' | 'saved' | 'planned' | 'visited';
 export type VerificationStatus = 'verified' | 'needs_review';
 
@@ -60,6 +61,8 @@ export interface AtlasItem {
   readonly event?: EventSchedule;
   readonly personalState: PersonalState;
   readonly personalRating?: number;
+  readonly isFavorite?: boolean;
+  readonly hasVisited?: boolean;
   readonly tags: readonly string[];
   readonly sources: readonly SourceLink[];
   readonly updatedAt?: string;
@@ -69,6 +72,22 @@ export interface AtlasItemEdit {
   readonly title: string;
   readonly description: string;
   readonly personalState: PersonalState;
+}
+
+export interface PlaceAssessment {
+  readonly itemId: string;
+  readonly overallRating?: number;
+  readonly isFavorite: boolean;
+  readonly hasVisited: boolean;
+  readonly summary?: string;
+  readonly updatedAt: string;
+}
+
+export interface PlaceAssessmentPatch {
+  readonly overallRating?: number | null;
+  readonly isFavorite?: boolean;
+  readonly hasVisited?: boolean;
+  readonly summary?: string | null;
 }
 
 export type ImportStatus =
@@ -97,21 +116,26 @@ export interface NewImportJob {
   readonly platform?: string;
 }
 
-export interface JournalEntry {
+export interface VisitRecord {
   readonly id: string;
   readonly itemId: string;
   readonly itemTitle: string;
   readonly visitedAt: string;
-  readonly rating: number;
-  readonly note: string;
+  readonly note?: string;
   readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
-export interface NewJournalEntry {
+export interface NewVisit {
   readonly itemId: string;
   readonly visitedAt: string;
-  readonly rating: number;
-  readonly note: string;
+  readonly rating?: number;
+  readonly note?: string;
+}
+
+export interface VisitCreateResult {
+  readonly visit: VisitRecord;
+  readonly item: AtlasItem;
 }
 
 export interface AtlasSummary {

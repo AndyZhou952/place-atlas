@@ -1,29 +1,30 @@
 import { NextResponse } from 'next/server';
 
-import type { NewJournalEntry } from '@/features/atlas/model';
-import { addJournalEntry, listJournalEntries } from '@/lib/server/atlas-store';
+import type { NewVisit } from '@/features/atlas/model';
+import { addVisit, listVisits } from '@/lib/server/atlas-store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(await listJournalEntries());
+  return NextResponse.json(await listVisits());
 }
 
 export async function POST(request: Request) {
-  const input = (await request.json()) as Partial<NewJournalEntry>;
+  const input = (await request.json()) as Partial<NewVisit>;
   if (
     typeof input.itemId !== 'string' ||
     !input.itemId ||
     typeof input.visitedAt !== 'string' ||
     !input.visitedAt ||
-    typeof input.rating !== 'number' ||
-    input.rating < 0 ||
-    input.rating > 5 ||
-    typeof input.note !== 'string' ||
-    !input.note.trim()
+    (input.rating !== undefined &&
+      (typeof input.rating !== 'number' ||
+        !Number.isFinite(input.rating) ||
+        input.rating < 0 ||
+        input.rating > 5)) ||
+    (input.note !== undefined && typeof input.note !== 'string')
   ) {
     return new NextResponse(
-      'Valid place, date, 0–5 rating, and note are required',
+      'Valid place and date are required; rating must be between 0 and 5 when provided',
       {
         status: 400,
       },
@@ -32,11 +33,11 @@ export async function POST(request: Request) {
 
   try {
     return NextResponse.json(
-      await addJournalEntry({
+      await addVisit({
         itemId: input.itemId,
         visitedAt: input.visitedAt,
         rating: input.rating,
-        note: input.note.trim(),
+        note: input.note?.trim() || undefined,
       }),
       { status: 201 },
     );

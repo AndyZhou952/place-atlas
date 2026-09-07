@@ -1,6 +1,6 @@
 'use client';
 
-import { type SyntheticEvent, useEffect, useState } from 'react';
+import { type SyntheticEvent, useEffect, useRef, useState } from 'react';
 import {
   Bot,
   Building2,
@@ -131,18 +131,22 @@ type AtlasViewModel = ReturnType<typeof useAtlasViewModel>;
 type LayoutVariant = 'floating' | 'split' | 'bottom';
 
 function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
-  const [listOpen, setListOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<AtlasItem>();
-  const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>('floating');
+  const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>('split');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const requested = new URLSearchParams(window.location.search).get(
         'layout',
       );
-      if (requested === 'split' || requested === 'bottom') {
+      if (
+        requested === 'floating' ||
+        requested === 'split' ||
+        requested === 'bottom'
+      ) {
         setLayoutVariant(requested);
-        setListOpen(true);
+        setListOpen(requested !== 'floating');
       }
     }, 0);
     return () => window.clearTimeout(timer);
@@ -177,12 +181,6 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
           <ListFilter data-icon="inline-start" />
           {listOpen ? 'Hide places' : 'Search places'}
         </Button>
-
-        {layoutVariant !== 'floating' ? (
-          <span className="layout-chip">
-            {layoutVariant === 'split' ? '方案 B · 分栏' : '方案 C · 底部卡片'}
-          </span>
-        ) : null}
 
         <aside
           id="atlas-collection"
@@ -248,26 +246,59 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
 
           <div
             className="filter-row personal-filter-row"
-            aria-label="Filter by personal status"
+            aria-label="Filter by visit and favourite status"
           >
-            {(
-              [
-                ['all', '全部'],
-                ['unvisited', '没去过'],
-                ['visited', '去过'],
-                ['favorite', '喜欢'],
-              ] as const
-            ).map(([value, label]) => (
-              <Button
-                key={value}
-                size="sm"
-                variant={vm.personalFilter === value ? 'default' : 'outline'}
-                aria-pressed={vm.personalFilter === value}
-                onClick={() => vm.setPersonalFilter(value)}
-              >
-                {label}
-              </Button>
-            ))}
+            <Button
+              size="sm"
+              variant={
+                vm.personalFilter === 'all' && !vm.favoriteOnly
+                  ? 'default'
+                  : 'outline'
+              }
+              aria-pressed={vm.personalFilter === 'all' && !vm.favoriteOnly}
+              onClick={() => {
+                vm.setPersonalFilter('all');
+                vm.setFavoriteOnly(false);
+              }}
+            >
+              All
+            </Button>
+            <Button
+              size="sm"
+              variant={
+                vm.personalFilter === 'unvisited' ? 'default' : 'outline'
+              }
+              aria-pressed={vm.personalFilter === 'unvisited'}
+              onClick={() =>
+                vm.setPersonalFilter(
+                  vm.personalFilter === 'unvisited' ? 'all' : 'unvisited',
+                )
+              }
+            >
+              Not yet
+            </Button>
+            <Button
+              size="sm"
+              variant={vm.personalFilter === 'visited' ? 'default' : 'outline'}
+              aria-pressed={vm.personalFilter === 'visited'}
+              onClick={() =>
+                vm.setPersonalFilter(
+                  vm.personalFilter === 'visited' ? 'all' : 'visited',
+                )
+              }
+            >
+              行った
+            </Button>
+            <Button
+              size="icon-sm"
+              variant={vm.favoriteOnly ? 'default' : 'outline'}
+              aria-label="お気に入り"
+              title="お気に入り"
+              aria-pressed={vm.favoriteOnly}
+              onClick={() => vm.setFavoriteOnly(!vm.favoriteOnly)}
+            >
+              <Heart fill={vm.favoriteOnly ? 'currentColor' : 'none'} />
+            </Button>
           </div>
 
           <div className="result-heading">
@@ -324,8 +355,8 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         ) : (
           <div className="detail-card detail-card-empty">
             <CircleHelp aria-hidden="true" />
-            <strong>没有符合当前筛选条件的地点</strong>
-            <span>打开地点列表，调整搜索词或筛选条件。</span>
+            <strong>No places match the current filters.</strong>
+            <span>Open the list to adjust search or filters.</span>
           </div>
         )}
       </section>
@@ -381,13 +412,20 @@ function PlaceRow({
         <span className="place-copy">
           <span className="place-title-line">
             <strong>{item.title}</strong>
-            {item.tabelog ? (
-              <span className="list-rating">
-                食べログ {item.tabelog.score.toFixed(2)}
-              </span>
-            ) : (
-              <span>{kindLabel[item.kind]}</span>
-            )}
+            <span className="list-rating-group">
+              {item.personalRating === undefined ? null : (
+                <span className="list-rating is-personal">
+                  マイ {item.personalRating.toString()}
+                </span>
+              )}
+              {item.tabelog ? (
+                <span className="list-rating">
+                  食べログ {item.tabelog.score.toFixed(2)}
+                </span>
+              ) : (
+                <span className="list-kind-label">{kindLabel[item.kind]}</span>
+              )}
+            </span>
           </span>
           {item.alternateTitle ? (
             <span className="place-local">{item.alternateTitle}</span>
@@ -404,10 +442,12 @@ function PlaceRow({
           type="button"
           className={cn('place-row-action', item.isFavorite && 'is-active')}
           aria-label={
-            item.isFavorite ? `取消喜欢 ${item.title}` : `喜欢 ${item.title}`
+            item.isFavorite
+              ? `お気に入りを解除 ${item.title}`
+              : `お気に入りに追加 ${item.title}`
           }
           aria-pressed={Boolean(item.isFavorite)}
-          title={item.isFavorite ? '取消喜欢' : '喜欢'}
+          title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
           onClick={onToggleFavorite}
           disabled={busy}
         >
@@ -415,24 +455,28 @@ function PlaceRow({
         </button>
         <button
           type="button"
-          className={cn('place-row-action', item.hasVisited && 'is-active')}
+          className={cn(
+            'place-row-action is-visited',
+            item.hasVisited && 'is-active',
+          )}
           aria-label={
             item.hasVisited
-              ? `标记为没去过 ${item.title}`
-              : `标记为去过 ${item.title}`
+              ? `未訪問に戻す ${item.title}`
+              : `訪問済みにする ${item.title}`
           }
           aria-pressed={Boolean(item.hasVisited)}
-          title={item.hasVisited ? '标记为没去过' : '标记为去过'}
+          title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
           onClick={onToggleVisited}
           disabled={busy}
         >
-          {item.hasVisited ? <CheckCircle2 /> : <Circle />}
+          <Circle fill={item.hasVisited ? 'currentColor' : 'none'} />
+          <span>行った</span>
         </button>
         <button
           type="button"
           className="place-row-action is-delete"
           aria-label={`Delete ${item.title}`}
-          title="删除"
+          title="削除"
           onClick={onDelete}
         >
           <Trash2 aria-hidden="true" />
@@ -472,25 +516,139 @@ function DeleteItemDialog({
         <span className="delete-dialog-icon" aria-hidden="true">
           <Trash2 />
         </span>
-        <h2 id="delete-dialog-title">删除这个地点？</h2>
+        <h2 id="delete-dialog-title">この場所を削除しますか？</h2>
         <p id="delete-dialog-description">
-          「{item.title}」会从你的 Atlas
-          中移除，对应的个人状态和到访记录也会删除。
+          「{item.title}」と紐づく個人ステータス、訪問記録が Atlas
+          から削除されます。
         </p>
         <div className="form-actions">
           <Button variant="outline" onClick={onCancel} disabled={busy}>
-            取消
+            キャンセル
           </Button>
           <Button
             variant="destructive"
             onClick={() => void onConfirm()}
             disabled={busy}
           >
-            确认删除
+            削除
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+function PersonalRatingInline({
+  item,
+  vm,
+}: {
+  readonly item: AtlasItem;
+  readonly vm: AtlasViewModel;
+}) {
+  const [editing, setEditing] = useState(false);
+  const cancelNextBlur = useRef(false);
+  const editActivatedAt = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(
+    item.personalRating === undefined ? '' : item.personalRating.toString(),
+  );
+
+  useEffect(() => {
+    if (!editing) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [editing]);
+
+  function beginEditing() {
+    editActivatedAt.current = performance.now();
+    setEditing(true);
+  }
+
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = draft.trim();
+    const rating = value === '' ? null : Number(value);
+    if (
+      rating !== null &&
+      (!Number.isFinite(rating) || rating < 0 || rating > 5)
+    ) {
+      setDraft(
+        item.personalRating === undefined ? '' : item.personalRating.toString(),
+      );
+      return;
+    }
+
+    setEditing(false);
+    try {
+      await vm.saveAssessment(item.id, { overallRating: rating });
+    } catch {
+      // The view model restores the previous value and presents the error.
+    }
+  }
+
+  if (editing) {
+    return (
+      <form
+        className="rating-strip-item personal-rating-editor"
+        onSubmit={submit}
+      >
+        <label htmlFor={`personal-rating-${item.id}`}>マイスコア</label>
+        <Input
+          ref={inputRef}
+          id={`personal-rating-${item.id}`}
+          type="number"
+          min="0"
+          max="5"
+          step="0.5"
+          value={draft}
+          aria-label="マイスコア"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={(event) => {
+            if (cancelNextBlur.current) {
+              cancelNextBlur.current = false;
+              return;
+            }
+            if (performance.now() - editActivatedAt.current < 300) {
+              window.requestAnimationFrame(() => inputRef.current?.focus());
+              return;
+            }
+            event.currentTarget.form?.requestSubmit();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              cancelNextBlur.current = true;
+              setDraft(
+                item.personalRating === undefined
+                  ? ''
+                  : item.personalRating.toString(),
+              );
+              setEditing(false);
+            }
+          }}
+        />
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="rating-strip-item personal-rating-inline"
+      title="Click to edit"
+      aria-label={`マイスコア ${item.personalRating ?? '未評価'}。Click to edit`}
+      onClick={beginEditing}
+      onDoubleClick={beginEditing}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') beginEditing();
+      }}
+    >
+      <span>マイスコア</span>
+      <strong>
+        {item.personalRating === undefined
+          ? '未評価'
+          : item.personalRating.toString()}
+      </strong>
+    </button>
   );
 }
 
@@ -539,8 +697,10 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             <Button
               variant={item.isFavorite ? 'default' : 'outline'}
               size="icon-sm"
-              aria-label={item.isFavorite ? '取消喜欢' : '喜欢'}
-              title={item.isFavorite ? '取消喜欢' : '喜欢'}
+              aria-label={
+                item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'
+              }
+              title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
               aria-pressed={Boolean(item.isFavorite)}
               onClick={() =>
                 void vm.saveAssessment(item.id, {
@@ -552,10 +712,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
             </Button>
             <Button
-              variant={item.hasVisited ? 'default' : 'outline'}
-              size="icon-sm"
-              aria-label={item.hasVisited ? '标记为没去过' : '标记为去过'}
-              title={item.hasVisited ? '标记为没去过' : '标记为去过'}
+              className="visited-toggle"
+              variant="outline"
+              size="sm"
+              aria-label={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
+              title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
               aria-pressed={Boolean(item.hasVisited)}
               onClick={() =>
                 void vm.saveAssessment(item.id, {
@@ -564,7 +725,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               }
               disabled={vm.busy}
             >
-              {item.hasVisited ? <CheckCircle2 /> : <Circle />}
+              <Circle
+                data-icon="inline-start"
+                fill={item.hasVisited ? 'currentColor' : 'none'}
+              />
+              行った
             </Button>
             <Button
               variant="outline"
@@ -638,15 +803,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             </div>
 
             <div className="rating-strip" aria-label="Ratings">
-              <div className="rating-strip-item personal-rating-inline">
-                <span>我的评分</span>
-                <strong>
-                  <NotebookPen aria-hidden="true" />
-                  {item.personalRating === undefined
-                    ? '未评分'
-                    : item.personalRating.toString()}
-                </strong>
-              </div>
+              <PersonalRatingInline item={item} vm={vm} />
               {item.tabelog ? (
                 <a
                   className="rating-strip-item tabelog-rating-inline"
@@ -664,8 +821,8 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                 </a>
               ) : null}
               <span className="rating-visit-count">
-                {itemVisits.length} 次到访
-                {itemVisits[0] ? ` · 最近 ${itemVisits[0].visitedAt}` : ''}
+                {itemVisits.length} visits
+                {itemVisits[0] ? ` · Last ${itemVisits[0].visitedAt}` : ''}
               </span>
             </div>
 
@@ -696,12 +853,12 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
 
             {itemVisits.length ? (
               <section className="detail-visit-history">
-                <h3>到访记录</h3>
+                <h3>訪問記録</h3>
                 <ol>
                   {itemVisits.slice(0, 3).map((visit, index) => (
                     <li key={visit.id}>
                       <span>
-                        第 {itemVisits.length - index} 次 · {visit.visitedAt}
+                        Visit {itemVisits.length - index} · {visit.visitedAt}
                       </span>
                       {visit.note ? <p>{visit.note}</p> : null}
                     </li>
@@ -723,9 +880,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               ))}
             </div>
             {overallCheckedAt ? (
-              <p className="source-checked-at">
-                资料整体检查：{overallCheckedAt}
-              </p>
+              <p className="source-checked-at">最終確認：{overallCheckedAt}</p>
             ) : null}
           </>
         )}
@@ -870,7 +1025,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   const [visitedAt, setVisitedAt] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [rating, setRating] = useState('');
+  const [rating, setRating] = useState('3');
   const [note, setNote] = useState('');
 
   const records = vm.items
@@ -882,15 +1037,20 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submittedRating = rating;
+    const submittedNote = note;
+    setRating('3');
+    setNote('');
     try {
       await vm.addVisit({
         itemId,
         visitedAt,
-        ...(rating === '' ? {} : { rating: Number(rating) }),
-        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(submittedRating === '' ? {} : { rating: Number(submittedRating) }),
+        ...(submittedNote.trim() ? { note: submittedNote.trim() } : {}),
       });
-      setNote('');
     } catch {
+      setRating(submittedRating);
+      setNote(submittedNote);
       // The view model presents the error in the notice bar.
     }
   }
@@ -938,19 +1098,16 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   />
                 </label>
                 <label htmlFor="journal-rating">
-                  My overall rating / 5 (optional)
+                  マイスコア / 5
                   <Input
                     id="journal-rating"
                     type="number"
                     min="0"
                     max="5"
-                    step="any"
+                    step="0.5"
                     value={rating}
                     onChange={(event) => setRating(event.target.value)}
                   />
-                  <small className="field-hint">
-                    可手动输入任意 0–5 数值；未来评分条按 0.5 递增。
-                  </small>
                 </label>
               </div>
               <label htmlFor="journal-note">
@@ -969,9 +1126,6 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
               >
                 <NotebookPen data-icon="inline-start" /> Save visit
               </Button>
-              <small className="field-hint">
-                评分或笔记填写任意一项即可；只有评分、没有笔记也可以保存。
-              </small>
             </form>
           </CardContent>
         </Card>

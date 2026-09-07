@@ -33,6 +33,12 @@ complete. See `task-tracker.md` for task-level status and dependencies.
 - live A/B/C presentation URLs from one main build and one database;
 - inline personal/Tabelog rating comparison with one consolidated source-check
   date at the bottom of place detail.
+- split sidebar (B) selected as the default main layout;
+- `マイスコア` shown beside Tabelog in detail and collection, with ViewModel-
+  backed double-click editing;
+- composable visit/favourite union filters and fixed `行った` status labels;
+- optimistic Journal rendering and form reset, with remaining hosted latency
+  tracked in issue #2; map profiling remains in issue #1.
 
 ## Phase 1 — correct the personal-memory model
 
@@ -41,7 +47,7 @@ Goal: make one place remain one place across repeated visits.
 - complete the selected-place timeline integration and empty-state polish;
 - make `hasVisited` derivation and manual override semantics explicit;
 - add idempotency and audit records to personal writes;
-- evaluate the three map-layout branches and select one UI direction;
+- refactor the selected split-sidebar layout into focused view components;
 - extend deterministic fuzzy search with aliases and tested ranking fixtures.
 
 Exit: a museum can have three visits, zero or one overall rating, and one place
@@ -122,9 +128,8 @@ explicitly post-v1 and never exposes Andy's private sources, photos, or journal.
 
 ## Immediate sequence
 
-1. review the three live map-layout variants and select the presentation;
-2. add object storage, photo captions, and upload APIs;
-3. implement Agent v2 service security, idempotency, and audit records;
-4. prepare the dedicated browser and run the bounded 小超人 experiment;
-5. build the OpenClaw/WeChat adapter;
-6. select cloud hosting only after the local channel proof succeeds.
+1. add object storage, photo captions, and upload APIs;
+2. implement Agent v2 service security, idempotency, and audit records;
+3. prepare the dedicated browser and run the bounded 小超人 experiment;
+4. build the OpenClaw/WeChat adapter;
+5. select cloud hosting only after the local channel proof succeeds.

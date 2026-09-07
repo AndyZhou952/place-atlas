@@ -38,6 +38,7 @@ export function useAtlasViewModel() {
   const [kind, setKind] = useState<AtlasKindFilter>('all');
   const [personalFilter, setPersonalFilter] =
     useState<AtlasPersonalFilter>('all');
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
@@ -63,11 +64,18 @@ export function useAtlasViewModel() {
     const filtered = items.filter((item) => {
       if (item.verificationStatus !== 'verified') return false;
       const matchesKind = kind === 'all' || item.kind === kind;
-      const matchesPersonal =
+      const matchesVisit =
         personalFilter === 'all' ||
         (personalFilter === 'unvisited' && !item.hasVisited) ||
-        (personalFilter === 'visited' && item.hasVisited) ||
-        (personalFilter === 'favorite' && item.isFavorite);
+        (personalFilter === 'visited' && item.hasVisited);
+      const matchesPersonal =
+        personalFilter === 'all'
+          ? favoriteOnly
+            ? Boolean(item.isFavorite)
+            : true
+          : favoriteOnly
+            ? matchesVisit || Boolean(item.isFavorite)
+            : matchesVisit;
       return matchesKind && matchesPersonal && matchesAtlasQuery(item, query);
     });
 
@@ -79,7 +87,7 @@ export function useAtlasViewModel() {
       if (rightDistance === undefined) return -1;
       return leftDistance - rightDistance;
     });
-  }, [distances, items, kind, personalFilter, query]);
+  }, [distances, favoriteOnly, items, kind, personalFilter, query]);
 
   const selectedItem =
     visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0];
@@ -139,30 +147,72 @@ export function useAtlasViewModel() {
     }
   }, []);
 
-  const addVisit = useCallback(async (input: NewVisit) => {
-    setBusy(true);
-    setNotice('');
-    try {
-      const result = await createVisit(input);
-      setVisits((current) => [result.visit, ...current]);
+  const addVisit = useCallback(
+    async (input: NewVisit) => {
+      const item = items.find((candidate) => candidate.id === input.itemId);
+      if (!item) throw new Error('Atlas item not found');
+      const now = new Date().toISOString();
+      const optimisticVisit: VisitRecord = {
+        id: `pending-${crypto.randomUUID()}`,
+        itemId: item.id,
+        itemTitle: item.title,
+        visitedAt: input.visitedAt,
+        note: input.note?.trim() || undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      setBusy(true);
+      setNotice('');
+      setVisits((current) => [optimisticVisit, ...current]);
       setItems((current) =>
-        current.map((item) =>
-          item.id === result.item.id ? result.item : item,
+        current.map((candidate) =>
+          candidate.id === item.id
+            ? {
+                ...candidate,
+                hasVisited: true,
+                ...(input.rating === undefined
+                  ? {}
+                  : { personalRating: input.rating }),
+              }
+            : candidate,
         ),
       );
-      setNotice('Visit saved. Your place record has been updated.');
-      return result;
-    } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : 'Could not save journal entry.',
-      );
-      throw error;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+      try {
+        const result = await createVisit(input);
+        setVisits((current) =>
+          current.map((visit) =>
+            visit.id === optimisticVisit.id ? result.visit : visit,
+          ),
+        );
+        setItems((current) =>
+          current.map((item) =>
+            item.id === result.item.id ? result.item : item,
+          ),
+        );
+        setNotice('Visit saved. Your place record has been updated.');
+        return result;
+      } catch (error) {
+        setVisits((current) =>
+          current.filter((visit) => visit.id !== optimisticVisit.id),
+        );
+        setItems((current) =>
+          current.map((candidate) =>
+            candidate.id === item.id ? item : candidate,
+          ),
+        );
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : 'Could not save journal entry.',
+        );
+        throw error;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [items],
+  );
 
   const saveAssessment = useCallback(
     async (id: string, patch: PlaceAssessmentPatch) => {
@@ -307,6 +357,7 @@ export function useAtlasViewModel() {
     distances,
     importJobs,
     items,
+    favoriteOnly,
     visits,
     kind,
     locationStatus,
@@ -320,6 +371,7 @@ export function useAtlasViewModel() {
     selectedItem,
     selectItem,
     setKind,
+    setFavoriteOnly,
     setPersonalFilter,
     setQuery,
     setView,

@@ -44,17 +44,19 @@ be scheduled independently within its phase.
 | UX-01 | Personal controls | Persistent icon-only favourite and visited controls in detail and collection rows | DATA-02 | done | Experimental |
 | UX-01A | Personal controls | Optimistic local feedback with durable reconciliation and rollback | UX-01 | done | Experimental |
 | UX-02 | Journal correction | One place card with one rating and a visit timeline, also visible in map detail | DATA-02, DATA-03 | done | Experimental |
-| UX-03 | Rating input | Manual arbitrary 0–5; future quick control uses 0.5 steps | DATA-02 | done | Experimental |
+| UX-03 | Rating input | Journal defaults to 3 with 0.5 steps; inline `マイスコア` edit uses the ViewModel | DATA-02 | done | Experimental |
+| UX-05 | Combined filters | Visit and favourite controls can be active together with union semantics | SEARCH-02 | done | Experimental |
 | UX-04 | Deletion | List delete, named confirmation, cascading personal cleanup, tombstone | FND-03 | done | Experimental |
 | SEARCH-01 | Deterministic search | Partial multilingual name/description/tag matching | — | done | Experimental |
 | SEARCH-02 | Search transparency | Visible tags and all/visited/unvisited/favourite filters | SEARCH-01, DATA-04 | done | Experimental |
 | MAP-01 | Interactive map | Multi-marker pan/zoom, marker selection, fit bounds | — | done | Experimental |
 | MAP-02 | Map-dominant layout | Collection collapses by default; floating search opener | MAP-01 | done | Experimental |
-| MAP-03 | Layout selection | Compare live floating drawer, split sidebar, and bottom-sheet variants | MAP-02 | in progress | Experimental |
+| MAP-03 | Layout selection | Select split sidebar (B) and make it the main default | MAP-02 | done | Experimental |
 | MAP-04A | Map performance | Reuse markers, remove blocking selection animation, and eliminate moving-canvas filters/blur | MAP-01 | done | Experimental |
-| MAP-04B | Map performance | Choose compliant vector tile/geocoder provider; caching and mobile profiling | MAP-03 | next | Experimental |
+| MAP-04B | Map performance | Profile remaining 1–2s pan/zoom stalls; evaluate vector tiles and caching ([#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)) | MAP-03 | next | Experimental |
+| PERF-01 | Journal performance | Optimistic submit is done; profile hosted API/D1 latency and add budget ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
 | DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
-| REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | blocked | Experimental |
+| REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | next | Experimental |
 
 ### 2 — Photo upload and captions
 
@@ -116,7 +118,7 @@ is not a substitute for the authenticated 24/7 service boundary.
 
 ## Current checkpoint
 
-The next user decision is visual, not architectural: select one map layout after
-reviewing the three live variants. In parallel, the next independent engineering
-slice is `MEDIA-01` through `MEDIA-03`. The dedicated-browser collector begins
-only after its separate Chrome context is prepared, as previously agreed.
+The split-sidebar layout is selected. The next independent engineering slice is
+`MEDIA-01` through `MEDIA-03`, followed by the dedicated-browser collector after
+its separate Chrome context is prepared. Performance issues #1 and #2 remain
+tracked without blocking the current interaction iteration.

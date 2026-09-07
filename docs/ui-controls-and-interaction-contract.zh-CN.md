@@ -10,22 +10,22 @@
 | 控件 | 用户可见结果 | 持久化操作 | 确认方式 | Agent 对等能力 |
 |---|---|---|---|---|
 | 心形图标 | 从详情或集合列表行切换喜欢状态 | `PATCH /api/items/{id}/personal`，传入 `isFavorite` | 本地乐观更新；失败时回滚并提示 | `update_item_preferences` |
-| 圆圈／勾选图标 | 从详情或集合列表行切换显式去过状态 | 同一端点，传入 `hasVisited` | 本地乐观更新；已有 Visit 仍意味着去过 | `update_item_preferences` |
+| 圆圈 + `行った` | 从详情或集合列表行切换显式去过状态；文字固定，仅通过圆圈空心／实心表达状态 | 同一端点，传入 `hasVisited` | 本地乐观更新；已有 Visit 仍意味着去过 | `update_item_preferences` |
 | Edit | 修改标题、描述、收藏阶段 | `PATCH /api/items/{id}` | 保存／取消表单 | `update_atlas_item` |
 | 列表删除操作 | 删除地点及其关联私有记录 | `DELETE /api/items/{id}`；内置记录创建 tombstone | 必须显示含地点名称的确认对话框 | `delete_atlas_item`，破坏性操作 |
 | 类型筛选 | 显示食物、活动、建筑或全部 | 仅修改 ViewModel 状态 | 无 | 未来映射为结构化搜索筛选 |
-| 个人状态筛选 | 显示全部、没去过、去过或喜欢 | 仅修改 ViewModel 状态 | 无 | 未来映射为推荐／搜索筛选 |
+| 到访 + 喜欢筛选 | 到访状态与喜欢可独立选择；同时启用时按并集显示 | 仅修改 ViewModel 状态 | 无 | 未来映射为推荐／搜索筛选 |
 | 搜索 | 匹配规范化后的名称、别名、区域、地址、描述和标签 | ViewModel 中的确定性查询 | 无 | Agent v2 中的 `search_atlas` |
 | 地图标记 | 选择并聚焦一个地点 | ViewModel 选择状态 | 无 | `focus_atlas_item` |
 | Near me | 获取位置并按距离排序 | 浏览器地理位置；不存储当前位置 | 浏览器权限确认 | `find_nearby_atlas_items` |
 | Save visit | 新增指定日期的到访；评分、笔记或图片必须提供内容 | `POST /api/journal`；若提供评分，则更新该地点唯一的 PlaceAssessment | 保存回执 | `create_visit` |
-| 个人评分 | 设置任意 0–5 的数值，或清空评分 | `PATCH /api/items/{id}/personal` | 显示已持久化值 | `set_personal_rating` |
+| `マイスコア` | 在详情与列表中和来源评分并列；双击详情数值可编辑或清空 | `PATCH /api/items/{id}/personal` | 乐观更新，失败时回滚 | `set_personal_rating` |
 
 ## 2. 评分语义
 
 - `null` 表示未评分；`0` 是一个有效的明确评分。
-- 手动数值输入接受从 0 到 5 的任意有限数值。
-- 未来的滑条、星级或快捷选择器可按 0.5 递增。
+- 当前 Journal 与行内编辑器默认值为 3，按 0.5 递增。
+- 领域层／API 仍独立校验 0–5 的闭区间。
 - 评分属于地点的 PlaceAssessment，而不属于某一次 Visit。
 - 个人评分与食べログ／Google 评分一起展示，便于直接比较，但在存储中仍是相互独立的值。
 - 各张卡片不再重复显示来源核验时间；选中地点详情底部统一显示一次最新核验时间。
@@ -66,10 +66,10 @@
 
 三个分支均从同一套已经测试的持久化／API／ViewModel commit 分出。两个备选分支只修改展示代码。
 
-当前主构建也通过同一个实时 API 和数据库暴露这三种方案，供用户直接视觉评审：
+分栏侧边栏方案已经选定，并成为主版本默认布局。主构建仍通过同一个实时 API 和数据库保留其他方案，用于回归比较：
 
-- A：`/` 或 `/?layout=floating`
-- B：`/?layout=split`
+- B（默认）：`/` 或 `/?layout=split`
+- A：`/?layout=floating`
 - C：`/?layout=bottom`
 
 这些 query parameter（查询参数）只选择展示方式；它们不会分叉数据状态，也不会持久保存用户偏好。
@@ -77,10 +77,11 @@
 ## 6. 交互性能契约
 
 - 喜欢和去过控件在同一个交互帧内先更新本地状态，再与持久 API 对账。写入失败时恢复旧值并显示提示。
+- Journal 提交会立即乐观显示 Visit；API 写入失败时恢复表单与数据。
 - 个人状态变化不得重建地图标记。
 - 选择标记时应原地更新标记状态并重新居中，不进行耗时的飞行动画。
 - 移动中的地图瓦片表面不得被全画布 CSS filter 或 backdrop blur 覆盖。
-- 当前 OSM 栅格服务是功能基线，并不承诺达到 Google Maps 级别的矢量渲染效果。服务商评估仍是独立的生产决策。
+- 当前 OSM 栅格服务是功能基线，并不承诺达到 Google Maps 级别的矢量渲染效果。服务商评估记录在 GitHub issue #1；托管 Journal 请求耗时分析记录在 issue #2。
 
 ## 7. 已知未完成控件
 

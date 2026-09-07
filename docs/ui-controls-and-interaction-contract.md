@@ -12,22 +12,22 @@ they must preserve these meanings, confirmations, and shared operations.
 | Control | User-visible result | Durable operation | Confirmation | Agent parity |
 |---|---|---|---|---|
 | Heart icon | Toggle favourite state from detail or collection row | `PATCH /api/items/{id}/personal` with `isFavorite` | Optimistic local update; rollback and notice on failure | `update_item_preferences` |
-| Circle/check icon | Toggle explicit visited state from detail or collection row | Same endpoint with `hasVisited` | Optimistic local update; visits still imply visited | `update_item_preferences` |
+| Circle + `行った` | Toggle explicit visited state from detail or collection row; the label stays fixed and the circle changes fill | Same endpoint with `hasVisited` | Optimistic local update; visits still imply visited | `update_item_preferences` |
 | Edit | Change title, description, collection state | `PATCH /api/items/{id}` | Save/cancel form | `update_atlas_item` |
 | Delete row action | Remove place and attached private records | `DELETE /api/items/{id}`; create bootstrap tombstone | Mandatory named confirmation dialog | `delete_atlas_item`, destructive |
 | Type filter | Show food, event, architecture, or all | View-model state only | None | Structured search filter later |
-| Personal filter | Show all, unvisited, visited, or favourite | View-model state only | None | Recommendation/search filter later |
+| Visit + favourite filters | Visit state and favourite are independently selectable; combined active filters use union semantics | View-model state only | None | Recommendation/search filter later |
 | Search | Match normalized name, alternate name, area, address, description, and tags | Deterministic view-model query | None | `search_atlas` in Agent v2 |
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |
 | Save visit | Add dated visit; rating, note, or photo must provide content | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
-| Personal rating | Set any 0–5 value or clear it | `PATCH /api/items/{id}/personal` | Show persisted value | `set_personal_rating` |
+| `マイスコア` | Show beside the source rating in detail and list; double-click detail value to edit or clear | `PATCH /api/items/{id}/personal` | Optimistic update and rollback | `set_personal_rating` |
 
 ## 2. Rating semantics
 
 - `null` means not rated; `0` is a valid explicit score.
-- Manual numeric entry accepts any finite value from 0 through 5.
-- A future slider, stars, or quick picker may step by 0.5.
+- The current Journal and inline editor default to 3 and step by 0.5.
+- The domain/API still validates the inclusive 0–5 range independently of UI.
 - Rating belongs to the place assessment, never to an individual visit.
 - Personal and Tabelog/Google ratings are displayed together for comparison,
   but remain separate values in storage.
@@ -78,11 +78,12 @@ and mobile sheet live. They must all:
 All three branch from the same tested persistence/API/view-model commit. Only
 presentation code differs in the two alternatives.
 
-The current main build also exposes the variants against the same live API and
-database for immediate visual review:
+The split-sidebar design is selected and is now the default main presentation.
+The main build retains the other variants against the same live API and database
+for regression comparison:
 
-- A: `/` or `/?layout=floating`
-- B: `/?layout=split`
+- B (default): `/` or `/?layout=split`
+- A: `/?layout=floating`
 - C: `/?layout=bottom`
 
 These query parameters select presentation only; they do not fork state or
@@ -93,6 +94,8 @@ persist a user preference.
 - Favourite and visited controls update locally in the same interaction frame,
   then reconcile with the durable API. A failed write restores the previous
   value and surfaces a notice.
+- Journal submissions render an optimistic Visit immediately and restore the
+  form/data if the API write fails.
 - Personal-state changes must not rebuild map markers.
 - Marker selection changes marker state in place and recenters without a long
   animated flight.
@@ -100,7 +103,8 @@ persist a user preference.
   surface.
 - The current OSM raster provider is a functional baseline, not a promise of
   Google Maps-level vector rendering. Provider evaluation remains a separate
-  production decision.
+  production decision tracked in GitHub issue #1. Hosted Journal request
+  profiling is tracked in issue #2.
 
 ## 7. Known incomplete controls
 

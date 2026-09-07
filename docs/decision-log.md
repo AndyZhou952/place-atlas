@@ -38,6 +38,11 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Map rendering | Reuse marker instances and remove map-wide filters/backdrop blur | Avoid unnecessary marker rebuilds and GPU-heavy repaints during pan/zoom |
 | 2026-09-07 | Rating presentation | Show personal and source ratings inline; show one overall checked time at detail bottom | Makes comparison immediate and removes repeated operational metadata |
 | 2026-09-07 | Layout review | Expose A/B/C through one main build using a non-persistent `layout` query | Lets Andy compare real rendering while preserving one API and one database |
+| 2026-09-07 | Selected layout | Split sidebar (B) becomes the default main presentation | Best balance of persistent browsing context, map visibility, and direct row actions |
+| 2026-09-07 | Visited control | Use a fixed `行った` label plus an empty/filled circle; favourite remains icon-only | Makes visited state understandable without changing copy between states |
+| 2026-09-07 | Combined filters | Visit and favourite filters are independent and combine by union | Supports “visited or favourite” and “not yet or favourite” review sets exactly as requested |
+| 2026-09-07 | Inline score editing | `マイスコア` is edited from detail through the existing ViewModel operation | Keeps the View free of direct persistence and synchronizes list/detail/Agent data |
+| 2026-09-07 | Remaining latency | Track map stalls in issue #1 and Journal request latency in issue #2 | Performance work stays visible without blocking the selected-layout iteration |
 
 ## Open decisions
 
@@ -46,6 +51,5 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | Exact delivery deadline, if any | Roadmap scheduling only; not core behavior | Andy, optional |
 | Main-account behavior supported by the Tencent/OpenClaw integration | WeChat proof of concept | Plugin experiment |
 | EU VPS vs Singapore/Japan | Travel deployment | One-week measured pilot |
-| Final map layout among the three implementation branches | Before UI component extraction | Andy after visual review |
 | Long-term database/API host after WeChat PoC | Before 24/7 deployment | Auth, latency, and operating-cost prototype |
 | Desired monthly infrastructure/model budget | Before cloud provisioning | Andy |

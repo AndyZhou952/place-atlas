@@ -1,7 +1,7 @@
 export type AtlasItemKind = 'food' | 'event' | 'architecture';
 export type AtlasView = 'map' | 'inbox' | 'journal';
 export type AtlasKindFilter = 'all' | AtlasItemKind;
-export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited' | 'favorite';
+export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited';
 export type PersonalState = 'candidate' | 'saved' | 'planned' | 'visited';
 export type VerificationStatus = 'verified' | 'needs_review';
 

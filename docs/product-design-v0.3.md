@@ -133,10 +133,19 @@ Marker styling and filters distinguish:
 Recommendation defaults should prefer unvisited places unless Andy explicitly
 asks for favourites, revisits, or all results.
 
-Favourite and visited state use icon-only heart and circle/check controls in
-both the selected-place detail and collapsible collection. They update
+The split-sidebar layout (B) is the selected default: the collection remains a
+stable left column while the map and selected-place record stay visible. The
+floating and bottom variants remain non-persistent comparison modes only.
+
+Favourite uses an icon-only heart. Visited uses a fixed `行った` label with an
+empty/filled circle in both the selected-place detail and collection. They update
 optimistically and reconcile with the durable API, so ordinary network latency
 does not block visible feedback.
+
+Visit state and favourite filters can be active at the same time and combine by
+union. `マイスコア` appears beside the source rating in both list and detail;
+double-click editing calls the ViewModel operation rather than writing directly
+from the View.
 
 The map must reuse markers when only personal state changes and avoid
 full-canvas filters or blur effects during movement. The baseline OSM raster

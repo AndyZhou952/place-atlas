@@ -1306,14 +1306,15 @@ function JournalVisitRow({
   );
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (editing) return;
+  function beginEditing() {
     setVisitedAt(visit.visitedAt);
     setNote(visit.note ?? '');
     setRating(
       item.personalRating === undefined ? '' : item.personalRating.toString(),
     );
-  }, [editing, item.personalRating, visit.note, visit.visitedAt]);
+    setError('');
+    setEditing(true);
+  }
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1421,7 +1422,7 @@ function JournalVisitRow({
           type="button"
           aria-label={`Edit visit ${visitNumber}`}
           title="Edit visit"
-          onClick={() => setEditing(true)}
+          onClick={beginEditing}
         >
           <Pencil aria-hidden="true" />
         </button>

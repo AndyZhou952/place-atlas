@@ -162,6 +162,12 @@ WebMCP Adapter
 
 现有 Inbox 与 Journal 路由仅作为过渡备用入口保留，直到微信适配器拥有等价写入操作。更早移除它们会导致产品失去可用写入路径。
 
+## 6.2 交互适配器与写入路径
+
+地图 View 依赖 `AtlasMapAdapter`，而不直接依赖 Leaflet。Leaflet adapter 负责地图实例、注入式瓦片供应商配置、按 key 对账标记、选择、尺寸更新与销毁。今后的供应商或地图引擎实验必须保留这一边界，不得修改 ViewModel 或 Agent 契约。
+
+Journal 新增遵循同一条命令路径：View -> ViewModel 乐观 mutation -> HTTP client -> route 验证 -> 定向地点解析 -> D1 原子批次。客户端 mutation UUID 成为 Visit 主键，因此同一命令可以安全重试而不重复。Visit 修改／删除也由网页 UI 与浏览器 Agent 工具复用同一个 ViewModel 与 HTTP route。
+
 ## 6. 采集与身份解析链路
 
 ```mermaid
@@ -199,6 +205,8 @@ stateDiagram-v2
 | `queue_creator_import` | 写入任务 | 显示回执 |
 | `update_atlas_item` | 写入个人字段 | 仅使用用户认可的输入 |
 | `create_visit` | 写入包含可选备注的 Visit | 显示 Visit 回执 |
+| `update_visit` | 修正 Visit 日期／笔记与可选持久评分 | 显示保存回执 |
+| `delete_visit` | 删除一个 Visit 并重新计算去过状态 | 明确确认 |
 | `set_personal_rating` | upsert 一个可空的地点评分 | 显示旧值／新值 |
 | `attach_visit_media` | 存储／关联照片与说明 | 显示附件回执 |
 | `search_atlas` / `recommend_places` | 读取并排序 | 展示实际应用的筛选条件 |

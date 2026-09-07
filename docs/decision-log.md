@@ -44,6 +44,10 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Collection row information | Stack source/personal ratings above the right-side status controls; expand truncated titles when the row is selected, hovered, or focused | Preserves title width while keeping ratings and full names discoverable |
 | 2026-09-07 | Inline score editing | `マイスコア` is edited from detail through the existing ViewModel operation | Keeps the View free of direct persistence and synchronizes list/detail/Agent data |
 | 2026-09-07 | Remaining latency | Track map stalls in issue #1 and Journal request latency in issue #2 | Performance work stays visible without blocking the selected-layout iteration |
+| 2026-09-07 | Rating normalization | Keep 0.5 spinner steps but accept any 0–5 typed value and round to one decimal at every write boundary | Preserves fast controls without rejecting values such as 3.76 |
+| 2026-09-07 | Journal correction | Visits are editable/deletable and history filters combine place with an inclusive date range | Mistakes remain correctable and Journal can serve as a memory browser before Agent parity |
+| 2026-09-07 | Map performance | Keep Leaflet for now; restore progressive tile scheduling and isolate it behind a provider-neutral adapter | Current evidence points to configuration and tile delivery, not a proven engine limit |
+| 2026-09-07 | Journal performance | Keep D1; use targeted item resolution, client mutation IDs, and an atomic write batch | Removes repeated full-table reads, prevents partial writes, and preserves future Agent retries |
 
 ## Open decisions
 

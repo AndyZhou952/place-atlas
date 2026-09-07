@@ -127,14 +127,26 @@ export interface VisitRecord {
 }
 
 export interface NewVisit {
+  readonly id?: string;
   readonly itemId: string;
   readonly visitedAt: string;
   readonly rating?: number;
   readonly note?: string;
 }
 
+export interface VisitUpdate {
+  readonly visitedAt: string;
+  readonly rating?: number | null;
+  readonly note?: string;
+}
+
 export interface VisitCreateResult {
   readonly visit: VisitRecord;
+  readonly item: AtlasItem;
+}
+
+export interface VisitMutationResult {
+  readonly visit?: VisitRecord;
   readonly item: AtlasItem;
 }
 

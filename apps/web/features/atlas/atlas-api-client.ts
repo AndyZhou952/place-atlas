@@ -6,7 +6,9 @@ import type {
   NewVisit,
   PlaceAssessmentPatch,
   VisitCreateResult,
+  VisitMutationResult,
   VisitRecord,
+  VisitUpdate,
 } from './model';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -74,5 +76,21 @@ export function createVisit(input: NewVisit): Promise<VisitCreateResult> {
   return requestJson('/api/journal', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export function updateVisit(
+  id: string,
+  input: VisitUpdate,
+): Promise<VisitMutationResult> {
+  return requestJson(`/api/journal/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteVisit(id: string): Promise<VisitMutationResult> {
+  return requestJson(`/api/journal/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   });
 }

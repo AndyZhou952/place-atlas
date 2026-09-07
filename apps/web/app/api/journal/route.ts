@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import type { NewVisit } from '@/features/atlas/model';
+import { normalizeRating } from '@/features/atlas/rating';
 import { addVisit, listVisits } from '@/lib/server/atlas-store';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const input = (await request.json()) as Partial<NewVisit>;
   if (
+    (input.id !== undefined &&
+      (typeof input.id !== 'string' || !input.id.trim())) ||
     typeof input.itemId !== 'string' ||
     !input.itemId ||
     typeof input.visitedAt !== 'string' ||
@@ -35,9 +38,13 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(
       await addVisit({
+        id: input.id?.trim(),
         itemId: input.itemId,
         visitedAt: input.visitedAt,
-        rating: input.rating,
+        rating:
+          input.rating === undefined
+            ? undefined
+            : normalizeRating(input.rating),
         note: input.note?.trim() || undefined,
       }),
       { status: 201 },

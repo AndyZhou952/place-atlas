@@ -6,11 +6,13 @@ import {
   createImportJob,
   createVisit,
   deleteAtlasItem,
+  deleteVisit,
   fetchAtlasItems,
   fetchImportJobs,
   fetchVisits,
   updateAtlasItem,
   updateItemAssessment,
+  updateVisit,
 } from './atlas-api-client';
 import { distanceInKm } from './distance';
 import { matchesPersonalStatus } from './personal-filter';
@@ -27,6 +29,7 @@ import type {
   NewVisit,
   PlaceAssessmentPatch,
   VisitRecord,
+  VisitUpdate,
 } from './model';
 import { useAtlasWebMcp } from './use-atlas-webmcp';
 import { verifiedAtlasItems } from './verified-items';
@@ -47,7 +50,20 @@ export function useAtlasViewModel() {
   const [distances, setDistances] = useState<Record<string, number>>({});
   const [locationStatus, setLocationStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [journalBusy, setJournalBusy] = useState(false);
+  const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const [notice, setNotice] = useState('');
+
+  const setItemPending = useCallback((id: string, pending: boolean) => {
+    setPendingItemIds((current) => {
+      const next = new Set(current);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     void Promise.all([
@@ -101,25 +117,28 @@ export function useAtlasViewModel() {
     setView('map');
   }, []);
 
-  const saveItemEdit = useCallback(async (id: string, edit: AtlasItemEdit) => {
-    setBusy(true);
-    setNotice('');
-    try {
-      const updated = await updateAtlasItem(id, edit);
-      setItems((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
-      setNotice('Changes saved. The Agent API will read the same record.');
-      return updated;
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : 'Could not save changes.',
-      );
-      throw error;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const saveItemEdit = useCallback(
+    async (id: string, edit: AtlasItemEdit) => {
+      setItemPending(id, true);
+      setNotice('');
+      try {
+        const updated = await updateAtlasItem(id, edit);
+        setItems((current) =>
+          current.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        setNotice('Changes saved. The Agent API will read the same record.');
+        return updated;
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? error.message : 'Could not save changes.',
+        );
+        throw error;
+      } finally {
+        setItemPending(id, false);
+      }
+    },
+    [setItemPending],
+  );
 
   const queueImport = useCallback(async (input: NewImportJob) => {
     setBusy(true);
@@ -146,8 +165,9 @@ export function useAtlasViewModel() {
       const item = items.find((candidate) => candidate.id === input.itemId);
       if (!item) throw new Error('Atlas item not found');
       const now = new Date().toISOString();
+      const visitId = input.id ?? crypto.randomUUID();
       const optimisticVisit: VisitRecord = {
-        id: `pending-${crypto.randomUUID()}`,
+        id: visitId,
         itemId: item.id,
         itemTitle: item.title,
         visitedAt: input.visitedAt,
@@ -156,7 +176,7 @@ export function useAtlasViewModel() {
         updatedAt: now,
       };
 
-      setBusy(true);
+      setJournalBusy(true);
       setNotice('');
       setVisits((current) => [optimisticVisit, ...current]);
       setItems((current) =>
@@ -173,7 +193,7 @@ export function useAtlasViewModel() {
         ),
       );
       try {
-        const result = await createVisit(input);
+        const result = await createVisit({ ...input, id: visitId });
         setVisits((current) =>
           current.map((visit) =>
             visit.id === optimisticVisit.id ? result.visit : visit,
@@ -202,10 +222,139 @@ export function useAtlasViewModel() {
         );
         throw error;
       } finally {
-        setBusy(false);
+        setJournalBusy(false);
       }
     },
     [items],
+  );
+
+  const editVisit = useCallback(
+    async (id: string, input: VisitUpdate) => {
+      const previousVisit = visits.find((visit) => visit.id === id);
+      if (!previousVisit) throw new Error('Journal entry not found');
+      const previousItem = items.find(
+        (item) => item.id === previousVisit.itemId,
+      );
+      if (!previousItem) throw new Error('Atlas item not found');
+
+      const optimisticVisit: VisitRecord = {
+        ...previousVisit,
+        visitedAt: input.visitedAt,
+        note: input.note?.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+      };
+
+      setJournalBusy(true);
+      setNotice('');
+      setVisits((current) =>
+        sortVisits(
+          current.map((visit) => (visit.id === id ? optimisticVisit : visit)),
+        ),
+      );
+      if (input.rating !== undefined) {
+        setItems((current) =>
+          current.map((item) =>
+            item.id === previousItem.id
+              ? {
+                  ...item,
+                  personalRating:
+                    input.rating === null ? undefined : input.rating,
+                }
+              : item,
+          ),
+        );
+      }
+
+      try {
+        const result = await updateVisit(id, input);
+        if (result.visit) {
+          setVisits((current) =>
+            sortVisits(
+              current.map((visit) =>
+                visit.id === result.visit?.id ? result.visit : visit,
+              ),
+            ),
+          );
+        }
+        setItems((current) =>
+          current.map((item) =>
+            item.id === result.item.id ? result.item : item,
+          ),
+        );
+        return result;
+      } catch (error) {
+        setVisits((current) =>
+          sortVisits(
+            current.map((visit) => (visit.id === id ? previousVisit : visit)),
+          ),
+        );
+        setItems((current) =>
+          current.map((item) =>
+            item.id === previousItem.id ? previousItem : item,
+          ),
+        );
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : 'Could not update journal entry.',
+        );
+        throw error;
+      } finally {
+        setJournalBusy(false);
+      }
+    },
+    [items, visits],
+  );
+
+  const removeVisit = useCallback(
+    async (id: string) => {
+      const previousVisit = visits.find((visit) => visit.id === id);
+      if (!previousVisit) throw new Error('Journal entry not found');
+      const previousItem = items.find(
+        (item) => item.id === previousVisit.itemId,
+      );
+      if (!previousItem) throw new Error('Atlas item not found');
+      const hasAnotherVisit = visits.some(
+        (visit) => visit.id !== id && visit.itemId === previousVisit.itemId,
+      );
+
+      setJournalBusy(true);
+      setNotice('');
+      setVisits((current) => current.filter((visit) => visit.id !== id));
+      if (!hasAnotherVisit) {
+        setItems((current) =>
+          current.map((item) =>
+            item.id === previousItem.id ? { ...item, hasVisited: false } : item,
+          ),
+        );
+      }
+
+      try {
+        const result = await deleteVisit(id);
+        setItems((current) =>
+          current.map((item) =>
+            item.id === result.item.id ? result.item : item,
+          ),
+        );
+        return result;
+      } catch (error) {
+        setVisits((current) => sortVisits([previousVisit, ...current]));
+        setItems((current) =>
+          current.map((item) =>
+            item.id === previousItem.id ? previousItem : item,
+          ),
+        );
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : 'Could not delete journal entry.',
+        );
+        throw error;
+      } finally {
+        setJournalBusy(false);
+      }
+    },
+    [items, visits],
   );
 
   const saveAssessment = useCallback(
@@ -213,7 +362,7 @@ export function useAtlasViewModel() {
       const previous = items.find((item) => item.id === id);
       if (!previous) throw new Error('Atlas item not found');
 
-      setBusy(true);
+      setItemPending(id, true);
       setNotice('');
       setItems((current) =>
         current.map((item) => {
@@ -253,29 +402,32 @@ export function useAtlasViewModel() {
         );
         throw error;
       } finally {
-        setBusy(false);
+        setItemPending(id, false);
       }
     },
-    [items],
+    [items, setItemPending],
   );
 
-  const removeItem = useCallback(async (id: string) => {
-    setBusy(true);
-    setNotice('');
-    try {
-      await deleteAtlasItem(id);
-      setItems((current) => current.filter((item) => item.id !== id));
-      setVisits((current) => current.filter((visit) => visit.itemId !== id));
-      setNotice('Place removed from your Atlas.');
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : 'Could not remove place.',
-      );
-      throw error;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const removeItem = useCallback(
+    async (id: string) => {
+      setItemPending(id, true);
+      setNotice('');
+      try {
+        await deleteAtlasItem(id);
+        setItems((current) => current.filter((item) => item.id !== id));
+        setVisits((current) => current.filter((visit) => visit.itemId !== id));
+        setNotice('Place removed from your Atlas.');
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? error.message : 'Could not remove place.',
+        );
+        throw error;
+      } finally {
+        setItemPending(id, false);
+      }
+    },
+    [setItemPending],
+  );
 
   const locateNearby = useCallback(async () => {
     setLocationStatus('Requesting your location…');
@@ -329,14 +481,18 @@ export function useAtlasViewModel() {
       removeItem,
       queueImport,
       addJournal: addVisit,
+      updateJournal: editVisit,
+      removeJournal: removeVisit,
       locateNearby,
     }),
     [
       addVisit,
+      editVisit,
       items,
       locateNearby,
       queueImport,
       removeItem,
+      removeVisit,
       saveAssessment,
       saveItemEdit,
       selectItem,
@@ -347,11 +503,14 @@ export function useAtlasViewModel() {
 
   return {
     addVisit,
+    editVisit,
     busy,
     distances,
     importJobs,
     items,
     favoriteOnly,
+    isItemPending: (id: string) => pendingItemIds.has(id),
+    journalBusy,
     visits,
     kind,
     locationStatus,
@@ -360,6 +519,7 @@ export function useAtlasViewModel() {
     query,
     queueImport,
     removeItem,
+    removeVisit,
     saveAssessment,
     saveItemEdit,
     selectedItem,
@@ -374,4 +534,12 @@ export function useAtlasViewModel() {
     visibleItems,
     locateNearby,
   } as const;
+}
+
+function sortVisits(visits: VisitRecord[]): VisitRecord[] {
+  return [...visits].sort(
+    (left, right) =>
+      right.visitedAt.localeCompare(left.visitedAt) ||
+      right.createdAt.localeCompare(left.createdAt),
+  );
 }

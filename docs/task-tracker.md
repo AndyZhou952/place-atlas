@@ -45,6 +45,8 @@ be scheduled independently within its phase.
 | UX-01A | Personal controls | Optimistic local feedback with durable reconciliation and rollback | UX-01 | done | Experimental |
 | UX-02 | Journal correction | One place card with one rating and a visit timeline, also visible in map detail | DATA-02, DATA-03 | done | Experimental |
 | UX-03 | Rating input | Journal defaults to 3 with 0.5 steps; inline `マイスコア` edit uses the ViewModel | DATA-02 | done | Experimental |
+| UX-03A | Rating normalization | Accept any typed 0–5 value and round consistently to one decimal in UI, API, and Agent tools | UX-03 | done | Experimental |
+| UX-02A | Journal correction | Edit/delete a Visit with confirmation; filter history by place and inclusive date range | UX-02 | done | Experimental |
 | UX-05 | Combined filters | Visit and favourite controls can be active together and require both selected states | SEARCH-02 | done | Experimental |
 | UX-06 | Collection readability | Move rating badges into the right rail and reveal full titles on selection, hover, or focus | UX-05 | done | Experimental |
 | CI-01 | Continuous integration | Pull requests and `main` run formatting, lint, type checks, unit tests, and production build | UX-05 | done | Experimental |
@@ -55,8 +57,9 @@ be scheduled independently within its phase.
 | MAP-02 | Map-dominant layout | Collection collapses by default; floating search opener | MAP-01 | done | Experimental |
 | MAP-03 | Layout selection | Select split sidebar (B) and make it the main default | MAP-02 | done | Experimental |
 | MAP-04A | Map performance | Reuse markers, remove blocking selection animation, and eliminate moving-canvas filters/blur | MAP-01 | done | Experimental |
-| MAP-04B | Map performance | Profile remaining 1–2s pan/zoom stalls; evaluate vector tiles and caching ([#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)) | MAP-03 | next | Experimental |
-| PERF-01 | Journal performance | Optimistic submit is done; profile hosted API/D1 latency and add budget ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
+| MAP-04B | Map performance | Restore progressive Leaflet tile scheduling, isolate a replaceable map adapter, reconcile markers by key, and validate hosted behavior ([#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)) | MAP-03 | in progress | Experimental |
+| PERF-01 | Journal performance | Replace repeated full-table reads with one targeted resolve plus an atomic write batch; validate hosted latency budget ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
+| DATA-05A | Write reliability | Client-supplied Visit mutation ID, idempotent insert, atomic Visit/assessment write | DATA-03 | done | Experimental |
 | DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
 | REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | next | Experimental |
 
@@ -82,8 +85,8 @@ be scheduled independently within its phase.
 | AGENT-05 | Navigation cleanup | Remove permanent Inbox/Journal only after Agent write parity | AGENT-02, MEDIA-06 | blocked | Demo |
 
 Current browser Agent bridge already exposes editing, preferences, rating,
-visits, deletion, import queueing, and nearby lookup as a working precursor. It
-is not a substitute for the authenticated 24/7 service boundary.
+visit create/update/delete, import queueing, and nearby lookup as a working
+precursor. It is not a substitute for the authenticated 24/7 service boundary.
 
 ### 4 — Dedicated-browser creator acquisition
 
@@ -120,7 +123,8 @@ is not a substitute for the authenticated 24/7 service boundary.
 
 ## Current checkpoint
 
-The split-sidebar layout is selected. The next independent engineering slice is
-`MEDIA-01` through `MEDIA-03`, followed by the dedicated-browser collector after
-its separate Chrome context is prepared. Performance issues #1 and #2 remain
-tracked without blocking the current interaction iteration.
+The split-sidebar layout is selected. Journal correction and free-form rating
+normalization are implemented. Map and Journal performance changes now await
+hosted verification and issue evidence. After that checkpoint, the next
+independent slice is `MEDIA-01` through `MEDIA-03`, followed by the dedicated-
+browser collector after its separate Chrome context is prepared.

@@ -21,12 +21,16 @@
 | 地图标记 | 选择并聚焦一个地点 | ViewModel 选择状态 | 无 | `focus_atlas_item` |
 | Near me | 获取位置并按距离排序 | 浏览器地理位置；不存储当前位置 | 浏览器权限确认 | `find_nearby_atlas_items` |
 | Save visit | 新增指定日期的到访；评分、笔记或图片必须提供内容 | `POST /api/journal`；若提供评分，则更新该地点唯一的 PlaceAssessment | 保存回执 | `create_visit` |
+| Edit visit | 修正日期／笔记，并可替换或清空持久地点评分 | 通过 ViewModel 调用 `PATCH /api/journal/{id}` | 保存／取消表单 | `update_visit` |
+| Delete visit | 删除一条错误 Visit，并重新计算推导出的去过状态 | 通过 ViewModel 调用 `DELETE /api/journal/{id}` | 必须确认 | `delete_visit`，破坏性操作 |
+| Journal 筛选 | 组合地点与包含边界的起止日期范围 | 仅 ViewModel 投影 | 清空筛选控件 | 未来结构化 Journal 查询 |
 | `マイスコア` | 在详情与列表中和来源评分并列；双击详情数值可编辑或清空 | `PATCH /api/items/{id}/personal` | 乐观更新，失败时回滚 | `set_personal_rating` |
 
 ## 2. 评分语义
 
 - `null` 表示未评分；`0` 是一个有效的明确评分。
-- 当前 Journal 与行内编辑器默认值为 3，按 0.5 递增。
+- 当前 Journal 与行内编辑器默认值为 3；上下按钮按 0.5 递增。
+- 手动输入接受任意有限的 0–5 数值；UI、HTTP route、store 与浏览器 Agent 工具都会将其四舍五入到最接近的一位小数。
 - 领域层／API 仍独立校验 0–5 的闭区间。
 - 评分属于地点的 PlaceAssessment，而不属于某一次 Visit。
 - 个人评分与食べログ／Google 评分一起展示，便于直接比较，但在存储中仍是相互独立的值。
@@ -80,9 +84,13 @@
 
 - 喜欢和去过控件在同一个交互帧内先更新本地状态，再与持久 API 对账。写入失败时恢复旧值并显示提示。
 - Journal 提交会立即乐观显示 Visit；API 写入失败时恢复表单与数据。
+- Journal 新增使用客户端 mutation ID 与 D1 原子批次，因此超时重试不会产生重复 Visit 或留下半完成的 assessment。
+- Journal 写入等待期间不得禁用无关的地图／地点控件。
 - 个人状态变化不得重建地图标记。
 - 选择标记时应原地更新标记状态并重新居中，不进行耗时的飞行动画。
 - 移动中的地图瓦片表面不得被全画布 CSS filter 或 backdrop blur 覆盖。
+- Leaflet 使用渐进式桌面瓦片调度；地图供应商、React View 与标记对账通过 adapter 边界分离。
+- 性能预算：交互或主线程任务不得超过 200 ms；帧间隔 p95 小于 50 ms、最大值小于 100 ms；固定 100 ms 测试瓦片下稳定时间 p95 小于 400 ms。关闭 issue 前仍需托管证据。
 - 当前 OSM 栅格服务是功能基线，并不承诺达到 Google Maps 级别的矢量渲染效果。服务商评估记录在 GitHub issue #1；托管 Journal 请求耗时分析记录在 issue #2。
 
 ## 7. 已知未完成控件

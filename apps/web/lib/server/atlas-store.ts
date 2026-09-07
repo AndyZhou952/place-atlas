@@ -6,12 +6,20 @@ import type {
   NewImportJob,
   NewVisit,
   PersonalState,
-  PlaceAssessment,
   PlaceAssessmentPatch,
   VisitCreateResult,
+  VisitMutationResult,
   VisitRecord,
+  VisitUpdate,
 } from '@/features/atlas/model';
+import { normalizeRating } from '@/features/atlas/rating';
 import { verifiedAtlasItems } from '@/features/atlas/verified-items';
+
+import {
+  insertVisitSql,
+  upsertVisitedWithRatingSql,
+  upsertVisitedWithoutRatingSql,
+} from './journal-write';
 
 interface ItemRow {
   id: string;
@@ -66,6 +74,23 @@ interface VisitRow {
   created_at: string;
   updated_at: string;
 }
+
+interface ResolvedItemRow {
+  payload_json: string | null;
+  override_title: string | null;
+  override_description: string | null;
+  override_personal_state: PersonalState | null;
+  override_updated_at: string | null;
+  overall_rating: number | null;
+  is_favorite: number | null;
+  has_visited: number | null;
+  has_visit: number;
+  tombstone_id: string | null;
+}
+
+const verifiedItemsById = new Map(
+  verifiedAtlasItems.map((item) => [item.id, item]),
+);
 
 function isMissingTable(error: unknown): boolean {
   return error instanceof Error && error.message.includes('no such table');
@@ -140,8 +165,11 @@ export async function listAtlasItems(): Promise<AtlasItem[]> {
   const countsByItem = new Map(
     visitCounts.map((row) => [row.item_id, row.visit_count]),
   );
+  const assessmentsByItem = new Map(
+    assessmentRows.map((row) => [row.item_id, row]),
+  );
   for (const [id, item] of byId) {
-    const assessment = assessmentRows.find((row) => row.item_id === id);
+    const assessment = assessmentsByItem.get(id);
     byId.set(id, {
       ...item,
       personalRating: assessment?.overall_rating ?? undefined,
@@ -155,7 +183,59 @@ export async function listAtlasItems(): Promise<AtlasItem[]> {
 }
 
 export async function getAtlasItem(id: string): Promise<AtlasItem | undefined> {
-  return (await listAtlasItems()).find((item) => item.id === id);
+  const row = await getD1()
+    .prepare(
+      `SELECT items.payload_json,
+              overrides.title AS override_title,
+              overrides.description AS override_description,
+              overrides.personal_state AS override_personal_state,
+              overrides.updated_at AS override_updated_at,
+              assessments.overall_rating,
+              assessments.is_favorite,
+              assessments.has_visited,
+              CASE WHEN EXISTS (
+                SELECT 1 FROM visits
+                WHERE visits.item_id = requested.item_id
+                LIMIT 1
+              ) THEN 1 ELSE 0 END AS has_visit,
+              tombstones.item_id AS tombstone_id
+       FROM (SELECT ? AS item_id) AS requested
+       LEFT JOIN atlas_items AS items ON items.id = requested.item_id
+       LEFT JOIN atlas_item_overrides AS overrides
+         ON overrides.item_id = requested.item_id
+       LEFT JOIN place_assessments AS assessments
+         ON assessments.item_id = requested.item_id
+       LEFT JOIN atlas_item_tombstones AS tombstones
+         ON tombstones.item_id = requested.item_id`,
+    )
+    .bind(id)
+    .first<ResolvedItemRow>();
+  if (!row || row.tombstone_id) return undefined;
+
+  let item = verifiedItemsById.get(id);
+  if (!item && row.payload_json) {
+    try {
+      item = JSON.parse(row.payload_json) as AtlasItem;
+    } catch {
+      return undefined;
+    }
+  }
+  if (!item) return undefined;
+
+  return {
+    ...item,
+    ...(row.override_title === null
+      ? {}
+      : {
+          title: row.override_title,
+          description: row.override_description ?? item.description,
+          personalState: row.override_personal_state ?? item.personalState,
+          updatedAt: row.override_updated_at ?? item.updatedAt,
+        }),
+    personalRating: row.overall_rating ?? undefined,
+    isFavorite: Boolean(row.is_favorite),
+    hasVisited: Boolean(row.has_visited) || Boolean(row.has_visit),
+  };
 }
 
 export async function saveDiscoveredItem(item: AtlasItem): Promise<AtlasItem> {
@@ -206,19 +286,17 @@ export async function updatePlaceAssessment(
   const existingItem = await getAtlasItem(id);
   if (!existingItem) throw new Error('Atlas item not found');
 
-  const current = await getPlaceAssessment(id);
-  const next: PlaceAssessment = {
-    itemId: id,
-    overallRating:
-      patch.overallRating === null
-        ? undefined
-        : (patch.overallRating ?? current?.overallRating),
-    isFavorite: patch.isFavorite ?? current?.isFavorite ?? false,
-    hasVisited: patch.hasVisited ?? current?.hasVisited ?? false,
-    summary:
-      patch.summary === null ? undefined : (patch.summary ?? current?.summary),
-    updatedAt: new Date().toISOString(),
-  };
+  const overallRating =
+    patch.overallRating === null
+      ? undefined
+      : patch.overallRating === undefined
+        ? existingItem.personalRating
+        : normalizeRating(patch.overallRating);
+  const isFavorite = patch.isFavorite ?? existingItem.isFavorite ?? false;
+  const hasVisited = patch.hasVisited ?? existingItem.hasVisited ?? false;
+  const summaryProvided = patch.summary !== undefined;
+  const summary = patch.summary?.trim() || null;
+  const updatedAt = new Date().toISOString();
 
   await getD1()
     .prepare(
@@ -229,47 +307,26 @@ export async function updatePlaceAssessment(
          overall_rating = excluded.overall_rating,
          is_favorite = excluded.is_favorite,
          has_visited = excluded.has_visited,
-         summary = excluded.summary,
+         summary = CASE WHEN ? = 1 THEN excluded.summary ELSE place_assessments.summary END,
          updated_at = excluded.updated_at`,
     )
     .bind(
       id,
-      next.overallRating ?? null,
-      next.isFavorite ? 1 : 0,
-      next.hasVisited ? 1 : 0,
-      next.summary ?? null,
-      next.updatedAt,
-      next.updatedAt,
+      overallRating ?? null,
+      isFavorite ? 1 : 0,
+      hasVisited ? 1 : 0,
+      summary,
+      updatedAt,
+      updatedAt,
+      summaryProvided ? 1 : 0,
     )
     .run();
 
   return {
     ...existingItem,
-    personalRating: next.overallRating,
-    isFavorite: next.isFavorite,
-    hasVisited: next.hasVisited,
-  };
-}
-
-async function getPlaceAssessment(
-  itemId: string,
-): Promise<PlaceAssessment | undefined> {
-  const row = await getD1()
-    .prepare(
-      `SELECT item_id, overall_rating, is_favorite, has_visited,
-              summary, updated_at
-       FROM place_assessments WHERE item_id = ?`,
-    )
-    .bind(itemId)
-    .first<PlaceAssessmentRow>();
-  if (!row) return undefined;
-  return {
-    itemId: row.item_id,
-    overallRating: row.overall_rating ?? undefined,
-    isFavorite: Boolean(row.is_favorite),
-    hasVisited: Boolean(row.has_visited),
-    summary: row.summary ?? undefined,
-    updatedAt: row.updated_at,
+    personalRating: overallRating,
+    isFavorite,
+    hasVisited,
   };
 }
 
@@ -367,7 +424,7 @@ export async function addVisit(input: NewVisit): Promise<VisitCreateResult> {
   if (!item) throw new Error('Atlas item not found');
   const now = new Date().toISOString();
   const visit: VisitRecord = {
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
     itemId: item.id,
     itemTitle: item.title,
     visitedAt: input.visitedAt,
@@ -376,36 +433,137 @@ export async function addVisit(input: NewVisit): Promise<VisitCreateResult> {
     updatedAt: now,
   };
 
-  await getD1()
-    .prepare(
-      `INSERT INTO visits
-       (id, item_id, item_title, visited_at, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      visit.id,
-      visit.itemId,
-      visit.itemTitle,
-      visit.visitedAt,
-      visit.note ?? null,
-      visit.createdAt,
-      visit.updatedAt,
-    )
-    .run();
-  const updatedItem = await updatePlaceAssessment(item.id, {
+  const db = getD1();
+  const assessmentStatement =
+    input.rating === undefined
+      ? db.prepare(upsertVisitedWithoutRatingSql).bind(item.id, now, now)
+      : db
+          .prepare(upsertVisitedWithRatingSql)
+          .bind(item.id, normalizeRating(input.rating), now, now);
+
+  await db.batch([
+    db
+      .prepare(insertVisitSql)
+      .bind(
+        visit.id,
+        visit.itemId,
+        visit.itemTitle,
+        visit.visitedAt,
+        visit.note ?? null,
+        visit.createdAt,
+        visit.updatedAt,
+      ),
+    assessmentStatement,
+  ]);
+  const updatedItem: AtlasItem = {
+    ...item,
     hasVisited: true,
-    ...(input.rating === undefined ? {} : { overallRating: input.rating }),
-  });
+    ...(input.rating === undefined
+      ? {}
+      : { personalRating: normalizeRating(input.rating) }),
+  };
   return { visit, item: updatedItem };
 }
 
-export async function deleteJournalEntry(id: string): Promise<boolean> {
+export async function updateVisit(
+  id: string,
+  input: VisitUpdate,
+): Promise<VisitMutationResult | undefined> {
+  const existing = await getVisit(id);
+  if (!existing) return undefined;
+
+  const item = await getAtlasItem(existing.itemId);
+  if (!item) throw new Error('Atlas item not found');
+
+  const updatedAt = new Date().toISOString();
+  const visit: VisitRecord = {
+    ...existing,
+    visitedAt: input.visitedAt,
+    note: input.note?.trim() || undefined,
+    updatedAt,
+  };
+
   const db = getD1();
-  const results = await db.batch([
+  const visitUpdate = db
+    .prepare(
+      `UPDATE visits
+       SET visited_at = ?, note = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(visit.visitedAt, visit.note ?? null, updatedAt, id);
+  if (input.rating === undefined) {
+    await visitUpdate.run();
+    return { visit, item };
+  }
+
+  const overallRating =
+    input.rating === null ? undefined : normalizeRating(input.rating);
+  const assessmentUpdate = db
+    .prepare(
+      `INSERT INTO place_assessments
+       (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, ?, ?)
+       ON CONFLICT(item_id) DO UPDATE SET
+         overall_rating = excluded.overall_rating,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      item.id,
+      overallRating ?? null,
+      item.isFavorite ? 1 : 0,
+      item.hasVisited ? 1 : 0,
+      updatedAt,
+      updatedAt,
+    );
+  await db.batch([visitUpdate, assessmentUpdate]);
+
+  const updatedItem = { ...item, personalRating: overallRating };
+  return { visit, item: updatedItem };
+}
+
+export async function deleteJournalEntry(
+  id: string,
+): Promise<VisitMutationResult | undefined> {
+  const existing = await getVisit(id);
+  if (!existing) return undefined;
+
+  const db = getD1();
+  await db.batch([
     db.prepare('DELETE FROM visits WHERE id = ?').bind(id),
     db.prepare('DELETE FROM journal_entries WHERE id = ?').bind(id),
   ]);
-  return results.some((result) => (result.meta.changes ?? 0) > 0);
+
+  const remaining = await db
+    .prepare('SELECT COUNT(*) AS visit_count FROM visits WHERE item_id = ?')
+    .bind(existing.itemId)
+    .first<VisitCountRow>();
+  const item = await getAtlasItem(existing.itemId);
+  if (!item) throw new Error('Atlas item not found');
+  const updatedItem =
+    (remaining?.visit_count ?? 0) === 0
+      ? await updatePlaceAssessment(existing.itemId, { hasVisited: false })
+      : item;
+  return { item: updatedItem };
+}
+
+async function getVisit(id: string): Promise<VisitRecord | undefined> {
+  const row = await getD1()
+    .prepare(
+      `SELECT id, item_id, item_title, visited_at, note, created_at, updated_at
+       FROM visits WHERE id = ?`,
+    )
+    .bind(id)
+    .first<VisitRow>();
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    itemTitle: row.item_title,
+    visitedAt: row.visited_at,
+    note: row.note ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export async function deleteImportJob(id: string): Promise<boolean> {

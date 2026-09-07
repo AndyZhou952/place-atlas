@@ -39,8 +39,11 @@ import type {
   AtlasKindFilter,
   AtlasView,
   PersonalState,
+  VisitRecord,
 } from './model';
 import { AtlasMap } from './atlas-map';
+import { filterJournalVisits } from './journal-filter';
+import { normalizeRating, parseOptionalRating } from './rating';
 import { useAtlasViewModel } from './use-atlas-view-model';
 
 const filters: readonly {
@@ -338,7 +341,7 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                     })
                   }
                   onDelete={() => setPendingDelete(item)}
-                  busy={vm.busy}
+                  busy={vm.isItemPending(item.id)}
                 />
               ))
             ) : (
@@ -363,7 +366,7 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
 
       <DeleteItemDialog
         item={pendingDelete}
-        busy={vm.busy}
+        busy={pendingDelete ? vm.isItemPending(pendingDelete.id) : false}
         onCancel={() => setPendingDelete(undefined)}
         onConfirm={async () => {
           if (!pendingDelete) return;
@@ -569,11 +572,10 @@ function PersonalRatingInline({
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = draft.trim();
-    const rating = value === '' ? null : Number(value);
-    if (
-      rating !== null &&
-      (!Number.isFinite(rating) || rating < 0 || rating > 5)
-    ) {
+    let rating: number | null;
+    try {
+      rating = value === '' ? null : normalizeRating(Number(value));
+    } catch {
       setDraft(
         item.personalRating === undefined ? '' : item.personalRating.toString(),
       );
@@ -593,6 +595,7 @@ function PersonalRatingInline({
       <form
         className="rating-strip-item personal-rating-editor"
         onSubmit={submit}
+        noValidate
       >
         <label htmlFor={`personal-rating-${item.id}`}>マイスコア</label>
         <Input
@@ -709,7 +712,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                   isFavorite: !item.isFavorite,
                 })
               }
-              disabled={vm.busy}
+              disabled={vm.isItemPending(item.id)}
             >
               <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
             </Button>
@@ -725,7 +728,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                   hasVisited: !item.hasVisited,
                 })
               }
-              disabled={vm.busy}
+              disabled={vm.isItemPending(item.id)}
             >
               <Circle
                 data-icon="inline-start"
@@ -779,7 +782,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               </select>
             </label>
             <div className="form-actions">
-              <Button type="submit" size="sm" disabled={vm.busy}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={vm.isItemPending(item.id)}
+              >
                 Save changes
               </Button>
               <Button
@@ -1029,25 +1036,46 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   );
   const [rating, setRating] = useState('3');
   const [note, setNote] = useState('');
+  const [formError, setFormError] = useState('');
+  const [placeFilter, setPlaceFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<VisitRecord>();
 
+  const filteredVisits = filterJournalVisits(vm.visits, {
+    placeId: placeFilter,
+    fromDate,
+    toDate,
+  });
   const records = vm.items
     .map((item) => ({
       item,
-      visits: vm.visits.filter((visit) => visit.itemId === item.id),
+      visits: filteredVisits.filter((visit) => visit.itemId === item.id),
     }))
     .filter((record) => record.visits.length > 0);
+  const placesWithVisits = vm.items.filter((item) =>
+    vm.visits.some((visit) => visit.itemId === item.id),
+  );
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const submittedRating = rating;
     const submittedNote = note;
+    let normalizedRating: number | undefined;
+    try {
+      normalizedRating = parseOptionalRating(submittedRating);
+      setFormError('');
+    } catch {
+      setFormError('Enter any number from 0 to 5. It will be saved to 0.1.');
+      return;
+    }
     setRating('3');
     setNote('');
     try {
       await vm.addVisit({
         itemId,
         visitedAt,
-        ...(submittedRating === '' ? {} : { rating: Number(submittedRating) }),
+        ...(normalizedRating === undefined ? {} : { rating: normalizedRating }),
         ...(submittedNote.trim() ? { note: submittedNote.trim() } : {}),
       });
     } catch {
@@ -1073,7 +1101,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
             <CardTitle>Add a visit</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="stacked-form" onSubmit={submit}>
+            <form className="stacked-form" onSubmit={submit} noValidate>
               <label htmlFor="journal-place">
                 Place
                 <select
@@ -1122,56 +1150,342 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   placeholder="What stood out? What would you order next time?"
                 />
               </label>
+              {formError ? (
+                <small className="form-error" role="alert">
+                  {formError}
+                </small>
+              ) : null}
               <Button
                 type="submit"
-                disabled={vm.busy || !itemId || (!rating && !note.trim())}
+                disabled={
+                  vm.journalBusy || !itemId || (!rating && !note.trim())
+                }
               >
                 <NotebookPen data-icon="inline-start" /> Save visit
               </Button>
             </form>
           </CardContent>
         </Card>
-        <div className="journal-list" aria-live="polite">
-          {records.length ? (
-            records.map(({ item, visits }) => (
-              <article key={item.id} className="journal-place-record">
-                <header>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>
-                      {visits.length} visits · Last {visits[0]?.visitedAt}
-                    </span>
-                  </div>
-                  <span className="personal-score is-persistent">
-                    {item.personalRating === undefined
-                      ? '—'
-                      : item.personalRating.toString()}
-                  </span>
-                </header>
-                <ol>
-                  {visits.map((visit, index) => (
-                    <li key={visit.id}>
+        <div className="journal-browser">
+          <div className="journal-filters" aria-label="Journal filters">
+            <label htmlFor="journal-place-filter">
+              Place
+              <select
+                id="journal-place-filter"
+                value={placeFilter}
+                onChange={(event) => setPlaceFilter(event.target.value)}
+              >
+                <option value="all">All places</option>
+                {placesWithVisits.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label htmlFor="journal-from-date">
+              From
+              <Input
+                id="journal-from-date"
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+              />
+            </label>
+            <label htmlFor="journal-to-date">
+              To
+              <Input
+                id="journal-to-date"
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              aria-label="Clear journal filters"
+              title="Clear filters"
+              onClick={() => {
+                setPlaceFilter('all');
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </div>
+          <div className="journal-list" aria-live="polite">
+            {records.length ? (
+              records.map(({ item, visits }) => (
+                <article key={item.id} className="journal-place-record">
+                  <header>
+                    <div>
+                      <strong>{item.title}</strong>
                       <span>
-                        {visits.length - index}回目 · {visit.visitedAt}
+                        {visits.length} visits · Last {visits[0]?.visitedAt}
                       </span>
-                      {visit.note ? <p>{visit.note}</p> : null}
-                    </li>
-                  ))}
-                </ol>
-              </article>
-            ))
-          ) : (
-            <div className="empty-panel">
-              <NotebookPen aria-hidden="true" />
-              <strong>No visits recorded yet.</strong>
-              <span>
-                Journal entries appear only after you save a real visit.
-              </span>
-            </div>
-          )}
+                    </div>
+                    <span className="personal-score is-persistent">
+                      {item.personalRating === undefined
+                        ? '—'
+                        : item.personalRating.toString()}
+                    </span>
+                  </header>
+                  <ol>
+                    {visits.map((visit, index) => (
+                      <JournalVisitRow
+                        key={visit.id}
+                        item={item}
+                        visit={visit}
+                        visitNumber={visits.length - index}
+                        busy={vm.journalBusy}
+                        onSave={vm.editVisit}
+                        onDelete={() => setPendingDelete(visit)}
+                      />
+                    ))}
+                  </ol>
+                </article>
+              ))
+            ) : (
+              <div className="empty-panel">
+                <NotebookPen aria-hidden="true" />
+                <strong>
+                  {vm.visits.length
+                    ? 'No visits match these filters.'
+                    : 'No visits recorded yet.'}
+                </strong>
+                <span>
+                  {vm.visits.length
+                    ? 'Try another place or clear the date range.'
+                    : 'Journal entries appear only after you save a real visit.'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+      <DeleteVisitDialog
+        visit={pendingDelete}
+        busy={vm.journalBusy}
+        onCancel={() => setPendingDelete(undefined)}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          try {
+            await vm.removeVisit(pendingDelete.id);
+            setPendingDelete(undefined);
+          } catch {
+            // The view model restores the record and presents the error.
+          }
+        }}
+      />
     </section>
+  );
+}
+
+function JournalVisitRow({
+  item,
+  visit,
+  visitNumber,
+  busy,
+  onSave,
+  onDelete,
+}: {
+  readonly item: AtlasItem;
+  readonly visit: VisitRecord;
+  readonly visitNumber: number;
+  readonly busy: boolean;
+  readonly onSave: AtlasViewModel['editVisit'];
+  readonly onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [visitedAt, setVisitedAt] = useState(visit.visitedAt);
+  const [note, setNote] = useState(visit.note ?? '');
+  const [rating, setRating] = useState(
+    item.personalRating === undefined ? '' : item.personalRating.toString(),
+  );
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (editing) return;
+    setVisitedAt(visit.visitedAt);
+    setNote(visit.note ?? '');
+    setRating(
+      item.personalRating === undefined ? '' : item.personalRating.toString(),
+    );
+  }, [editing, item.personalRating, visit.note, visit.visitedAt]);
+
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    let normalizedRating: number | undefined;
+    try {
+      normalizedRating = parseOptionalRating(rating);
+      setError('');
+    } catch {
+      setError('Enter any number from 0 to 5.');
+      return;
+    }
+
+    try {
+      await onSave(visit.id, {
+        visitedAt,
+        note: note.trim() || undefined,
+        rating: normalizedRating ?? null,
+      });
+      setEditing(false);
+    } catch {
+      // The view model restores the previous record and presents the error.
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="journal-visit is-editing">
+        <form className="journal-visit-form" onSubmit={submit} noValidate>
+          <div className="form-pair">
+            <label htmlFor={`visit-date-${visit.id}`}>
+              Visited
+              <Input
+                id={`visit-date-${visit.id}`}
+                type="date"
+                value={visitedAt}
+                onChange={(event) => setVisitedAt(event.target.value)}
+                required
+              />
+            </label>
+            <label htmlFor={`visit-rating-${visit.id}`}>
+              マイスコア
+              <Input
+                id={`visit-rating-${visit.id}`}
+                type="number"
+                min="0"
+                max="5"
+                step="0.5"
+                value={rating}
+                onChange={(event) => setRating(event.target.value)}
+              />
+            </label>
+          </div>
+          <label htmlFor={`visit-note-${visit.id}`}>
+            Note
+            <textarea
+              id={`visit-note-${visit.id}`}
+              rows={3}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </label>
+          {error ? (
+            <small className="form-error" role="alert">
+              {error}
+            </small>
+          ) : null}
+          <div className="form-actions">
+            <Button type="submit" disabled={busy || !visitedAt}>
+              Save
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setVisitedAt(visit.visitedAt);
+                setNote(visit.note ?? '');
+                setRating(
+                  item.personalRating === undefined
+                    ? ''
+                    : item.personalRating.toString(),
+                );
+                setError('');
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="journal-visit">
+      <div className="journal-visit-copy">
+        <span>
+          {visitNumber}回目 · {visit.visitedAt}
+        </span>
+        {visit.note ? <p>{visit.note}</p> : null}
+      </div>
+      <div className="journal-visit-actions">
+        <button
+          type="button"
+          aria-label={`Edit visit ${visitNumber}`}
+          title="Edit visit"
+          onClick={() => setEditing(true)}
+        >
+          <Pencil aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label={`Delete visit ${visitNumber}`}
+          title="Delete visit"
+          onClick={onDelete}
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function DeleteVisitDialog({
+  visit,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  readonly visit?: VisitRecord;
+  readonly busy: boolean;
+  readonly onCancel: () => void;
+  readonly onConfirm: () => Promise<void>;
+}) {
+  if (!visit) return null;
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <button
+        type="button"
+        className="dialog-dismiss"
+        aria-label="Cancel deleting this visit"
+        onClick={onCancel}
+      />
+      <div
+        className="delete-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-visit-title"
+        aria-describedby="delete-visit-description"
+      >
+        <span className="delete-dialog-icon" aria-hidden="true">
+          <Trash2 />
+        </span>
+        <h2 id="delete-visit-title">Delete this visit?</h2>
+        <p id="delete-visit-description">
+          The record from {visit.visitedAt} will be permanently removed.
+        </p>
+        <div className="form-actions">
+          <Button variant="outline" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => void onConfirm()}
+            disabled={busy}
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import type { PlaceAssessmentPatch } from '@/features/atlas/model';
+import { normalizeRating } from '@/features/atlas/rating';
 import { updatePlaceAssessment } from '@/lib/server/atlas-store';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,14 @@ export async function PATCH(
   }
 
   try {
-    return NextResponse.json(await updatePlaceAssessment(id, input));
+    return NextResponse.json(
+      await updatePlaceAssessment(id, {
+        ...input,
+        ...(typeof input.overallRating === 'number'
+          ? { overallRating: normalizeRating(input.overallRating) }
+          : {}),
+      }),
+    );
   } catch (error) {
     if (error instanceof Error && error.message === 'Atlas item not found') {
       return new NextResponse(error.message, { status: 404 });

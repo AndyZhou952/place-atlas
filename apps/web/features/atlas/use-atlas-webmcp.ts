@@ -8,7 +8,9 @@ import type {
   NewImportJob,
   NewVisit,
   PlaceAssessmentPatch,
+  VisitUpdate,
 } from './model';
+import { normalizeRating } from './rating';
 
 interface ModelContextTool {
   readonly name: string;
@@ -47,6 +49,8 @@ interface AtlasWebMcpActions {
   readonly removeItem: (id: string) => Promise<void>;
   readonly queueImport: (input: NewImportJob) => Promise<unknown>;
   readonly addJournal: (input: NewVisit) => Promise<unknown>;
+  readonly updateJournal: (id: string, input: VisitUpdate) => Promise<unknown>;
+  readonly removeJournal: (id: string) => Promise<unknown>;
   readonly locateNearby: () => Promise<AtlasItem[]>;
 }
 
@@ -226,7 +230,7 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
           throw new TypeError('rating must be null or a number from 0 to 5');
         }
         const updated = await actions.updateAssessment(id, {
-          overallRating: rating,
+          overallRating: rating === null ? null : normalizeRating(rating),
         });
         return { id: updated.id, rating: updated.personalRating ?? null };
       },
@@ -240,6 +244,7 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
       inputSchema: {
         type: 'object',
         properties: {
+          mutationId: { type: 'string' },
           itemId: { type: 'string' },
           visitedAt: { type: 'string' },
           rating: { type: 'number', minimum: 0, maximum: 5 },
@@ -266,11 +271,78 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
           throw new TypeError('a visit requires at least a rating or note');
         }
         return actions.addJournal({
+          id: readOptionalString(input, 'mutationId'),
           itemId: readString(input, 'itemId'),
           visitedAt: readString(input, 'visitedAt'),
-          ...(rating === undefined ? {} : { rating }),
+          ...(rating === undefined ? {} : { rating: normalizeRating(rating) }),
           note,
         });
+      },
+    });
+
+    register({
+      name: 'update_visit',
+      title: 'Update a visit record',
+      description:
+        'Correct the date or note on a visit and optionally replace or clear the place’s persistent personal rating.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          visitedAt: { type: 'string' },
+          rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
+          note: { type: 'string' },
+        },
+        required: ['id', 'visitedAt'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
+      async execute(input) {
+        const values = readRecord(input);
+        const rating = values.rating;
+        if (
+          rating !== undefined &&
+          rating !== null &&
+          (typeof rating !== 'number' ||
+            !Number.isFinite(rating) ||
+            rating < 0 ||
+            rating > 5)
+        ) {
+          throw new TypeError('rating must be null or a number from 0 to 5');
+        }
+        return actions.updateJournal(readString(input, 'id'), {
+          visitedAt: readString(input, 'visitedAt'),
+          note: readOptionalString(input, 'note'),
+          ...(rating === undefined
+            ? {}
+            : {
+                rating:
+                  rating === null ? null : normalizeRating(rating as number),
+              }),
+        });
+      },
+    });
+
+    register({
+      name: 'delete_visit',
+      title: 'Delete a visit record',
+      description:
+        'Delete one user-confirmed visit and reconcile the place’s visited status.',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        additionalProperties: false,
+      },
+      annotations: {
+        readOnlyHint: false,
+        untrustedContentHint: true,
+        destructiveHint: true,
+      },
+      async execute(input) {
+        const id = readString(input, 'id');
+        await actions.removeJournal(id);
+        return { id, deleted: true };
       },
     });
 

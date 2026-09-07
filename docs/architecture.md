@@ -198,6 +198,20 @@ The existing Inbox and Journal routes are retained only as transitional
 fallbacks until the WeChat adapter has equivalent write operations. Removing
 them sooner would leave the product without a usable write path.
 
+## 6.2 Interaction adapters and mutation path
+
+The map View depends on an `AtlasMapAdapter`, not directly on Leaflet. The
+Leaflet adapter owns the map instance, injected tile-provider configuration,
+keyed marker reconciliation, selection, resize, and destruction. A provider or
+engine experiment must keep this boundary and must not change the ViewModel or
+Agent contract.
+
+Journal create follows one command path: View -> ViewModel optimistic mutation
+-> HTTP client -> route validation -> targeted item resolver -> atomic D1
+batch. The client mutation UUID becomes the Visit primary key, so the same
+command can be retried without duplication. Visit update/delete reuse the same
+ViewModel and HTTP route from both the web UI and browser-Agent tools.
+
 ## 6. Acquisition and identity pipeline
 
 ```mermaid
@@ -237,6 +251,8 @@ Application operations remain narrow and auditable:
 | `queue_creator_import` | Write job | Show receipt |
 | `update_atlas_item` | Write personal fields | User-approved input only |
 | `create_visit` | Write visit with optional note | Show visit receipt |
+| `update_visit` | Correct visit date/note and optional persistent score | Save receipt |
+| `delete_visit` | Delete one visit and reconcile visited state | Explicit confirmation |
 | `set_personal_rating` | Upsert one nullable place rating | Show old/new value |
 | `attach_visit_media` | Store/attach photo and caption | Show attachment receipt |
 | `search_atlas` / `recommend_places` | Read and rank | Expose applied filters |

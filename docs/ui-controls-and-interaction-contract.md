@@ -23,12 +23,17 @@ they must preserve these meanings, confirmations, and shared operations.
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |
 | Save visit | Add dated visit; rating, note, or photo must provide content | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
+| Edit visit | Correct date/note and optionally replace or clear the persistent place rating | `PATCH /api/journal/{id}` through the ViewModel | Save/cancel form | `update_visit` |
+| Delete visit | Remove one mistaken Visit and reconcile derived visited state | `DELETE /api/journal/{id}` through the ViewModel | Mandatory confirmation dialog | `delete_visit`, destructive |
+| Journal filters | Combine one place with an inclusive from/to date range | View-model projection only | Clear-filter control | Structured Journal query later |
 | `マイスコア` | Show beside the source rating in detail and list; double-click detail value to edit or clear | `PATCH /api/items/{id}/personal` | Optimistic update and rollback | `set_personal_rating` |
 
 ## 2. Rating semantics
 
 - `null` means not rated; `0` is a valid explicit score.
-- The current Journal and inline editor default to 3 and step by 0.5.
+- The current Journal and inline editor default to 3; spinner arrows step by 0.5.
+- Typed input accepts any finite value from 0 to 5 and is normalized to the
+  nearest one decimal by the UI, HTTP routes, store, and browser-Agent tools.
 - The domain/API still validates the inclusive 0–5 range independently of UI.
 - Rating belongs to the place assessment, never to an individual visit.
 - Personal and Tabelog/Google ratings are displayed together for comparison,
@@ -98,11 +103,19 @@ persist a user preference.
   value and surfaces a notice.
 - Journal submissions render an optimistic Visit immediately and restore the
   form/data if the API write fails.
+- Journal create uses a client-provided mutation ID and an atomic D1 batch, so
+  timeout retries do not duplicate a Visit or leave assessment state half-written.
+- Pending Journal writes do not disable unrelated map/place controls.
 - Personal-state changes must not rebuild map markers.
 - Marker selection changes marker state in place and recenters without a long
   animated flight.
 - Full-canvas CSS filters and backdrop blur must not cover the moving tile
   surface.
+- Leaflet uses progressive desktop tile scheduling; map provider, React view,
+  and marker reconciliation are separated behind an adapter boundary.
+- Performance budget: no interaction or main-thread task above 200 ms; frame
+  gap p95 below 50 ms and max below 100 ms; fixed-100-ms fixture tile settle
+  p95 below 400 ms. Hosted evidence remains required before closing issues.
 - The current OSM raster provider is a functional baseline, not a promise of
   Google Maps-level vector rendering. Provider evaluation remains a separate
   production decision tracked in GitHub issue #1. Hosted Journal request

@@ -39,12 +39,18 @@ complete. See `task-tracker.md` for task-level status and dependencies.
 - composable visit/favourite intersection filters and fixed `行った` status labels;
 - optimistic Journal rendering and form reset, with remaining hosted latency
   tracked in issue #2; map profiling remains in issue #1.
+- journal visit editing, confirmed deletion, and place/date-range memory filters;
+- 0.5 spinner steps with unrestricted 0–5 typing normalized to one decimal;
+- a replaceable Leaflet adapter with progressive tile scheduling and keyed
+  marker reconciliation;
+- idempotent Visit IDs and an atomic Journal write batch with no mutation-time
+  full-table reads.
 
 ## Phase 1 — correct the personal-memory model
 
 Goal: make one place remain one place across repeated visits.
 
-- complete the selected-place timeline integration and empty-state polish;
+- complete hosted verification of Journal correction and empty-state polish;
 - make `hasVisited` derivation and manual override semantics explicit;
 - add idempotency and audit records to personal writes;
 - refactor the selected split-sidebar layout into focused view components;

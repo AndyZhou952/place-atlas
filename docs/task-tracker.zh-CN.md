@@ -55,7 +55,7 @@
 | MAP-03 | 布局选择 | 选定分栏侧边栏（B）并设为主版本默认布局 | MAP-02 | 已完成 | 实验阶段 |
 | MAP-04A | 地图性能 | 复用标记、移除阻塞式选择动画，并消除移动画布上的 filter／blur | MAP-01 | 已完成 | 实验阶段 |
 | MAP-04B | 地图性能 | 恢复 Leaflet 渐进瓦片调度，隔离可替换地图适配器，按 key 对账标记，并验证托管表现（[#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)） | MAP-03 | 进行中 | 实验阶段 |
-| PERF-01 | Journal 性能 | 用一次定向读取和一次原子写批次替代重复全表读取，并验证托管延迟预算（[#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)） | DATA-03 | 进行中 | 实验阶段 |
+| PERF-01 | Journal 性能 | 定向读取与原子批次已部署；托管采样显示约两秒平台／鉴权底噪，因此前台保持乐观交互并跟踪独立服务选项（[#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)） | DATA-03 | 进行中 | 实验阶段 |
 | DATA-05A | 写入可靠性 | 客户端 Visit mutation ID、幂等插入、Visit／assessment 原子写入 | DATA-03 | 已完成 | 实验阶段 |
 | DATA-05 | 写入可靠性 | 幂等键、审计事件、可恢复删除策略 | DATA-02、DATA-03 | 下一步 | 实验阶段 |
 | REFACTOR-01 | 视图结构 | 将选定布局拆成职责单一的视图组件 | MAP-03 | 下一步 | 实验阶段 |

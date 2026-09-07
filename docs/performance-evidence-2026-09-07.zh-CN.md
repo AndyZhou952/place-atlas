@@ -1,6 +1,6 @@
 # 性能证据 — 2026-09-07
 
-状态：本地实现验证通过；等待部署后的托管实测
+状态：实现与部署验证通过；地图交互 trace 仍待完成
 
 ## Issue #1 — 地图平移与缩放
 
@@ -36,7 +36,9 @@
 - 重试使用 `ON CONFLICT(id) DO NOTHING`，不会产生重复 Visit；
 - Journal 等待期间不再禁用无关的地图／地点操作。
 
-新增 Visit 的结构预算为：**2 次 D1 binding 往返、3 条 statement、0 次全表读取**，修改前约为 13 条 statement 与 5 个串行阶段。SQLite 契约测试验证幂等性，以及 favorite／summary 等无关字段不会被覆盖。部署后仍需采样 p50／p95。
+新增 Visit 的结构预算为：**2 次 D1 binding 往返、3 条 statement、0 次全表读取**，修改前约为 13 条 statement 与 5 个串行阶段。SQLite 契约测试验证幂等性，以及 favorite／summary 等无关字段不会被覆盖。
+
+生产环境使用同一个幂等 Visit ID 采样五次，分别为 1.889 s、2.020 s、2.703 s、3.178 s 与 3.986 s：**p50 为 2.703 s，观测 p95 为 3.986 s**。临时 Visit 随后已删除，并确认生产 visits 表为空。同一环境下，在进入有意义的应用逻辑前，只读端点也很慢：静态 capabilities TTFB 2.894 s、空 Journal TTFB 2.016 s、items TTFB 2.078 s。这说明本次采样路径存在约两秒的 Sites／私有鉴权／运行时底噪；D1 查询数量是正确性与扩展问题，但不是全部托管延迟。网页因此将持久确认视为异步过程，立即绘制乐观 Visit。如果后台同步耗时日后影响实际使用，可再评估独立的 APAC 服务／API 主机。
 
 ## 验收预算
 

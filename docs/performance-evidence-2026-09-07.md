@@ -1,6 +1,6 @@
 # Performance Evidence — 2026-09-07
 
-Status: implementation verified locally; hosted measurements pending deployment
+Status: implementation and deployment verified; interactive map trace still pending
 
 ## Issue #1 — map pan and zoom
 
@@ -48,7 +48,19 @@ The two writes were not atomic.
 Structural budget for create: **2 D1 binding round trips, 3 statements, 0
 full-table reads**, down from about 13 statements and five serial waiting phases.
 SQLite contract tests verify idempotency and preservation of unrelated favorite
-and summary fields. Hosted p50/p95 remains to be sampled after deployment.
+and summary fields.
+
+Five authenticated production samples using the same idempotent Visit ID were
+1.889 s, 2.020 s, 2.703 s, 3.178 s, and 3.986 s: **p50 2.703 s; observed p95
+3.986 s**. The temporary Visit was deleted and the production Visit table was
+read back empty. Read-only endpoints measured in the same environment were also
+slow before meaningful application work: static capabilities TTFB 2.894 s,
+empty Journal TTFB 2.016 s, and items TTFB 2.078 s. This indicates a roughly
+2-second Sites/private-auth/runtime floor in this sampling path; D1 query count
+was a correctness and scaling problem, but was not the whole hosted latency.
+The UI therefore treats durable confirmation as asynchronous and paints the
+optimistic Visit immediately. A direct APAC service/API host remains a later
+option if background synchronization time becomes operationally important.
 
 ## Acceptance budget
 

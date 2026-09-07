@@ -58,7 +58,7 @@ be scheduled independently within its phase.
 | MAP-03 | Layout selection | Select split sidebar (B) and make it the main default | MAP-02 | done | Experimental |
 | MAP-04A | Map performance | Reuse markers, remove blocking selection animation, and eliminate moving-canvas filters/blur | MAP-01 | done | Experimental |
 | MAP-04B | Map performance | Restore progressive Leaflet tile scheduling, isolate a replaceable map adapter, reconcile markers by key, and validate hosted behavior ([#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)) | MAP-03 | in progress | Experimental |
-| PERF-01 | Journal performance | Replace repeated full-table reads with one targeted resolve plus an atomic write batch; validate hosted latency budget ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
+| PERF-01 | Journal performance | Targeted resolve + atomic write batch are deployed; hosted sample shows a roughly 2s platform/auth floor, so keep optimistic foreground and track direct-service option ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
 | DATA-05A | Write reliability | Client-supplied Visit mutation ID, idempotent insert, atomic Visit/assessment write | DATA-03 | done | Experimental |
 | DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
 | REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | next | Experimental |

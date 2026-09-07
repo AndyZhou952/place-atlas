@@ -411,21 +411,7 @@ function PlaceRow({
         </span>
         <span className="place-copy">
           <span className="place-title-line">
-            <strong>{item.title}</strong>
-            <span className="list-rating-group">
-              {item.personalRating === undefined ? null : (
-                <span className="list-rating is-personal">
-                  マイ {item.personalRating.toString()}
-                </span>
-              )}
-              {item.tabelog ? (
-                <span className="list-rating">
-                  食べログ {item.tabelog.score.toFixed(2)}
-                </span>
-              ) : (
-                <span className="list-kind-label">{kindLabel[item.kind]}</span>
-              )}
-            </span>
+            <strong title={item.title}>{item.title}</strong>
           </span>
           {item.alternateTitle ? (
             <span className="place-local">{item.alternateTitle}</span>
@@ -437,50 +423,66 @@ function PlaceRow({
         </span>
         <ChevronRight aria-hidden="true" />
       </button>
-      <div className="place-row-actions">
-        <button
-          type="button"
-          className={cn('place-row-action', item.isFavorite && 'is-active')}
-          aria-label={
-            item.isFavorite
-              ? `お気に入りを解除 ${item.title}`
-              : `お気に入りに追加 ${item.title}`
-          }
-          aria-pressed={Boolean(item.isFavorite)}
-          title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
-          onClick={onToggleFavorite}
-          disabled={busy}
-        >
-          <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
-        </button>
-        <button
-          type="button"
-          className={cn(
-            'place-row-action is-visited',
-            item.hasVisited && 'is-active',
+      <div className="place-row-side">
+        <span className="list-rating-group" aria-label="Ratings">
+          {item.personalRating === undefined ? null : (
+            <span className="list-rating is-personal">
+              マイ {item.personalRating.toString()}
+            </span>
           )}
-          aria-label={
-            item.hasVisited
-              ? `未訪問に戻す ${item.title}`
-              : `訪問済みにする ${item.title}`
-          }
-          aria-pressed={Boolean(item.hasVisited)}
-          title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
-          onClick={onToggleVisited}
-          disabled={busy}
-        >
-          <Circle fill={item.hasVisited ? 'currentColor' : 'none'} />
-          <span>行った</span>
-        </button>
-        <button
-          type="button"
-          className="place-row-action is-delete"
-          aria-label={`Delete ${item.title}`}
-          title="削除"
-          onClick={onDelete}
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
+          {item.tabelog ? (
+            <span className="list-rating">
+              食べログ {item.tabelog.score.toFixed(2)}
+            </span>
+          ) : (
+            <span className="list-kind-label">{kindLabel[item.kind]}</span>
+          )}
+        </span>
+        <div className="place-row-actions">
+          <button
+            type="button"
+            className={cn('place-row-action', item.isFavorite && 'is-active')}
+            aria-label={
+              item.isFavorite
+                ? `お気に入りを解除 ${item.title}`
+                : `お気に入りに追加 ${item.title}`
+            }
+            aria-pressed={Boolean(item.isFavorite)}
+            title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
+            onClick={onToggleFavorite}
+            disabled={busy}
+          >
+            <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'place-row-action is-visited',
+              item.hasVisited && 'is-active',
+            )}
+            aria-label={
+              item.hasVisited
+                ? `未訪問に戻す ${item.title}`
+                : `訪問済みにする ${item.title}`
+            }
+            aria-pressed={Boolean(item.hasVisited)}
+            title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
+            onClick={onToggleVisited}
+            disabled={busy}
+          >
+            <Circle fill={item.hasVisited ? 'currentColor' : 'none'} />
+            <span>行った</span>
+          </button>
+          <button
+            type="button"
+            className="place-row-action is-delete"
+            aria-label={`Delete ${item.title}`}
+            title="削除"
+            onClick={onDelete}
+          >
+            <Trash2 aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );

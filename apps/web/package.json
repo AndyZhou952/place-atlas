@@ -11,6 +11,9 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint app features lib components",
     "format": "oxfmt",
+    "format:check": "oxfmt --check app components db features lib",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

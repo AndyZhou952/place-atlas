@@ -36,7 +36,7 @@ complete. See `task-tracker.md` for task-level status and dependencies.
 - split sidebar (B) selected as the default main layout;
 - `マイスコア` shown beside Tabelog in detail and collection, with ViewModel-
   backed double-click editing;
-- composable visit/favourite union filters and fixed `行った` status labels;
+- composable visit/favourite intersection filters and fixed `行った` status labels;
 - optimistic Journal rendering and form reset, with remaining hosted latency
   tracked in issue #2; map profiling remains in issue #1.
 

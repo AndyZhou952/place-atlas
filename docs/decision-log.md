@@ -40,7 +40,8 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Layout review | Expose A/B/C through one main build using a non-persistent `layout` query | Lets Andy compare real rendering while preserving one API and one database |
 | 2026-09-07 | Selected layout | Split sidebar (B) becomes the default main presentation | Best balance of persistent browsing context, map visibility, and direct row actions |
 | 2026-09-07 | Visited control | Use a fixed `行った` label plus an empty/filled circle; favourite remains icon-only | Makes visited state understandable without changing copy between states |
-| 2026-09-07 | Combined filters | Visit and favourite filters are independent and combine by union | Supports “visited or favourite” and “not yet or favourite” review sets exactly as requested |
+| 2026-09-07 | Combined filters | Visit and favourite controls remain independently selectable, but active filters combine by intersection | Prevents non-favourite places from appearing when the heart filter is active |
+| 2026-09-07 | Collection row information | Stack source/personal ratings above the right-side status controls; expand truncated titles when the row is selected, hovered, or focused | Preserves title width while keeping ratings and full names discoverable |
 | 2026-09-07 | Inline score editing | `マイスコア` is edited from detail through the existing ViewModel operation | Keeps the View free of direct persistence and synchronizes list/detail/Agent data |
 | 2026-09-07 | Remaining latency | Track map stalls in issue #1 and Journal request latency in issue #2 | Performance work stays visible without blocking the selected-layout iteration |
 

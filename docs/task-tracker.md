@@ -45,7 +45,9 @@ be scheduled independently within its phase.
 | UX-01A | Personal controls | Optimistic local feedback with durable reconciliation and rollback | UX-01 | done | Experimental |
 | UX-02 | Journal correction | One place card with one rating and a visit timeline, also visible in map detail | DATA-02, DATA-03 | done | Experimental |
 | UX-03 | Rating input | Journal defaults to 3 with 0.5 steps; inline `マイスコア` edit uses the ViewModel | DATA-02 | done | Experimental |
-| UX-05 | Combined filters | Visit and favourite controls can be active together with union semantics | SEARCH-02 | done | Experimental |
+| UX-05 | Combined filters | Visit and favourite controls can be active together and require both selected states | SEARCH-02 | done | Experimental |
+| UX-06 | Collection readability | Move rating badges into the right rail and reveal full titles on selection, hover, or focus | UX-05 | done | Experimental |
+| CI-01 | Continuous integration | Pull requests and `main` run formatting, lint, type checks, unit tests, and production build | UX-05 | done | Experimental |
 | UX-04 | Deletion | List delete, named confirmation, cascading personal cleanup, tombstone | FND-03 | done | Experimental |
 | SEARCH-01 | Deterministic search | Partial multilingual name/description/tag matching | — | done | Experimental |
 | SEARCH-02 | Search transparency | Visible tags and all/visited/unvisited/favourite filters | SEARCH-01, DATA-04 | done | Experimental |

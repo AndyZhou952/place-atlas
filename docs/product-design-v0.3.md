@@ -143,7 +143,7 @@ optimistically and reconcile with the durable API, so ordinary network latency
 does not block visible feedback.
 
 Visit state and favourite filters can be active at the same time and combine by
-union. `マイスコア` appears beside the source rating in both list and detail;
+intersection. `マイスコア` appears beside the source rating in both list and detail;
 double-click editing calls the ViewModel operation rather than writing directly
 from the View.
 

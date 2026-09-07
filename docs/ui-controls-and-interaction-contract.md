@@ -16,7 +16,9 @@ they must preserve these meanings, confirmations, and shared operations.
 | Edit | Change title, description, collection state | `PATCH /api/items/{id}` | Save/cancel form | `update_atlas_item` |
 | Delete row action | Remove place and attached private records | `DELETE /api/items/{id}`; create bootstrap tombstone | Mandatory named confirmation dialog | `delete_atlas_item`, destructive |
 | Type filter | Show food, event, architecture, or all | View-model state only | None | Structured search filter later |
-| Visit + favourite filters | Visit state and favourite are independently selectable; combined active filters use union semantics | View-model state only | None | Recommendation/search filter later |
+| Visit + favourite filters | Visit state and favourite are independently selectable; combined active filters require both selected states | View-model state only | None | Recommendation/search filter later |
+| Collection-row title | Compact rows start with ellipsis; selected, hovered, or keyboard-focused rows expand the full title | View state only | None | None |
+| Collection-row ratings | Place `マイ` and Tabelog badges in the right status rail above the personal controls | Read-only projection of the same item model | None | None |
 | Search | Match normalized name, alternate name, area, address, description, and tags | Deterministic view-model query | None | `search_atlas` in Agent v2 |
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |

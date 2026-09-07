@@ -13,6 +13,7 @@ import {
   updateItemAssessment,
 } from './atlas-api-client';
 import { distanceInKm } from './distance';
+import { matchesPersonalStatus } from './personal-filter';
 import { matchesAtlasQuery } from './search';
 import type {
   AtlasItem,
@@ -64,18 +65,11 @@ export function useAtlasViewModel() {
     const filtered = items.filter((item) => {
       if (item.verificationStatus !== 'verified') return false;
       const matchesKind = kind === 'all' || item.kind === kind;
-      const matchesVisit =
-        personalFilter === 'all' ||
-        (personalFilter === 'unvisited' && !item.hasVisited) ||
-        (personalFilter === 'visited' && item.hasVisited);
-      const matchesPersonal =
-        personalFilter === 'all'
-          ? favoriteOnly
-            ? Boolean(item.isFavorite)
-            : true
-          : favoriteOnly
-            ? matchesVisit || Boolean(item.isFavorite)
-            : matchesVisit;
+      const matchesPersonal = matchesPersonalStatus(
+        item,
+        personalFilter,
+        favoriteOnly,
+      );
       return matchesKind && matchesPersonal && matchesAtlasQuery(item, query);
     });
 
@@ -248,7 +242,7 @@ export function useAtlasViewModel() {
         setItems((current) =>
           current.map((item) => (item.id === updated.id ? updated : item)),
         );
-        setNotice('Personal place status saved.');
+        setNotice('');
         return updated;
       } catch (error) {
         setItems((current) =>

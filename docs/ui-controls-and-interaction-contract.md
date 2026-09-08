@@ -103,6 +103,9 @@ persist a user preference.
   value and surfaces a notice.
 - Journal submissions render an optimistic Visit immediately and restore the
   form/data if the API write fails.
+- Journal edits exit edit mode immediately; confirmed deletion closes the
+  dialog and removes the Visit immediately. A background failure restores the
+  data and reopens the relevant interface.
 - Journal create uses a client-provided mutation ID and an atomic D1 batch, so
   timeout retries do not duplicate a Visit or leave assessment state half-written.
 - Pending Journal writes do not disable unrelated map/place controls.
@@ -118,8 +121,9 @@ persist a user preference.
   p95 below 400 ms. Hosted evidence remains required before closing issues.
 - The current OSM raster provider is a functional baseline, not a promise of
   Google Maps-level vector rendering. Provider evaluation remains a separate
-  production decision tracked in GitHub issue #1. Hosted Journal request
-  profiling is tracked in issue #2.
+  production decision tracked in GitHub issue #1. Journal foreground blocking
+  is resolved; the roughly two-second Sites background response floor is
+  recorded in issue #2.
 
 ## 7. Known incomplete controls
 

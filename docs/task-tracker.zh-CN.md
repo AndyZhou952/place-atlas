@@ -55,7 +55,7 @@
 | MAP-03 | 布局选择 | 选定分栏侧边栏（B）并设为主版本默认布局 | MAP-02 | 已完成 | 实验阶段 |
 | MAP-04A | 地图性能 | 复用标记、移除阻塞式选择动画，并消除移动画布上的 filter／blur | MAP-01 | 已完成 | 实验阶段 |
 | MAP-04B | 地图性能 | 恢复 Leaflet 渐进瓦片调度，隔离可替换地图适配器，按 key 对账标记，并验证托管表现（[#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)） | MAP-03 | 进行中 | 实验阶段 |
-| PERF-01 | Journal 性能 | 定向读取与原子批次已部署；托管采样显示约两秒平台／鉴权底噪，因此前台保持乐观交互并跟踪独立服务选项（[#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)） | DATA-03 | 进行中 | 实验阶段 |
+| PERF-01 | Journal 性能 | create／edit／delete 均为 2 次 D1 往返；编辑器与删除弹窗立即乐观收起，约两秒平台／鉴权回包仅在后台完成（[#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)） | DATA-03 | 已完成 | 实验阶段 |
 | DATA-05A | 写入可靠性 | 客户端 Visit mutation ID、幂等插入、Visit／assessment 原子写入 | DATA-03 | 已完成 | 实验阶段 |
 | DATA-05 | 写入可靠性 | 幂等键、审计事件、可恢复删除策略 | DATA-02、DATA-03 | 下一步 | 实验阶段 |
 | REFACTOR-01 | 视图结构 | 将选定布局拆成职责单一的视图组件 | MAP-03 | 下一步 | 实验阶段 |
@@ -118,4 +118,4 @@
 
 ## 当前检查点
 
-分栏侧边栏方案已经选定。Journal 纠错与自由输入评分规范化已经实现；地图与 Journal 性能修改正在等待托管验证及 issue 证据。完成这一检查点后，下一段可独立推进的工程工作是 `MEDIA-01` 至 `MEDIA-03`，之后在独立 Chrome context 准备完成后启动采集器。
+分栏侧边栏方案已经选定。Journal 纠错、自由输入评分规范化和前台写入延迟修正已经部署并完成托管验证。地图性能仍由 issue #1 跟踪。下一段可独立推进的工程工作是 `MEDIA-01` 至 `MEDIA-03`，之后抽取 `AGENT-01` 应用边界，并在独立 Chrome context 准备完成后启动采集器。

@@ -37,8 +37,9 @@ complete. See `task-tracker.md` for task-level status and dependencies.
 - `マイスコア` shown beside Tabelog in detail and collection, with ViewModel-
   backed double-click editing;
 - composable visit/favourite intersection filters and fixed `行った` status labels;
-- optimistic Journal rendering and form reset, with remaining hosted latency
-  tracked in issue #2; map profiling remains in issue #1.
+- immediate optimistic Journal create/edit/delete interaction, with the hosted
+  background response floor recorded in issue #2; map profiling remains in
+  issue #1.
 - journal visit editing, confirmed deletion, and place/date-range memory filters;
 - 0.5 spinner steps with unrestricted 0–5 typing normalized to one decimal;
 - a replaceable Leaflet adapter with progressive tile scheduling and keyed

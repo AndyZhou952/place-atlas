@@ -58,7 +58,7 @@ be scheduled independently within its phase.
 | MAP-03 | Layout selection | Select split sidebar (B) and make it the main default | MAP-02 | done | Experimental |
 | MAP-04A | Map performance | Reuse markers, remove blocking selection animation, and eliminate moving-canvas filters/blur | MAP-01 | done | Experimental |
 | MAP-04B | Map performance | Restore progressive Leaflet tile scheduling, isolate a replaceable map adapter, reconcile markers by key, and validate hosted behavior ([#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)) | MAP-03 | in progress | Experimental |
-| PERF-01 | Journal performance | Targeted resolve + atomic write batch are deployed; hosted sample shows a roughly 2s platform/auth floor, so keep optimistic foreground and track direct-service option ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | in progress | Experimental |
+| PERF-01 | Journal performance | Create/edit/delete each use two D1 round trips; editors/dialogs close optimistically while the roughly 2s platform/auth response completes in the background ([#2](https://github.com/AndyZhou952/jp-food-event-map/issues/2)) | DATA-03 | done | Experimental |
 | DATA-05A | Write reliability | Client-supplied Visit mutation ID, idempotent insert, atomic Visit/assessment write | DATA-03 | done | Experimental |
 | DATA-05 | Write reliability | Idempotency keys, audit events, recoverable delete policy | DATA-02, DATA-03 | next | Experimental |
 | REFACTOR-01 | View structure | Split selected layout into focused view components | MAP-03 | next | Experimental |
@@ -123,8 +123,9 @@ precursor. It is not a substitute for the authenticated 24/7 service boundary.
 
 ## Current checkpoint
 
-The split-sidebar layout is selected. Journal correction and free-form rating
-normalization are implemented. Map and Journal performance changes now await
-hosted verification and issue evidence. After that checkpoint, the next
-independent slice is `MEDIA-01` through `MEDIA-03`, followed by the dedicated-
-browser collector after its separate Chrome context is prepared.
+The split-sidebar layout is selected. Journal correction, free-form rating
+normalization, and foreground mutation-latency fixes are deployed and hosted-
+verified. Map performance remains tracked in issue #1. The next independent
+engineering slice is `MEDIA-01` through `MEDIA-03`, followed by the `AGENT-01`
+application boundary and then the collector after the dedicated Chrome context
+is ready.

@@ -27,7 +27,7 @@ unchanged marker is neither removed nor rebuilt. Type-check, lint, production
 build, and the complete unit suite pass. Hosted frame/tile timings are still
 required before the issue is closed.
 
-## Issue #2 — Journal save latency
+## Issue #2 — Journal mutation latency
 
 ### Before
 
@@ -62,6 +62,27 @@ The UI therefore treats durable confirmation as asynchronous and paints the
 optimistic Visit immediately. A direct APAC service/API host remains a later
 option if background synchronization time becomes operationally important.
 
+### 2026-09-08 edit/delete correction
+
+The API was not the only source of perceived latency. The ViewModel already
+applied optimistic state, but the View kept the inline editor and confirmation
+dialog open until the hosted request resolved. Save now exits edit mode in the
+same interaction frame, and Delete immediately closes the dialog and removes
+the Visit. A failed durable write rolls data back and reopens the relevant UI.
+
+The server path was also reduced. Edit moved from three serial D1 binding round
+trips to **two** (one combined Visit/place resolve and one atomic write).
+Deleting the last Visit moved from as many as six round trips to **two** (one
+resolve and one atomic delete/status-reconciliation batch). Neither path uses a
+full-table read, and place-level score, favorite, and summary fields survive.
+
+A disposable production record measured edit at 2.353 s and delete at 2.348 s;
+the following read-only Journal request measured 2.019 s. This again attributes
+most remaining time to the private Sites auth/runtime path rather than mutation
+logic. The disposable record was removed and its absence read back. Because the
+foreground no longer awaits the response, this network floor no longer blocks
+the visible Save/Delete interaction.
+
 ## Acceptance budget
 
 | Metric | Budget |
@@ -70,7 +91,7 @@ option if background synchronization time becomes operationally important.
 | Frame gap | p95 < 50 ms; max < 100 ms |
 | Tile settle with fixed 100 ms fixture delay | p95 < 400 ms |
 | Journal optimistic paint | p95 <= 100 ms |
-| Journal D1 binding round trips | 2 |
+| Journal create/edit/delete D1 binding round trips | 2 each |
 | Retry duplicates / partial Visit writes | 0 |
 
 Map tests must use fixture/intercepted tiles rather than automated load against

@@ -48,6 +48,7 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Journal correction | Visits are editable/deletable and history filters combine place with an inclusive date range | Mistakes remain correctable and Journal can serve as a memory browser before Agent parity |
 | 2026-09-07 | Map performance | Keep Leaflet for now; restore progressive tile scheduling and isolate it behind a provider-neutral adapter | Current evidence points to configuration and tile delivery, not a proven engine limit |
 | 2026-09-07 | Journal performance | Keep D1; use targeted item resolution, client mutation IDs, and an atomic write batch | Removes repeated full-table reads, prevents partial writes, and preserves future Agent retries |
+| 2026-09-08 | Journal edit/delete latency | Close the View in the same interaction frame with ViewModel rollback on failure; cap both server paths at two D1 round trips | Keeps the private Sites response floor out of the user interaction without sacrificing durable correctness |
 
 ## Open decisions
 

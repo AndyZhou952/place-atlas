@@ -84,6 +84,7 @@
 
 - 喜欢和去过控件在同一个交互帧内先更新本地状态，再与持久 API 对账。写入失败时恢复旧值并显示提示。
 - Journal 提交会立即乐观显示 Visit；API 写入失败时恢复表单与数据。
+- Journal 修改会立即退出编辑态；确认删除会立即关闭弹窗并移除 Visit。后台失败时恢复数据并重新打开对应界面。
 - Journal 新增使用客户端 mutation ID 与 D1 原子批次，因此超时重试不会产生重复 Visit 或留下半完成的 assessment。
 - Journal 写入等待期间不得禁用无关的地图／地点控件。
 - 个人状态变化不得重建地图标记。
@@ -91,7 +92,7 @@
 - 移动中的地图瓦片表面不得被全画布 CSS filter 或 backdrop blur 覆盖。
 - Leaflet 使用渐进式桌面瓦片调度；地图供应商、React View 与标记对账通过 adapter 边界分离。
 - 性能预算：交互或主线程任务不得超过 200 ms；帧间隔 p95 小于 50 ms、最大值小于 100 ms；固定 100 ms 测试瓦片下稳定时间 p95 小于 400 ms。关闭 issue 前仍需托管证据。
-- 当前 OSM 栅格服务是功能基线，并不承诺达到 Google Maps 级别的矢量渲染效果。服务商评估记录在 GitHub issue #1；托管 Journal 请求耗时分析记录在 issue #2。
+- 当前 OSM 栅格服务是功能基线，并不承诺达到 Google Maps 级别的矢量渲染效果。服务商评估记录在 GitHub issue #1；Journal 的前台阻塞已解决，约两秒的 Sites 后台回包底噪记录在 issue #2。
 
 ## 7. 已知未完成控件
 

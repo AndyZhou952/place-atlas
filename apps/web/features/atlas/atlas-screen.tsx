@@ -1271,10 +1271,12 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         onCancel={() => setPendingDelete(undefined)}
         onConfirm={async () => {
           if (!pendingDelete) return;
+          const visit = pendingDelete;
+          setPendingDelete(undefined);
           try {
-            await vm.removeVisit(pendingDelete.id);
-            setPendingDelete(undefined);
+            await vm.removeVisit(visit.id);
           } catch {
+            setPendingDelete(visit);
             // The view model restores the record and presents the error.
           }
         }}
@@ -1327,14 +1329,15 @@ function JournalVisitRow({
       return;
     }
 
+    setEditing(false);
     try {
       await onSave(visit.id, {
         visitedAt,
         note: note.trim() || undefined,
         rating: normalizedRating ?? null,
       });
-      setEditing(false);
     } catch {
+      setEditing(true);
       // The view model restores the previous record and presents the error.
     }
   }

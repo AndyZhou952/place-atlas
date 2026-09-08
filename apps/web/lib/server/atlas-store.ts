@@ -16,7 +16,12 @@ import { normalizeRating } from '@/features/atlas/rating';
 import { verifiedAtlasItems } from '@/features/atlas/verified-items';
 
 import {
+  deleteLegacyJournalEntrySql,
+  deleteVisitSql,
   insertVisitSql,
+  reconcileVisitedAfterDeleteSql,
+  updateVisitSql,
+  upsertVisitRatingSql,
   upsertVisitedWithRatingSql,
   upsertVisitedWithoutRatingSql,
 } from './journal-write';
@@ -86,6 +91,17 @@ interface ResolvedItemRow {
   has_visited: number | null;
   has_visit: number;
   tombstone_id: string | null;
+}
+
+interface ResolvedVisitMutationRow extends ResolvedItemRow {
+  visit_id: string;
+  visit_item_id: string;
+  visit_item_title: string;
+  visit_visited_at: string;
+  visit_note: string | null;
+  visit_created_at: string;
+  visit_updated_at: string;
+  visit_count: number;
 }
 
 const verifiedItemsById = new Map(
@@ -210,7 +226,14 @@ export async function getAtlasItem(id: string): Promise<AtlasItem | undefined> {
     )
     .bind(id)
     .first<ResolvedItemRow>();
-  if (!row || row.tombstone_id) return undefined;
+  return row ? resolveAtlasItem(id, row) : undefined;
+}
+
+function resolveAtlasItem(
+  id: string,
+  row: ResolvedItemRow,
+): AtlasItem | undefined {
+  if (row.tombstone_id) return undefined;
 
   let item = verifiedItemsById.get(id);
   if (!item && row.payload_json) {
@@ -469,11 +492,9 @@ export async function updateVisit(
   id: string,
   input: VisitUpdate,
 ): Promise<VisitMutationResult | undefined> {
-  const existing = await getVisit(id);
-  if (!existing) return undefined;
-
-  const item = await getAtlasItem(existing.itemId);
-  if (!item) throw new Error('Atlas item not found');
+  const context = await getVisitMutationContext(id);
+  if (!context) return undefined;
+  const { item, visit: existing } = context;
 
   const updatedAt = new Date().toISOString();
   const visit: VisitRecord = {
@@ -485,11 +506,7 @@ export async function updateVisit(
 
   const db = getD1();
   const visitUpdate = db
-    .prepare(
-      `UPDATE visits
-       SET visited_at = ?, note = ?, updated_at = ?
-       WHERE id = ?`,
-    )
+    .prepare(updateVisitSql)
     .bind(visit.visitedAt, visit.note ?? null, updatedAt, id);
   if (input.rating === undefined) {
     await visitUpdate.run();
@@ -499,14 +516,7 @@ export async function updateVisit(
   const overallRating =
     input.rating === null ? undefined : normalizeRating(input.rating);
   const assessmentUpdate = db
-    .prepare(
-      `INSERT INTO place_assessments
-       (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, ?, ?)
-       ON CONFLICT(item_id) DO UPDATE SET
-         overall_rating = excluded.overall_rating,
-         updated_at = excluded.updated_at`,
-    )
+    .prepare(upsertVisitRatingSql)
     .bind(
       item.id,
       overallRating ?? null,
@@ -524,45 +534,82 @@ export async function updateVisit(
 export async function deleteJournalEntry(
   id: string,
 ): Promise<VisitMutationResult | undefined> {
-  const existing = await getVisit(id);
-  if (!existing) return undefined;
+  const context = await getVisitMutationContext(id);
+  if (!context) return undefined;
+  const { item, visit: existing, visitCount } = context;
 
   const db = getD1();
+  const updatedAt = new Date().toISOString();
   await db.batch([
-    db.prepare('DELETE FROM visits WHERE id = ?').bind(id),
-    db.prepare('DELETE FROM journal_entries WHERE id = ?').bind(id),
+    db.prepare(deleteVisitSql).bind(id),
+    db.prepare(deleteLegacyJournalEntrySql).bind(id),
+    db
+      .prepare(reconcileVisitedAfterDeleteSql)
+      .bind(existing.itemId, existing.itemId, updatedAt, updatedAt),
   ]);
-
-  const remaining = await db
-    .prepare('SELECT COUNT(*) AS visit_count FROM visits WHERE item_id = ?')
-    .bind(existing.itemId)
-    .first<VisitCountRow>();
-  const item = await getAtlasItem(existing.itemId);
-  if (!item) throw new Error('Atlas item not found');
-  const updatedItem =
-    (remaining?.visit_count ?? 0) === 0
-      ? await updatePlaceAssessment(existing.itemId, { hasVisited: false })
-      : item;
-  return { item: updatedItem };
+  return { item: { ...item, hasVisited: visitCount > 1 } };
 }
 
-async function getVisit(id: string): Promise<VisitRecord | undefined> {
+async function getVisitMutationContext(
+  id: string,
+): Promise<
+  { visit: VisitRecord; item: AtlasItem; visitCount: number } | undefined
+> {
   const row = await getD1()
     .prepare(
-      `SELECT id, item_id, item_title, visited_at, note, created_at, updated_at
-       FROM visits WHERE id = ?`,
+      `WITH requested_visit AS (
+         SELECT visits.*,
+                (
+                  SELECT COUNT(*) FROM visits AS sibling
+                  WHERE sibling.item_id = visits.item_id
+                ) AS visit_count
+         FROM visits
+         WHERE visits.id = ?
+       )
+       SELECT requested_visit.id AS visit_id,
+              requested_visit.item_id AS visit_item_id,
+              requested_visit.item_title AS visit_item_title,
+              requested_visit.visited_at AS visit_visited_at,
+              requested_visit.note AS visit_note,
+              requested_visit.created_at AS visit_created_at,
+              requested_visit.updated_at AS visit_updated_at,
+              requested_visit.visit_count,
+              items.payload_json,
+              overrides.title AS override_title,
+              overrides.description AS override_description,
+              overrides.personal_state AS override_personal_state,
+              overrides.updated_at AS override_updated_at,
+              assessments.overall_rating,
+              assessments.is_favorite,
+              assessments.has_visited,
+              CASE WHEN requested_visit.visit_count > 0 THEN 1 ELSE 0 END AS has_visit,
+              tombstones.item_id AS tombstone_id
+       FROM requested_visit
+       LEFT JOIN atlas_items AS items ON items.id = requested_visit.item_id
+       LEFT JOIN atlas_item_overrides AS overrides
+         ON overrides.item_id = requested_visit.item_id
+       LEFT JOIN place_assessments AS assessments
+         ON assessments.item_id = requested_visit.item_id
+       LEFT JOIN atlas_item_tombstones AS tombstones
+         ON tombstones.item_id = requested_visit.item_id`,
     )
     .bind(id)
-    .first<VisitRow>();
+    .first<ResolvedVisitMutationRow>();
   if (!row) return undefined;
+  const item = resolveAtlasItem(row.visit_item_id, row);
+  if (!item) throw new Error('Atlas item not found');
   return {
-    id: row.id,
-    itemId: row.item_id,
-    itemTitle: row.item_title,
-    visitedAt: row.visited_at,
-    note: row.note ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    visit: {
+      id: row.visit_id,
+      itemId: row.visit_item_id,
+      itemTitle: row.visit_item_title,
+      visitedAt: row.visit_visited_at,
+      note: row.visit_note ?? undefined,
+      createdAt: row.visit_created_at,
+      updatedAt: row.visit_updated_at,
+    },
+    item,
+    visitCount: row.visit_count,
   };
 }
 

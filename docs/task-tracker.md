@@ -73,7 +73,7 @@ be scheduled independently within its phase.
 | MEDIA-02 | Upload safety | MIME/signature/size/hash validation and rollback cleanup are done; server-side dimensions and orphan sweeper remain | MEDIA-01 | in progress | Experimental |
 | MEDIA-03 | Media model | Ordered Visit photos, private content route, optional normalized one-line caption | MEDIA-01 | done | Experimental |
 | MEDIA-04 | Web fallback | Same-form Visit photos; 24-file selection split into four-file requests; later add/retry, caption, delete through ViewModel | MEDIA-03, MAP-03 | done | Experimental |
-| MEDIA-05 | Map memory | Visit-grouped photos/captions; show four then expand | MEDIA-03 | done | Experimental |
+| MEDIA-05 | Map memory | Visit-grouped photos/captions; four-thumbnail preview plus keyboard/button/swipe lightbox | MEDIA-03 | done | Experimental |
 | MEDIA-06 | Agent intake | Capture-session association, channel-message idempotency, ambiguity confirmation, photo/reply captions (RFC #4) | MEDIA-03, AGENT-02, AGENT-03 | blocked | Demo |
 
 ### 3 — Framework-neutral Agent application layer

@@ -74,8 +74,8 @@ Goal: make personal visual memory durable and visible on the map.
 Current progress: private R2 storage, D1 metadata, signature/size/hash checks,
 per-Visit multi-image upload, one-line caption editing/deletion, and map-detail
 display are implemented. The web form now accepts photos during Visit creation,
-supports 24-photo selections through bounded four-file requests, and folds
-galleries after four images. Conversational association/caption behavior is
+supports 24-photo selections through bounded four-file requests, and opens a
+keyboard/button/swipe lightbox after four thumbnails. Conversational association/caption behavior is
 specified in GitHub RFC #4. Server-side dimension extraction, failed-chunk
 retry, and scheduled orphan cleanup remain before this phase is fully closed.
 

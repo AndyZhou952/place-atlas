@@ -21,7 +21,7 @@
 | 地图标记 | 选择并聚焦一个地点 | ViewModel 选择状态 | 无 | `focus_atlas_item` |
 | Near me | 获取位置并按距离排序 | 浏览器地理位置；不存储当前位置 | 浏览器权限确认 | `find_nearby_atlas_items` |
 | Save visit | 新增指定日期的到访，并可在同一表单预先选择图片；目前仍需由评分或笔记提供 Visit 内容 | 一次 ViewModel action 先调用 `POST /api/journal`，再分批调用 `POST /api/media`；评分仍更新地点唯一的 PlaceAssessment | Visit 立即回执；图片批次失败会明确提示且不丢失已经保存的 Visit | `create_visit`；未来 capture session 会组合 Visit 与媒体 use case |
-| Visit 图片 | 网页一次可选择最多 24 张私有图片，由客户端自动拆成每批四张；每个 Visit 没有固定图片上限。支持单行说明、确认删除，并在 Journal／地图详情中折叠展示 | 通过 ViewModel 调用 `GET/POST /api/media`、`PATCH/DELETE /api/media/{id}` 与需鉴权的 `GET /api/media/{id}/content` | 删除必须确认；说明与删除失败时回滚乐观更新 | `list_visit_media`、`update_visit_media_caption` 与确认后的 `delete_visit_media`；未来服务端 Agent 使用同一个 multipart HTTP 操作并显式提供 Visit／capture context |
+| Visit 图片 | 网页一次可选择最多 24 张私有图片，由客户端自动拆成每批四张；每个 Visit 没有固定图片上限。页面先显示四张缩略图，完整图库在弹窗中通过按钮、键盘方向键或移动端滑动浏览；Journal 模式仍可编辑说明 | 通过 ViewModel 调用 `GET/POST /api/media`、`PATCH/DELETE /api/media/{id}` 与需鉴权的 `GET /api/media/{id}/content` | 删除必须确认；说明与删除失败时回滚乐观更新；Escape／背景关闭浏览器 | `list_visit_media`、`update_visit_media_caption` 与确认后的 `delete_visit_media`；未来服务端 Agent 使用同一个 multipart HTTP 操作并显式提供 Visit／capture context |
 | Edit visit | 修正日期／笔记，并可替换或清空持久地点评分 | 通过 ViewModel 调用 `PATCH /api/journal/{id}` | 保存／取消表单 | `update_visit` |
 | Delete visit | 删除一条错误 Visit，并重新计算推导出的去过状态 | 通过 ViewModel 调用 `DELETE /api/journal/{id}` | 必须确认 | `delete_visit`，破坏性操作 |
 | Journal 筛选 | 组合地点与包含边界的起止日期范围 | 仅 ViewModel 投影 | 清空筛选控件 | 未来结构化 Journal 查询 |
@@ -46,7 +46,7 @@
 - v1 中，每张上传图片可有一行可选说明文字。
 - 网页可以在 Save 前选择图片，但 ViewModel 会先保存 Visit，再用有限大小的批次附加图片；已有 Visit 仍保留 `Add photos` 入口。
 - 四张只是单次传输请求的上限，不是用户或 Visit 上限。网页一次可选 24 张，更多图片可再选一批。
-- 图库默认展示四张，用户需要时再展开其余图片。
+- 图库默认展示四张缩略图；完整图片在弹窗内一次显示一张。桌面支持前后按钮、Left／Right／Escape，移动端支持横向滑动；浏览时预加载相邻图片。
 - 把“只发图片”作为单一原子命令留到 Agent capture-session 阶段处理，届时 create／upload 任一失败都需要补偿清理。
 - 只有当二进制、元数据、关联关系和说明文字都能在刷新后保留，并出现在地图的选中地点详情中时，媒体功能才算完成。
 

@@ -2,17 +2,21 @@
 
 import {
   type ChangeEvent,
+  type PointerEvent as ReactPointerEvent,
   type SyntheticEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import {
   Bot,
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Circle,
   CircleHelp,
@@ -1528,32 +1532,45 @@ function VisitMediaGallery({
 }: {
   readonly media: readonly VisitMediaRecord[];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number>();
   if (!media.length) return null;
-  const visibleMedia = expanded ? media : media.slice(0, 4);
+  const visibleMedia = media.slice(0, 4);
   return (
     <div className="visit-media-collection">
       <div className="visit-media-gallery">
-        {visibleMedia.map((entry) => (
+        {visibleMedia.map((entry, index) => (
           <figure key={entry.id}>
-            <Image
-              src={entry.contentUrl}
-              alt={entry.caption || entry.originalFilename}
-              width={640}
-              height={480}
-              sizes="(max-width: 600px) 50vw, 180px"
-              unoptimized
-              loading="lazy"
-            />
+            <button
+              className="media-thumbnail-button"
+              type="button"
+              aria-label={`Open ${entry.caption || entry.originalFilename}`}
+              onClick={() => setLightboxIndex(index)}
+            >
+              <Image
+                src={entry.contentUrl}
+                alt={entry.caption || entry.originalFilename}
+                width={640}
+                height={480}
+                sizes="(max-width: 600px) 50vw, 180px"
+                unoptimized
+                loading="lazy"
+              />
+            </button>
             {entry.caption ? <figcaption>{entry.caption}</figcaption> : null}
           </figure>
         ))}
       </div>
-      <MediaExpansionButton
+      <MediaBrowseButton
         count={media.length}
-        expanded={expanded}
-        onToggle={() => setExpanded((value) => !value)}
+        onOpen={() => setLightboxIndex(0)}
       />
+      {lightboxIndex !== undefined ? (
+        <PhotoLightbox
+          media={media}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(undefined)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1573,8 +1590,8 @@ function VisitMediaEditor({
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
   readonly onDelete: AtlasViewModel['removeMedia'];
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const visibleMedia = expanded ? media : media.slice(0, 4);
+  const [lightboxIndex, setLightboxIndex] = useState<number>();
+  const visibleMedia = media.slice(0, 4);
 
   async function selectFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
@@ -1590,19 +1607,19 @@ function VisitMediaEditor({
   return (
     <div className="visit-media-editor">
       <div className="visit-media-gallery is-editable">
-        {visibleMedia.map((entry) => (
+        {visibleMedia.map((entry, index) => (
           <MediaCaptionEditor
             key={`${entry.id}:${entry.caption ?? ''}`}
             media={entry}
             onSave={onSaveCaption}
             onDelete={onDelete}
+            onOpen={() => setLightboxIndex(index)}
           />
         ))}
       </div>
-      <MediaExpansionButton
+      <MediaBrowseButton
         count={media.length}
-        expanded={expanded}
-        onToggle={() => setExpanded((value) => !value)}
+        onOpen={() => setLightboxIndex(0)}
       />
       <label className={cn('media-upload-control', busy && 'is-busy')}>
         <ImagePlus aria-hidden="true" />
@@ -1615,23 +1632,33 @@ function VisitMediaEditor({
           onChange={(event) => void selectFiles(event)}
         />
       </label>
+      {lightboxIndex !== undefined ? (
+        <PhotoLightbox
+          media={media}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(undefined)}
+          onSaveCaption={onSaveCaption}
+          onDelete={async (id) => {
+            if (media.length === 1) setLightboxIndex(undefined);
+            return onDelete(id);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function MediaExpansionButton({
+function MediaBrowseButton({
   count,
-  expanded,
-  onToggle,
+  onOpen,
 }: {
   readonly count: number;
-  readonly expanded: boolean;
-  readonly onToggle: () => void;
+  readonly onOpen: () => void;
 }) {
   if (count <= 4) return null;
   return (
-    <button className="media-expansion-button" type="button" onClick={onToggle}>
-      {expanded ? 'Show less' : `Show ${count - 4} more`}
+    <button className="media-browse-button" type="button" onClick={onOpen}>
+      View all {count} photos
     </button>
   );
 }
@@ -1640,10 +1667,12 @@ function MediaCaptionEditor({
   media,
   onSave,
   onDelete,
+  onOpen,
 }: {
   readonly media: VisitMediaRecord;
   readonly onSave: AtlasViewModel['saveMediaCaption'];
   readonly onDelete: AtlasViewModel['removeMedia'];
+  readonly onOpen: () => void;
 }) {
   const [caption, setCaption] = useState(media.caption ?? '');
 
@@ -1658,15 +1687,22 @@ function MediaCaptionEditor({
 
   return (
     <figure>
-      <Image
-        src={media.contentUrl}
-        alt={media.caption || media.originalFilename}
-        width={640}
-        height={480}
-        sizes="(max-width: 600px) 50vw, 180px"
-        unoptimized
-        loading="lazy"
-      />
+      <button
+        className="media-thumbnail-button"
+        type="button"
+        aria-label={`Open ${media.caption || media.originalFilename}`}
+        onClick={onOpen}
+      >
+        <Image
+          src={media.contentUrl}
+          alt={media.caption || media.originalFilename}
+          width={640}
+          height={480}
+          sizes="(max-width: 600px) 50vw, 180px"
+          unoptimized
+          loading="lazy"
+        />
+      </button>
       <div className="media-caption-row">
         <Input
           value={caption}
@@ -1694,6 +1730,211 @@ function MediaCaptionEditor({
         </button>
       </div>
     </figure>
+  );
+}
+
+function PhotoLightbox({
+  media,
+  initialIndex,
+  onClose,
+  onSaveCaption,
+  onDelete,
+}: {
+  readonly media: readonly VisitMediaRecord[];
+  readonly initialIndex: number;
+  readonly onClose: () => void;
+  readonly onSaveCaption?: AtlasViewModel['saveMediaCaption'];
+  readonly onDelete?: AtlasViewModel['removeMedia'];
+}) {
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const swipeStartX = useRef<number | undefined>(undefined);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const safeIndex = Math.min(activeIndex, Math.max(media.length - 1, 0));
+  const active = media[safeIndex];
+
+  const move = useCallback(
+    (direction: -1 | 1) => {
+      setActiveIndex(
+        (current) => (current + direction + media.length) % media.length,
+      );
+    },
+    [media.length],
+  );
+
+  useEffect(() => {
+    closeButton.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    function keyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+      if (event.key === 'ArrowLeft' && media.length > 1) move(-1);
+      if (event.key === 'ArrowRight' && media.length > 1) move(1);
+    }
+    window.addEventListener('keydown', keyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', keyDown);
+    };
+  }, [media.length, move, onClose]);
+
+  useEffect(() => {
+    if (media.length < 2) return;
+    const neighbors = [
+      media[(safeIndex + 1) % media.length],
+      media[(safeIndex - 1 + media.length) % media.length],
+    ];
+    for (const entry of neighbors) {
+      if (!entry) continue;
+      const preload = new window.Image();
+      preload.src = entry.contentUrl;
+    }
+  }, [media, safeIndex]);
+
+  if (!active) return null;
+
+  function pointerDown(event: ReactPointerEvent) {
+    swipeStartX.current = event.clientX;
+  }
+
+  function pointerUp(event: ReactPointerEvent) {
+    const start = swipeStartX.current;
+    swipeStartX.current = undefined;
+    if (start === undefined || media.length < 2) return;
+    const delta = event.clientX - start;
+    if (Math.abs(delta) < 45) return;
+    move(delta > 0 ? -1 : 1);
+  }
+
+  return createPortal(
+    <div className="photo-lightbox" role="presentation">
+      <button
+        className="photo-lightbox-dismiss"
+        type="button"
+        aria-label="Close photo viewer"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        className="photo-lightbox-panel"
+        aria-modal="true"
+        aria-label="Visit photo viewer"
+      >
+        <header>
+          <span aria-live="polite">
+            {safeIndex + 1} / {media.length}
+          </span>
+          <button
+            ref={closeButton}
+            type="button"
+            aria-label="Close photo viewer"
+            onClick={onClose}
+          >
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <div
+          className="photo-lightbox-stage"
+          onPointerDown={pointerDown}
+          onPointerUp={pointerUp}
+        >
+          <Image
+            key={active.id}
+            src={active.contentUrl}
+            alt={active.caption || active.originalFilename}
+            width={1600}
+            height={1200}
+            sizes="100vw"
+            unoptimized
+            priority
+            draggable={false}
+          />
+          {media.length > 1 ? (
+            <>
+              <button
+                className="photo-lightbox-previous"
+                type="button"
+                aria-label="Previous photo"
+                onClick={() => move(-1)}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              <button
+                className="photo-lightbox-next"
+                type="button"
+                aria-label="Next photo"
+                onClick={() => move(1)}
+              >
+                <ChevronRight aria-hidden="true" />
+              </button>
+            </>
+          ) : null}
+        </div>
+        <footer>
+          {onSaveCaption ? (
+            <LightboxCaptionEditor
+              key={`${active.id}:${active.caption ?? ''}`}
+              media={active}
+              onSave={onSaveCaption}
+            />
+          ) : active.caption ? (
+            <p>{active.caption}</p>
+          ) : (
+            <span>No caption</span>
+          )}
+          {onDelete ? (
+            <button
+              className="photo-lightbox-delete"
+              type="button"
+              aria-label={`Delete ${active.originalFilename}`}
+              onClick={() => {
+                if (window.confirm('Delete this photo?')) {
+                  void onDelete(active.id);
+                }
+              }}
+            >
+              <Trash2 aria-hidden="true" />
+            </button>
+          ) : null}
+        </footer>
+      </dialog>
+    </div>,
+    document.body,
+  );
+}
+
+function LightboxCaptionEditor({
+  media,
+  onSave,
+}: {
+  readonly media: VisitMediaRecord;
+  readonly onSave: AtlasViewModel['saveMediaCaption'];
+}) {
+  const [caption, setCaption] = useState(media.caption ?? '');
+
+  async function saveCaption() {
+    if (caption.trim() === (media.caption ?? '')) return;
+    try {
+      await onSave(media.id, caption);
+    } catch {
+      setCaption(media.caption ?? '');
+    }
+  }
+
+  return (
+    <Input
+      value={caption}
+      maxLength={160}
+      aria-label={`Caption for ${media.originalFilename}`}
+      placeholder="What is this?"
+      onChange={(event) => setCaption(event.target.value)}
+      onBlur={() => void saveCaption()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 

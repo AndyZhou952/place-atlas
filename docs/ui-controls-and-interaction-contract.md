@@ -23,7 +23,7 @@ they must preserve these meanings, confirmations, and shared operations.
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |
 | Save visit | Add a dated visit with optional photos selected in the same form; rating or note must currently provide the Visit content | `POST /api/journal`, followed by bounded `POST /api/media` batches through one ViewModel action; optional rating updates the one place assessment | Immediate Visit receipt; failed photo batches are reported without losing the saved Visit | `create_visit`; the future capture-session operation composes Visit and media use cases |
-| Visit photos | Select up to 24 private images in one browser action; the client sends batches of four, with no fixed per-Visit limit. Edit one-line captions, delete an image, and show a folded gallery in Journal/map detail | `GET/POST /api/media`, `PATCH/DELETE /api/media/{id}`, and authenticated `GET /api/media/{id}/content`, all reached through the ViewModel | Delete requires confirmation; optimistic caption/delete rollback on failure | `list_visit_media`, `update_visit_media_caption`, and confirmed `delete_visit_media`; future service Agent uses the same multipart HTTP operation with explicit Visit/capture context |
+| Visit photos | Select up to 24 private images in one browser action; the client sends batches of four, with no fixed per-Visit limit. Show four thumbnails, then browse the complete set in a modal with buttons, arrow keys, or mobile swipe. Captions remain editable in Journal mode | `GET/POST /api/media`, `PATCH/DELETE /api/media/{id}`, and authenticated `GET /api/media/{id}/content`, all reached through the ViewModel | Delete requires confirmation; optimistic caption/delete rollback on failure; Escape/backdrop closes the viewer | `list_visit_media`, `update_visit_media_caption`, and confirmed `delete_visit_media`; future service Agent uses the same multipart HTTP operation with explicit Visit/capture context |
 | Edit visit | Correct date/note and optionally replace or clear the persistent place rating | `PATCH /api/journal/{id}` through the ViewModel | Save/cancel form | `update_visit` |
 | Delete visit | Remove one mistaken Visit and reconcile derived visited state | `DELETE /api/journal/{id}` through the ViewModel | Mandatory confirmation dialog | `delete_visit`, destructive |
 | Journal filters | Combine one place with an inclusive from/to date range | View-model projection only | Clear-filter control | Structured Journal query later |
@@ -54,7 +54,9 @@ they must preserve these meanings, confirmations, and shared operations.
   `Add photos` fallback.
 - Four is a transport-level request bound, not a user or Visit limit. One web
   selection accepts 24 photos and larger sets can use another selection.
-- Galleries show four photos initially and expand on request.
+- Galleries show four thumbnails initially. The complete set opens in a modal:
+  desktop uses previous/next buttons plus Left/Right/Escape; touch screens swipe
+  horizontally. Adjacent full images preload while only one is rendered.
 - Supporting a photo-only Visit as one atomic command is deferred to the Agent
   capture-session slice, where create/upload can provide compensating cleanup.
 - Media is not complete until bytes, metadata, attachment, and caption all

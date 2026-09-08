@@ -794,6 +794,21 @@
   margin: 0;
 }
 
+.media-thumbnail-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.media-thumbnail-button:focus-visible {
+  border-radius: 0.55rem;
+  outline: 3px solid color-mix(in srgb, var(--vermilion) 48%, transparent);
+  outline-offset: 2px;
+}
+
 .visit-media-gallery img {
   display: block;
   width: 100%;
@@ -908,7 +923,7 @@
   font-size: 0.7rem;
 }
 
-.media-expansion-button {
+.media-browse-button {
   width: fit-content;
   padding: 0.34rem 0.65rem;
   border: 1px solid var(--line-strong);
@@ -920,9 +935,180 @@
   cursor: pointer;
 }
 
-.media-expansion-button:hover {
+.media-browse-button:hover {
   color: var(--vermilion-dark);
   border-color: var(--vermilion);
+}
+
+.photo-lightbox {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+  place-items: center;
+  background: rgb(13 14 12 / 92%);
+}
+
+.photo-lightbox-dismiss {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+
+.photo-lightbox-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(72rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 1rem;
+  color: #f7f4ec;
+  background: #11120f;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 52%);
+}
+
+.photo-lightbox-panel > header,
+.photo-lightbox-panel > footer {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.photo-lightbox-panel > header {
+  justify-content: space-between;
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
+}
+
+.photo-lightbox-panel > header span {
+  color: rgb(255 255 255 / 72%);
+  font-family: var(--font-geist-mono);
+  font-size: 0.78rem;
+}
+
+.photo-lightbox-panel > header button,
+.photo-lightbox-previous,
+.photo-lightbox-next,
+.photo-lightbox-delete {
+  display: grid;
+  width: 2.55rem;
+  height: 2.55rem;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  place-items: center;
+  color: #fff;
+  background: rgb(255 255 255 / 9%);
+  cursor: pointer;
+}
+
+.photo-lightbox-panel button:hover {
+  background: rgb(255 255 255 / 18%);
+}
+
+.photo-lightbox-panel button:focus-visible {
+  outline: 3px solid rgb(255 255 255 / 40%);
+  outline-offset: 2px;
+}
+
+.photo-lightbox-panel button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.photo-lightbox-stage {
+  position: relative;
+  display: grid;
+  min-height: min(68vh, 42rem);
+  overflow: hidden;
+  place-items: center;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.photo-lightbox-stage img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(72vh, 48rem);
+  object-fit: contain;
+}
+
+.photo-lightbox-previous,
+.photo-lightbox-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  backdrop-filter: blur(8px);
+}
+
+.photo-lightbox-previous {
+  left: 0.85rem;
+}
+
+.photo-lightbox-next {
+  right: 0.85rem;
+}
+
+.photo-lightbox-panel > footer {
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.photo-lightbox-panel > footer input {
+  flex: 1;
+  min-width: 0;
+  border-color: rgb(255 255 255 / 22%);
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+
+.photo-lightbox-panel > footer p,
+.photo-lightbox-panel > footer span {
+  flex: 1;
+  margin: 0;
+  color: rgb(255 255 255 / 72%);
+  line-height: 1.45;
+}
+
+.photo-lightbox-delete:hover {
+  color: #ffae98;
+  border-color: rgb(255 174 152 / 55%);
+}
+
+@media (max-width: 700px) {
+  .photo-lightbox {
+    padding: 0;
+  }
+
+  .photo-lightbox-panel {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .photo-lightbox-stage {
+    min-height: 0;
+  }
+
+  .photo-lightbox-stage img {
+    max-height: calc(100dvh - 8rem);
+  }
+
+  .photo-lightbox-previous,
+  .photo-lightbox-next {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
 }
 
 .dialog-backdrop {

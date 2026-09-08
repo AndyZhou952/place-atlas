@@ -52,6 +52,7 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-08 | Visit media boundary | Store private bytes in R2, searchable relations/captions/hash in D1, and route both web and future Agent adapters through the same media operations | Preserves MVVM, avoids database blobs, and keeps channel/runtime choices replaceable |
 | 2026-09-08 | High-volume photo upload | Let the web select 24 photos while keeping four-file server requests and no fixed per-Visit cap | Supports long tasting menus without exceeding Worker request/memory budgets |
 | 2026-09-08 | Conversational media association | Put a user/conversation/place-scoped capture session above the explicit Visit media port; ask on ambiguity and use channel message IDs for idempotency | Independent chat messages stay convenient without silently attaching private photos to the wrong place |
+| 2026-09-09 | Large-gallery browsing | Keep four thumbnails in the timeline and open the full set in a single-image modal with adjacent preload, buttons, keyboard, and touch swipe | Preserves timeline scan speed while making 18-photo meals comfortable on desktop and mobile |
 
 ## Open decisions
 

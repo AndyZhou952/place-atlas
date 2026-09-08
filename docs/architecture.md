@@ -198,8 +198,10 @@ The four-file server limit is a bounded request contract, not a Visit limit.
 The web client accepts 24 files per selection and sequences bounded requests;
 completed chunks enter the ViewModel immediately. The Journal form may select
 photos before saving, while the ViewModel still persists an explicit Visit ID
-before attaching bytes. Galleries render four thumbnails first and expand on
-demand.
+before attaching bytes. Galleries render four thumbnails first, then open a
+single-image modal for the full set. Only the current full image renders while
+its two neighbors preload; navigation supports buttons, keyboard, and touch
+swipe without changing the media/ViewModel boundary.
 
 Future chat adapters add a short-lived `VisitCaptureSession` above these same
 use cases. A session is scoped to authenticated user + conversation + explicit

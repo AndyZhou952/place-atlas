@@ -170,7 +170,7 @@ test('Journal edit and delete keep explicit database call budgets', () => {
   });
   assert.deepEqual(journalDeletePerformanceBudget, {
     bindingRoundTrips: 2,
-    statements: 4,
+    statements: 5,
     fullTableReads: 0,
   });
 });

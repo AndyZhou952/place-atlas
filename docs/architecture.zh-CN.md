@@ -156,6 +156,8 @@ WebMCP Adapter
 
 照片二进制存放在对象存储；D1 保留元数据、内容哈希、说明文字、显示顺序，以及 Visit／Item 关联。网页与 Agent 上传都使用同一个 finalize-and-attach 操作。
 
+已实现的媒体边界在 `/api/media` 下提供列表、multipart 关联上传、私有内容读取、说明修改和删除操作。React View 不直接访问存储：它交给 Atlas ViewModel，再由 ViewModel 使用未来经过鉴权的 Agent adapter 也会调用的同一 HTTP client。当前对 JPEG、PNG、WebP 与 GIF 做文件签名校验；单次最多四张、每张 8 MB。R2 失败不会创建元数据，元数据批次失败则清理已经写入的对象。
+
 ## 6.1 界面归属
 
 微信是主要指令与采集入口。私有地图是主要读取、空间整理与记忆入口。地图显示选中地点的统一评价、Visit 时间线与媒体；有歧义的采集证据通过上下文深链接打开，而不要求永久保留 Inbox 入口。

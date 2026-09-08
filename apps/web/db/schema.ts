@@ -4,6 +4,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
 export const atlasItems = sqliteTable(
@@ -60,6 +61,29 @@ export const visits = sqliteTable(
   },
   (table) => [
     index('idx_visits_item_visited').on(table.itemId, table.visitedAt),
+  ],
+);
+
+export const visitMedia = sqliteTable(
+  'visit_media',
+  {
+    id: text('id').primaryKey(),
+    visitId: text('visit_id').notNull(),
+    itemId: text('item_id').notNull(),
+    objectKey: text('object_key').notNull(),
+    originalFilename: text('original_filename').notNull(),
+    contentType: text('content_type').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    contentSha256: text('content_sha256').notNull(),
+    caption: text('caption'),
+    displayOrder: integer('display_order').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_visit_media_object_key').on(table.objectKey),
+    index('idx_visit_media_visit_order').on(table.visitId, table.displayOrder),
+    index('idx_visit_media_item_created').on(table.itemId, table.createdAt),
   ],
 );
 

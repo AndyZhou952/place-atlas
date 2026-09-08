@@ -1,7 +1,7 @@
 # Japan Atlas Task Tracker v0.4
 
 Status: active execution board
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 ## Stage definitions
 
@@ -15,6 +15,8 @@ Last updated: 2026-09-07
 **Current overall stage: Experimental.** The persistent web core is real; the
 creator collector, photo pipeline, service-secured Agent, and WeChat channel are
 not yet complete.
+
+Cross-milestone delivery is tracked in [RFC roadmap #3](https://github.com/AndyZhou952/jp-food-event-map/issues/3).
 
 Status vocabulary: `done`, `in progress`, `next`, `blocked`, and `later`.
 
@@ -67,11 +69,11 @@ be scheduled independently within its phase.
 
 | ID | Parent task | Subtask / deliverable | Prerequisite | Status | Stage |
 |---|---|---|---|---|---|
-| MEDIA-01 | Object storage | Enable private R2 binding and media metadata tables | DATA-03 | next | Experimental |
-| MEDIA-02 | Upload safety | Validate MIME, size, dimensions, hash; create/finalize lifecycle | MEDIA-01 | blocked | Experimental |
-| MEDIA-03 | Media model | Attach ordered photos to visits; optional one-line caption | MEDIA-02 | blocked | Experimental |
-| MEDIA-04 | Web fallback | Selected-place/visit uploader and gallery | MEDIA-03, MAP-03 | blocked | Experimental |
-| MEDIA-05 | Map memory | Show visit-grouped photos and captions on place detail | MEDIA-03 | blocked | Experimental |
+| MEDIA-01 | Object storage | Private R2 binding and D1 media metadata/migration | DATA-03 | done | Experimental |
+| MEDIA-02 | Upload safety | MIME/signature/size/hash validation and rollback cleanup are done; server-side dimensions and orphan sweeper remain | MEDIA-01 | in progress | Experimental |
+| MEDIA-03 | Media model | Ordered Visit photos, private content route, optional normalized one-line caption | MEDIA-01 | done | Experimental |
+| MEDIA-04 | Web fallback | Per-Visit multi-image uploader, caption editor, and delete control through ViewModel | MEDIA-03, MAP-03 | done | Experimental |
+| MEDIA-05 | Map memory | Visit-grouped photos and captions on place detail | MEDIA-03 | done | Experimental |
 | MEDIA-06 | Agent intake | Map WeChat/Agent images and captions to the same APIs | MEDIA-03, AGENT-02 | blocked | Demo |
 
 ### 3 — Framework-neutral Agent application layer
@@ -126,6 +128,6 @@ precursor. It is not a substitute for the authenticated 24/7 service boundary.
 The split-sidebar layout is selected. Journal correction, free-form rating
 normalization, and foreground mutation-latency fixes are deployed and hosted-
 verified. Map performance remains tracked in issue #1. The next independent
-engineering slice is `MEDIA-01` through `MEDIA-03`, followed by the `AGENT-01`
-application boundary and then the collector after the dedicated Chrome context
-is ready.
+engineering checkpoint is to finish the remaining `MEDIA-02` hardening, then
+extract the `AGENT-01` application boundary before the dedicated-browser
+collector begins.

@@ -61,6 +61,6 @@ export const journalUpdatePerformanceBudget = {
 
 export const journalDeletePerformanceBudget = {
   bindingRoundTrips: 2,
-  statements: 4,
+  statements: 5,
   fullTableReads: 0,
 } as const;

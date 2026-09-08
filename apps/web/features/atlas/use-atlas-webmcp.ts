@@ -9,6 +9,7 @@ import type {
   NewVisit,
   PlaceAssessmentPatch,
   VisitUpdate,
+  VisitMediaRecord,
 } from './model';
 import { normalizeRating } from './rating';
 
@@ -40,6 +41,7 @@ declare global {
 
 interface AtlasWebMcpActions {
   readonly items: readonly AtlasItem[];
+  readonly media: readonly VisitMediaRecord[];
   readonly selectItem: (id: string) => void;
   readonly updateItem: (id: string, edit: AtlasItemEdit) => Promise<AtlasItem>;
   readonly updateAssessment: (
@@ -51,6 +53,11 @@ interface AtlasWebMcpActions {
   readonly addJournal: (input: NewVisit) => Promise<unknown>;
   readonly updateJournal: (id: string, input: VisitUpdate) => Promise<unknown>;
   readonly removeJournal: (id: string) => Promise<unknown>;
+  readonly updateMediaCaption: (
+    id: string,
+    caption: string,
+  ) => Promise<VisitMediaRecord>;
+  readonly removeMedia: (id: string) => Promise<void>;
   readonly locateNearby: () => Promise<AtlasItem[]>;
 }
 
@@ -240,7 +247,7 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
       name: 'create_visit',
       title: 'Create a visit record',
       description:
-        'Record a visit to one Atlas item. Provide at least a rating or note until photo intake is available.',
+        'Record a visit to one Atlas item with at least a rating or note. Photos can then be attached through the media operation.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -320,6 +327,72 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
                   rating === null ? null : normalizeRating(rating as number),
               }),
         });
+      },
+    });
+
+    register({
+      name: 'list_visit_media',
+      title: 'List Visit photos',
+      description:
+        'Read private photo metadata and captions for one Visit. Binary upload uses the scoped media HTTP operation.',
+      inputSchema: {
+        type: 'object',
+        properties: { visitId: { type: 'string' } },
+        required: ['visitId'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      execute(input) {
+        const visitId = readString(input, 'visitId');
+        return actions.media
+          .filter((entry) => entry.visitId === visitId)
+          .map(({ contentSha256: _hash, ...entry }) => entry);
+      },
+    });
+
+    register({
+      name: 'update_visit_media_caption',
+      title: 'Update a Visit photo caption',
+      description:
+        'Set or clear the optional one-line caption on a private Visit photo.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          caption: { type: 'string', maxLength: 160 },
+        },
+        required: ['id', 'caption'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
+      async execute(input) {
+        const updated = await actions.updateMediaCaption(
+          readString(input, 'id'),
+          readString(input, 'caption'),
+        );
+        return { id: updated.id, caption: updated.caption ?? null };
+      },
+    });
+
+    register({
+      name: 'delete_visit_media',
+      title: 'Delete a Visit photo',
+      description: 'Delete one user-confirmed private Visit photo.',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        additionalProperties: false,
+      },
+      annotations: {
+        readOnlyHint: false,
+        untrustedContentHint: true,
+        destructiveHint: true,
+      },
+      async execute(input) {
+        const id = readString(input, 'id');
+        await actions.removeMedia(id);
+        return { id, deleted: true };
       },
     });
 

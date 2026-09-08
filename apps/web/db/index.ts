@@ -7,3 +7,12 @@ export function getD1(): D1Database {
 
   return env.DB;
 }
+
+export function getMediaBucket(): R2Bucket {
+  const media = (env as unknown as { MEDIA?: R2Bucket }).MEDIA;
+  if (!media) {
+    throw new Error('Cloudflare R2 binding `MEDIA` is unavailable.');
+  }
+
+  return media;
+}

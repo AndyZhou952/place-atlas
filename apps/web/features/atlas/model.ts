@@ -126,6 +126,21 @@ export interface VisitRecord {
   readonly updatedAt: string;
 }
 
+export interface VisitMediaRecord {
+  readonly id: string;
+  readonly visitId: string;
+  readonly itemId: string;
+  readonly originalFilename: string;
+  readonly contentType: string;
+  readonly byteSize: number;
+  readonly contentSha256: string;
+  readonly caption?: string;
+  readonly displayOrder: number;
+  readonly contentUrl: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export interface NewVisit {
   readonly id?: string;
   readonly itemId: string;

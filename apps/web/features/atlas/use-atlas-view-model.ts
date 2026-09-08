@@ -6,13 +6,17 @@ import {
   createImportJob,
   createVisit,
   deleteAtlasItem,
+  deleteVisitMedia,
   deleteVisit,
   fetchAtlasItems,
   fetchImportJobs,
   fetchVisits,
+  fetchVisitMedia,
   updateAtlasItem,
   updateItemAssessment,
   updateVisit,
+  updateVisitMediaCaption,
+  uploadVisitMedia,
 } from './atlas-api-client';
 import { distanceInKm } from './distance';
 import { matchesPersonalStatus } from './personal-filter';
@@ -29,6 +33,7 @@ import type {
   NewVisit,
   PlaceAssessmentPatch,
   VisitRecord,
+  VisitMediaRecord,
   VisitUpdate,
 } from './model';
 import { useAtlasWebMcp } from './use-atlas-webmcp';
@@ -47,6 +52,7 @@ export function useAtlasViewModel() {
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
+  const [media, setMedia] = useState<VisitMediaRecord[]>([]);
   const [distances, setDistances] = useState<Record<string, number>>({});
   const [locationStatus, setLocationStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,6 +60,9 @@ export function useAtlasViewModel() {
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
+  const [pendingMediaVisitIds, setPendingMediaVisitIds] = useState<
+    ReadonlySet<string>
+  >(new Set());
   const [notice, setNotice] = useState('');
 
   const setItemPending = useCallback((id: string, pending: boolean) => {
@@ -70,12 +79,25 @@ export function useAtlasViewModel() {
       fetchAtlasItems().then(setItems),
       fetchImportJobs().then(setImportJobs),
       fetchVisits().then(setVisits),
+      fetchVisitMedia().then(setMedia),
     ]).catch(() => {
       setNotice(
         'Local preview is using verified source data; cloud records reconnect after publish.',
       );
     });
   }, []);
+
+  const setMediaVisitPending = useCallback(
+    (visitId: string, pending: boolean) => {
+      setPendingMediaVisitIds((current) => {
+        const next = new Set(current);
+        if (pending) next.add(visitId);
+        else next.delete(visitId);
+        return next;
+      });
+    },
+    [],
+  );
 
   const visibleItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -317,10 +339,12 @@ export function useAtlasViewModel() {
       const hasAnotherVisit = visits.some(
         (visit) => visit.id !== id && visit.itemId === previousVisit.itemId,
       );
+      const previousMedia = media.filter((entry) => entry.visitId === id);
 
       setJournalBusy(true);
       setNotice('');
       setVisits((current) => current.filter((visit) => visit.id !== id));
+      setMedia((current) => current.filter((entry) => entry.visitId !== id));
       if (!hasAnotherVisit) {
         setItems((current) =>
           current.map((item) =>
@@ -339,6 +363,7 @@ export function useAtlasViewModel() {
         return result;
       } catch (error) {
         setVisits((current) => sortVisits([previousVisit, ...current]));
+        setMedia((current) => [...previousMedia, ...current]);
         setItems((current) =>
           current.map((item) =>
             item.id === previousItem.id ? previousItem : item,
@@ -354,7 +379,72 @@ export function useAtlasViewModel() {
         setJournalBusy(false);
       }
     },
-    [items, visits],
+    [items, media, visits],
+  );
+
+  const addVisitMedia = useCallback(
+    async (visitId: string, files: readonly File[]) => {
+      setMediaVisitPending(visitId, true);
+      setNotice('');
+      try {
+        const uploaded = await uploadVisitMedia(visitId, files);
+        setMedia((current) => [...current, ...uploaded]);
+        return uploaded;
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? error.message : 'Could not upload photos.',
+        );
+        throw error;
+      } finally {
+        setMediaVisitPending(visitId, false);
+      }
+    },
+    [setMediaVisitPending],
+  );
+
+  const saveMediaCaption = useCallback(
+    async (id: string, caption: string) => {
+      const previous = media.find((entry) => entry.id === id);
+      if (!previous) throw new Error('Photo not found');
+      const optimistic = { ...previous, caption: caption.trim() || undefined };
+      setMedia((current) =>
+        current.map((entry) => (entry.id === id ? optimistic : entry)),
+      );
+      try {
+        const updated = await updateVisitMediaCaption(id, caption.trim());
+        setMedia((current) =>
+          current.map((entry) => (entry.id === id ? updated : entry)),
+        );
+        return updated;
+      } catch (error) {
+        setMedia((current) =>
+          current.map((entry) => (entry.id === id ? previous : entry)),
+        );
+        setNotice(
+          error instanceof Error ? error.message : 'Could not save caption.',
+        );
+        throw error;
+      }
+    },
+    [media],
+  );
+
+  const removeMedia = useCallback(
+    async (id: string) => {
+      const previous = media.find((entry) => entry.id === id);
+      if (!previous) throw new Error('Photo not found');
+      setMedia((current) => current.filter((entry) => entry.id !== id));
+      try {
+        await deleteVisitMedia(id);
+      } catch (error) {
+        setMedia((current) => [...current, previous]);
+        setNotice(
+          error instanceof Error ? error.message : 'Could not delete photo.',
+        );
+        throw error;
+      }
+    },
+    [media],
   );
 
   const saveAssessment = useCallback(
@@ -416,6 +506,7 @@ export function useAtlasViewModel() {
         await deleteAtlasItem(id);
         setItems((current) => current.filter((item) => item.id !== id));
         setVisits((current) => current.filter((visit) => visit.itemId !== id));
+        setMedia((current) => current.filter((entry) => entry.itemId !== id));
         setNotice('Place removed from your Atlas.');
       } catch (error) {
         setNotice(
@@ -481,6 +572,9 @@ export function useAtlasViewModel() {
       removeItem,
       queueImport,
       addJournal: addVisit,
+      media,
+      updateMediaCaption: saveMediaCaption,
+      removeMedia,
       updateJournal: editVisit,
       removeJournal: removeVisit,
       locateNearby,
@@ -490,9 +584,12 @@ export function useAtlasViewModel() {
       editVisit,
       items,
       locateNearby,
+      media,
       queueImport,
       removeItem,
+      removeMedia,
       removeVisit,
+      saveMediaCaption,
       saveAssessment,
       saveItemEdit,
       selectItem,
@@ -503,6 +600,7 @@ export function useAtlasViewModel() {
 
   return {
     addVisit,
+    addVisitMedia,
     editVisit,
     busy,
     distances,
@@ -510,8 +608,10 @@ export function useAtlasViewModel() {
     items,
     favoriteOnly,
     isItemPending: (id: string) => pendingItemIds.has(id),
+    isMediaVisitPending: (visitId: string) => pendingMediaVisitIds.has(visitId),
     journalBusy,
     visits,
+    media,
     kind,
     locationStatus,
     notice,
@@ -519,8 +619,10 @@ export function useAtlasViewModel() {
     query,
     queueImport,
     removeItem,
+    removeMedia,
     removeVisit,
     saveAssessment,
+    saveMediaCaption,
     saveItemEdit,
     selectedItem,
     selectItem,

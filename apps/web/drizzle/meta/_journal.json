@@ -15,6 +15,13 @@
       "when": 1788687069989,
       "tag": "0001_dapper_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788879310819,
+      "tag": "0002_funny_wrecker",
+      "breakpoints": true
     }
   ]
 }

@@ -71,6 +71,11 @@ Goal: make personal visual memory durable and visible on the map.
 - show visit-grouped thumbnails and a gallery in map detail;
 - support web upload as a fallback and Agent upload as the primary path.
 
+Current progress: private R2 storage, D1 metadata, signature/size/hash checks,
+per-Visit multi-image upload, one-line caption editing/deletion, and map-detail
+display are implemented. Server-side dimension extraction and scheduled orphan
+cleanup remain before this phase is fully closed.
+
 Exit: images sent through either supported surface appear under the correct
 place and visit with captions after refresh.
 

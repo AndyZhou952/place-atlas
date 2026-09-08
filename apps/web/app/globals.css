@@ -777,6 +777,117 @@
   line-height: 1.45;
 }
 
+.visit-media-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+}
+
+.visit-media-gallery figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.visit-media-gallery img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  object-fit: cover;
+  background: var(--paper);
+}
+
+.visit-media-gallery figcaption {
+  margin-top: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.visit-media-editor {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+
+.visit-media-gallery.is-editable {
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  margin-top: 0;
+}
+
+.media-caption-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.media-caption-row input {
+  height: 2rem;
+  font-size: 0.72rem;
+}
+
+.media-caption-row button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  place-items: center;
+  color: var(--ink-soft);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.media-caption-row button:hover {
+  color: var(--vermilion-dark);
+  border-color: var(--vermilion);
+}
+
+.media-caption-row svg,
+.media-upload-control svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.media-upload-control {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.media-upload-control:hover {
+  border-color: var(--vermilion);
+  color: var(--vermilion-dark);
+}
+
+.media-upload-control.is-busy {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.media-upload-control input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .dialog-backdrop {
   position: fixed;
   z-index: 1000;
@@ -1527,6 +1638,7 @@ button.personal-rating-inline:focus-visible {
 }
 
 .journal-visit-copy {
+  flex: 1;
   min-width: 0;
 }
 

@@ -1,4 +1,4 @@
-import { getD1 } from '@/db';
+import { getD1, getMediaBucket } from '@/db';
 import type {
   AtlasItem,
   AtlasItemEdit,
@@ -102,6 +102,7 @@ interface ResolvedVisitMutationRow extends ResolvedItemRow {
   visit_created_at: string;
   visit_updated_at: string;
   visit_count: number;
+  media_object_keys_json: string;
 }
 
 const verifiedItemsById = new Map(
@@ -357,8 +358,12 @@ export async function deleteAtlasItem(id: string): Promise<boolean> {
   const existing = await getAtlasItem(id);
   if (!existing) return false;
   const db = getD1();
+  const mediaRows = await allOrEmpty<{ object_key: string }>(
+    db.prepare('SELECT object_key FROM visit_media WHERE item_id = ?').bind(id),
+  );
   const deletedAt = new Date().toISOString();
   await db.batch([
+    db.prepare('DELETE FROM visit_media WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM visits WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM journal_entries WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM place_assessments WHERE item_id = ?').bind(id),
@@ -372,6 +377,7 @@ export async function deleteAtlasItem(id: string): Promise<boolean> {
       )
       .bind(id, deletedAt),
   ]);
+  await deleteMediaObjects(mediaRows.map((row) => row.object_key));
   return true;
 }
 
@@ -536,24 +542,30 @@ export async function deleteJournalEntry(
 ): Promise<VisitMutationResult | undefined> {
   const context = await getVisitMutationContext(id);
   if (!context) return undefined;
-  const { item, visit: existing, visitCount } = context;
+  const { item, mediaObjectKeys, visit: existing, visitCount } = context;
 
   const db = getD1();
   const updatedAt = new Date().toISOString();
   await db.batch([
     db.prepare(deleteVisitSql).bind(id),
     db.prepare(deleteLegacyJournalEntrySql).bind(id),
+    db.prepare('DELETE FROM visit_media WHERE visit_id = ?').bind(id),
     db
       .prepare(reconcileVisitedAfterDeleteSql)
       .bind(existing.itemId, existing.itemId, updatedAt, updatedAt),
   ]);
+  await deleteMediaObjects(mediaObjectKeys);
   return { item: { ...item, hasVisited: visitCount > 1 } };
 }
 
-async function getVisitMutationContext(
-  id: string,
-): Promise<
-  { visit: VisitRecord; item: AtlasItem; visitCount: number } | undefined
+async function getVisitMutationContext(id: string): Promise<
+  | {
+      visit: VisitRecord;
+      item: AtlasItem;
+      visitCount: number;
+      mediaObjectKeys: string[];
+    }
+  | undefined
 > {
   const row = await getD1()
     .prepare(
@@ -574,6 +586,11 @@ async function getVisitMutationContext(
               requested_visit.created_at AS visit_created_at,
               requested_visit.updated_at AS visit_updated_at,
               requested_visit.visit_count,
+              COALESCE((
+                SELECT json_group_array(visit_media.object_key)
+                FROM visit_media
+                WHERE visit_media.visit_id = requested_visit.id
+              ), '[]') AS media_object_keys_json,
               items.payload_json,
               overrides.title AS override_title,
               overrides.description AS override_description,
@@ -610,7 +627,25 @@ async function getVisitMutationContext(
     },
     item,
     visitCount: row.visit_count,
+    mediaObjectKeys: readStringArray(row.media_object_keys_json),
   };
+}
+
+async function deleteMediaObjects(keys: readonly string[]): Promise<void> {
+  if (!keys.length) return;
+  const bucket = getMediaBucket();
+  await Promise.allSettled(keys.map((key) => bucket.delete(key)));
+}
+
+function readStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteImportJob(id: string): Promise<boolean> {

@@ -49,6 +49,7 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Map performance | Keep Leaflet for now; restore progressive tile scheduling and isolate it behind a provider-neutral adapter | Current evidence points to configuration and tile delivery, not a proven engine limit |
 | 2026-09-07 | Journal performance | Keep D1; use targeted item resolution, client mutation IDs, and an atomic write batch | Removes repeated full-table reads, prevents partial writes, and preserves future Agent retries |
 | 2026-09-08 | Journal edit/delete latency | Close the View in the same interaction frame with ViewModel rollback on failure; cap both server paths at two D1 round trips | Keeps the private Sites response floor out of the user interaction without sacrificing durable correctness |
+| 2026-09-08 | Visit media boundary | Store private bytes in R2, searchable relations/captions/hash in D1, and route both web and future Agent adapters through the same media operations | Preserves MVVM, avoids database blobs, and keeps channel/runtime choices replaceable |
 
 ## Open decisions
 

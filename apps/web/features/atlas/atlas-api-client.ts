@@ -6,6 +6,7 @@ import type {
   NewVisit,
   PlaceAssessmentPatch,
   VisitCreateResult,
+  VisitMediaRecord,
   VisitMutationResult,
   VisitRecord,
   VisitUpdate,
@@ -13,7 +14,9 @@ import type {
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  headers.set('content-type', 'application/json');
+  if (!(init?.body instanceof FormData)) {
+    headers.set('content-type', 'application/json');
+  }
   const response = await fetch(url, {
     ...init,
     headers,
@@ -91,6 +94,36 @@ export function updateVisit(
 
 export function deleteVisit(id: string): Promise<VisitMutationResult> {
   return requestJson(`/api/journal/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function fetchVisitMedia(): Promise<VisitMediaRecord[]> {
+  return requestJson('/api/media');
+}
+
+export function uploadVisitMedia(
+  visitId: string,
+  files: readonly File[],
+): Promise<VisitMediaRecord[]> {
+  const body = new FormData();
+  body.set('visitId', visitId);
+  for (const file of files) body.append('files', file);
+  return requestJson('/api/media', { method: 'POST', body });
+}
+
+export function updateVisitMediaCaption(
+  id: string,
+  caption?: string,
+): Promise<VisitMediaRecord> {
+  return requestJson(`/api/media/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ caption: caption || null }),
+  });
+}
+
+export function deleteVisitMedia(id: string): Promise<{ deleted: true }> {
+  return requestJson(`/api/media/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
 }

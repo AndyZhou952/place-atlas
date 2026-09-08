@@ -1,7 +1,7 @@
 # UI 控件与交互契约 v0.1
 
 状态：有效实施契约
-最后更新：2026-09-07
+最后更新：2026-09-08
 
 本文档用于防止视觉方案实验与数据库或 Agent 行为悄然分叉。不同布局分支可以移动控件或改变样式，但必须保持下列语义、确认流程和共享操作不变。
 
@@ -20,7 +20,8 @@
 | 搜索 | 匹配规范化后的名称、别名、区域、地址、描述和标签 | ViewModel 中的确定性查询 | 无 | Agent v2 中的 `search_atlas` |
 | 地图标记 | 选择并聚焦一个地点 | ViewModel 选择状态 | 无 | `focus_atlas_item` |
 | Near me | 获取位置并按距离排序 | 浏览器地理位置；不存储当前位置 | 浏览器权限确认 | `find_nearby_atlas_items` |
-| Save visit | 新增指定日期的到访；评分、笔记或图片必须提供内容 | `POST /api/journal`；若提供评分，则更新该地点唯一的 PlaceAssessment | 保存回执 | `create_visit` |
+| Save visit | 新增指定日期的到访；评分或笔记必须提供内容，保存后可继续添加图片 | `POST /api/journal`；若提供评分，则更新该地点唯一的 PlaceAssessment | 保存回执 | `create_visit` |
+| Visit 图片 | 每次上传最多四张私有图片、修改单行图片说明或删除图片；在 Journal 与地图详情中展示 | 通过 ViewModel 调用 `GET/POST /api/media`、`PATCH/DELETE /api/media/{id}` 与需鉴权的 `GET /api/media/{id}/content` | 删除必须确认；说明与删除失败时回滚乐观更新 | `list_visit_media`、`update_visit_media_caption` 与确认后的 `delete_visit_media`；未来服务端 Agent 使用同一个 multipart HTTP 上传操作 |
 | Edit visit | 修正日期／笔记，并可替换或清空持久地点评分 | 通过 ViewModel 调用 `PATCH /api/journal/{id}` | 保存／取消表单 | `update_visit` |
 | Delete visit | 删除一条错误 Visit，并重新计算推导出的去过状态 | 通过 ViewModel 调用 `DELETE /api/journal/{id}` | 必须确认 | `delete_visit`，破坏性操作 |
 | Journal 筛选 | 组合地点与包含边界的起止日期范围 | 仅 ViewModel 投影 | 清空筛选控件 | 未来结构化 Journal 查询 |
@@ -38,12 +39,12 @@
 
 ## 3. 到访与媒体语义
 
-- 一次 Visit 必须关联地点和日期，并至少包含评分、笔记或图片之一。
+- 一次 Visit 必须关联地点和日期，并在添加媒体前先包含评分或笔记。
 - 即使没有图片且笔记为空，只有评分的 Visit 也有效。
 - 到访序号按时间推导，用户无需手动输入。
 - 一个地点拥有一个持久评分和任意数量的 Visit。
 - v1 中，每张上传图片可有一行可选说明文字。
-- 一次 Visit 可以只包含图片，同时让备注和评分都为空，但三者全部为空的 Visit 无效。
+- 图片必须归属于已经保存的 Visit。把“只发图片”作为单一原子命令留到 Agent intake 阶段处理，届时 create 与 upload 任一失败都需要补偿清理。
 - 只有当二进制、元数据、关联关系和说明文字都能在刷新后保留，并出现在地图的选中地点详情中时，媒体功能才算完成。
 
 ## 4. 删除安全
@@ -98,7 +99,7 @@
 
 | 控件 | 当前状态 | 完成依赖 |
 |---|---|---|
-| 图片上传与逐图说明 | 未实现 | R2 binding、媒体表、upload／finalize API |
+| 服务端图片尺寸与孤儿对象清理 | 上传、私有读取、逐图说明、哈希、失败回滚与级联清理已经实现；仍缺服务端尺寸提取和定时 R2 孤儿清理 | 媒体加固任务与对账指标 |
 | 审核模糊地点身份 | 目前只有过渡 Inbox | 采集证据模型与 review candidate API |
 | Agent 语义搜索／推荐 | 目前只有网页端确定性筛选 | Agent v2 应用服务 |
 | 地图地点／地理编码搜索 | 已有集合内搜索；没有外部 geocoder | 服务商／隐私决策与限流策略 |

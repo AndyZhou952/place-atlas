@@ -186,6 +186,14 @@ Photo bytes live in object storage while D1 retains metadata, content hash,
 caption, display order, and visit/item relations. Both web and Agent uploads use
 the same finalize-and-attach operation.
 
+The implemented media boundary exposes list, multipart attach, private content,
+caption update, and delete operations under `/api/media`. The React View never
+calls storage directly: it delegates to the Atlas ViewModel, which uses the same
+HTTP client intended for an authenticated Agent adapter. Supported files are
+signature-checked JPEG, PNG, WebP, and GIF images; one request accepts up to four
+8 MB files. R2 failures do not create metadata, and failed metadata batches
+remove already-written objects.
+
 ## 6.1 Interface ownership
 
 WeChat is the primary command and capture interface. The private map is the

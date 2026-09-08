@@ -1,7 +1,7 @@
 # UI Controls and Interaction Contract v0.1
 
 Status: active implementation contract
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 This document prevents visual experiments from silently diverging from the
 database or Agent behavior. Layout branches may move or restyle controls, but
@@ -22,7 +22,8 @@ they must preserve these meanings, confirmations, and shared operations.
 | Search | Match normalized name, alternate name, area, address, description, and tags | Deterministic view-model query | None | `search_atlas` in Agent v2 |
 | Map marker | Select and focus one place | View-model selection | None | `focus_atlas_item` |
 | Near me | Request location and distance-sort results | Browser geolocation; no stored location | Browser permission | `find_nearby_atlas_items` |
-| Save visit | Add dated visit; rating, note, or photo must provide content | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
+| Save visit | Add dated visit; rating or note must provide content, and photos can be attached after save | `POST /api/journal`; optional rating updates the one place assessment | Save receipt | `create_visit` |
+| Visit photos | Upload up to four private images at a time, edit one-line captions, or delete an image; show them in Journal and map detail | `GET/POST /api/media`, `PATCH/DELETE /api/media/{id}`, and authenticated `GET /api/media/{id}/content`, all reached through the ViewModel | Delete requires confirmation; optimistic caption/delete rollback on failure | `list_visit_media`, `update_visit_media_caption`, and confirmed `delete_visit_media`; future service Agent uses the same multipart HTTP upload operation |
 | Edit visit | Correct date/note and optionally replace or clear the persistent place rating | `PATCH /api/journal/{id}` through the ViewModel | Save/cancel form | `update_visit` |
 | Delete visit | Remove one mistaken Visit and reconcile derived visited state | `DELETE /api/journal/{id}` through the ViewModel | Mandatory confirmation dialog | `delete_visit`, destructive |
 | Journal filters | Combine one place with an inclusive from/to date range | View-model projection only | Clear-filter control | Structured Journal query later |
@@ -43,13 +44,14 @@ they must preserve these meanings, confirmations, and shared operations.
 
 ## 3. Visit and media semantics
 
-- A visit requires a place and date plus at least one of rating, note, or photo.
+- A visit requires a place and date plus a rating or note before media can be attached.
 - A rating-only visit is valid even when it has no photo and an empty note.
 - Visit numbering is derived chronologically and never typed by the user.
 - One place has one persistent rating and any number of visits.
 - In v1, every uploaded image may have one optional one-line caption.
-- A visit may contain photos while its note and rating are both empty, but an
-  entirely content-free visit is invalid.
+- Photos belong to a saved Visit. Supporting a photo-only Visit as one atomic
+  command is deferred to the Agent intake slice, where the create-and-upload
+  workflow can provide compensating cleanup if either side fails.
 - Media is not complete until bytes, metadata, attachment, and caption all
   survive refresh and appear in the selected-place map detail.
 
@@ -129,7 +131,7 @@ persist a user preference.
 
 | Control | Current state | Completion dependency |
 |---|---|---|
-| Photo upload and per-image caption | Not implemented | R2 binding, media tables, upload/finalize APIs |
+| Server-derived image dimensions and orphan cleanup | Upload, private delivery, captions, hashes, rollback, and cascade cleanup are implemented; dimensions and a scheduled R2 orphan sweeper remain | Media hardening job and reconciliation metrics |
 | Review ambiguous identity | Transitional Inbox only | Collector evidence model and review candidate API |
 | Agent semantic search/recommendation | Deterministic web filters only | Agent v2 application service |
 | Map place/geocoder search | Collection search exists; external geocoder absent | Provider/privacy decision and rate-limit policy |

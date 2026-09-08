@@ -1,6 +1,13 @@
 'use client';
 
-import { type SyntheticEvent, useEffect, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type SyntheticEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import Image from 'next/image';
 import {
   Bot,
   Building2,
@@ -14,6 +21,7 @@ import {
   Database,
   ExternalLink,
   Heart,
+  ImagePlus,
   Inbox,
   ListFilter,
   LocateFixed,
@@ -40,6 +48,7 @@ import type {
   AtlasView,
   PersonalState,
   VisitRecord,
+  VisitMediaRecord,
 } from './model';
 import { AtlasMap } from './atlas-map';
 import { filterJournalVisits } from './journal-filter';
@@ -870,6 +879,11 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                         Visit {itemVisits.length - index} · {visit.visitedAt}
                       </span>
                       {visit.note ? <p>{visit.note}</p> : null}
+                      <VisitMediaGallery
+                        media={vm.media.filter(
+                          (entry) => entry.visitId === visit.id,
+                        )}
+                      />
                     </li>
                   ))}
                 </ol>
@@ -1092,7 +1106,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         <h2>Your own rating remains separate from Tabelog.</h2>
         <p>
           Record a visit now. A rating by itself is enough; notes are optional,
-          and photo uploads will be added with object storage in the next slice.
+          and photos with optional captions can be attached after saving.
         </p>
       </div>
       <div className="journal-grid">
@@ -1240,7 +1254,14 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                         visit={visit}
                         visitNumber={visits.length - index}
                         busy={vm.journalBusy}
+                        media={vm.media.filter(
+                          (entry) => entry.visitId === visit.id,
+                        )}
+                        mediaBusy={vm.isMediaVisitPending(visit.id)}
                         onSave={vm.editVisit}
+                        onUpload={vm.addVisitMedia}
+                        onSaveCaption={vm.saveMediaCaption}
+                        onDeleteMedia={vm.removeMedia}
                         onDelete={() => setPendingDelete(visit)}
                       />
                     ))}
@@ -1290,14 +1311,24 @@ function JournalVisitRow({
   visit,
   visitNumber,
   busy,
+  media,
+  mediaBusy,
   onSave,
+  onUpload,
+  onSaveCaption,
+  onDeleteMedia,
   onDelete,
 }: {
   readonly item: AtlasItem;
   readonly visit: VisitRecord;
   readonly visitNumber: number;
   readonly busy: boolean;
+  readonly media: readonly VisitMediaRecord[];
+  readonly mediaBusy: boolean;
   readonly onSave: AtlasViewModel['editVisit'];
+  readonly onUpload: AtlasViewModel['addVisitMedia'];
+  readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onDeleteMedia: AtlasViewModel['removeMedia'];
   readonly onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1419,6 +1450,14 @@ function JournalVisitRow({
           {visitNumber}回目 · {visit.visitedAt}
         </span>
         {visit.note ? <p>{visit.note}</p> : null}
+        <VisitMediaEditor
+          visitId={visit.id}
+          media={media}
+          busy={mediaBusy}
+          onUpload={onUpload}
+          onSaveCaption={onSaveCaption}
+          onDelete={onDeleteMedia}
+        />
       </div>
       <div className="journal-visit-actions">
         <button
@@ -1439,6 +1478,146 @@ function JournalVisitRow({
         </button>
       </div>
     </li>
+  );
+}
+
+function VisitMediaGallery({
+  media,
+}: {
+  readonly media: readonly VisitMediaRecord[];
+}) {
+  if (!media.length) return null;
+  return (
+    <div className="visit-media-gallery">
+      {media.map((entry) => (
+        <figure key={entry.id}>
+          <Image
+            src={entry.contentUrl}
+            alt={entry.caption || entry.originalFilename}
+            width={640}
+            height={480}
+            sizes="(max-width: 600px) 50vw, 180px"
+            unoptimized
+            loading="lazy"
+          />
+          {entry.caption ? <figcaption>{entry.caption}</figcaption> : null}
+        </figure>
+      ))}
+    </div>
+  );
+}
+
+function VisitMediaEditor({
+  visitId,
+  media,
+  busy,
+  onUpload,
+  onSaveCaption,
+  onDelete,
+}: {
+  readonly visitId: string;
+  readonly media: readonly VisitMediaRecord[];
+  readonly busy: boolean;
+  readonly onUpload: AtlasViewModel['addVisitMedia'];
+  readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onDelete: AtlasViewModel['removeMedia'];
+}) {
+  async function selectFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = '';
+    if (!files.length) return;
+    try {
+      await onUpload(visitId, files);
+    } catch {
+      // The view model presents the error in the notice bar.
+    }
+  }
+
+  return (
+    <div className="visit-media-editor">
+      <div className="visit-media-gallery is-editable">
+        {media.map((entry) => (
+          <MediaCaptionEditor
+            key={`${entry.id}:${entry.caption ?? ''}`}
+            media={entry}
+            onSave={onSaveCaption}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+      <label className={cn('media-upload-control', busy && 'is-busy')}>
+        <ImagePlus aria-hidden="true" />
+        {busy ? 'Uploading…' : 'Add photos'}
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          disabled={busy}
+          onChange={(event) => void selectFiles(event)}
+        />
+      </label>
+    </div>
+  );
+}
+
+function MediaCaptionEditor({
+  media,
+  onSave,
+  onDelete,
+}: {
+  readonly media: VisitMediaRecord;
+  readonly onSave: AtlasViewModel['saveMediaCaption'];
+  readonly onDelete: AtlasViewModel['removeMedia'];
+}) {
+  const [caption, setCaption] = useState(media.caption ?? '');
+
+  async function saveCaption() {
+    if (caption.trim() === (media.caption ?? '')) return;
+    try {
+      await onSave(media.id, caption);
+    } catch {
+      setCaption(media.caption ?? '');
+    }
+  }
+
+  return (
+    <figure>
+      <Image
+        src={media.contentUrl}
+        alt={media.caption || media.originalFilename}
+        width={640}
+        height={480}
+        sizes="(max-width: 600px) 50vw, 180px"
+        unoptimized
+        loading="lazy"
+      />
+      <div className="media-caption-row">
+        <Input
+          value={caption}
+          maxLength={160}
+          aria-label={`Caption for ${media.originalFilename}`}
+          placeholder="What is this?"
+          onChange={(event) => setCaption(event.target.value)}
+          onBlur={() => void saveCaption()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label={`Delete ${media.originalFilename}`}
+          title="Delete photo"
+          onClick={() => {
+            if (window.confirm('Delete this photo?')) void onDelete(media.id);
+          }}
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      </div>
+    </figure>
   );
 }
 

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export function GET() {
   return NextResponse.json({
     service: 'Japan Atlas',
-    version: '0.4',
+    version: '0.5',
     channelStatus: 'not_connected',
     operations: [
       { name: 'list_atlas_items', method: 'GET', path: '/api/items' },
@@ -33,6 +33,14 @@ export function GET() {
         method: 'POST',
         contentType: 'multipart/form-data',
         path: '/api/media',
+        contract: {
+          required: ['visitId', 'files'],
+          optional: ['captions'],
+          maxFilesPerRequest: 4,
+          perVisitLimit: null,
+          retryGuidance:
+            'Use bounded batches. A future intake-session adapter will supply idempotent message IDs.',
+        },
       },
       {
         name: 'update_visit_media_caption',

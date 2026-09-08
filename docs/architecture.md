@@ -194,6 +194,21 @@ signature-checked JPEG, PNG, WebP, and GIF images; one request accepts up to fou
 8 MB files. R2 failures do not create metadata, and failed metadata batches
 remove already-written objects.
 
+The four-file server limit is a bounded request contract, not a Visit limit.
+The web client accepts 24 files per selection and sequences bounded requests;
+completed chunks enter the ViewModel immediately. The Journal form may select
+photos before saving, while the ViewModel still persists an explicit Visit ID
+before attaching bytes. Galleries render four thumbnails first and expand on
+demand.
+
+Future chat adapters add a short-lived `VisitCaptureSession` above these same
+use cases. A session is scoped to authenticated user + conversation + explicit
+place, and maps independent channel messages to one Visit. Explicit session,
+reply, or place context wins; one recent unambiguous session may be reused;
+otherwise the Agent must ask. Channel message IDs provide idempotency. Captions
+may arrive with a photo or as a reply to a stable media ID. The low-level media
+port never guesses the destination place.
+
 ## 6.1 Interface ownership
 
 WeChat is the primary command and capture interface. The private map is the

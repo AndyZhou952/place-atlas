@@ -115,9 +115,7 @@
       "indexes": {
         "idx_atlas_items_verification_status": {
           "name": "idx_atlas_items_verification_status",
-          "columns": [
-            "verification_status"
-          ],
+          "columns": ["verification_status"],
           "isUnique": false
         }
       },
@@ -205,10 +203,7 @@
       "indexes": {
         "idx_import_jobs_status_created_at": {
           "name": "idx_import_jobs_status_created_at",
-          "columns": [
-            "status",
-            "created_at"
-          ],
+          "columns": ["status", "created_at"],
           "isUnique": false
         }
       },
@@ -273,10 +268,7 @@
       "indexes": {
         "idx_journal_entries_item_visited": {
           "name": "idx_journal_entries_item_visited",
-          "columns": [
-            "item_id",
-            "visited_at"
-          ],
+          "columns": ["item_id", "visited_at"],
           "isUnique": false
         }
       },
@@ -438,25 +430,17 @@
       "indexes": {
         "idx_visit_media_object_key": {
           "name": "idx_visit_media_object_key",
-          "columns": [
-            "object_key"
-          ],
+          "columns": ["object_key"],
           "isUnique": true
         },
         "idx_visit_media_visit_order": {
           "name": "idx_visit_media_visit_order",
-          "columns": [
-            "visit_id",
-            "display_order"
-          ],
+          "columns": ["visit_id", "display_order"],
           "isUnique": false
         },
         "idx_visit_media_item_created": {
           "name": "idx_visit_media_item_created",
-          "columns": [
-            "item_id",
-            "created_at"
-          ],
+          "columns": ["item_id", "created_at"],
           "isUnique": false
         }
       },
@@ -521,10 +505,7 @@
       "indexes": {
         "idx_visits_item_visited": {
           "name": "idx_visits_item_visited",
-          "columns": [
-            "item_id",
-            "visited_at"
-          ],
+          "columns": ["item_id", "visited_at"],
           "isUnique": false
         }
       },

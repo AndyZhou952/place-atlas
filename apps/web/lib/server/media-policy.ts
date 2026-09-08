@@ -1,13 +1,14 @@
-export const allowedImageContentTypes = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-] as const;
+import {
+  allowedImageContentTypes,
+  maxMediaCaptionLength,
+  maxMediaFileBytes,
+} from '../../features/atlas/media-constraints.ts';
 
-export const maxMediaFilesPerUpload = 4;
-export const maxMediaFileBytes = 8 * 1024 * 1024;
-export const maxMediaCaptionLength = 160;
+export {
+  allowedImageContentTypes,
+  maxMediaCaptionLength,
+  maxMediaFileBytes,
+} from '../../features/atlas/media-constraints.ts';
 
 export function normalizeMediaCaption(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;

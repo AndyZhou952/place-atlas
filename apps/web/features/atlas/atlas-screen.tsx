@@ -50,6 +50,7 @@ import type {
   VisitRecord,
   VisitMediaRecord,
 } from './model';
+import { maxMediaFilesPerSelection } from './media-constraints';
 import { AtlasMap } from './atlas-map';
 import { filterJournalVisits } from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
@@ -1050,6 +1051,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   );
   const [rating, setRating] = useState('3');
   const [note, setNote] = useState('');
+  const [visitPhotos, setVisitPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState('');
   const [placeFilter, setPlaceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
@@ -1075,6 +1077,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
     event.preventDefault();
     const submittedRating = rating;
     const submittedNote = note;
+    const submittedPhotos = visitPhotos;
     let normalizedRating: number | undefined;
     try {
       normalizedRating = parseOptionalRating(submittedRating);
@@ -1083,18 +1086,26 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
       setFormError('Enter any number from 0 to 5. It will be saved to 0.1.');
       return;
     }
-    setRating('3');
-    setNote('');
     try {
-      await vm.addVisit({
+      const result = await vm.addVisit({
         itemId,
         visitedAt,
         ...(normalizedRating === undefined ? {} : { rating: normalizedRating }),
         ...(submittedNote.trim() ? { note: submittedNote.trim() } : {}),
       });
+      setRating('3');
+      setNote('');
+      setVisitPhotos([]);
+      if (submittedPhotos.length) {
+        try {
+          await vm.addVisitMedia(result.visit.id, submittedPhotos);
+        } catch {
+          setFormError(
+            'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
+          );
+        }
+      }
     } catch {
-      setRating(submittedRating);
-      setNote(submittedNote);
       // The view model presents the error in the notice bar.
     }
   }
@@ -1105,8 +1116,8 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         <p className="eyebrow">Personal journal</p>
         <h2>Your own rating remains separate from Tabelog.</h2>
         <p>
-          Record a visit now. A rating by itself is enough; notes are optional,
-          and photos with optional captions can be attached after saving.
+          Record a visit with photos in one step, or add more photos later. A
+          rating by itself is enough and notes are optional.
         </p>
       </div>
       <div className="journal-grid">
@@ -1163,6 +1174,37 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                   rows={5}
                   placeholder="What stood out? What would you order next time?"
                 />
+              </label>
+              <label className="journal-media-picker">
+                <span>Photos (optional)</span>
+                <span className="media-upload-control">
+                  <ImagePlus aria-hidden="true" />
+                  {visitPhotos.length
+                    ? `${visitPhotos.length} selected`
+                    : 'Choose photos'}
+                  <input
+                    key={visitPhotos.length ? 'selected' : 'empty'}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={(event) => {
+                      const files = [...(event.target.files ?? [])];
+                      if (files.length > maxMediaFilesPerSelection) {
+                        setFormError(
+                          `Choose up to ${maxMediaFilesPerSelection} photos per batch. You can add another batch afterward.`,
+                        );
+                        event.target.value = '';
+                        return;
+                      }
+                      setVisitPhotos(files);
+                      setFormError('');
+                    }}
+                  />
+                </span>
+                <small>
+                  Up to {maxMediaFilesPerSelection} per selection; additional
+                  batches can be added to the same visit.
+                </small>
               </label>
               {formError ? (
                 <small className="form-error" role="alert">
@@ -1486,23 +1528,32 @@ function VisitMediaGallery({
 }: {
   readonly media: readonly VisitMediaRecord[];
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (!media.length) return null;
+  const visibleMedia = expanded ? media : media.slice(0, 4);
   return (
-    <div className="visit-media-gallery">
-      {media.map((entry) => (
-        <figure key={entry.id}>
-          <Image
-            src={entry.contentUrl}
-            alt={entry.caption || entry.originalFilename}
-            width={640}
-            height={480}
-            sizes="(max-width: 600px) 50vw, 180px"
-            unoptimized
-            loading="lazy"
-          />
-          {entry.caption ? <figcaption>{entry.caption}</figcaption> : null}
-        </figure>
-      ))}
+    <div className="visit-media-collection">
+      <div className="visit-media-gallery">
+        {visibleMedia.map((entry) => (
+          <figure key={entry.id}>
+            <Image
+              src={entry.contentUrl}
+              alt={entry.caption || entry.originalFilename}
+              width={640}
+              height={480}
+              sizes="(max-width: 600px) 50vw, 180px"
+              unoptimized
+              loading="lazy"
+            />
+            {entry.caption ? <figcaption>{entry.caption}</figcaption> : null}
+          </figure>
+        ))}
+      </div>
+      <MediaExpansionButton
+        count={media.length}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
     </div>
   );
 }
@@ -1522,6 +1573,9 @@ function VisitMediaEditor({
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
   readonly onDelete: AtlasViewModel['removeMedia'];
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleMedia = expanded ? media : media.slice(0, 4);
+
   async function selectFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
     event.target.value = '';
@@ -1536,7 +1590,7 @@ function VisitMediaEditor({
   return (
     <div className="visit-media-editor">
       <div className="visit-media-gallery is-editable">
-        {media.map((entry) => (
+        {visibleMedia.map((entry) => (
           <MediaCaptionEditor
             key={`${entry.id}:${entry.caption ?? ''}`}
             media={entry}
@@ -1545,6 +1599,11 @@ function VisitMediaEditor({
           />
         ))}
       </div>
+      <MediaExpansionButton
+        count={media.length}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
       <label className={cn('media-upload-control', busy && 'is-busy')}>
         <ImagePlus aria-hidden="true" />
         {busy ? 'Uploading…' : 'Add photos'}
@@ -1557,6 +1616,23 @@ function VisitMediaEditor({
         />
       </label>
     </div>
+  );
+}
+
+function MediaExpansionButton({
+  count,
+  expanded,
+  onToggle,
+}: {
+  readonly count: number;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  if (count <= 4) return null;
+  return (
+    <button className="media-expansion-button" type="button" onClick={onToggle}>
+      {expanded ? 'Show less' : `Show ${count - 4} more`}
+    </button>
   );
 }
 

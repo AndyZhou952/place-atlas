@@ -11,6 +11,10 @@ import type {
   VisitRecord,
   VisitUpdate,
 } from './model';
+import {
+  chunkMediaSelection,
+  maxMediaFilesPerSelection,
+} from './media-constraints';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -102,14 +106,36 @@ export function fetchVisitMedia(): Promise<VisitMediaRecord[]> {
   return requestJson('/api/media');
 }
 
-export function uploadVisitMedia(
+export async function uploadVisitMedia(
   visitId: string,
   files: readonly File[],
+  captions: readonly string[] = [],
+  onChunkUploaded?: (media: readonly VisitMediaRecord[]) => void,
 ): Promise<VisitMediaRecord[]> {
-  const body = new FormData();
-  body.set('visitId', visitId);
-  for (const file of files) body.append('files', file);
-  return requestJson('/api/media', { method: 'POST', body });
+  if (files.length > maxMediaFilesPerSelection) {
+    throw new TypeError(
+      `Select no more than ${maxMediaFilesPerSelection} photos at once. You can add another batch afterward.`,
+    );
+  }
+
+  const uploaded: VisitMediaRecord[] = [];
+  let offset = 0;
+  for (const chunk of chunkMediaSelection(files)) {
+    const body = new FormData();
+    body.set('visitId', visitId);
+    chunk.forEach((file, index) => {
+      body.append('files', file);
+      body.append('captions', captions[offset + index] ?? '');
+    });
+    const completed = await requestJson<VisitMediaRecord[]>('/api/media', {
+      method: 'POST',
+      body,
+    });
+    uploaded.push(...completed);
+    onChunkUploaded?.(completed);
+    offset += chunk.length;
+  }
+  return uploaded;
 }
 
 export function updateVisitMediaCaption(

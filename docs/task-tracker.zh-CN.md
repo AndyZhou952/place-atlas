@@ -69,9 +69,9 @@
 | MEDIA-01 | 对象存储 | 私有 R2 binding 与 D1 媒体元数据／迁移 | DATA-03 | 已完成 | 实验阶段 |
 | MEDIA-02 | 上传安全 | MIME／签名／大小／哈希校验及失败回滚已完成；服务端尺寸解析与孤儿对象清理任务仍待完成 | MEDIA-01 | 进行中 | 实验阶段 |
 | MEDIA-03 | 媒体模型 | 有序 Visit 照片、私有内容 route、可选且规范化的一行说明 | MEDIA-01 | 已完成 | 实验阶段 |
-| MEDIA-04 | 网页备用入口 | 通过 ViewModel 提供每次 Visit 多图上传、说明编辑和删除 | MEDIA-03、MAP-03 | 已完成 | 实验阶段 |
-| MEDIA-05 | 地图记忆 | 在地点详情中按 Visit 分组展示照片与说明文字 | MEDIA-03 | 已完成 | 实验阶段 |
-| MEDIA-06 | Agent 采集 | 将微信／Agent 图片与说明映射到同一套 API | MEDIA-03、AGENT-02 | 受阻 | Demo 阶段 |
+| MEDIA-04 | 网页备用入口 | 新增 Visit 时同步选图；一次选 24 张并拆成每批四张；后续添加／重试、说明与删除都经过 ViewModel | MEDIA-03、MAP-03 | 已完成 | 实验阶段 |
+| MEDIA-05 | 地图记忆 | 按 Visit 展示照片／说明；先显示四张再展开 | MEDIA-03 | 已完成 | 实验阶段 |
+| MEDIA-06 | Agent 采集 | Capture session 关联、渠道消息幂等、歧义确认、图片／回复说明（RFC #4） | MEDIA-03、AGENT-02、AGENT-03 | 受阻 | Demo 阶段 |
 
 ### 3 — 与框架无关的 Agent 应用层
 

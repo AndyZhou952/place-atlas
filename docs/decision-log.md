@@ -50,6 +50,8 @@ technical choices receive a separate ADR; open questions remain explicitly open.
 | 2026-09-07 | Journal performance | Keep D1; use targeted item resolution, client mutation IDs, and an atomic write batch | Removes repeated full-table reads, prevents partial writes, and preserves future Agent retries |
 | 2026-09-08 | Journal edit/delete latency | Close the View in the same interaction frame with ViewModel rollback on failure; cap both server paths at two D1 round trips | Keeps the private Sites response floor out of the user interaction without sacrificing durable correctness |
 | 2026-09-08 | Visit media boundary | Store private bytes in R2, searchable relations/captions/hash in D1, and route both web and future Agent adapters through the same media operations | Preserves MVVM, avoids database blobs, and keeps channel/runtime choices replaceable |
+| 2026-09-08 | High-volume photo upload | Let the web select 24 photos while keeping four-file server requests and no fixed per-Visit cap | Supports long tasting menus without exceeding Worker request/memory budgets |
+| 2026-09-08 | Conversational media association | Put a user/conversation/place-scoped capture session above the explicit Visit media port; ask on ambiguity and use channel message IDs for idempotency | Independent chat messages stay convenient without silently attaching private photos to the wrong place |
 
 ## Open decisions
 

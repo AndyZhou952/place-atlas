@@ -158,6 +158,10 @@ WebMCP Adapter
 
 已实现的媒体边界在 `/api/media` 下提供列表、multipart 关联上传、私有内容读取、说明修改和删除操作。React View 不直接访问存储：它交给 Atlas ViewModel，再由 ViewModel 使用未来经过鉴权的 Agent adapter 也会调用的同一 HTTP client。当前对 JPEG、PNG、WebP 与 GIF 做文件签名校验；单次最多四张、每张 8 MB。R2 失败不会创建元数据，元数据批次失败则清理已经写入的对象。
 
+服务端四张上限只是单次受控请求，并非 Visit 上限。网页一次选择最多 24 张，然后顺序拆分请求；每个完成批次会立即进入 ViewModel。Journal 可以在保存前选择图片，但 ViewModel 仍先取得明确 Visit ID 再关联二进制。图库先展示四张，按需展开。
+
+未来聊天渠道会在同一批 use case 之上增加短生命周期的 `VisitCaptureSession`。Session 绑定“已认证用户＋会话＋明确地点”，把各条独立消息映射到一个 Visit。优先使用显式 session、reply 或地点上下文；只有一个近期且无歧义的 session 时才自动沿用，否则 Agent 必须询问。渠道 message ID 用于幂等；说明可随图片或作为对稳定 media ID 的回复到达。底层媒体 port 永远不自行猜测地点。
+
 ## 6.1 界面归属
 
 微信是主要指令与采集入口。私有地图是主要读取、空间整理与记忆入口。地图显示选中地点的统一评价、Visit 时间线与媒体；有歧义的采集证据通过上下文深链接打开，而不要求永久保留 Inbox 入口。

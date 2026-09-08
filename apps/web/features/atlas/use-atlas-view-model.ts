@@ -387,8 +387,14 @@ export function useAtlasViewModel() {
       setMediaVisitPending(visitId, true);
       setNotice('');
       try {
-        const uploaded = await uploadVisitMedia(visitId, files);
-        setMedia((current) => [...current, ...uploaded]);
+        const uploaded = await uploadVisitMedia(
+          visitId,
+          files,
+          [],
+          (completed) => {
+            setMedia((current) => [...current, ...completed]);
+          },
+        );
         return uploaded;
       } catch (error) {
         setNotice(

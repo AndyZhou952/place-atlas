@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { maxMediaFilesPerRequest } from '@/features/atlas/media-constraints';
 import { attachVisitMedia, listVisitMedia } from '@/lib/server/media-store';
-import { maxMediaFilesPerUpload } from '@/lib/server/media-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +21,17 @@ export async function POST(request: Request) {
   const files = form
     .getAll('files')
     .filter((value): value is File => value instanceof File);
+  const captions = form
+    .getAll('captions')
+    .map((value) => (typeof value === 'string' ? value : ''));
   if (typeof visitId !== 'string' || !visitId || !files.length) {
     return new NextResponse('A Visit and at least one image are required.', {
       status: 400,
     });
   }
-  if (files.length > maxMediaFilesPerUpload) {
+  if (files.length > maxMediaFilesPerRequest) {
     return new NextResponse(
-      `Upload no more than ${maxMediaFilesPerUpload} images at once.`,
+      `Upload no more than ${maxMediaFilesPerRequest} images in one request.`,
       { status: 400 },
     );
   }
@@ -37,10 +40,11 @@ export async function POST(request: Request) {
     const media = await attachVisitMedia(
       visitId,
       await Promise.all(
-        files.map(async (file) => ({
+        files.map(async (file, index) => ({
           originalFilename: file.name,
           contentType: file.type,
           bytes: new Uint8Array(await file.arrayBuffer()),
+          caption: captions[index],
         })),
       ),
     );

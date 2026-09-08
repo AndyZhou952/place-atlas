@@ -784,6 +784,11 @@
   margin-top: 0.55rem;
 }
 
+.visit-media-collection {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .visit-media-gallery figure {
   min-width: 0;
   margin: 0;
@@ -886,6 +891,38 @@
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.journal-media-picker {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+}
+
+.journal-media-picker > span:first-child {
+  font-weight: 700;
+}
+
+.journal-media-picker small {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+}
+
+.media-expansion-button {
+  width: fit-content;
+  padding: 0.34rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--paper) 88%, var(--ink) 12%);
+  font-size: 0.7rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.media-expansion-button:hover {
+  color: var(--vermilion-dark);
+  border-color: var(--vermilion);
 }
 
 .dialog-backdrop {

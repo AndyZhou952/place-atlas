@@ -115,9 +115,7 @@
       "indexes": {
         "idx_atlas_items_verification_status": {
           "name": "idx_atlas_items_verification_status",
-          "columns": [
-            "verification_status"
-          ],
+          "columns": ["verification_status"],
           "isUnique": false
         }
       },
@@ -205,10 +203,7 @@
       "indexes": {
         "idx_import_jobs_status_created_at": {
           "name": "idx_import_jobs_status_created_at",
-          "columns": [
-            "status",
-            "created_at"
-          ],
+          "columns": ["status", "created_at"],
           "isUnique": false
         }
       },
@@ -273,10 +268,7 @@
       "indexes": {
         "idx_journal_entries_item_visited": {
           "name": "idx_journal_entries_item_visited",
-          "columns": [
-            "item_id",
-            "visited_at"
-          ],
+          "columns": ["item_id", "visited_at"],
           "isUnique": false
         }
       },
@@ -402,10 +394,7 @@
       "indexes": {
         "idx_visits_item_visited": {
           "name": "idx_visits_item_visited",
-          "columns": [
-            "item_id",
-            "visited_at"
-          ],
+          "columns": ["item_id", "visited_at"],
           "isUnique": false
         }
       },

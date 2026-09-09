@@ -1,46 +1,48 @@
 # Japan Personal Atlas
 
-A private, map-first assistant for turning Andy's saved Japan food, event, and
-architecture discoveries into nearby recommendations, reservation reminders,
-and a long-term personal journal.
+一个私有、单用户、以地图和 Agent 为核心的日本地点助手。它把餐厅、咖啡店、活动、展览和建筑来源整理成附近推荐、预约提示与长期个人 Journal。
 
-The repository contains the private web product, durable data foundation, and
-the product/engineering design for the collector and WeChat agent.
+## 当前状态
 
-## Design documents
+项目处于实验阶段。私有地图、D1 持久数据、R2 照片、搜索、个人状态、Visit/Journal 与浏览器 Agent 操作已经可用；框架无关 Agent 服务层、创作者采集、微信渠道和旅行级运维仍在开发。
 
-- [Product brief](docs/product-brief-v0.1.md)
-- [Product design v0.3](docs/product-design-v0.3.md)
-- [Task tracker](docs/task-tracker.md)
-- [System architecture and harness selection](docs/architecture.md)
-- [Data ingestion and place identity resolution](docs/data-ingestion-and-identity-resolution.md)
-- [Evaluation plan](docs/evaluation-plan.md)
-- [Delivery roadmap](docs/roadmap.md)
-- [Legacy `food-map` audit](docs/legacy-food-map-audit.md)
-- [Time-sensitive research notes](docs/research-notes-2026-09-06.md)
-- [Decision log](docs/decision-log.md)
-- [ADR 0001: OpenClaw as channel gateway](docs/adr/0001-openclaw-channel-gateway.md)
-- [ADR 0002: Cloud/local split](docs/adr/0002-cloud-local-split.md)
-- [ADR 0003: Durable Atlas API](docs/adr/0003-durable-atlas-api.md)
-- [ADR 0004: Place memory and channel boundaries](docs/adr/0004-place-memory-and-channel-boundaries.md)
+## 快速开始
 
-## Current recommendation
+要求 Node.js 22.13 或更高版本。
 
-Use OpenClaw as the replaceable 24/7 WeChat gateway and initial agent runtime,
-but keep all durable product data and business rules in a framework-neutral
-domain service. Run the user-facing gateway and API in the cloud; run fragile
-logged-in browser acquisition locally and only when requested.
+```bash
+cd apps/web
+npm ci
+npm run dev
+```
 
-Do not choose the harness by asking which one can identify restaurants best.
-Identity accuracy belongs to a separately evaluated evidence and entity-
-resolution pipeline. The harness evaluation covers channel reliability, tool
-execution, recovery, security, maintenance, and cost.
+提交前运行：
 
-## Status
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-The project is in the experimental stage. The private map has source-checked
-records, dated Tabelog/reservation facts, editable personal fields, durable D1
-storage, and shared HTTP/WebMCP operations. The current Inbox and Journal views
-are transitional: the target product uses WeChat for capture/actions and the
-map for browsing one consolidated place record with visits and photos. The
-collector worker, media storage, and OpenClaw/WeChat channel are not connected.
+## 文档
+
+从 [文档导航](docs/README.md) 开始。核心文档包括：
+
+- [产品基线](docs/product.md)
+- [系统架构与开发指南](docs/architecture.md)
+- [路线图与任务看板](docs/roadmap.md)
+- [数据采集、实体识别与评测](docs/ingestion-and-evaluation.md)
+- [决策登记册](docs/decisions.md)
+
+稳定原则和当前架构放在 `/docs`；详细实施记录、低优先级性能问题和实验验收由 GitHub Issues 跟踪。
+
+## 核心方向
+
+- 微信／Agent 是目标态的主要采集和操作入口；
+- 私有地图是主要浏览、空间整理和记忆入口；
+- 所有入口调用同一套应用操作和持久化数据；
+- Agent runtime、采集器、地图和存储通过 adapter 解耦；
+- 模糊地点允许放弃判断并进入人工审核，不用猜测污染可信集合；
+- 私有来源、照片和 Journal 不进入公开作品集数据。

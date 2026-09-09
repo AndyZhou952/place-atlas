@@ -1,150 +1,116 @@
-# Product Development Roadmap v0.3
+# Japan Atlas 路线图与任务看板
 
-Status: active
-Last updated: 2026-09-07
+状态：有效执行摘要
+最后更新：2026-09-09
 
-The product is currently in the **experimental stage**. Its database, private
-map, source-backed records, and API are real; its intended daily Agent channel,
-media pipeline, creator collector, and consolidated place memory are not yet
-complete. See `task-tracker.md` for task-level status and dependencies.
+详细实验、验收记录和低优先级工作由 GitHub Issues 跟踪。本文件只维护阶段、依赖、当前状态和下一检查点。
 
-## Completed — durable foundation
+## 1. 阶段定义
 
-- private GitHub repository and owner-only hosted map;
-- legacy prototype audited without becoming the new code baseline;
-- source-checked real records with Japanese-first titles;
-- dated Tabelog/reservation facts, official links, and event dates;
-- D1 persistence for edits, import jobs, and the first visit prototype;
-- shared HTTP and browser-Agent operations;
-- Web Access installed for the dedicated-browser experiment;
-- architecture split between channels, Agent, core product, and acquisition.
-- one persistent optional personal rating per place and repeatable rating-free
-  visit records;
-- persistent favourite and visited state, destructive place removal with a
-  confirmation boundary, and tombstones for bootstrap records;
-- interactive multi-marker map, collapsible place drawer, visible tags, and
-  deterministic partial/tag search;
-- browser Agent tools for preferences, rating, visits, and deletion using the
-  same APIs as the web UI.
-- icon-only favourite/visited controls in both place detail and the collapsible
-  collection, with immediate optimistic feedback and failure rollback;
-- marker reuse and lighter map compositing for substantially faster pan, zoom,
-  selection, and personal-state changes;
-- live A/B/C presentation URLs from one main build and one database;
-- inline personal/Tabelog rating comparison with one consolidated source-check
-  date at the bottom of place detail.
-- split sidebar (B) selected as the default main layout;
-- `マイスコア` shown beside Tabelog in detail and collection, with ViewModel-
-  backed double-click editing;
-- composable visit/favourite intersection filters and fixed `行った` status labels;
-- immediate optimistic Journal create/edit/delete interaction, with the hosted
-  background response floor recorded in issue #2; map profiling remains in
-  issue #1.
-- journal visit editing, confirmed deletion, and place/date-range memory filters;
-- 0.5 spinner steps with unrestricted 0–5 typing normalized to one decimal;
-- a replaceable Leaflet adapter with progressive tile scheduling and keyed
-  marker reconciliation;
-- idempotent Visit IDs and an atomic Journal write batch with no mutation-time
-  full-table reads.
+| 阶段 | 含义 | 完成标志 |
+|---|---|---|
+| 实验阶段 | 解决架构与集成不确定性 | “来源→地图”和“含照片到访→地图”两条闭环可运行 |
+| Demo 阶段 | 核心闭环在人工保护下端到端可用 | Agent、采集、审核、媒体和地图协同 |
+| 成型阶段 | 足以供个人日常使用 | 微信连续七天、备份恢复和移动体验通过 |
+| 交付阶段 | 可承担旅居期间真实使用 | 纯手机演练完成，无需开发工具干预 |
 
-## Phase 1 — correct the personal-memory model
+**当前：实验阶段。** Web 与媒体垂直切片真实可用；下一主线是应用层／安全边界，然后才是采集器和微信渠道。
 
-Goal: make one place remain one place across repeated visits.
+## 2. 当前能力快照
 
-- complete hosted verification of Journal correction and empty-state polish;
-- make `hasVisited` derivation and manual override semantics explicit;
-- add idempotency and audit records to personal writes;
-- refactor the selected split-sidebar layout into focused view components;
-- extend deterministic fuzzy search with aliases and tested ranking fixtures.
+已完成并作为后续基线：
 
-Exit: a museum can have three visits, zero or one overall rating, and one place
-detail containing all notes without duplicate place cards.
+- 私有仓库、仅所有者 Site、D1 和不可变 migration；
+- 可信初始目录、日文优先名称、来源和预约／活动字段；
+- 分栏地图、确定性多语言／标签搜索、组合筛选；
+- 每地点一个可空个人评分，可重复 Visit、喜欢和到访状态；
+- Journal 新增／编辑／删除、地点与日期筛选、乐观更新和幂等 Visit；
+- R2 私有图片、D1 媒体元数据、批量上传、说明、删除和图库弹窗；
+- Leaflet adapter、marker 对账和基础性能修正；
+- WebMCP 浏览器操作与 Web UI 共用 API；
+- PR/main 的完整 CI。
 
-## Phase 2 — photos and captions
+## 3. 按依赖排序的任务
 
-Goal: make personal visual memory durable and visible on the map.
+状态：`完成`、`进行中`、`下一步`、`受阻`、`以后`。
 
-- configure R2-compatible object storage;
-- add media metadata, upload state, visit relation, ordering, and content hash;
-- accept common phone image formats with size/type validation;
-- allow optional one-line captions per image;
-- show visit-grouped thumbnails and a gallery in map detail;
-- support web upload as a fallback and Agent upload as the primary path.
+| ID | 大类 | 交付物 | 前置 | 状态 | 目标阶段 |
+|---|---|---|---|---|---|
+| DOC-03 | 文档 | 中文核心文档、统一决策与 Issue 跟踪规则 | — | 完成 | 实验 |
+| MAP-04 | 地图性能 | 托管环境 trace 和移动端验收；必要时比较矢量方案 | 当前 adapter | 进行中，[#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1) | 实验 |
+| MEDIA-02 | 媒体加固 | 服务端可信尺寸、缩略图、失败批次重试、孤儿清理与指标 | 现有媒体链路 | 进行中，[#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4) | 实验 |
+| APP-01 | 应用边界 | 从 D1 store 抽取框架无关 ports/use cases | 当前 API | 下一步 | 实验 |
+| APP-02 | 写入可靠性 | 通用幂等键、审计 receipt 和可恢复删除策略 | APP-01 | 下一步 | 实验 |
+| AGENT-01 | 类型化操作 | search/recommend/place/Visit/rating/tag/media/import 工具 | APP-01、MEDIA-02 | 受阻 | 实验 |
+| AGENT-02 | 服务安全 | scoped authentication、授权、签名和逐工具权限 | APP-01、APP-02 | 受阻 | 实验 |
+| VIEW-01 | View 重构 | 拆分列表、详情、Visit 时间线与图库组件 | 当前 ViewModel | 以后 | 实验 |
+| ACQ-01 | 采集环境 | 独立浏览器 profile、小号和本地 loopback connector | APP-01 | 受阻 | 实验 |
+| ACQ-02 | Discovery | 小批来源枚举和不可变 evidence manifest | ACQ-01 | 受阻 | 实验 |
+| ACQ-03 | Enrichment | 正文／评论、ASR、关键帧、OCR 和候选生成 | ACQ-02 | 受阻 | Demo |
+| ACQ-04 | 身份审核 | 精确分店解析、abstain 和最多三候选审核 | ACQ-03、AGENT-01 | 受阻 | Demo |
+| EVAL-01 | 领域校准 | smoke 后运行约 30 条校准，再决定是否扩至 150 | ACQ-04 | 受阻 | Demo |
+| HARNESS-01 | Runtime 契约 | 共享 AgentRuntime 与 mocked tool suite | AGENT-01、AGENT-02 | 受阻 | Demo |
+| HARNESS-02 | Harness 选择 | 以本项目任务比较候选并更新决策 | HARNESS-01 | 受阻 | Demo |
+| MEDIA-06 | 对话式照片 | capture session、message 幂等、歧义确认和 reply caption | AGENT-01、AGENT-02 | 受阻，[#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4) | Demo |
+| WX-01 | 微信 PoC | 主账号私聊的文字、链接、图片、语音和位置往返 | HARNESS-02 | 受阻 | Demo |
+| WX-02 | 渠道适配 | 微信消息映射到同一应用操作，支持回执、进度和深链接 | WX-01、AGENT-02 | 受阻 | Demo |
+| WX-03 | 可靠性 | 重复投递、重试、重启、重新登录和连续七天 soak | WX-02、MEDIA-06 | 受阻 | 成型 |
+| CLOUD-01 | 24/7 托管 | 按实测选择 region/provider/API 边界和预算 | WX-01 | 受阻 | 成型 |
+| OPS-01 | 运维 | 版本锁定、监控、加密备份和恢复演练 | CLOUD-01 | 受阻 | 成型 |
+| OPS-02 | 旅行体验 | 手机优先、弱网和最后同步数据 | MAP-04 | 以后 | 成型 |
+| OPS-03 | 新鲜度 | 预约／活动刷新和 JST 提醒 | AGENT-02 | 以后 | 成型 |
+| QA-01 | 交付演练 | 一周纯手机旅行演练 | WX-03、OPS-01、OPS-02 | 受阻 | 交付 |
+| PORT-01 | 后续通用化 | 清理私有数据并抽取可配置公共主干 | QA-01 | 以后，v1 后 | 交付后 |
 
-Current progress: private R2 storage, D1 metadata, signature/size/hash checks,
-per-Visit multi-image upload, one-line caption editing/deletion, and map-detail
-display are implemented. The web form now accepts photos during Visit creation,
-supports 24-photo selections through bounded four-file requests, and opens a
-keyboard/button/swipe lightbox after four thumbnails. Conversational association/caption behavior is
-specified in GitHub RFC #4. Server-side dimension extraction, failed-chunk
-retry, and scheduled orphan cleanup remain before this phase is fully closed.
+## 4. 当前执行顺序
 
-Exit: images sent through either supported surface appear under the correct
-place and visit with captions after refresh.
+1. 收尾媒体加固中会阻碍 Agent 的部分；缩略图等低风险体验项继续放在 #4。
+2. 抽取 `APP-01` application ports/use cases，并补通用幂等、授权和审计边界。
+3. 用非微信测试 adapter 验证日常读写与媒体操作。
+4. 准备独立浏览器，完成范围受控的来源采集→证据→审核实验。
+5. 运行校准数据后确认自动判断／人工审核取舍。
+6. 实现并比较 Agent runtime，再做微信私聊 PoC。
+7. PoC 成功后才选择 24/7 region/provider，随后做稳定性和旅行演练。
 
-## Phase 3 — Agent application layer
+地图 #1 不阻塞第 2–6 步，除非已经影响基本数据操作。View 拆分也不应阻塞应用层抽取。
 
-Goal: make WeChat able to operate the product without direct database access.
+## 5. 里程碑验收
 
-- extract framework-neutral use cases from the current store;
-- add typed operations for search/recommendation, visits, persistent rating,
-  tags, and media;
-- require service authentication, idempotency, authorization, and audit events;
-- translate natural language into structured filters while preserving sources;
-- default nearby recommendations toward unvisited places unless asked otherwise.
+### M1：媒体闭环关闭
 
-Exit: a non-WeChat test adapter can execute every daily workflow and the map
-updates immediately.
+- 图片在正确 Visit 下持久化并可恢复；
+- 部分失败只重试失败批次，不复制成功图片；
+- D1 与 R2 可以对账并清理孤儿对象。
 
-## Phase 4 — dedicated-browser acquisition experiment
+### M2：Agent-ready 产品核心
 
-Goal: prove creator-level collection before bulk import.
+- 测试 adapter 无需导入 React、D1 或 R2 即可完成所有日常操作；
+- 服务凭证、授权、幂等和审计通过负面测试。
 
-1. use an isolated Chrome/Edge profile and secondary social accounts;
-2. run a small discovery batch for 在日本摸鱼的小超人;
-3. persist post metadata and evidence rather than only final guesses;
-4. add captions/comments, ASR, sampled keyframes, and multilingual OCR;
-5. resolve exact branches with sources and send uncertainty to review;
-6. calibrate on the agreed creators only after the smoke loop works.
+### M3：来源采集闭环
 
-Exit: one creator reference yields at least ten reviewable posts, partial
-failures remain visible, and auto-confirmed exact-branch precision reaches at
-least 90% with abstention.
+- 一个用户指定来源可重复地产生 evidence manifest；
+- 自动确认达到精确分店目标，剩余内容进入快速审核；
+- 局部失败可见且可恢复。
 
-## Phase 5 — OpenClaw and WeChat
+### M4：微信闭环
 
-Goal: make Andy's private chat the primary input and command surface.
+- 日常采集、附近推荐、纠错、Visit 和照片均可从微信发起并显示在地图；
+- 歧义和破坏性操作会确认；重复消息不会重复写入。
 
-- verify main-account private-chat text, image, voice, link, and location flows;
-- map messages to the same Agent operations used by the test adapter;
-- return immediate receipts plus asynchronous progress;
-- deep-link ambiguous visual review to the relevant map context;
-- test retries, duplicate delivery, restarts, and seven-day reliability;
-- remove permanent Inbox/Journal navigation only after feature parity.
+### M5：旅行交付
 
-Exit: daily capture, nearby unvisited recommendations, edits, visits, photos,
-and import requests work from WeChat and appear on the map.
+- 七天稳定运行；
+- 备份恢复通过；
+- 弱网与纯手机演练通过；
+- 无需直接数据库或开发工具干预。
 
-Only after the message round trip is proven should a 24/7 server be rented.
-Start planning around 2 vCPU, 4 GB RAM, encrypted storage, and daily backups;
-choose region from measured latency and operating reliability.
+## 6. Issue 使用方式
 
-## Phase 6 — formed product and delivery
+- [#3](https://github.com/AndyZhou952/jp-food-event-map/issues/3)：跨里程碑主 RFC 和长期交付讨论。
+- [#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4)：对话式图片、大图库和媒体加固。
+- [#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)：非阻塞地图性能跟踪。
+- [#5](https://github.com/AndyZhou952/jp-food-event-map/issues/5)：Visit 推导状态与个人状态 mutation 的一致性。
+- 已关闭 Issue 保留实施与测量证据；本文件只吸收仍有效的约束。
 
-- reservation/event freshness and JST reminders;
-- phone-first layout and offline-tolerant last-seen data;
-- backup/restore rehearsal;
-- one-week phone-only travel rehearsal;
-- security and cost review;
-- scrubbed architecture/demo material for the later portfolio version.
-
-Exit: the personal product is dependable for the Japan stay. Generalization is
-explicitly post-v1 and never exposes Andy's private sources, photos, or journal.
-
-## Immediate sequence
-
-1. add object storage, photo captions, and upload APIs;
-2. implement Agent v2 service security, idempotency, and audit records;
-3. prepare the dedicated browser and run the bounded 小超人 experiment;
-4. build the OpenClaw/WeChat adapter;
-5. select cloud hosting only after the local channel proof succeeds.
+每个新 Issue 应说明背景、非目标、依赖、验收标准和关闭证据。低优先级性能项留在 Issue，不应反复扩写核心文档。

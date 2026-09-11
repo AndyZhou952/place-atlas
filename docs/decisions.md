@@ -143,7 +143,6 @@ OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin �
 | 旧 `food-map` 代码／数据作为基线 | Superseded | 只借鉴个别体验，从零构建，不迁移旧代码、依赖或样例数据 |
 | 静态 JSON／Git 作为数据库 | Superseded | D1/R2 与唯一应用 API 写边界 |
 | 每条 Journal 记录拥有评分 | Superseded | 每地点一个 PlaceAssessment，Visit 独立可重复 |
-| A/B/C 长期并存 | Superseded | B 分栏布局为默认，实验 query 不进入产品契约 |
 | 大图库在时间线内全部展开 | Superseded | 四缩略图＋单图弹窗 |
 | 媒体只能保存 Visit 后追加 | Superseded | Journal 创建时可同步选择图片，同时保留后续追加 |
 | 一开始全面处理创作者历史 | Superseded | Discovery 后只 enrichment 选中／高相关内容 |

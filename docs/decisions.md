@@ -146,6 +146,14 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 允许使用明确不用于训练且提供受限保留配置的云模型处理批准的第三方材料与私人内容。提交前剥离 EXIF、Cookie、token 和无关凭证；应用日志只保留结构化结果。未来如私人媒体需要更强隔离，可在同一模型处理 port 后增加本地 adapter，而不改变产品核心。
 
+### D-020：未部署 reset migration 的一次性安全重排
+
+**状态：Accepted（2026-09-12）**
+
+原 `0003_reset_test_place_assessments.sql` 从未在生产执行。为先建立完整生产快照与恢复能力，允许一次性把其 SQL 按字节与 SHA-256 原样转为 non-runnable pending artifact；新的 active 0003 只建立持久化 maintenance fence、write lease 与 snapshot 控制结构。完整 before evidence 和全 D1 恢复演练通过后，原 reset SQL 才以 active 0004 发布，CI 必须证明 0004 与 pending artifact 逐字节一致。
+
+这不是修改已部署 migration 的先例。任何已经部署的 migration 继续不可修改；已保存但未部署且带原 reset 0003 的 Site version 16 永不发布。详细门禁见 `features/003-production-snapshot/spec.md`。
+
 ## 2. 提议中决策
 
 ### D-P01：OpenClaw 作为首个微信 runtime

@@ -1,33 +1,17 @@
-import { NextResponse } from 'next/server';
+import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
 
-import type { NewImportJob } from '@/features/atlas/model';
-import { listImportJobs, queueImportJob } from '@/lib/server/atlas-store';
+import { queueImportJobResponse } from './import-job-write-response';
+import { listImportJobsResponse } from './list-import-jobs-response';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(await listImportJobs());
+  return listImportJobsResponse(getServerAtlasApplication());
 }
 
 export async function POST(request: Request) {
-  const input = (await request.json()) as Partial<NewImportJob>;
-  if (
-    typeof input.sourceRef !== 'string' ||
-    !input.sourceRef.trim() ||
-    typeof input.creatorName !== 'string' ||
-    !input.creatorName.trim()
-  ) {
-    return new NextResponse('Creator name and source reference are required', {
-      status: 400,
-    });
-  }
-
-  return NextResponse.json(
-    await queueImportJob({
-      sourceRef: input.sourceRef.trim(),
-      creatorName: input.creatorName.trim(),
-      platform: input.platform,
-    }),
-    { status: 201 },
+  return queueImportJobResponse(
+    getServerAtlasApplication(),
+    await request.json(),
   );
 }

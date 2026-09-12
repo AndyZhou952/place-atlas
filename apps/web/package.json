@@ -9,12 +9,13 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
-    "lint": "oxlint app features lib components",
+    "lint": "oxlint app features lib components product scripts",
     "format": "oxfmt",
-    "format:check": "oxfmt --check app components db features lib",
+    "format:check": "oxfmt --check app components db features lib product scripts",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "maintenance:assessment-reset": "node --experimental-strip-types scripts/assessment-reset-maintenance.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

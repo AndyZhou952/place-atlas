@@ -1,7 +1,7 @@
 # Japan Atlas 系统架构与开发指南
 
 状态：有效架构基线
-最后更新：2026-09-09
+最后更新：2026-09-12
 
 ## 1. 架构原则
 
@@ -59,12 +59,15 @@ flowchart LR
 - AtlasItem、ImportJob、PlaceAssessment、Visit 与 VisitMedia；
 - R2 私有图片、签名／大小／哈希校验、说明和删除；
 - 地图、搜索、筛选、乐观写入和 Journal 纠错；
-- WebMCP 浏览器工具与 Web UI 共用 ViewModel／HTTP 操作；
+- WebMCP 浏览器工具与 Web UI 共用 Browser AtlasApplication／HTTP 操作；
+- 框架无关的 `AtlasApplication`、静态 operation catalog、领域 handlers 与 D1/R2/InMemory ports；
+- 全部现有 HTTP 读写经唯一 server composition 调用同一 Application Operations；
+- Browser、capabilities 与 WebMCP 共用同一 HTTP/operation mapping；
+- 架构适应度测试覆盖依赖方向、无环、handler 隔离、operation key 与旧 store 绕行；
 - CI 的格式、Lint、类型、单元测试与生产构建。
 
 ### 尚未实现或尚未形成服务边界
 
-- 独立的 application ports/use cases 包；
 - 供 24/7 Agent 使用的 scoped authentication、授权和审计；
 - 能消费 ImportJob 的本地 collector worker；
 - 对话式 Visit capture session；
@@ -80,8 +83,10 @@ React View
   -> Atlas ViewModel
     -> Browser API Client
       -> Route Handler
-        -> Application Port / Use Case（下一阶段抽取）
-          -> D1 / R2 Adapter
+        -> AtlasApplication
+          -> Domain Operation Group
+            -> State / Object Port
+              <- D1 / R2 Adapter
 
 WebMCP / 未来微信 Adapter
   -> 同一 Application Use Case
@@ -90,15 +95,17 @@ WebMCP / 未来微信 Adapter
 
 | 层 | 当前职责 | 位置 |
 |---|---|---|
-| 领域类型 | 地点、来源、预约、评价、Visit、媒体与导入类型 | `apps/web/features/atlas/model.ts` |
+| Product Core | 类型化 Application Operations、业务不变量、领域类型与 ports | `apps/web/product/application/**` |
+| UI 类型兼容层 | Product Core record 的 type alias 与 Web-only view/filter 类型 | `apps/web/features/atlas/model.ts` |
 | 可信初始目录 | 经来源核验的内置记录 | `apps/web/features/atlas/verified-items.ts` |
 | View | 地图、列表、详情、备用 Inbox／Journal | `apps/web/features/atlas/atlas-screen.tsx` |
 | ViewModel | 客户端状态、乐观更新、API 编排与回滚 | `apps/web/features/atlas/use-atlas-view-model.ts` |
 | Browser Adapter | 类型化 HTTP 调用 | `apps/web/features/atlas/atlas-api-client.ts` |
+| 共享 Browser mapping | Browser、capabilities 与 WebMCP 的唯一 HTTP/operation 映射 | `apps/web/features/atlas/atlas-browser-operation-catalog.ts` |
 | Browser Agent Adapter | WebMCP 工具注册 | `apps/web/features/atlas/use-atlas-webmcp.ts` |
 | Map Port / Adapter | 地图生命周期、marker 对账和供应商隔离 | `apps/web/features/atlas/map-adapter.ts`、`leaflet-map-adapter.ts` |
-| Server Adapter | D1 查询、目录合并和写入 | `apps/web/lib/server/atlas-store.ts` |
-| Media Adapter | R2 对象与 D1 媒体元数据 | `apps/web/lib/server/media-store.ts` |
+| Server composition | 唯一静态 operation catalog、系统 Clock/IdSource/hash 注入 | `apps/web/lib/server/application/server-atlas-application.ts` |
+| Infrastructure adapters | D1 record state 与 R2 media object ports | `apps/web/lib/server/application/**` |
 | Delivery | HTTP routes | `apps/web/app/api/**` |
 | Persistence | schema 与 migration | `apps/web/db`、`apps/web/drizzle` |
 
@@ -118,22 +125,24 @@ WebMCP / 未来微信 Adapter
 | `VisitMedia` | Visit 归属、R2 object key、MIME、大小、哈希、顺序和可选说明 |
 | Tombstone | 防止已删除的内置目录记录在刷新后重新出现 |
 
-当前有效到访状态为：存在 Visit 一定为 `true`；没有 Visit 时可使用显式标记。删除最后一条 Visit 会进行状态对账。是否要在未来保存“三态人工 override”列在决策登记册中。
+有效到访状态已经统一为 `存在 Visit OR manualVisited`：真实 Visit 不能被人工“没去过”覆盖；删除最后一条 Visit 后，仅当此前独立保存了 `manualVisited=true` 才继续显示 `行った`。D1 adapter 在内部把旧列 `has_visited` 解释为 `manualVisited`，HTTP compatibility adapter 继续接受旧字段名 `hasVisited`；业务核心和新接口不得使用旧语义，`personalState: visited` 也不参与有效到访计算。
 
 `journal_entries` 是旧兼容表，不应承载新功能；新开发只使用 `visits` 与 `place_assessments`，待迁移安全窗口确定后再删除旧表。
 
 ## 6. 应用操作与写入契约
 
-核心操作至少覆盖：
+当前唯一静态 catalog 覆盖：
 
-- 地点：list、details、update、delete；
-- 发现：search、nearby、recommend；
-- 个人状态：favorite、visited、personal rating；
-- Visit：create、update、delete、history；
+- 地点：list、get、保存 `needs_review` 采集结果、update、delete；
+- 发现：search、nearby；
+- 个人状态：rating、favorite、manual visited、summary update；
+- Visit：list、create、update、delete；
 - 媒体：attach、list/content、caption、delete；
-- 采集：queue import、status、propose/confirm identity。
+- 采集：ImportJob list、queue、delete。
 
-以下是目标写入契约；当前 Visit create 已具备部分幂等与原子保证，但通用审计、授权和所有 mutation 的幂等仍属于 `APP-01/APP-02`：
+这些 operation 由领域 group 静态组合一次；JSON 与 media-stream key 在类型层分离，不能 runtime registration。HTTP route 只解析协议和映射 `Result`，不得导入数据库、对象存储或重新实现评分、到访、目录合并、搜索、距离与删除规则。
+
+以下是目标写入契约；当前 Visit create 已具备特征化重投与 D1 原子边界，但通用审计、授权和所有 mutation 的幂等仍属于 `APP-02`：
 
 1. 在 delivery 边界做运行时类型和范围校验；
 2. 使用稳定 mutation/message ID 实现幂等；
@@ -202,6 +211,20 @@ npm run build
 ```
 
 CI 会在 Pull Request 以及 `main` push 上运行同一组检查。
+
+默认测试同时执行架构适应度门：Product Core 禁止框架／供应商／feature import，生产依赖图不得成环，operation handlers 不得横向互调，route 到旧 store 的直连与第二 HTTP operation mapping 必须为零。静态 catalog 从导出的 server factory 实际返回表达式出发，按 TypeScript lexical symbol binding 对称追踪唯一 Application factory、`defineOperationGroup`、catalog／group factory／operation value 的命名导入与只读 const alias chain；namespace、dynamic、mutable／循环 alias、参数／局部遮蔽、游离 group 和伪造 catalog 都失败关闭。Browser、capabilities、WebMCP 只允许从唯一 mapping owner 命名导入各自白名单 symbol；search、rating、model 兼容 adapter 的 import/export 路径、named/type specifier 与声明形状也使用严格白名单，拒绝裸导入、任意 Product 依赖和含顶层副作用的 owner。owner 的 eager-effect 检查会沿本地 runtime import／re-export 递归审计 initializer、IIFE、赋值／更新、调用／构造、await／yield、tagged template 以及 class static／computed 执行路径；纯 type-only 依赖、纯数据和 lazy function／arrow／class 定义不会产生运行时边，依赖循环、无法解析的本地模块和未列入白名单的外部运行时包都失败关闭。`typecheck` 还会执行 operation key/input/output 关联以及 JSON/media key 负面编译测试。
+
+适应度门的公开 violation 与异常输出统一经过同一条“先分类、再格式化”的脱敏出口：`rule` 是封闭枚举，`detail` 只能由固定代码、安全标识符或结构化路径分类产生，不得包含 AST/source 原文、module specifier 或捕获到的异常消息／stack；仓库内文件必须通过 `realpath` 与相对路径验证后才能输出仓库相对路径。POSIX（包括任意数量的前导 `/`）、Windows／混合分隔符、UNC／`file://` 绝对路径（包括 query/hash）以及指向仓库外的目录穿越路径只返回幂等的固定安全标记，不输出真实路径或参数内容。解析或解析依赖时发生的异常只返回固定错误代码。
+
+适应度门通过“模块所有权 + 已知规则 primitive + 严格 adapter 形状”阻止当前可预见的第二实现入口；它不是对任意代码语义等价性的数学证明。新增搜索、评分、到访或 HTTP mapping 语法时，必须先补一个会失败的坏 fixture，再扩展 AST 检查，不能用更宽松的文本正则替代。
+
+已踩坑原则：
+
+- 读写能力必须在类型和构造层真实成立；没有写 state/Clock 时只能组合只读 group，不能公开一个运行时必失败的写 key。
+- 业务校验必须在 Application seam 再执行一次，不能只信任 HTTP inbound；例如采集条目的空白身份字段必须由核心拒绝。
+- operation key 只在领域 descriptor 定义并由 server composition 静态汇总；Browser/capabilities/WebMCP 的 HTTP 映射只维护一份。
+- `apps/web/features/atlas/verified-items.ts` 是必要静态 seed；`features/atlas/model.ts` 只保留 Product Core type alias 与 UI-only 类型，不复制 record 结构。
+- `journal_entries`、旧 HTTP 字段名与 `personalState: visited` 仅是数据／协议兼容，不得成为第二套业务实现。
 
 ## 10. 开发检查表
 

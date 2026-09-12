@@ -1,12 +1,10 @@
-export function normalizeRating(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 5) {
-    throw new RangeError('Rating must be a number from 0 to 5.');
-  }
+import { normalizeAssessmentRating } from '../../product/application/assessments/assessment-rating.ts';
 
-  return Math.round((value + Number.EPSILON) * 10) / 10;
-}
+export { normalizeAssessmentRating as normalizeRating } from '../../product/application/assessments/assessment-rating.ts';
 
 export function parseOptionalRating(value: string): number | undefined {
   const trimmed = value.trim();
-  return trimmed === '' ? undefined : normalizeRating(Number(trimmed));
+  return trimmed === ''
+    ? undefined
+    : normalizeAssessmentRating(Number(trimmed));
 }

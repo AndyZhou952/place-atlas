@@ -1,31 +1,32 @@
 import { NextResponse } from 'next/server';
 
-import type { AtlasItemEdit, PersonalState } from '@/features/atlas/model';
-import { deleteAtlasItem, updateAtlasItem } from '@/lib/server/atlas-store';
+import { deleteAtlasItemResponse } from '@/app/api/destructive-responses';
+import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import type {
+  AtlasItemEdit,
+  PersonalState,
+} from '@/product/application/catalog/atlas-item';
+
+import { getAtlasItemResponse } from './get-atlas-item-response';
+import { updateAtlasItemResponse } from '../item-write-response';
 
 export const dynamic = 'force-dynamic';
 
-const personalStates = new Set<PersonalState>([
-  'candidate',
-  'saved',
-  'planned',
-  'visited',
-]);
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  return getAtlasItemResponse(getServerAtlasApplication(), id);
+}
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const input = (await request.json()) as Partial<AtlasItemEdit>;
-  if (
-    typeof input.title !== 'string' ||
-    !input.title.trim() ||
-    typeof input.description !== 'string' ||
-    !input.description.trim() ||
-    !input.personalState ||
-    !personalStates.has(input.personalState)
-  ) {
+  const edit = parseAtlasItemEdit(await request.json());
+  if (!edit) {
     return new NextResponse(
       'Valid title, description, and state are required',
       {
@@ -34,20 +35,7 @@ export async function PATCH(
     );
   }
 
-  try {
-    return NextResponse.json(
-      await updateAtlasItem(id, {
-        title: input.title.trim(),
-        description: input.description.trim(),
-        personalState: input.personalState,
-      }),
-    );
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Atlas item not found') {
-      return new NextResponse(error.message, { status: 404 });
-    }
-    throw error;
-  }
+  return updateAtlasItemResponse(getServerAtlasApplication(), id, edit);
 }
 
 export async function DELETE(
@@ -55,8 +43,36 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const deleted = await deleteAtlasItem(id);
-  if (!deleted)
-    return new NextResponse('Atlas item not found', { status: 404 });
-  return NextResponse.json({ id, deleted: true });
+  return deleteAtlasItemResponse(getServerAtlasApplication(), id);
+}
+
+function parseAtlasItemEdit(input: unknown): AtlasItemEdit | undefined {
+  if (
+    !isRecord(input) ||
+    typeof input.title !== 'string' ||
+    !input.title.trim() ||
+    typeof input.description !== 'string' ||
+    !input.description.trim() ||
+    !isPersonalState(input.personalState)
+  ) {
+    return undefined;
+  }
+  return {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    personalState: input.personalState,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPersonalState(value: unknown): value is PersonalState {
+  return (
+    value === 'candidate' ||
+    value === 'saved' ||
+    value === 'planned' ||
+    value === 'visited'
+  );
 }

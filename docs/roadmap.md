@@ -1,7 +1,7 @@
 # Japan Atlas 路线图与任务看板
 
 状态：有效执行摘要
-最后更新：2026-09-09
+最后更新：2026-09-12
 
 详细实验、验收记录和低优先级工作由 GitHub Issues 跟踪。本文件只维护阶段、依赖、当前状态和下一检查点。
 
@@ -14,7 +14,7 @@
 | 成型阶段 | 足以供个人日常使用 | 微信连续七天、备份恢复和移动体验通过 |
 | 交付阶段 | 可承担旅居期间真实使用 | 纯手机演练完成，无需开发工具干预 |
 
-**当前：实验阶段。** Web 与媒体垂直切片真实可用；下一主线是应用层／安全边界，然后才是采集器和微信渠道。
+**当前：实验阶段。** Web 与媒体垂直切片真实可用；Agent-ready 应用核心已完成本地实现、独立评审与 PR CI，正在等待用户批准生产维护窗口。生产切换后，下一主线是服务安全／写入可靠性，然后才是采集器和微信渠道。
 
 ## 2. 当前能力快照
 
@@ -28,6 +28,10 @@
 - R2 私有图片、D1 媒体元数据、批量上传、说明、删除和图库弹窗；
 - Leaflet adapter、marker 对账和基础性能修正；
 - WebMCP 浏览器操作与 Web UI 共用 API；
+- 框架无关 `AtlasApplication`、20 个类型化操作和七个领域组；
+- Browser MVVM adapter、乐观回滚与 stale-load 防护；
+- Search、评分归一化、有效到访状态和 HTTP mapping 均只有一个产品实现；
+- AST 架构适应度门、迁移安全测试和独立代码评审；
 - PR/main 的完整 CI。
 
 ## 3. 按依赖排序的任务
@@ -39,9 +43,10 @@
 | DOC-03 | 文档 | 中文核心文档、统一决策与 Issue 跟踪规则 | — | 完成 | 实验 |
 | MAP-04 | 地图性能 | 托管环境 trace 和移动端验收；必要时比较矢量方案 | 当前 adapter | 进行中，[#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1) | 实验 |
 | MEDIA-02 | 媒体加固 | 服务端可信尺寸、缩略图、失败批次重试、孤儿清理与指标 | 现有媒体链路 | 进行中，[#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4) | 实验 |
-| APP-01 | 应用边界 | 从 D1 store 抽取框架无关 ports/use cases | 当前 API | 下一步 | 实验 |
+| CORE-14 | 生产切换 | 经批准后备份、四字段测试状态 reset、部署、对账与回退验证 | Agent-ready core PR CI | 下一步，需人工批准窗口 | 实验 |
+| APP-01 | 应用边界 | 从 D1 store 抽取框架无关 ports/use cases | 当前 API | 完成 | 实验 |
 | APP-02 | 写入可靠性 | 通用幂等键、审计 receipt 和可恢复删除策略 | APP-01 | 下一步 | 实验 |
-| AGENT-01 | 类型化操作 | search/recommend/place/Visit/rating/tag/media/import 工具 | APP-01、MEDIA-02 | 受阻 | 实验 |
+| AGENT-01 | 类型化操作 | search/recommend/place/Visit/rating/tag/media/import 工具 | APP-01 | 完成 | 实验 |
 | AGENT-02 | 服务安全 | scoped authentication、授权、签名和逐工具权限 | APP-01、APP-02 | 受阻 | 实验 |
 | VIEW-01 | View 重构 | 拆分列表、详情、Visit 时间线与图库组件 | 当前 ViewModel | 以后 | 实验 |
 | ACQ-01 | 采集环境 | 独立浏览器 profile、小号和本地 loopback connector | APP-01 | 受阻 | 实验 |
@@ -64,9 +69,9 @@
 
 ## 4. 当前执行顺序
 
-1. 收尾媒体加固中会阻碍 Agent 的部分；缩略图等低风险体验项继续放在 #4。
-2. 抽取 `APP-01` application ports/use cases，并补通用幂等、授权和审计边界。
-3. 用非微信测试 adapter 验证日常读写与媒体操作。
+1. Agent-ready core PR 的 GitHub CI 已通过；用户批准具体维护窗口后才执行 `CORE-14`，否则生产保持不变。
+2. 补通用幂等、授权、审计 receipt 和可恢复删除边界；媒体缩略图等低风险体验项继续放在 #4。
+3. 用非微信测试 adapter 验证所有 20 个日常操作及负面授权场景。
 4. 准备独立浏览器，完成范围受控的来源采集→证据→审核实验。
 5. 运行校准数据后确认自动判断／人工审核取舍。
 6. 实现并比较 Agent runtime，再做微信私聊 PoC。
@@ -84,8 +89,9 @@
 
 ### M2：Agent-ready 产品核心
 
-- 测试 adapter 无需导入 React、D1 或 R2 即可完成所有日常操作；
-- 服务凭证、授权、幂等和审计通过负面测试。
+- [x] 测试 adapter 无需导入 React、D1 或 R2 即可完成所有日常操作；
+- [x] Web UI、capabilities 与 WebMCP 共用同一应用操作和 HTTP mapping；
+- [ ] 服务凭证、授权、通用幂等和审计通过负面测试。
 
 ### M3：来源采集闭环
 

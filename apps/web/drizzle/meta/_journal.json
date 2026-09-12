@@ -22,6 +22,13 @@
       "when": 1788879310819,
       "tag": "0002_funny_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789193789162,
+      "tag": "0003_reset_test_place_assessments",
+      "breakpoints": true
     }
   ]
 }

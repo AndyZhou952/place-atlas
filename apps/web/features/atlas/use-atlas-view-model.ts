@@ -1,24 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
-import {
-  createImportJob,
-  createVisit,
-  deleteAtlasItem,
-  deleteVisitMedia,
-  deleteVisit,
-  fetchAtlasItems,
-  fetchImportJobs,
-  fetchVisits,
-  fetchVisitMedia,
-  updateAtlasItem,
-  updateItemAssessment,
-  updateVisit,
-  updateVisitMediaCaption,
-  uploadVisitMedia,
-} from './atlas-api-client';
-import { distanceInKm } from './distance';
+import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
 import { matchesAtlasQuery } from './search';
 import type {
@@ -28,31 +12,34 @@ import type {
   AtlasPersonalFilter,
   AtlasSummary,
   AtlasView,
-  ImportJob,
   NewImportJob,
   NewVisit,
   PlaceAssessmentPatch,
   VisitRecord,
-  VisitMediaRecord,
   VisitUpdate,
 } from './model';
 import { useAtlasWebMcp } from './use-atlas-webmcp';
+import {
+  createAtlasViewModelState,
+  reduceAtlasViewModelState,
+} from './atlas-view-model-state';
 import { verifiedAtlasItems } from './verified-items';
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
 export function useAtlasViewModel() {
   const [view, setView] = useState<AtlasView>('map');
-  const [items, setItems] = useState<AtlasItem[]>([...verifiedAtlasItems]);
+  const [state, dispatch] = useReducer(
+    reduceAtlasViewModelState,
+    createAtlasViewModelState({ items: verifiedAtlasItems }),
+  );
+  const { importJobs, items, media, visits } = state;
   const [kind, setKind] = useState<AtlasKindFilter>('all');
   const [personalFilter, setPersonalFilter] =
     useState<AtlasPersonalFilter>('all');
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
-  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
-  const [visits, setVisits] = useState<VisitRecord[]>([]);
-  const [media, setMedia] = useState<VisitMediaRecord[]>([]);
   const [distances, setDistances] = useState<Record<string, number>>({});
   const [locationStatus, setLocationStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -75,11 +62,59 @@ export function useAtlasViewModel() {
   }, []);
 
   useEffect(() => {
+    const loadIds = {
+      items: crypto.randomUUID(),
+      importJobs: crypto.randomUUID(),
+      visits: crypto.randomUUID(),
+      media: crypto.randomUUID(),
+    };
+    dispatch({ type: 'items.load.started', loadId: loadIds.items });
+    dispatch({
+      type: 'import-jobs.load.started',
+      loadId: loadIds.importJobs,
+    });
+    dispatch({ type: 'visits.load.started', loadId: loadIds.visits });
+    dispatch({ type: 'media.load.started', loadId: loadIds.media });
     void Promise.all([
-      fetchAtlasItems().then(setItems),
-      fetchImportJobs().then(setImportJobs),
-      fetchVisits().then(setVisits),
-      fetchVisitMedia().then(setMedia),
+      browserAtlasApplication
+        .execute({
+          key: 'catalog.list',
+          input: { profile: 'full_merged_catalog' },
+        })
+        .then((loadedItems) =>
+          dispatch({
+            type: 'items.loaded',
+            loadId: loadIds.items,
+            items: loadedItems,
+          }),
+        ),
+      browserAtlasApplication
+        .execute({ key: 'import.list', input: {} })
+        .then((loadedJobs) =>
+          dispatch({
+            type: 'import-jobs.loaded',
+            loadId: loadIds.importJobs,
+            importJobs: loadedJobs,
+          }),
+        ),
+      browserAtlasApplication
+        .execute({ key: 'visit.list', input: {} })
+        .then((loadedVisits) =>
+          dispatch({
+            type: 'visits.loaded',
+            loadId: loadIds.visits,
+            visits: loadedVisits,
+          }),
+        ),
+      browserAtlasApplication
+        .execute({ key: 'media.list', input: {} })
+        .then((loadedMedia) =>
+          dispatch({
+            type: 'media.loaded',
+            loadId: loadIds.media,
+            media: loadedMedia,
+          }),
+        ),
     ]).catch(() => {
       setNotice(
         'Local preview is using verified source data; cloud records reconnect after publish.',
@@ -144,10 +179,11 @@ export function useAtlasViewModel() {
       setItemPending(id, true);
       setNotice('');
       try {
-        const updated = await updateAtlasItem(id, edit);
-        setItems((current) =>
-          current.map((item) => (item.id === updated.id ? updated : item)),
-        );
+        const updated = await browserAtlasApplication.execute({
+          key: 'catalog.update_item',
+          input: { id, ...edit },
+        });
+        dispatch({ type: 'item.received', item: updated });
         setNotice('Changes saved. The Agent API will read the same record.');
         return updated;
       } catch (error) {
@@ -166,8 +202,11 @@ export function useAtlasViewModel() {
     setBusy(true);
     setNotice('');
     try {
-      const job = await createImportJob(input);
-      setImportJobs((current) => [job, ...current]);
+      const job = await browserAtlasApplication.execute({
+        key: 'import.queue',
+        input,
+      });
+      dispatch({ type: 'import-job.prepended', importJob: job });
       setNotice(
         'Import queued. It will start when the collector worker is connected.',
       );
@@ -188,6 +227,7 @@ export function useAtlasViewModel() {
       if (!item) throw new Error('Atlas item not found');
       const now = new Date().toISOString();
       const visitId = input.id ?? crypto.randomUUID();
+      const mutationId = crypto.randomUUID();
       const optimisticVisit: VisitRecord = {
         id: visitId,
         itemId: item.id,
@@ -200,43 +240,43 @@ export function useAtlasViewModel() {
 
       setJournalBusy(true);
       setNotice('');
-      setVisits((current) => [optimisticVisit, ...current]);
-      setItems((current) =>
-        current.map((candidate) =>
-          candidate.id === item.id
-            ? {
-                ...candidate,
-                hasVisited: true,
-                ...(input.rating === undefined
-                  ? {}
-                  : { personalRating: input.rating }),
-              }
-            : candidate,
-        ),
-      );
+      dispatch({ type: 'visit.prepended', visit: optimisticVisit });
+      dispatch({
+        type: 'item.mutation.started',
+        itemId: item.id,
+        mutationId,
+        patch: {
+          hasVisited: true,
+          ...(input.rating === undefined
+            ? {}
+            : { personalRating: input.rating }),
+        },
+      });
       try {
-        const result = await createVisit({ ...input, id: visitId });
-        setVisits((current) =>
-          current.map((visit) =>
-            visit.id === optimisticVisit.id ? result.visit : visit,
-          ),
-        );
-        setItems((current) =>
-          current.map((item) =>
-            item.id === result.item.id ? result.item : item,
-          ),
-        );
+        const result = await browserAtlasApplication.execute({
+          key: 'visit.create',
+          input: { ...input, id: visitId },
+        });
+        dispatch({
+          type: 'visit.received',
+          optimisticId: optimisticVisit.id,
+          visit: result.visit,
+        });
+        dispatch({
+          type: 'item.mutation.succeeded',
+          itemId: item.id,
+          mutationId,
+          item: result.item,
+        });
         setNotice('Visit saved. Your place record has been updated.');
         return result;
       } catch (error) {
-        setVisits((current) =>
-          current.filter((visit) => visit.id !== optimisticVisit.id),
-        );
-        setItems((current) =>
-          current.map((candidate) =>
-            candidate.id === item.id ? item : candidate,
-          ),
-        );
+        dispatch({ type: 'visit.removed', visitId: optimisticVisit.id });
+        dispatch({
+          type: 'item.mutation.failed',
+          itemId: item.id,
+          mutationId,
+        });
         setNotice(
           error instanceof Error
             ? error.message
@@ -265,56 +305,58 @@ export function useAtlasViewModel() {
         note: input.note?.trim() || undefined,
         updatedAt: new Date().toISOString(),
       };
+      const mutationId = crypto.randomUUID();
 
       setJournalBusy(true);
       setNotice('');
-      setVisits((current) =>
-        sortVisits(
-          current.map((visit) => (visit.id === id ? optimisticVisit : visit)),
-        ),
-      );
-      if (input.rating !== undefined) {
-        setItems((current) =>
-          current.map((item) =>
-            item.id === previousItem.id
-              ? {
-                  ...item,
-                  personalRating:
-                    input.rating === null ? undefined : input.rating,
-                }
-              : item,
-          ),
-        );
-      }
+      dispatch({
+        type: 'visit.received',
+        optimisticId: id,
+        visit: optimisticVisit,
+      });
+      dispatch({
+        type: 'item.mutation.started',
+        itemId: previousItem.id,
+        mutationId,
+        patch:
+          input.rating === undefined
+            ? {}
+            : {
+                personalRating:
+                  input.rating === null ? undefined : input.rating,
+              },
+      });
 
       try {
-        const result = await updateVisit(id, input);
+        const result = await browserAtlasApplication.execute({
+          key: 'visit.update',
+          input: { id, ...input },
+        });
         if (result.visit) {
-          setVisits((current) =>
-            sortVisits(
-              current.map((visit) =>
-                visit.id === result.visit?.id ? result.visit : visit,
-              ),
-            ),
-          );
+          dispatch({
+            type: 'visit.received',
+            optimisticId: id,
+            visit: result.visit,
+          });
         }
-        setItems((current) =>
-          current.map((item) =>
-            item.id === result.item.id ? result.item : item,
-          ),
-        );
+        dispatch({
+          type: 'item.mutation.succeeded',
+          itemId: previousItem.id,
+          mutationId,
+          item: result.item,
+        });
         return result;
       } catch (error) {
-        setVisits((current) =>
-          sortVisits(
-            current.map((visit) => (visit.id === id ? previousVisit : visit)),
-          ),
-        );
-        setItems((current) =>
-          current.map((item) =>
-            item.id === previousItem.id ? previousItem : item,
-          ),
-        );
+        dispatch({
+          type: 'visit.received',
+          optimisticId: id,
+          visit: previousVisit,
+        });
+        dispatch({
+          type: 'item.mutation.failed',
+          itemId: previousItem.id,
+          mutationId,
+        });
         setNotice(
           error instanceof Error
             ? error.message
@@ -336,39 +378,25 @@ export function useAtlasViewModel() {
         (item) => item.id === previousVisit.itemId,
       );
       if (!previousItem) throw new Error('Atlas item not found');
-      const hasAnotherVisit = visits.some(
-        (visit) => visit.id !== id && visit.itemId === previousVisit.itemId,
-      );
       const previousMedia = media.filter((entry) => entry.visitId === id);
 
       setJournalBusy(true);
       setNotice('');
-      setVisits((current) => current.filter((visit) => visit.id !== id));
-      setMedia((current) => current.filter((entry) => entry.visitId !== id));
-      if (!hasAnotherVisit) {
-        setItems((current) =>
-          current.map((item) =>
-            item.id === previousItem.id ? { ...item, hasVisited: false } : item,
-          ),
-        );
-      }
+      dispatch({ type: 'visit.removed', visitId: id });
 
       try {
-        const result = await deleteVisit(id);
-        setItems((current) =>
-          current.map((item) =>
-            item.id === result.item.id ? result.item : item,
-          ),
-        );
+        const result = await browserAtlasApplication.execute({
+          key: 'visit.delete',
+          input: { id },
+        });
+        dispatch({ type: 'item.received', item: result.item });
         return result;
       } catch (error) {
-        setVisits((current) => sortVisits([previousVisit, ...current]));
-        setMedia((current) => [...previousMedia, ...current]);
-        setItems((current) =>
-          current.map((item) =>
-            item.id === previousItem.id ? previousItem : item,
-          ),
-        );
+        dispatch({
+          type: 'visit.restored',
+          visit: previousVisit,
+          media: previousMedia,
+        });
         setNotice(
           error instanceof Error
             ? error.message
@@ -387,14 +415,16 @@ export function useAtlasViewModel() {
       setMediaVisitPending(visitId, true);
       setNotice('');
       try {
-        const uploaded = await uploadVisitMedia(
-          visitId,
-          files,
-          [],
-          (completed) => {
-            setMedia((current) => [...current, ...completed]);
+        const uploaded = await browserAtlasApplication.execute({
+          key: 'media.attach',
+          input: {
+            visitId,
+            files,
+            onBatchCompleted: (completed) => {
+              dispatch({ type: 'media.appended', media: completed });
+            },
           },
-        );
+        });
         return uploaded;
       } catch (error) {
         setNotice(
@@ -413,19 +443,16 @@ export function useAtlasViewModel() {
       const previous = media.find((entry) => entry.id === id);
       if (!previous) throw new Error('Photo not found');
       const optimistic = { ...previous, caption: caption.trim() || undefined };
-      setMedia((current) =>
-        current.map((entry) => (entry.id === id ? optimistic : entry)),
-      );
+      dispatch({ type: 'media.received', media: optimistic });
       try {
-        const updated = await updateVisitMediaCaption(id, caption.trim());
-        setMedia((current) =>
-          current.map((entry) => (entry.id === id ? updated : entry)),
-        );
+        const updated = await browserAtlasApplication.execute({
+          key: 'media.caption',
+          input: { id, caption: caption.trim() },
+        });
+        dispatch({ type: 'media.received', media: updated });
         return updated;
       } catch (error) {
-        setMedia((current) =>
-          current.map((entry) => (entry.id === id ? previous : entry)),
-        );
+        dispatch({ type: 'media.received', media: previous });
         setNotice(
           error instanceof Error ? error.message : 'Could not save caption.',
         );
@@ -439,11 +466,14 @@ export function useAtlasViewModel() {
     async (id: string) => {
       const previous = media.find((entry) => entry.id === id);
       if (!previous) throw new Error('Photo not found');
-      setMedia((current) => current.filter((entry) => entry.id !== id));
+      dispatch({ type: 'media.removed', mediaId: id });
       try {
-        await deleteVisitMedia(id);
+        await browserAtlasApplication.execute({
+          key: 'media.delete',
+          input: { id },
+        });
       } catch (error) {
-        setMedia((current) => [...current, previous]);
+        dispatch({ type: 'media.restored', media: previous });
         setNotice(
           error instanceof Error ? error.message : 'Could not delete photo.',
         );
@@ -457,42 +487,59 @@ export function useAtlasViewModel() {
     async (id: string, patch: PlaceAssessmentPatch) => {
       const previous = items.find((item) => item.id === id);
       if (!previous) throw new Error('Atlas item not found');
+      const mutationId = crypto.randomUUID();
 
       setItemPending(id, true);
       setNotice('');
-      setItems((current) =>
-        current.map((item) => {
-          if (item.id !== id) return item;
-          return {
-            ...item,
-            ...(patch.overallRating === undefined
-              ? {}
-              : {
-                  personalRating:
-                    patch.overallRating === null
-                      ? undefined
-                      : patch.overallRating,
-                }),
-            ...(patch.isFavorite === undefined
-              ? {}
-              : { isFavorite: patch.isFavorite }),
-            ...(patch.hasVisited === undefined
-              ? {}
-              : { hasVisited: patch.hasVisited }),
-          };
-        }),
-      );
+      dispatch({
+        type: 'item.mutation.started',
+        itemId: id,
+        mutationId,
+        patch: {
+          ...(patch.overallRating === undefined
+            ? {}
+            : {
+                personalRating:
+                  patch.overallRating === null
+                    ? undefined
+                    : patch.overallRating,
+              }),
+          ...(patch.isFavorite === undefined
+            ? {}
+            : { isFavorite: patch.isFavorite }),
+          ...(patch.hasVisited === undefined
+            ? {}
+            : { hasVisited: patch.hasVisited }),
+        },
+      });
       try {
-        const updated = await updateItemAssessment(id, patch);
-        setItems((current) =>
-          current.map((item) => (item.id === updated.id ? updated : item)),
-        );
+        const { hasVisited, ...assessmentPatch } = patch;
+        const updated = await browserAtlasApplication.execute({
+          key: 'assessment.update',
+          input: {
+            itemId: id,
+            patch: {
+              ...assessmentPatch,
+              ...(hasVisited === undefined
+                ? {}
+                : { manualVisited: hasVisited }),
+            },
+          },
+        });
+        dispatch({
+          type: 'item.mutation.succeeded',
+          itemId: id,
+          mutationId,
+          item: updated,
+        });
         setNotice('');
         return updated;
       } catch (error) {
-        setItems((current) =>
-          current.map((item) => (item.id === id ? previous : item)),
-        );
+        dispatch({
+          type: 'item.mutation.failed',
+          itemId: id,
+          mutationId,
+        });
         setNotice(
           error instanceof Error ? error.message : 'Could not save status.',
         );
@@ -509,10 +556,11 @@ export function useAtlasViewModel() {
       setItemPending(id, true);
       setNotice('');
       try {
-        await deleteAtlasItem(id);
-        setItems((current) => current.filter((item) => item.id !== id));
-        setVisits((current) => current.filter((visit) => visit.itemId !== id));
-        setMedia((current) => current.filter((entry) => entry.itemId !== id));
+        await browserAtlasApplication.execute({
+          key: 'catalog.delete_item',
+          input: { id },
+        });
+        dispatch({ type: 'item.removed', itemId: id });
         setNotice('Place removed from your Atlas.');
       } catch (error) {
         setNotice(
@@ -537,28 +585,42 @@ export function useAtlasViewModel() {
     return new Promise<AtlasItem[]>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const nextDistances = Object.fromEntries(
-            items.map((item) => [
-              item.id,
-              distanceInKm(
-                position.coords.latitude,
-                position.coords.longitude,
-                item.latitude,
-                item.longitude,
-              ),
-            ]),
-          );
-          setDistances(nextDistances);
-          const nearest = [...items].sort(
-            (left, right) => nextDistances[left.id] - nextDistances[right.id],
-          );
-          if (nearest[0]) setSelectedId(nearest[0].id);
-          setLocationStatus(
-            nearest[0]
-              ? `Nearest verified place: ${nearest[0].title} · ${nextDistances[nearest[0].id].toFixed(1)} km`
-              : 'No verified places found.',
-          );
-          resolve(nearest);
+          void browserAtlasApplication
+            .execute({
+              key: 'decision.nearby',
+              input: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                limit: 20,
+              },
+            })
+            .then((results) => {
+              const nextDistances = Object.fromEntries(
+                results.map((item) => [item.id, item.distanceKm]),
+              );
+              const itemsById = new Map(items.map((item) => [item.id, item]));
+              const nearest = results.flatMap((result) => {
+                const item = itemsById.get(result.id);
+                return item ? [item] : [];
+              });
+              setDistances(nextDistances);
+              if (nearest[0]) setSelectedId(nearest[0].id);
+              setLocationStatus(
+                nearest[0]
+                  ? `Nearest verified place: ${nearest[0].title} · ${results[0].distanceKm.toFixed(1)} km`
+                  : 'No verified places found.',
+              );
+              resolve(nearest);
+            })
+            .catch((error) => {
+              setLocationStatus('Nearby places are temporarily unavailable.');
+              setNotice(
+                error instanceof Error
+                  ? error.message
+                  : 'Could not find nearby places.',
+              );
+              resolve([]);
+            });
         },
         () => {
           setLocationStatus('Location permission was not granted.');
@@ -642,12 +704,4 @@ export function useAtlasViewModel() {
     visibleItems,
     locateNearby,
   } as const;
-}
-
-function sortVisits(visits: VisitRecord[]): VisitRecord[] {
-  return [...visits].sort(
-    (left, right) =>
-      right.visitedAt.localeCompare(left.visitedAt) ||
-      right.createdAt.localeCompare(left.createdAt),
-  );
 }

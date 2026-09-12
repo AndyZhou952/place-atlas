@@ -1,6 +1,6 @@
 # Japan Atlas 决策登记册
 
-最后更新：2026-09-09
+最后更新：2026-09-12
 
 本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
 
@@ -74,7 +74,8 @@ Web 与未来 Agent 必须先共享可测试的持久操作，不能把聊天层
 **状态：Accepted（2026-09-06，2026-09-07 补充）**
 
 - `isFavorite` 是独立喜欢状态，不等同于候选／保存／计划；
-- 存在 Visit 一定意味着去过；无 Visit 时可以显式标记 `行った`；
+- `有效行った = 存在 Visit OR manualVisited`；存在 Visit 一定意味着去过，不能被人工“没去过”覆盖；
+- 删除最后一条 Visit 后，仅当此前独立保存了 `manualVisited=true` 才继续显示 `行った`；
 - 喜欢与到访筛选可以同时启用，同时启用时为逻辑 AND；
 - 推荐默认优先没去过，除非用户明确要求重访或喜欢。
 
@@ -113,6 +114,37 @@ Visit 时间线最多先展示四张缩略图；完整集合在单图弹窗中�
 **状态：Accepted（2026-09-07 至 2026-09-08）**
 
 Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewModel 乐观更新并在失败时恢复。Visit create/edit/delete 各限制为两次 D1 binding 往返且不全表读取。地图更换引擎前必须先取得托管 trace；见 [#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)。
+
+### D-016：模块化单体与首个 Agent-ready 切片
+
+**状态：Accepted（2026-09-12）**
+
+当前保持单仓库，Web 常驻核心采用单部署单元的模块化单体，在内部以 Application Operation、port 与 adapter 建立真实接缝，不立即拆微服务。高权限本地 connector 必须位于独立短时进程与信任区。首个切片只做现有地点、个人状态、Visit、媒体、ImportJob、搜索与 nearby 的行为保持式迁移；推荐、身份确认和对话式采集分别立项。
+
+**2026-09-12 补充：** 旧 `/api/nearby` 会把缺失的 `lat` 或 `lon` 经 `Number(null)` 意外解释为 `0`。用户确认这是缺陷而非兼容契约；缺失、非数值或越界坐标必须统一映射为 HTTP 400 `invalid_input`。
+
+### D-017：30 天可恢复删除
+
+**状态：Accepted（2026-09-12）**
+
+普通删除进入 30 天回收站；显式永久删除需再次确认并立即清理主存储。R2 媒体在恢复窗口结束后清理，备份中的副本按备份淘汰周期删除。所有入口共享相同语义和审计 receipt。
+
+### D-018：数据保留与日志最小化
+
+**状态：Accepted（2026-09-12）**
+
+- 私人 Journal 笔记与媒体保留至用户删除；
+- 未分配聊天附件或草稿保留 24 小时；
+- 第三方原始媒体在处理完成后最多保留 72 小时；
+- 必要的来源 URL、hash、时间戳、短摘录及低分辨率证据帧可长期私有保存；
+- 原始聊天正文在 capture session 关闭后最多保留 7 天；
+- 结构化审计事件保留 180 天，不记录 Cookie、token、图片二进制或私人笔记全文。
+
+### D-019：受限云模型处理边界
+
+**状态：Accepted（2026-09-12）**
+
+允许使用明确不用于训练且提供受限保留配置的云模型处理批准的第三方材料与私人内容。提交前剥离 EXIF、Cookie、token 和无关凭证；应用日志只保留结构化结果。未来如私人媒体需要更强隔离，可在同一模型处理 port 后增加本地 adapter，而不改变产品核心。
 
 ## 2. 提议中决策
 
@@ -156,7 +188,6 @@ OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin �
 | 24/7 API/gateway 的 host、region 与预算 | 微信 PoC 通过后 | APAC/EU 实测延迟、月成本、备份与运维可靠性 |
 | Sites owner-only 与 Bot 的服务鉴权边界 | 发放任何云端 Agent credential 前 | scoped API 原型、签名、权限和审计测试 |
 | 是否更换地图引擎／瓦片供应商 | #1 trace 后 | 当前 Leaflet/OSM 与合规矢量方案的移动端数据 |
-| 删除最后一条 Visit 后是否保留人工 `行った` | 引入更完整审计／恢复模型前 | 建议三态 override；当前实现会对账为未到访；一致性见 [#5](https://github.com/AndyZhou952/jp-food-event-map/issues/5) |
 | 每月基础设施与模型预算 | 采购云资源前 | 实际消息量、媒体、模型与日志成本 |
 
 这些事项尚未阻塞当前 application layer 和采集器开发。到达决策点时，应在 Issue 中附证据，再将结果更新为 `Accepted` 或 `Rejected/Superseded`。

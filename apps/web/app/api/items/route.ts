@@ -1,29 +1,42 @@
-import { NextResponse } from 'next/server';
+import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { isAtlasItem } from '@/product/application/catalog/catalog-projection';
 
-import type { AtlasItem } from '@/features/atlas/model';
-import { listAtlasItems, saveDiscoveredItem } from '@/lib/server/atlas-store';
+import { saveDiscoveredItemResponse } from './item-write-response';
+import { listAtlasItemsResponse } from './list-atlas-items-response';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(await listAtlasItems());
+  return listAtlasItemsResponse(getServerAtlasApplication());
 }
 
 export async function POST(request: Request) {
-  const item = (await request.json()) as Partial<AtlasItem>;
-  if (!item.id || !item.title || !item.kind || !item.description) {
-    return new NextResponse('id, title, kind, and description are required', {
+  const item: unknown = await request.json();
+  if (
+    !isRecord(item) ||
+    !item.id ||
+    !item.title ||
+    !item.kind ||
+    !item.description
+  ) {
+    return new Response('id, title, kind, and description are required', {
       status: 400,
     });
   }
   if (item.verificationStatus !== 'needs_review') {
-    return new NextResponse(
-      'Collector-created items must enter as needs_review',
-      { status: 400 },
-    );
+    return new Response('Collector-created items must enter as needs_review', {
+      status: 400,
+    });
+  }
+  if (!isAtlasItem(item)) {
+    return new Response('id, title, kind, and description are required', {
+      status: 400,
+    });
   }
 
-  return NextResponse.json(await saveDiscoveredItem(item as AtlasItem), {
-    status: 201,
-  });
+  return saveDiscoveredItemResponse(getServerAtlasApplication(), item);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

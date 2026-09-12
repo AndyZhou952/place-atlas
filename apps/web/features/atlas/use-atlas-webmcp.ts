@@ -2,18 +2,15 @@
 
 import { useEffect } from 'react';
 
-import type {
-  AtlasItem,
-  AtlasItemEdit,
-  NewImportJob,
-  NewVisit,
-  PlaceAssessmentPatch,
-  VisitUpdate,
-  VisitMediaRecord,
-} from './model';
-import { normalizeRating } from './rating';
+import {
+  browserAtlasApplication,
+  type BrowserAtlasApplication,
+} from './atlas-api-client.ts';
+import { browserOperationHttpCatalog } from './atlas-browser-operation-catalog.ts';
+import type { AtlasItem, AtlasItemEdit } from './model';
+import { normalizeRating } from './rating.ts';
 
-interface ModelContextTool {
+export interface ModelContextTool {
   readonly name: string;
   readonly title: string;
   readonly description: string;
@@ -39,52 +36,61 @@ declare global {
   }
 }
 
-interface AtlasWebMcpActions {
+interface AtlasWebMcpUiActions {
   readonly items: readonly AtlasItem[];
-  readonly media: readonly VisitMediaRecord[];
   readonly selectItem: (id: string) => void;
-  readonly updateItem: (id: string, edit: AtlasItemEdit) => Promise<AtlasItem>;
-  readonly updateAssessment: (
-    id: string,
-    patch: PlaceAssessmentPatch,
-  ) => Promise<AtlasItem>;
-  readonly removeItem: (id: string) => Promise<void>;
-  readonly queueImport: (input: NewImportJob) => Promise<unknown>;
-  readonly addJournal: (input: NewVisit) => Promise<unknown>;
-  readonly updateJournal: (id: string, input: VisitUpdate) => Promise<unknown>;
-  readonly removeJournal: (id: string) => Promise<unknown>;
-  readonly updateMediaCaption: (
-    id: string,
-    caption: string,
-  ) => Promise<VisitMediaRecord>;
-  readonly removeMedia: (id: string) => Promise<void>;
-  readonly locateNearby: () => Promise<AtlasItem[]>;
 }
 
-export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
+interface Coordinates {
+  readonly latitude: number;
+  readonly longitude: number;
+}
+
+interface AtlasWebMcpToolDependencies extends AtlasWebMcpUiActions {
+  readonly application: BrowserAtlasApplication;
+  readonly getCurrentCoordinates: () => Promise<Coordinates | undefined>;
+}
+
+export function useAtlasWebMcp(actions: AtlasWebMcpUiActions): void {
   useEffect(() => {
     const context = document.modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
-    const register = (tool: ModelContextTool) => {
+    const tools = createAtlasWebMcpTools({
+      application: browserAtlasApplication,
+      items: actions.items,
+      selectItem: actions.selectItem,
+      getCurrentCoordinates: readBrowserCoordinates,
+    });
+    for (const tool of tools) {
       void Promise.resolve(
         context.registerTool(tool, { signal: lifecycle.signal }),
       ).catch(() => undefined);
-    };
+    }
+    return () => lifecycle.abort();
+  }, [actions]);
+}
 
-    register({
+export function createAtlasWebMcpTools({
+  application,
+  items,
+  selectItem,
+  getCurrentCoordinates,
+}: AtlasWebMcpToolDependencies): readonly ModelContextTool[] {
+  return [
+    {
       name: 'list_atlas_items',
       title: 'List Japan Atlas items',
       description:
         'Read the verified and review-pending places currently visible to the user.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
-      execute() {
-        return actions.items.map((item) => ({
+      inputSchema: emptyInputSchema(),
+      annotations: readAnnotations,
+      async execute() {
+        const currentItems = await application.execute({
+          key: browserOperationHttpCatalog['catalog.list'].key,
+          input: { profile: 'full_merged_catalog' },
+        });
+        return currentItems.map((item) => ({
           id: item.id,
           title: item.title,
           kind: item.kind,
@@ -93,37 +99,29 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
           tabelogScore: item.tabelog?.score,
         }));
       },
-    });
-
-    register({
+    },
+    {
       name: 'focus_atlas_item',
       title: 'Focus Japan Atlas item',
       description:
         'Select an existing Atlas item and center the visible map on it.',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      inputSchema: objectInputSchema({ id: { type: 'string' } }, ['id']),
+      annotations: uiReadAnnotations,
       execute(input) {
         const id = readString(input, 'id');
-        const item = actions.items.find((candidate) => candidate.id === id);
+        const item = items.find((candidate) => candidate.id === id);
         if (!item) throw new Error(`Unknown Atlas item: ${id}`);
-        actions.selectItem(id);
+        selectItem(id);
         return { id, title: item.title, focused: true };
       },
-    });
-
-    register({
+    },
+    {
       name: 'update_atlas_item',
       title: 'Update Japan Atlas item',
       description:
         'Persist a user-approved title, description, and personal state for an existing item.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           id: { type: 'string' },
           title: { type: 'string' },
           description: { type: 'string' },
@@ -132,73 +130,79 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
             enum: ['candidate', 'saved', 'planned', 'visited'],
           },
         },
-        required: ['id', 'title', 'description', 'personalState'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['id', 'title', 'description', 'personalState'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
         const id = readString(input, 'id');
-        const updated = await actions.updateItem(id, {
-          title: readString(input, 'title'),
-          description: readString(input, 'description'),
-          personalState: readPersonalState(input),
+        const updated = await application.execute({
+          key: browserOperationHttpCatalog['catalog.update_item'].key,
+          input: {
+            id,
+            title: readString(input, 'title'),
+            description: readString(input, 'description'),
+            personalState: readPersonalState(input),
+          },
         });
         return { id: updated.id, title: updated.title, updated: true };
       },
-    });
-
-    register({
+    },
+    {
       name: 'queue_creator_import',
       title: 'Queue creator import',
       description:
         'Create a durable acquisition job for a creator profile, channel, or post URL.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           creatorName: { type: 'string' },
           sourceRef: { type: 'string' },
           platform: { type: 'string' },
         },
-        required: ['creatorName', 'sourceRef'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['creatorName', 'sourceRef'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
-        const job = await actions.queueImport({
-          creatorName: readString(input, 'creatorName'),
-          sourceRef: readString(input, 'sourceRef'),
-          platform: readOptionalString(input, 'platform'),
+        const job = await application.execute({
+          key: browserOperationHttpCatalog['import.queue'].key,
+          input: {
+            creatorName: readString(input, 'creatorName'),
+            sourceRef: readString(input, 'sourceRef'),
+            platform: readOptionalString(input, 'platform'),
+          },
         });
         return { queued: true, job };
       },
-    });
-
-    register({
+    },
+    {
       name: 'update_item_preferences',
       title: 'Update favorite or visited status',
       description:
         'Persist the user-approved favorite and visited status for one Atlas item.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           id: { type: 'string' },
           isFavorite: { type: 'boolean' },
           hasVisited: { type: 'boolean' },
         },
-        required: ['id'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['id'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
         const id = readString(input, 'id');
         const values = readRecord(input);
-        const updated = await actions.updateAssessment(id, {
-          ...(typeof values.isFavorite === 'boolean'
-            ? { isFavorite: values.isFavorite }
-            : {}),
-          ...(typeof values.hasVisited === 'boolean'
-            ? { hasVisited: values.hasVisited }
-            : {}),
+        const updated = await application.execute({
+          key: browserOperationHttpCatalog['assessment.update'].key,
+          input: {
+            itemId: id,
+            patch: {
+              ...(typeof values.isFavorite === 'boolean'
+                ? { isFavorite: values.isFavorite }
+                : {}),
+              ...(typeof values.hasVisited === 'boolean'
+                ? { manualVisited: values.hasVisited }
+                : {}),
+            },
+          },
         });
         return {
           id: updated.id,
@@ -206,263 +210,255 @@ export function useAtlasWebMcp(actions: AtlasWebMcpActions): void {
           hasVisited: updated.hasVisited,
         };
       },
-    });
-
-    register({
+    },
+    {
       name: 'set_personal_rating',
       title: 'Set or clear a personal rating',
       description:
         'Persist one optional overall rating from 0 to 5 for an Atlas item. This is separate from individual visits and Tabelog.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           id: { type: 'string' },
           rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
         },
-        required: ['id', 'rating'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['id', 'rating'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
         const values = readRecord(input);
         const id = readString(input, 'id');
         const rating = values.rating;
-        if (
-          rating !== null &&
-          (typeof rating !== 'number' ||
-            !Number.isFinite(rating) ||
-            rating < 0 ||
-            rating > 5)
-        ) {
-          throw new TypeError('rating must be null or a number from 0 to 5');
-        }
-        const updated = await actions.updateAssessment(id, {
-          overallRating: rating === null ? null : normalizeRating(rating),
+        assertRating(rating, true);
+        const updated = await application.execute({
+          key: browserOperationHttpCatalog['assessment.update'].key,
+          input: {
+            itemId: id,
+            patch: {
+              overallRating:
+                rating === null ? null : normalizeRating(rating as number),
+            },
+          },
         });
         return { id: updated.id, rating: updated.personalRating ?? null };
       },
-    });
-
-    register({
+    },
+    {
       name: 'create_visit',
       title: 'Create a visit record',
       description:
         'Record a visit to one Atlas item with at least a rating or note. Photos can then be attached through the media operation.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           mutationId: { type: 'string' },
           itemId: { type: 'string' },
           visitedAt: { type: 'string' },
           rating: { type: 'number', minimum: 0, maximum: 5 },
           note: { type: 'string' },
         },
-        required: ['itemId', 'visitedAt'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['itemId', 'visitedAt'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
         const values = readRecord(input);
         const rating = values.rating;
-        if (
-          rating !== undefined &&
-          (typeof rating !== 'number' ||
-            !Number.isFinite(rating) ||
-            rating < 0 ||
-            rating > 5)
-        ) {
-          throw new TypeError('rating must be a number from 0 to 5');
-        }
+        if (rating !== undefined) assertRating(rating, false);
         const note = readOptionalString(input, 'note');
         if (rating === undefined && !note) {
           throw new TypeError('a visit requires at least a rating or note');
         }
-        return actions.addJournal({
-          id: readOptionalString(input, 'mutationId'),
-          itemId: readString(input, 'itemId'),
-          visitedAt: readString(input, 'visitedAt'),
-          ...(rating === undefined ? {} : { rating: normalizeRating(rating) }),
-          note,
+        return application.execute({
+          key: browserOperationHttpCatalog['visit.create'].key,
+          input: {
+            id: readOptionalString(input, 'mutationId'),
+            itemId: readString(input, 'itemId'),
+            visitedAt: readString(input, 'visitedAt'),
+            ...(rating === undefined
+              ? {}
+              : { rating: normalizeRating(rating as number) }),
+            note,
+          },
         });
       },
-    });
-
-    register({
+    },
+    {
       name: 'update_visit',
       title: 'Update a visit record',
       description:
         'Correct the date or note on a visit and optionally replace or clear the place’s persistent personal rating.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           id: { type: 'string' },
           visitedAt: { type: 'string' },
           rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
           note: { type: 'string' },
         },
-        required: ['id', 'visitedAt'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['id', 'visitedAt'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
         const values = readRecord(input);
         const rating = values.rating;
-        if (
-          rating !== undefined &&
-          rating !== null &&
-          (typeof rating !== 'number' ||
-            !Number.isFinite(rating) ||
-            rating < 0 ||
-            rating > 5)
-        ) {
-          throw new TypeError('rating must be null or a number from 0 to 5');
-        }
-        return actions.updateJournal(readString(input, 'id'), {
-          visitedAt: readString(input, 'visitedAt'),
-          note: readOptionalString(input, 'note'),
-          ...(rating === undefined
-            ? {}
-            : {
-                rating:
-                  rating === null ? null : normalizeRating(rating as number),
-              }),
+        assertOptionalNullableRating(rating);
+        return application.execute({
+          key: browserOperationHttpCatalog['visit.update'].key,
+          input: {
+            id: readString(input, 'id'),
+            visitedAt: readString(input, 'visitedAt'),
+            note: readOptionalString(input, 'note'),
+            ...(rating === undefined
+              ? {}
+              : {
+                  rating:
+                    rating === null ? null : normalizeRating(rating as number),
+                }),
+          },
         });
       },
-    });
-
-    register({
+    },
+    {
       name: 'list_visit_media',
       title: 'List Visit photos',
       description:
         'Read private photo metadata and captions for one Visit. Binary upload uses the scoped media HTTP operation.',
-      inputSchema: {
-        type: 'object',
-        properties: { visitId: { type: 'string' } },
-        required: ['visitId'],
-        additionalProperties: false,
+      inputSchema: objectInputSchema({ visitId: { type: 'string' } }, [
+        'visitId',
+      ]),
+      annotations: readAnnotations,
+      async execute(input) {
+        const currentMedia = await application.execute({
+          key: browserOperationHttpCatalog['media.list'].key,
+          input: { visitId: readString(input, 'visitId') },
+        });
+        return currentMedia.map(({ contentSha256: _hash, ...entry }) => entry);
       },
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
-      execute(input) {
-        const visitId = readString(input, 'visitId');
-        return actions.media
-          .filter((entry) => entry.visitId === visitId)
-          .map(({ contentSha256: _hash, ...entry }) => entry);
-      },
-    });
-
-    register({
+    },
+    {
       name: 'update_visit_media_caption',
       title: 'Update a Visit photo caption',
       description:
         'Set or clear the optional one-line caption on a private Visit photo.',
-      inputSchema: {
-        type: 'object',
-        properties: {
+      inputSchema: objectInputSchema(
+        {
           id: { type: 'string' },
           caption: { type: 'string', maxLength: 160 },
         },
-        required: ['id', 'caption'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: true },
+        ['id', 'caption'],
+      ),
+      annotations: writeAnnotations,
       async execute(input) {
-        const updated = await actions.updateMediaCaption(
-          readString(input, 'id'),
-          readString(input, 'caption'),
-        );
+        const updated = await application.execute({
+          key: browserOperationHttpCatalog['media.caption'].key,
+          input: {
+            id: readString(input, 'id'),
+            caption: readString(input, 'caption'),
+          },
+        });
         return { id: updated.id, caption: updated.caption ?? null };
       },
-    });
-
-    register({
+    },
+    {
       name: 'delete_visit_media',
       title: 'Delete a Visit photo',
       description: 'Delete one user-confirmed private Visit photo.',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-        additionalProperties: false,
-      },
-      annotations: {
-        readOnlyHint: false,
-        untrustedContentHint: true,
-        destructiveHint: true,
-      },
+      inputSchema: objectInputSchema({ id: { type: 'string' } }, ['id']),
+      annotations: destructiveAnnotations,
       async execute(input) {
         const id = readString(input, 'id');
-        await actions.removeMedia(id);
+        await application.execute({
+          key: browserOperationHttpCatalog['media.delete'].key,
+          input: { id },
+        });
         return { id, deleted: true };
       },
-    });
-
-    register({
+    },
+    {
       name: 'delete_visit',
       title: 'Delete a visit record',
       description:
         'Delete one user-confirmed visit and reconcile the place’s visited status.',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-        additionalProperties: false,
-      },
-      annotations: {
-        readOnlyHint: false,
-        untrustedContentHint: true,
-        destructiveHint: true,
-      },
+      inputSchema: objectInputSchema({ id: { type: 'string' } }, ['id']),
+      annotations: destructiveAnnotations,
       async execute(input) {
         const id = readString(input, 'id');
-        await actions.removeJournal(id);
+        await application.execute({
+          key: browserOperationHttpCatalog['visit.delete'].key,
+          input: { id },
+        });
         return { id, deleted: true };
       },
-    });
-
-    register({
+    },
+    {
       name: 'delete_atlas_item',
       title: 'Delete an Atlas item',
       description:
         'Remove one user-confirmed Atlas item and its personal visit data.',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-        additionalProperties: false,
-      },
-      annotations: {
-        readOnlyHint: false,
-        untrustedContentHint: true,
-        destructiveHint: true,
-      },
+      inputSchema: objectInputSchema({ id: { type: 'string' } }, ['id']),
+      annotations: destructiveAnnotations,
       async execute(input) {
         const id = readString(input, 'id');
-        await actions.removeItem(id);
+        await application.execute({
+          key: browserOperationHttpCatalog['catalog.delete_item'].key,
+          input: { id },
+        });
         return { id, deleted: true };
       },
-    });
-
-    register({
+    },
+    {
       name: 'find_nearby_atlas_items',
       title: 'Find nearby Atlas items',
       description:
         'Request the user’s browser location, sort Atlas items by distance, and focus the nearest result.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      inputSchema: emptyInputSchema(),
+      annotations: uiReadAnnotations,
       async execute() {
-        const nearby = await actions.locateNearby();
-        return nearby
-          .slice(0, 5)
-          .map((item) => ({ id: item.id, title: item.title }));
+        const coordinates = await getCurrentCoordinates();
+        if (!coordinates) return [];
+        const nearby = await application.execute({
+          key: browserOperationHttpCatalog['decision.nearby'].key,
+          input: {
+            ...coordinates,
+            limit: 5,
+            profile: 'full_merged_catalog',
+          },
+        });
+        if (nearby[0]) selectItem(nearby[0].id);
+        return nearby.map((item) => ({ id: item.id, title: item.title }));
       },
-    });
+    },
+  ];
+}
 
-    return () => lifecycle.abort();
-  }, [actions]);
+const readAnnotations = {
+  readOnlyHint: true,
+  untrustedContentHint: true,
+} as const;
+const uiReadAnnotations = {
+  readOnlyHint: true,
+  untrustedContentHint: false,
+} as const;
+const writeAnnotations = {
+  readOnlyHint: false,
+  untrustedContentHint: true,
+} as const;
+const destructiveAnnotations = {
+  ...writeAnnotations,
+  destructiveHint: true,
+} as const;
+
+function emptyInputSchema() {
+  return objectInputSchema({});
+}
+
+function objectInputSchema(
+  properties: Readonly<Record<string, unknown>>,
+  required?: readonly string[],
+) {
+  return {
+    type: 'object',
+    properties,
+    ...(required ? { required } : {}),
+    additionalProperties: false,
+  };
 }
 
 function readString(input: unknown, key: string): string {
@@ -493,4 +489,41 @@ function readPersonalState(input: unknown): AtlasItemEdit['personalState'] {
     throw new TypeError('personalState is invalid');
   }
   return value as AtlasItemEdit['personalState'];
+}
+
+function assertRating(value: unknown, nullable: boolean): void {
+  if (
+    (nullable && value === null) ||
+    (typeof value === 'number' &&
+      Number.isFinite(value) &&
+      value >= 0 &&
+      value <= 5)
+  ) {
+    return;
+  }
+  throw new TypeError(
+    nullable
+      ? 'rating must be null or a number from 0 to 5'
+      : 'rating must be a number from 0 to 5',
+  );
+}
+
+function assertOptionalNullableRating(value: unknown): void {
+  if (value === undefined || value === null) return;
+  assertRating(value, false);
+}
+
+function readBrowserCoordinates(): Promise<Coordinates | undefined> {
+  if (!navigator.geolocation) return Promise.resolve(undefined);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }),
+      () => resolve(undefined),
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  });
 }

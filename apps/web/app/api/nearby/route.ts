@@ -1,14 +1,13 @@
-import { NextRequest } from 'next/server';
-
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { withOwnerReadAuth } from '@/lib/server/auth/owner-auth';
 
 import { nearbyAtlasItemsResponse } from './nearby-atlas-items-response';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export const GET = withOwnerReadAuth(async function GET(request: Request) {
   return nearbyAtlasItemsResponse(
     getServerAtlasApplication(),
-    request.nextUrl.searchParams,
+    new URL(request.url).searchParams,
   );
-}
+});

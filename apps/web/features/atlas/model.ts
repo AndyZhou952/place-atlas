@@ -33,7 +33,9 @@ export type SourceLink = CoreSourceLink;
 export type TabelogSnapshot = CoreTabelogSnapshot;
 export type ReservationSnapshot = CoreReservationSnapshot;
 export type EventSchedule = CoreEventSchedule;
-export type AtlasItem = CoreAtlasItem;
+export type AtlasItem = CoreAtlasItem & {
+  readonly overallComment?: string;
+};
 export type AtlasItemEdit = CoreAtlasItemEdit;
 
 interface EffectiveVisitedProjection {
@@ -60,7 +62,16 @@ export type {
 } from '@/product/application/import-jobs/import-job';
 
 export type VisitRecord = CoreVisit;
-export type VisitMediaRecord = CoreVisitMedia;
+export type VisitMediaRecord = Pick<
+  CoreVisitMedia,
+  | 'id'
+  | 'visitId'
+  | 'itemId'
+  | 'originalFilename'
+  | 'caption'
+  | 'displayOrder'
+  | 'contentUrl'
+>;
 export type NewVisit = CoreNewVisit;
 export type VisitUpdate = Omit<CoreVisitUpdate, 'id'>;
 export type VisitCreateResult = CoreVisitMutationResult;

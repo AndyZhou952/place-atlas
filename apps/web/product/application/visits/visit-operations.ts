@@ -68,7 +68,7 @@ export function createVisitOperationGroup(
       effect: 'write',
       validate: validateNewVisit,
     },
-    async handle(input) {
+    async handle(input, execution) {
       try {
         const context = await state.readItemContext(input.itemId);
         const item = itemProjection.project(context);
@@ -90,7 +90,16 @@ export function createVisitOperationGroup(
           input.rating,
           now,
         );
-        const { inserted } = await state.create({ visit, assessment });
+        const projectedItem = itemProjection.project({
+          ...context,
+          assessment: assessment ?? context.assessment,
+          visitCount: context.visitCount + 1,
+        })!;
+        const output = { visit, item: projectedItem };
+        const { inserted } = await state.create(
+          { visit, assessment },
+          execution?.atomicMutation?.receiptFor(output),
+        );
         return success({
           visit,
           item: itemProjection.project({
@@ -120,7 +129,7 @@ export function createVisitOperationGroup(
       effect: 'write',
       validate: validateVisitUpdate,
     },
-    async handle(input) {
+    async handle(input, execution) {
       try {
         const context = await state.readVisitContext(input.id);
         if (!context) {
@@ -145,14 +154,18 @@ export function createVisitOperationGroup(
                 input.rating,
                 now,
               );
-        await state.update({ visit, assessment });
-        return success({
+        const output = {
           visit,
           item: itemProjection.project({
             ...context,
             assessment: assessment ?? context.assessment,
           })!,
-        });
+        };
+        await state.update(
+          { visit, assessment },
+          execution?.atomicMutation?.receiptFor(output),
+        );
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

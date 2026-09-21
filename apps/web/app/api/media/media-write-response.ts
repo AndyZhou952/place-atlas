@@ -1,14 +1,12 @@
-import type { AtlasApplication } from '@/product/application/atlas-application';
-import type { createMediaOperationGroup } from '@/product/application/media/media-operations';
+import { ownerMutationResponse } from '../owner-mutation-response.ts';
+import type { createInvocationCoordinator } from '../../../product/application/invocation/invocation-coordinator.ts';
 
 import { maxMediaFilesPerRequest } from '../../../features/atlas/media-constraints.ts';
 
-type MediaApplication = AtlasApplication<
-  ReturnType<typeof createMediaOperationGroup>
->;
+type InvocationCoordinator = ReturnType<typeof createInvocationCoordinator>;
 
 export async function attachVisitMediaResponse(
-  application: MediaApplication,
+  coordinator: InvocationCoordinator,
   request: Request,
 ): Promise<Response> {
   const form = await request.formData();
@@ -19,8 +17,19 @@ export async function attachVisitMediaResponse(
   const captions = form
     .getAll('captions')
     .map((value) => (typeof value === 'string' ? value : ''));
+  const ids = form
+    .getAll('ids')
+    .map((value) => (typeof value === 'string' ? value : ''));
   if (typeof visitId !== 'string' || !visitId || !files.length) {
     return new Response('A Visit and at least one image are required.', {
+      status: 400,
+    });
+  }
+  if (
+    ids.length !== files.length ||
+    ids.some((id) => !/^[A-Za-z0-9._:-]{1,160}$/u.test(id))
+  ) {
+    return new Response('A stable ID is required for every image.', {
       status: 400,
     });
   }
@@ -31,12 +40,15 @@ export async function attachVisitMediaResponse(
     );
   }
 
-  const result = await application.execute({
-    key: 'media.attach',
-    input: {
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'media.attach',
+    operationInput: {
       visitId,
       uploads: await Promise.all(
         files.map(async (file, index) => ({
+          id: ids[index],
           originalFilename: file.name,
           contentType: file.type,
           bytes: new Uint8Array(await file.arrayBuffer()),
@@ -44,13 +56,11 @@ export async function attachVisitMediaResponse(
         })),
       ),
     },
+    successStatus: 201,
+    errors: {
+      invalidInput: 'Visit photos could not be saved.',
+      notFound: 'Journal entry not found',
+      dependencyFailure: 'Visit photos could not be saved.',
+    },
   });
-  if (result.ok) return Response.json(result.value, { status: 201 });
-  if (result.error.kind === 'invalid_input') {
-    return new Response(result.error.message, { status: 400 });
-  }
-  if (result.error.kind === 'not_found') {
-    return new Response('Journal entry not found', { status: 404 });
-  }
-  return new Response('Visit photos could not be saved.', { status: 500 });
 }

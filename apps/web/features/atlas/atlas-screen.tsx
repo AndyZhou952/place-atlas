@@ -59,6 +59,8 @@ import { AtlasMap } from './atlas-map';
 import { filterJournalVisits } from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
 import { useAtlasViewModel } from './use-atlas-view-model';
+import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
+import { useOwnerSession } from './use-owner-session';
 
 const filters: readonly {
   value: AtlasKindFilter;
@@ -85,6 +87,7 @@ const navItems: readonly { value: AtlasView; label: string }[] = [
 
 export function AtlasScreen() {
   const vm = useAtlasViewModel();
+  const owner = useOwnerSession();
 
   return (
     <main className="atlas-shell">
@@ -113,15 +116,20 @@ export function AtlasScreen() {
           ))}
         </nav>
 
-        <Button
-          className="ask-button"
-          aria-label="Find nearby Atlas items"
-          onClick={() => void vm.locateNearby()}
-        >
-          <Sparkles data-icon="inline-start" />
-          Ask nearby
-        </Button>
+        <div className="header-actions">
+          <OwnerAccessButton owner={owner} />
+          <Button
+            className="ask-button"
+            aria-label="Find nearby Atlas items"
+            onClick={() => void vm.locateNearby()}
+          >
+            <Sparkles data-icon="inline-start" />
+            Ask nearby
+          </Button>
+        </div>
       </header>
+
+      <OwnerAccessPanel owner={owner} />
 
       <section className="system-strip" aria-label="System status">
         <span>
@@ -671,6 +679,140 @@ function PersonalRatingInline({
   );
 }
 
+type OverallCommentStatus = 'idle' | 'saving' | 'error' | 'success';
+
+function OverallCommentEditor({
+  item,
+  vm,
+}: {
+  readonly item: AtlasItem;
+  readonly vm: AtlasViewModel;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.overallComment ?? '');
+  const [status, setStatus] = useState<OverallCommentStatus>('idle');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const busy = status === 'saving' || vm.isItemPending(item.id);
+  const feedbackId = `overall-comment-feedback-${item.id}`;
+
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus();
+  }, [editing]);
+
+  function beginEditing() {
+    setDraft(item.overallComment ?? '');
+    setStatus('idle');
+    setEditing(true);
+  }
+
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalized = draft.trim() || null;
+    setStatus('saving');
+    try {
+      await vm.saveAssessment(item.id, { summary: normalized });
+      setStatus('success');
+      setEditing(false);
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  function cancel() {
+    setDraft(item.overallComment ?? '');
+    setStatus('idle');
+    setEditing(false);
+  }
+
+  return (
+    <section
+      className="overall-comment"
+      aria-labelledby={`overall-comment-title-${item.id}`}
+    >
+      <header>
+        <div>
+          <p className="eyebrow">Personal note</p>
+          <h3 id={`overall-comment-title-${item.id}`}>Overall comment</h3>
+        </div>
+        {!editing ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={beginEditing}
+            disabled={busy}
+          >
+            <NotebookPen data-icon="inline-start" />
+            {item.overallComment
+              ? 'Edit overall comment'
+              : 'Add overall comment'}
+          </Button>
+        ) : null}
+      </header>
+
+      {editing ? (
+        <form
+          className="overall-comment-editor"
+          aria-busy={status === 'saving'}
+          onSubmit={submit}
+        >
+          <label htmlFor={`overall-comment-input-${item.id}`}>
+            Your overall impression
+          </label>
+          <textarea
+            ref={textareaRef}
+            id={`overall-comment-input-${item.id}`}
+            value={draft}
+            rows={5}
+            disabled={busy}
+            aria-invalid={status === 'error'}
+            aria-describedby={
+              status === 'error' || status === 'success'
+                ? feedbackId
+                : undefined
+            }
+            placeholder="What stood out, and would you return?"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          {status === 'error' ? (
+            <p id={feedbackId} className="overall-comment-error" role="alert">
+              Comment could not be saved. Log in as Owner and try again.
+            </p>
+          ) : null}
+          <div className="overall-comment-actions">
+            <Button type="submit" size="sm" disabled={busy}>
+              {status === 'saving' ? 'Saving…' : 'Save comment'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={cancel}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="overall-comment-copy">
+          {item.overallComment ?? 'No overall comment yet.'}
+        </p>
+      )}
+
+      {status === 'success' ? (
+        <output
+          id={feedbackId}
+          className="overall-comment-success"
+          aria-live="polite"
+        >
+          Comment saved.
+        </output>
+      ) : null}
+    </section>
+  );
+}
+
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const item = vm.selectedItem!;
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
@@ -848,6 +990,8 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                 {itemVisits[0] ? ` · Last ${itemVisits[0].visitedAt}` : ''}
               </span>
             </div>
+
+            <OverallCommentEditor key={item.id} item={item} vm={vm} />
 
             <div className="fact-grid">
               <div className="fact-card">

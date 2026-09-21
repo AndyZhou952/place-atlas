@@ -1727,22 +1727,58 @@ test('fitness rejects unapproved declarations in the UI model adapter', () => {
   }
 });
 
+test('fitness permits only the exact AtlasItem UI projection', () => {
+  for (const projection of [
+    'CoreAtlasItem',
+    'CoreAtlasItem & { readonly overallComment?: string; }',
+  ]) {
+    withArchitectureFixture(
+      {
+        'features/atlas/model.ts': `
+        import type { AtlasItem as CoreAtlasItem } from '../../product/application/core-model.ts';
+        export type AtlasItem = ${projection};
+      `,
+      },
+      ({ manifest }) => {
+        const violations = auditArchitecture(manifest);
+        assert.equal(
+          violations.some(({ rule }) => rule === 'duplicate_core_model'),
+          false,
+        );
+        assert.equal(
+          violations.some(({ rule }) => rule === 'compatibility_adapter_shape'),
+          false,
+        );
+      },
+    );
+  }
+});
+
 test('fitness rejects a core record type literal in the feature adapter', () => {
-  withArchitectureFixture(
-    {
-      'features/atlas/model.ts': `export type AtlasItem = { readonly id: string };`,
-    },
-    ({ manifest }) => {
-      assert.ok(
-        auditArchitecture(manifest).some(
-          ({ rule }) => rule === 'duplicate_core_model',
-        ),
-      );
-    },
-  );
+  for (const projection of [
+    `{ readonly id: string }`,
+    `CoreAtlasItem & { readonly overallComment?: string; readonly extra?: string }`,
+  ]) {
+    withArchitectureFixture(
+      {
+        'features/atlas/model.ts': `
+          import type { AtlasItem as CoreAtlasItem } from '../../product/application/core-model.ts';
+          export type AtlasItem = ${projection};
+        `,
+      },
+      ({ manifest }) => {
+        const rules = new Set(
+          auditArchitecture(manifest).map(({ rule }) => rule),
+        );
+        assert.ok(rules.has('duplicate_core_model'), projection);
+        assert.ok(rules.has('compatibility_adapter_shape'), projection);
+      },
+    );
+  }
 });
 
 const expectedOperationKeys = [
+  'assessment.display',
   'assessment.update',
   'agent.nearby',
   'catalog.delete_item',
@@ -1760,9 +1796,12 @@ const expectedOperationKeys = [
   'media.delete',
   'media.list',
   'media.open',
+  'media.openDisplay',
   'visit.create',
   'visit.delete',
+  'visit.getDisplay',
   'visit.list',
+  'visit.listDisplay',
   'visit.update',
 ];
 
@@ -1770,6 +1809,7 @@ const expectedOperationGroupCreators = [
   'createImportJobOperationGroup',
   'createCatalogOperationGroup',
   'createPlaceAssessmentOperationGroup',
+  'createPublicDisplayOperationGroup',
   'createDecisionOperationGroup',
   'createVisitOperationGroup',
   'createNearbyRecommendationOperationGroup',
@@ -1851,7 +1891,7 @@ function productionArchitectureManifest() {
       'features/atlas/distance.ts',
     ],
     expectedOperationKeys,
-    expectedMediaOperationKeys: ['media.open'],
+    expectedMediaOperationKeys: ['media.open', 'media.openDisplay'],
     expectedOperationGroupCreators,
     businessPolicyOwners: {
       search: path.join(

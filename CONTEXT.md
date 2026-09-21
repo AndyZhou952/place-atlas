@@ -33,7 +33,7 @@ _Avoid_：Visit 评分、食べログ评分
 _Avoid_：地点、评分卡、Journal 条目
 
 **到访媒体（VisitMedia）**：
-明确归属于一次 Visit、具有稳定身份、顺序与可选说明的私有图片。
+明确归属于一次 Visit、具有稳定身份、顺序与可选说明的图片；产品默认按私人内容处理，只有进入版本化 Public Read Projection 的非敏感 PoC 媒体才可匿名读取。
 _Avoid_：来源关键帧、第三方帖子媒体
 
 **有效到访状态（Effective Visited State）**：
@@ -85,6 +85,14 @@ _Avoid_：VisitMedia、来源证据
 **应用操作（Application Operation）**：
 供 Web、Agent 与采集器共同调用、具有类型化输入输出和一致业务语义的产品能力。
 _Avoid_：数据库调用、页面事件、Agent tool 实现
+
+**调用上下文（InvocationContext）**：
+由可信入口验证凭证后生成的 actor、channel、operation scope 与请求时间上下文；写入另携带稳定 mutation ID。权威 payload digest 由协调器在 schema normalization 后统一计算，入口 digest 不是业务事实。
+_Avoid_：Cookie、HMAC secret、模型自报身份
+
+**公开读取投影（Public Read Projection）**：
+Owner PoC 对匿名访问者显式开放的版本化闭合 DTO allowlist。v1 公开 Catalog、个人总体状态与评论、Visit 展示、媒体展示元数据和照片二进制；禁止 object key、原文件名、hash、内部存储 ID 与审计数据。授权先于任何 Application/R2 调用，投影禁止领域对象直出；未知读取默认私有。
+_Avoid_：所有 GET 自动公开、数据库行直出、永久公开承诺
 
 **渠道适配器（ChannelAdapter）**：
 把特定消息渠道的事件与回复转换为应用操作的可替换边界。

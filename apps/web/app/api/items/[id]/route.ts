@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { deleteAtlasItemResponse } from '@/app/api/destructive-responses';
+import { rejectUncoordinatedOwnerPocWrite } from '@/lib/server/application/owner-poc-write-policy';
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
 import type {
   AtlasItemEdit,
   PersonalState,
@@ -20,10 +22,12 @@ export async function GET(
   return getAtlasItemResponse(getServerAtlasApplication(), id);
 }
 
-export async function PATCH(
+export const PATCH = withOwnerWriteAuth(async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const unavailable = rejectUncoordinatedOwnerPocWrite();
+  if (unavailable) return unavailable;
   const { id } = await context.params;
   const edit = parseAtlasItemEdit(await request.json());
   if (!edit) {
@@ -36,15 +40,18 @@ export async function PATCH(
   }
 
   return updateAtlasItemResponse(getServerAtlasApplication(), id, edit);
-}
+});
 
-export async function DELETE(
-  _request: Request,
+export const DELETE = withOwnerWriteAuth(async function DELETE(
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const unavailable = rejectUncoordinatedOwnerPocWrite();
+  if (unavailable) return unavailable;
+  void request;
   const { id } = await context.params;
   return deleteAtlasItemResponse(getServerAtlasApplication(), id);
-}
+});
 
 function parseAtlasItemEdit(input: unknown): AtlasItemEdit | undefined {
   if (

@@ -1,9 +1,7 @@
-import type { AtlasApplication } from '@/product/application/atlas-application';
-import type { createPlaceAssessmentOperationGroup } from '@/product/application/assessments/place-assessment-operations';
+import { ownerMutationResponse } from '../../../owner-mutation-response.ts';
+import type { createInvocationCoordinator } from '../../../../../product/application/invocation/invocation-coordinator.ts';
 
-type PlaceAssessmentApplication = AtlasApplication<
-  ReturnType<typeof createPlaceAssessmentOperationGroup>
->;
+type InvocationCoordinator = ReturnType<typeof createInvocationCoordinator>;
 
 interface PersonalItemPatch {
   readonly overallRating?: number | null;
@@ -13,7 +11,8 @@ interface PersonalItemPatch {
 }
 
 export async function updatePlaceAssessmentResponse(
-  application: PlaceAssessmentApplication,
+  coordinator: InvocationCoordinator,
+  request: Request,
   itemId: string,
   input: unknown,
 ): Promise<Response> {
@@ -21,9 +20,11 @@ export async function updatePlaceAssessmentResponse(
     return new Response('Invalid personal item update', { status: 400 });
   }
 
-  const result = await application.execute({
-    key: 'assessment.update',
-    input: {
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'assessment.update',
+    operationInput: {
       itemId,
       patch: {
         ...(input.overallRating === undefined
@@ -38,21 +39,12 @@ export async function updatePlaceAssessmentResponse(
         ...(input.summary === undefined ? {} : { summary: input.summary }),
       },
     },
+    errors: {
+      invalidInput: 'Invalid personal item update',
+      notFound: 'Atlas item not found',
+      dependencyFailure: 'The personal place status could not be saved.',
+    },
   });
-
-  if (!result.ok) {
-    if (result.error.kind === 'invalid_input') {
-      return new Response('Invalid personal item update', { status: 400 });
-    }
-    if (result.error.kind === 'not_found') {
-      return new Response('Atlas item not found', { status: 404 });
-    }
-    return new Response('The personal place status could not be saved.', {
-      status: 500,
-    });
-  }
-
-  return Response.json(result.value.item);
 }
 
 function isPersonalItemPatch(value: unknown): value is PersonalItemPatch {

@@ -39,7 +39,7 @@ export function createPlaceAssessmentOperationGroup(
       effect: 'write',
       validate: validateMutation,
     },
-    async handle({ itemId, patch }) {
+    async handle({ itemId, patch }, execution) {
       try {
         const item = await catalog.get(itemId);
         if (!item) return failure('not_found', 'Atlas item not found.');
@@ -51,9 +51,7 @@ export function createPlaceAssessmentOperationGroup(
           patch,
           dependencies.clock.now(),
         );
-        await state.save(assessment);
-
-        return success({
+        const output = {
           assessment,
           item: {
             ...item,
@@ -63,8 +61,15 @@ export function createPlaceAssessmentOperationGroup(
               assessment.manualVisited,
               context.visitCount,
             ),
+            overallComment: assessment.summary,
           },
-        });
+        };
+        await state.save(
+          assessment,
+          execution?.atomicMutation?.receiptFor(output),
+        );
+
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

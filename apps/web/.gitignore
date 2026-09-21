@@ -37,5 +37,6 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /wrangler.agent-poc.local.jsonc
+/wrangler.owner-poc.local.jsonc
 /outputs/
 /work/

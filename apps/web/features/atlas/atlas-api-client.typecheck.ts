@@ -13,7 +13,7 @@ void application.execute({
 
 void application.execute({
   key: 'media.attach',
-  input: { visitId: 'visit-1', files: [] },
+  input: { visitId: 'visit-1', files: [], uploadIds: [] },
 });
 
 void application.execute({

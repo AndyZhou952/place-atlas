@@ -71,7 +71,12 @@ export function createNearbyRecommendationOperationGroup(
   const recommendation =
     dependencies.nearbyRecommendation ??
     createNearbyRecommendation(dependencies);
-  const nearby: AgentNearbyOperationDefinition = {
+  const nearby: OperationDefinition<
+    'agent.nearby',
+    AgentNearbyInput,
+    AgentNearbyResult,
+    'json'
+  > = {
     descriptor: {
       key: 'agent.nearby',
       resultKind: 'json',

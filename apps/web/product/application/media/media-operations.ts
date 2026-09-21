@@ -38,6 +38,7 @@ export interface DeleteVisitMediaOutput {
 export interface MediaDependencies {
   readonly clock: { now(): string };
   readonly idSource: { nextId(): string };
+  readonly displayIdSource?: { nextId(): string };
   readonly digest: (bytes: Uint8Array) => Promise<string>;
 }
 
@@ -118,6 +119,43 @@ export function createMediaOperationGroup(
     },
   };
 
+  const openDisplayMedia: OperationDefinition<
+    'media.openDisplay',
+    { readonly displayId: string },
+    MediaContent,
+    'media_stream'
+  > = {
+    descriptor: {
+      key: 'media.openDisplay',
+      resultKind: 'media_stream',
+      effect: 'read',
+      validate: validateDisplayMediaId,
+    },
+    async handle({ displayId }) {
+      try {
+        const metadata = await state.findByDisplayId(displayId);
+        if (!metadata) return failure('not_found', 'Photo not found.');
+        const object = await objects.get(metadata.objectKey);
+        if (!object) {
+          return failure(
+            'dependency_failure',
+            'Photo content is temporarily unavailable.',
+          );
+        }
+        return success({
+          body: sanitizeMediaBody(object.body),
+          contentType: metadata.contentType,
+          byteSize: metadata.byteSize,
+        });
+      } catch {
+        return failure(
+          'dependency_failure',
+          'Photo content is temporarily unavailable.',
+        );
+      }
+    },
+  };
+
   const attachVisitMedia: OperationDefinition<
     'media.attach',
     AttachVisitMediaInput,
@@ -130,7 +168,7 @@ export function createMediaOperationGroup(
       effect: 'write',
       validate: validateAttachInput,
     },
-    async handle({ visitId, uploads }) {
+    async handle({ visitId, uploads }, execution) {
       try {
         const context = await state.getVisitContext(visitId);
         if (!context) return failure('not_found', 'Journal entry not found.');
@@ -139,10 +177,12 @@ export function createMediaOperationGroup(
           uploads.map(async (upload, index) => {
             assertAllowedImage(upload.contentType, upload.bytes);
             const id = upload.id ?? dependencies.idSource.nextId();
+            const displayId = createDisplayId(dependencies.displayIdSource);
             const contentSha256 = await dependencies.digest(upload.bytes);
             const objectKey = `visits/${visitId}/${id}`;
             const metadata: VisitMediaMetadata = {
               id,
+              displayId,
               visitId,
               itemId: context.itemId,
               objectKey,
@@ -178,7 +218,11 @@ export function createMediaOperationGroup(
             : failure('dependency_failure', 'Visit photos could not be saved.');
         }
         try {
-          await state.insert(prepared);
+          const output = prepared.map(toVisitMedia);
+          await state.insert(
+            prepared,
+            execution?.atomicMutation?.receiptFor(output),
+          );
         } catch {
           await cleanupStoredObjects(objects, prepared);
           return failure(
@@ -208,7 +252,7 @@ export function createMediaOperationGroup(
       effect: 'write',
       validate: validateCaptionInput,
     },
-    async handle({ id, caption: value }) {
+    async handle({ id, caption: value }, execution) {
       let caption: string | undefined;
       try {
         caption = normalizeCaption(value);
@@ -221,13 +265,42 @@ export function createMediaOperationGroup(
         );
       }
       try {
+        if (!execution?.atomicMutation) {
+          let metadata = await state.updateCaption(
+            id,
+            caption,
+            dependencies.clock.now(),
+          );
+          if (!metadata) {
+            const displayRecord = await state.findByDisplayId(id);
+            if (displayRecord) {
+              metadata = await state.updateCaption(
+                displayRecord.id,
+                caption,
+                dependencies.clock.now(),
+              );
+            }
+          }
+          return metadata
+            ? success(toVisitMedia(metadata))
+            : failure('not_found', 'Photo not found.');
+        }
+        const directRecord = await state.find(id);
+        const displayRecord = directRecord
+          ? undefined
+          : await state.findByDisplayId(id);
+        const current = directRecord ?? displayRecord;
+        if (!current) return failure('not_found', 'Photo not found.');
+        const updatedAt = dependencies.clock.now();
+        const output = toVisitMedia({ ...current, caption, updatedAt });
         const metadata = await state.updateCaption(
-          id,
+          current.id,
           caption,
-          dependencies.clock.now(),
+          updatedAt,
+          execution?.atomicMutation?.receiptFor(output),
         );
         return metadata
-          ? success(toVisitMedia(metadata))
+          ? success(output)
           : failure('not_found', 'Photo not found.');
       } catch {
         return failure(
@@ -250,18 +323,39 @@ export function createMediaOperationGroup(
       effect: 'destructive',
       validate: validateMediaId,
     },
-    async handle({ id }) {
+    async handle({ id }, execution) {
       let metadata: VisitMediaMetadata | undefined;
       try {
-        metadata = await state.delete(id);
+        if (!execution?.atomicMutation) {
+          metadata = await state.delete(id);
+          if (!metadata) {
+            const displayRecord = await state.findByDisplayId(id);
+            if (displayRecord) metadata = await state.delete(displayRecord.id);
+          }
+        } else {
+          const directRecord = await state.find(id);
+          const displayRecord = directRecord
+            ? undefined
+            : await state.findByDisplayId(id);
+          const current = directRecord ?? displayRecord;
+          if (!current) return failure('not_found', 'Photo not found.');
+          const output = { id: current.id, deleted: true as const };
+          metadata = await state.delete(
+            current.id,
+            execution.atomicMutation.receiptFor(output),
+          );
+        }
       } catch {
         return failure('dependency_failure', 'The photo could not be deleted.');
       }
       if (!metadata) return failure('not_found', 'Photo not found.');
       try {
         await objects.delete(metadata.objectKey);
-        return success({ id, deleted: true });
+        return success({ id: metadata.id, deleted: true });
       } catch {
+        if (execution?.atomicMutation) {
+          return success({ id: metadata.id, deleted: true });
+        }
         return failure('dependency_failure', 'The photo could not be deleted.');
       }
     },
@@ -270,6 +364,7 @@ export function createMediaOperationGroup(
   return defineOperationGroup({
     'media.list': listVisitMedia,
     'media.open': openVisitMedia,
+    'media.openDisplay': openDisplayMedia,
     'media.attach': attachVisitMedia,
     'media.caption': updateVisitMediaCaption,
     'media.delete': deleteVisitMedia,
@@ -443,9 +538,40 @@ function validateMediaId(input: unknown): Result<{ readonly id: string }> {
   }
   return success({ id });
 }
+function validateDisplayMediaId(
+  input: unknown,
+): Result<{ readonly displayId: string }> {
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    Object.keys(input).length !== 1
+  ) {
+    return failure('invalid_input', 'A photo display ID is required.');
+  }
+  const displayId = Reflect.get(input, 'displayId');
+  if (
+    typeof displayId !== 'string' ||
+    !/^pm_[A-Za-z0-9_-]+$/u.test(displayId)
+  ) {
+    return failure('invalid_input', 'A photo display ID is required.');
+  }
+  return success({ displayId });
+}
+
+function createDisplayId(source?: { nextId(): string }): string {
+  const token = (source?.nextId() ?? crypto.randomUUID()).trim();
+  if (!/^[A-Za-z0-9-]{8,128}$/u.test(token)) {
+    throw new MediaInputError(
+      'A secure photo display ID could not be created.',
+    );
+  }
+  return `pm_${token}`;
+}
 
 function toVisitMedia({
   objectKey: _objectKey,
+  displayId: _displayId,
   ...record
 }: VisitMediaMetadata): VisitMedia {
   return {

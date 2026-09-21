@@ -275,7 +275,7 @@ export class D1NearbyFixtureProvider implements NearbyRecommendationProvider {
   }
 }
 
-export function createFixtureAgentKeyStore(input: {
+export function createSingleOwnerAgentKeyStore(input: {
   readonly keyId: string;
   readonly secret: string;
   readonly actorId: string;

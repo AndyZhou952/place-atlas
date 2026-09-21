@@ -40,12 +40,9 @@ test('the Item GET adapter maps a merged item and not_found without duplicating 
     getAtlasItemResponse(application, 'missing'),
   ]);
 
+  const { personalState: _personalState, ...publicItem } = item;
   assert.equal(found.status, 200);
-  assert.deepEqual(await found.json(), {
-    ...item,
-    isFavorite: false,
-    hasVisited: false,
-  });
+  assert.deepEqual(await found.json(), publicItem);
   assert.equal(missing.status, 404);
   assert.equal(await missing.text(), 'Atlas item not found');
 });

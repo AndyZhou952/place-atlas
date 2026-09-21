@@ -1,9 +1,12 @@
-import { getD1, getMediaBucket } from '@/db';
+import { getAtlasDeploymentEnvironment, getD1, getMediaBucket } from '@/db';
 import { verifiedAtlasItems } from '@/features/atlas/verified-items';
 import { createAtlasApplication } from '@/product/application/atlas-application';
 import { createPlaceAssessmentOperationGroup } from '@/product/application/assessments/place-assessment-operations';
 import { createCatalogOperationGroup } from '@/product/application/catalog/catalog-operations';
-import { createCatalogItemProjection } from '@/product/application/catalog/catalog-item-projection';
+import {
+  createCatalogItemProjection,
+  type CatalogItemProjection,
+} from '@/product/application/catalog/catalog-item-projection';
 import {
   createCatalogRead,
   type CatalogRead,
@@ -20,6 +23,7 @@ import {
   createMediaOperationGroup,
   type MediaDependencies,
 } from '@/product/application/media/media-operations';
+import { createPublicDisplayOperationGroup } from '@/product/application/public-display/public-display-operations';
 import { createVisitOperationGroup } from '@/product/application/visits/visit-operations';
 
 import { D1CatalogState } from './d1-catalog-state';
@@ -29,6 +33,7 @@ import { D1PlaceAssessmentState } from './d1-place-assessment-state';
 import { D1VisitMediaState } from './media/d1-visit-media-state';
 import { R2MediaObjectStore } from './media/r2-media-object-store';
 import { D1VisitState } from './d1-visit-state';
+import { createOwnerPocComposition } from './owner-poc-composition';
 
 export function createServerAtlasApplication(
   database: D1Database,
@@ -43,8 +48,13 @@ export function createServerAtlasApplication(
   const catalogRead =
     dependencies.catalogRead ??
     createCatalogRead(catalogState, verifiedAtlasItems);
-  const catalogItemProjection = createCatalogItemProjection(verifiedAtlasItems);
+  const catalogItemProjection =
+    dependencies.catalogItemProjection ??
+    createCatalogItemProjection(verifiedAtlasItems);
   const mediaObjects = new R2MediaObjectStore(mediaBucket);
+  const assessmentState = new D1PlaceAssessmentState(database);
+  const visitState = new D1VisitState(database);
+  const mediaState = new D1VisitMediaState(database);
   return createAtlasApplication({
     ...createImportJobOperationGroup(
       new D1ImportJobState(database),
@@ -54,18 +64,22 @@ export function createServerAtlasApplication(
       state: catalogState,
       clock: dependencies.clock,
     }),
-    ...createPlaceAssessmentOperationGroup(
-      catalogRead,
-      new D1PlaceAssessmentState(database),
-      { clock: dependencies.clock },
-    ),
+    ...createPlaceAssessmentOperationGroup(catalogRead, assessmentState, {
+      clock: dependencies.clock,
+    }),
+    ...createPublicDisplayOperationGroup({
+      catalog: catalogRead,
+      assessments: assessmentState,
+      visits: visitState,
+      media: mediaState,
+    }),
     ...createDecisionOperationGroup(catalogRead),
     ...createNearbyRecommendationOperationGroup({
       ...dependencies.agentNearby,
       catalog: catalogRead,
     }),
     ...createVisitOperationGroup(
-      new D1VisitState(database),
+      visitState,
       catalogItemProjection,
       dependencies,
     ),
@@ -75,21 +89,27 @@ export function createServerAtlasApplication(
       mediaObjects,
       { clock: dependencies.clock },
     ),
-    ...createMediaOperationGroup(
-      new D1VisitMediaState(database),
-      mediaObjects,
-      dependencies,
-    ),
+    ...createMediaOperationGroup(mediaState, mediaObjects, dependencies),
   });
 }
 
 export function getServerAtlasApplication() {
-  return createServerAtlasApplication(getD1(), getMediaBucket());
+  const database = getD1();
+  const mediaBucket = getMediaBucket();
+  if (getAtlasDeploymentEnvironment() === 'owner-poc') {
+    return createServerAtlasApplication(
+      database,
+      mediaBucket,
+      createOwnerPocComposition(database),
+    );
+  }
+  return createServerAtlasApplication(database, mediaBucket);
 }
 
 export interface ServerAtlasDependencies
   extends ImportJobDependencies, MediaDependencies {
   readonly catalogRead?: CatalogRead;
+  readonly catalogItemProjection?: CatalogItemProjection;
   readonly agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'>;
 }
 

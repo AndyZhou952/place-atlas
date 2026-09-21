@@ -3,6 +3,9 @@ import type {
   DestructiveItemContext,
   DestructiveRecordState,
 } from '@/product/application/destructive/destructive-state';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface DestructiveContextRow {
   readonly item_id: string;
@@ -41,16 +44,23 @@ export class D1DestructiveState implements DestructiveRecordState {
     return row ? toContext(row) : undefined;
   }
 
-  async commitVisitDeletion(id: string): Promise<void> {
-    await this.#database.batch([
-      this.#database
-        .prepare('DELETE FROM visit_media WHERE visit_id = ?')
-        .bind(id),
-      this.#database.prepare('DELETE FROM visits WHERE id = ?').bind(id),
-      this.#database
-        .prepare('DELETE FROM journal_entries WHERE id = ?')
-        .bind(id),
-    ]);
+  async commitVisitDeletion(
+    id: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    await commitD1MutationAtomically(
+      this.#database,
+      [
+        this.#database
+          .prepare('DELETE FROM visit_media WHERE visit_id = ?')
+          .bind(id),
+        this.#database.prepare('DELETE FROM visits WHERE id = ?').bind(id),
+        this.#database
+          .prepare('DELETE FROM journal_entries WHERE id = ?')
+          .bind(id),
+      ],
+      atomicCommit,
+    );
   }
 
   async readItemDeletion(id: string): Promise<DestructiveItemContext> {

@@ -16,3 +16,8 @@ export function getMediaBucket(): R2Bucket {
 
   return media;
 }
+
+export function getAtlasDeploymentEnvironment(): string | undefined {
+  return (env as unknown as { ATLAS_DEPLOYMENT_ENV?: string })
+    .ATLAS_DEPLOYMENT_ENV;
+}

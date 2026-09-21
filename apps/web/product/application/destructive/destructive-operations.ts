@@ -41,7 +41,7 @@ export function createDestructiveOperationGroup(
       effect: 'destructive',
       validate: validateId,
     },
-    async handle({ id }) {
+    async handle({ id }, execution) {
       try {
         const context = await state.readVisitDeletion(id);
         if (!context) {
@@ -50,15 +50,19 @@ export function createDestructiveOperationGroup(
         const item = itemProjection.project(context);
         if (!item) return failure('not_found', 'Atlas item not found.');
 
-        await state.commitVisitDeletion(id);
-        await deleteObjectsBestEffort(objects, context.mediaObjectKeys);
-        return success({
+        const output = {
           item: itemProjection.project({
             ...context,
             visitCount: Math.max(0, context.visitCount - 1),
             mediaObjectKeys: [],
           })!,
-        });
+        };
+        await state.commitVisitDeletion(
+          id,
+          execution?.atomicMutation?.receiptFor(output),
+        );
+        await deleteObjectsBestEffort(objects, context.mediaObjectKeys);
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

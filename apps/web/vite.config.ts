@@ -68,14 +68,16 @@ export async function createWebViteConfig(
       : undefined,
   } satisfies UserConfig;
 
-  if (mode === 'agent-poc') {
+  if (mode === 'agent-poc' || mode === 'owner-poc') {
+    const configBaseName =
+      mode === 'agent-poc' ? 'wrangler.agent-poc' : 'wrangler.owner-poc';
     const localConfigPath = path.join(
       dependencies.appRoot,
-      'wrangler.agent-poc.local.jsonc',
+      `${configBaseName}.local.jsonc`,
     );
     const configPath = dependencies.existsSync(localConfigPath)
       ? localConfigPath
-      : path.join(dependencies.appRoot, 'wrangler.agent-poc.jsonc');
+      : path.join(dependencies.appRoot, `${configBaseName}.jsonc`);
     return {
       ...shared,
       plugins: [

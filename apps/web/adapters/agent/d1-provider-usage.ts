@@ -11,6 +11,26 @@ export class D1ProviderUsage implements ProviderUsagePort {
 
   async reserve(reservation: {
     readonly providerId: string;
+    readonly sku?: 'geocoding.requests' | 'walking_matrix.elements';
+    readonly units?: number;
+    readonly requests: 1;
+    readonly costUsd: number;
+    readonly hardRequestLimit: number;
+    readonly hardUnitLimit?: number;
+    readonly hardCostLimitUsd: number;
+  }): Promise<'reserved' | 'quota_exceeded' | 'cost_exceeded'> {
+    if (
+      reservation.sku !== undefined ||
+      reservation.units !== undefined ||
+      reservation.hardUnitLimit !== undefined
+    ) {
+      return this.#reserveSkuUnits(reservation);
+    }
+    return this.#reserveLegacy(reservation);
+  }
+
+  async #reserveLegacy(reservation: {
+    readonly providerId: string;
     readonly requests: 1;
     readonly costUsd: number;
     readonly hardRequestLimit: number;
@@ -56,6 +76,85 @@ export class D1ProviderUsage implements ProviderUsagePort {
         .bind(reservation.providerId, period)
         .first<{ request_count: number; cost_micro_usd: number }>();
       return current && current.request_count >= reservation.hardRequestLimit
+        ? 'quota_exceeded'
+        : 'cost_exceeded';
+    } catch {
+      return 'cost_exceeded';
+    }
+  }
+
+  async #reserveSkuUnits(reservation: {
+    readonly providerId: string;
+    readonly sku?: 'geocoding.requests' | 'walking_matrix.elements';
+    readonly units?: number;
+    readonly requests: 1;
+    readonly costUsd: number;
+    readonly hardRequestLimit: number;
+    readonly hardUnitLimit?: number;
+    readonly hardCostLimitUsd: number;
+  }): Promise<'reserved' | 'quota_exceeded' | 'cost_exceeded'> {
+    const cost = toMicroUsd(reservation.costUsd);
+    const hardCost = toMicroUsd(reservation.hardCostLimitUsd);
+    if (
+      cost === undefined ||
+      hardCost === undefined ||
+      reservation.sku === undefined ||
+      !Number.isSafeInteger(reservation.units) ||
+      reservation.units === undefined ||
+      reservation.units < 1 ||
+      !Number.isSafeInteger(reservation.hardRequestLimit) ||
+      reservation.hardRequestLimit < 1 ||
+      !Number.isSafeInteger(reservation.hardUnitLimit) ||
+      reservation.hardUnitLimit === undefined ||
+      reservation.hardUnitLimit < 1 ||
+      (reservation.sku === 'geocoding.requests' && reservation.units !== 1)
+    ) {
+      return 'cost_exceeded';
+    }
+    const period = monthStart(this.now());
+    try {
+      const result = await this.database
+        .prepare(
+          `INSERT INTO agent_provider_usage_by_sku (
+             provider_id, sku, period_start_utc, request_count,
+             billable_units, cost_micro_usd
+           ) VALUES (?, ?, ?, 1, ?, ?)
+           ON CONFLICT(provider_id, sku, period_start_utc) DO UPDATE SET
+             request_count = request_count + 1,
+             billable_units = billable_units + excluded.billable_units,
+             cost_micro_usd = cost_micro_usd + excluded.cost_micro_usd
+           WHERE request_count + 1 <= ?
+             AND billable_units + excluded.billable_units <= ?
+             AND cost_micro_usd + excluded.cost_micro_usd <= ?`,
+        )
+        .bind(
+          reservation.providerId,
+          reservation.sku,
+          period,
+          reservation.units,
+          cost,
+          reservation.hardRequestLimit,
+          reservation.hardUnitLimit,
+          hardCost,
+        )
+        .run();
+      if (result.meta.changes === 1) return 'reserved';
+      const current = await this.database
+        .prepare(
+          `SELECT request_count, billable_units, cost_micro_usd
+           FROM agent_provider_usage_by_sku
+           WHERE provider_id = ? AND sku = ? AND period_start_utc = ?`,
+        )
+        .bind(reservation.providerId, reservation.sku, period)
+        .first<{
+          request_count: number;
+          billable_units: number;
+          cost_micro_usd: number;
+        }>();
+      return current &&
+        (current.request_count + 1 > reservation.hardRequestLimit ||
+          current.billable_units + reservation.units >
+            reservation.hardUnitLimit)
         ? 'quota_exceeded'
         : 'cost_exceeded';
     } catch {

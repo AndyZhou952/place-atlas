@@ -37,12 +37,7 @@ test('the Items GET adapter preserves the full merged JSON collection', async ()
 
   const response = await listAtlasItemsResponse(application);
 
+  const { personalState: _personalState, ...publicCandidate } = candidate;
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), [
-    {
-      ...candidate,
-      isFavorite: false,
-      hasVisited: false,
-    },
-  ]);
+  assert.deepEqual(await response.json(), [publicCandidate]);
 });

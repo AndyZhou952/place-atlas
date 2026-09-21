@@ -10,12 +10,12 @@ import {
 } from '../../product/application/conversation/project-command-router.ts';
 import { createAgentHttpHandler } from './agent-http-mapping.ts';
 import {
-  createFixtureAgentKeyStore,
+  createSingleOwnerAgentKeyStore,
   D1AgentAuditSink,
   D1AgentGatewayState,
 } from './d1-agent-gateway-adapters.ts';
 
-export interface IsolatedReadonlyAgentBindings {
+interface AgentGatewayBindings {
   readonly DB: D1Database;
   readonly MEDIA: R2Bucket;
   readonly ATLAS_DATASET: string;
@@ -24,6 +24,11 @@ export interface IsolatedReadonlyAgentBindings {
   readonly AGENT_JPMAP_HMAC_SECRET: string;
   readonly AGENT_OWNER_ACTOR_ID: string;
   readonly AGENT_OWNER_CONVERSATION_ID: string;
+}
+
+export type OwnerPocAgentBindings = AgentGatewayBindings;
+
+export interface IsolatedReadonlyAgentBindings extends AgentGatewayBindings {
   readonly GOOGLE_MAPS_API_KEY?: string;
 }
 
@@ -32,30 +37,38 @@ export function createIsolatedReadonlyAgentHttpHandler(
   application: AtlasApplication<NearbyApplicationDefinitions>,
   clock: { readonly nowMs: () => number } = { nowMs: Date.now },
 ) {
-  if (!hasSafeIsolatedBindings(bindings)) {
-    return async (): Promise<Response> =>
-      new Response(
-        JSON.stringify({
-          ok: false,
-          error: {
-            kind: 'dependency_failure',
-            message: 'The isolated Japan Atlas PoC is unavailable.',
-          },
-        }),
-        {
-          status: 503,
-          headers: {
-            'cache-control': 'no-store',
-            'content-type': 'application/json; charset=utf-8',
-          },
-        },
-      );
-  }
+  return createReadonlyAgentHttpHandler(
+    bindings,
+    application,
+    hasSafeIsolatedBindings(bindings),
+    clock,
+  );
+}
 
+export function createOwnerPocAgentHttpHandler(
+  bindings: OwnerPocAgentBindings,
+  application: AtlasApplication<NearbyApplicationDefinitions>,
+  clock: { readonly nowMs: () => number } = { nowMs: Date.now },
+) {
+  return createReadonlyAgentHttpHandler(
+    bindings,
+    application,
+    hasSafeOwnerPocBindings(bindings),
+    clock,
+  );
+}
+
+function createReadonlyAgentHttpHandler(
+  bindings: AgentGatewayBindings,
+  application: AtlasApplication<NearbyApplicationDefinitions>,
+  safe: boolean,
+  clock: { readonly nowMs: () => number },
+) {
+  if (!safe) return unavailableHandler();
   const gateway = createAgentServiceGateway({
     router: createProjectCommandRouter(application),
     toolCatalog: createAgentToolCatalog(),
-    keys: createFixtureAgentKeyStore({
+    keys: createSingleOwnerAgentKeyStore({
       keyId: bindings.AGENT_JPMAP_KEY_ID,
       secret: bindings.AGENT_JPMAP_HMAC_SECRET,
       actorId: bindings.AGENT_OWNER_ACTOR_ID,
@@ -68,12 +81,48 @@ export function createIsolatedReadonlyAgentHttpHandler(
   return createAgentHttpHandler(gateway);
 }
 
+function unavailableHandler() {
+  return async (): Promise<Response> =>
+    new Response(
+      JSON.stringify({
+        ok: false,
+        error: {
+          kind: 'dependency_failure',
+          message: 'The isolated Japan Atlas PoC is unavailable.',
+        },
+      }),
+      {
+        status: 503,
+        headers: {
+          'cache-control': 'no-store',
+          'content-type': 'application/json; charset=utf-8',
+        },
+      },
+    );
+}
+
+function hasSafeOwnerPocBindings(bindings: OwnerPocAgentBindings): boolean {
+  return (
+    bindings.ATLAS_DEPLOYMENT_ENV === 'owner-poc' &&
+    bindings.ATLAS_DATASET === 'owner-poc' &&
+    hasConfiguredAgentGatewayBindings(bindings)
+  );
+}
+
 function hasSafeIsolatedBindings(
   bindings: IsolatedReadonlyAgentBindings,
 ): boolean {
   return (
     bindings.ATLAS_DEPLOYMENT_ENV === 'agent-poc-readonly' &&
     bindings.ATLAS_DATASET === 'fixture' &&
+    hasConfiguredAgentGatewayBindings(bindings)
+  );
+}
+
+function hasConfiguredAgentGatewayBindings(
+  bindings: AgentGatewayBindings,
+): boolean {
+  return (
     Boolean(bindings.DB) &&
     Boolean(bindings.MEDIA) &&
     isConfigured(bindings.AGENT_JPMAP_KEY_ID) &&

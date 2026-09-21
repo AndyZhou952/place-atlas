@@ -1,129 +1,92 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createAtlasApplication } from '../../../../product/application/atlas-application.ts';
-import { createMediaOperationGroup } from '../../../../product/application/media/media-operations.ts';
-import {
-  InMemoryMediaObjectStore,
-  InMemoryVisitMediaState,
-} from '../../../../product/application/media/media-read-memory.ts';
 import {
   deleteVisitMediaResponse,
   updateVisitMediaCaptionResponse,
 } from './media-mutation-response.ts';
 
-const metadata = {
-  id: 'media-1',
-  visitId: 'visit-1',
-  itemId: 'item-1',
-  objectKey: 'visits/visit-1/media-1',
-  originalFilename: 'sushi.jpg',
-  contentType: 'image/jpeg',
-  byteSize: 3,
-  contentSha256: 'sha-1',
-  displayOrder: 0,
-  createdAt: '2026-09-11T08:00:00.000Z',
-  updatedAt: '2026-09-11T08:00:00.000Z',
-};
-const dependencies = {
-  clock: { now: () => '2026-09-12T08:00:00.000Z' },
-  idSource: { nextId: () => 'unused' },
-  digest: async () => 'unused',
-};
-
-test('Media PATCH and DELETE adapters preserve response shapes', async () => {
-  const application = createAtlasApplication(
-    createMediaOperationGroup(
-      new InMemoryVisitMediaState([metadata]),
-      new InMemoryMediaObjectStore(
-        new Map([
-          [
-            metadata.objectKey,
-            { body: new ReadableStream(), etag: '"etag-1"' },
-          ],
-        ]),
-      ),
-      dependencies,
-    ),
-  );
-
+test('Media PATCH and DELETE emit mutation envelopes and receipt responses', async () => {
+  const envelopes = [];
+  const fake = coordinator(async (input) => {
+    envelopes.push(input);
+    return okReceipt(
+      input.mutationId,
+      input.operation === 'media.caption'
+        ? { id: 'media-1', caption: 'chef choice' }
+        : { id: 'media-1', deleted: true },
+    );
+  });
   const updated = await updateVisitMediaCaptionResponse(
-    application,
+    fake,
+    mutationRequest('PATCH', 'caption-1'),
     'media-1',
     { caption: '  chef\nchoice  ' },
   );
-  const deleted = await deleteVisitMediaResponse(application, 'media-1');
-
-  assert.equal(updated.status, 200);
-  assert.equal((await updated.json()).caption, 'chef choice');
-  assert.equal(deleted.status, 200);
-  assert.deepEqual(await deleted.json(), { id: 'media-1', deleted: true });
-});
-
-test('Media mutation adapters preserve invalid-caption and not-found responses', async () => {
-  const application = createAtlasApplication(
-    createMediaOperationGroup(
-      new InMemoryVisitMediaState(),
-      new InMemoryMediaObjectStore(),
-      dependencies,
-    ),
+  const deleted = await deleteVisitMediaResponse(
+    fake,
+    mutationRequest('DELETE', 'delete-1'),
+    'media-1',
   );
 
+  assert.equal((await updated.json()).result.caption, 'chef choice');
+  assert.deepEqual((await deleted.json()).result, {
+    id: 'media-1',
+    deleted: true,
+  });
+  assert.deepEqual(
+    envelopes.map(({ operation, mutationId }) => [operation, mutationId]),
+    [
+      ['media.caption', 'caption-1'],
+      ['media.delete', 'delete-1'],
+    ],
+  );
+});
+
+test('Media mutations reject invalid input or missing mutation IDs before coordinator', async () => {
+  let calls = 0;
+  const fake = coordinator(async () => {
+    calls += 1;
+    throw new Error('must not run');
+  });
   const invalid = await updateVisitMediaCaptionResponse(
-    application,
+    fake,
+    mutationRequest('PATCH', 'caption-1'),
     'media-1',
     { caption: 42 },
   );
-  const missingUpdate = await updateVisitMediaCaptionResponse(
-    application,
+  const missingId = await deleteVisitMediaResponse(
+    fake,
+    new Request('https://atlas.example/api/media/media-1', {
+      method: 'DELETE',
+    }),
     'media-1',
-    { caption: 'missing' },
   );
-  const missingDelete = await deleteVisitMediaResponse(application, 'media-1');
 
   assert.equal(invalid.status, 400);
-  assert.equal(await invalid.text(), 'Caption must be text.');
-  assert.equal(missingUpdate.status, 404);
-  assert.equal(await missingUpdate.text(), 'Photo not found');
-  assert.equal(missingDelete.status, 404);
-  assert.equal(await missingDelete.text(), 'Photo not found');
+  assert.equal(missingId.status, 400);
+  assert.equal(calls, 0);
 });
 
-test('Media PATCH preserves the baseline 400 mapping for a sanitized dependency failure', async () => {
-  const application = createAtlasApplication(
-    createMediaOperationGroup(
-      {
-        async list() {
-          return [];
-        },
-        async find() {
-          return undefined;
-        },
-        async getVisitContext() {
-          return undefined;
-        },
-        async insert() {},
-        async updateCaption() {
-          throw new Error('secret D1 failure');
-        },
-        async delete() {
-          return undefined;
-        },
-      },
-      new InMemoryMediaObjectStore(),
-      dependencies,
-    ),
-  );
+function mutationRequest(method, mutationId) {
+  return new Request('https://atlas.example/api/media/media-1', {
+    method,
+    headers: { 'x-atlas-mutation-id': mutationId },
+  });
+}
 
-  const response = await updateVisitMediaCaptionResponse(
-    application,
-    'media-1',
-    { caption: 'course' },
-  );
+function coordinator(mutate) {
+  return { mutate };
+}
 
-  assert.equal(response.status, 400);
-  assert.equal(
-    await response.text(),
-    'The photo caption could not be updated.',
-  );
-});
+function okReceipt(mutationId, result) {
+  return {
+    ok: true,
+    value: {
+      mutationId,
+      payloadDigest: 'a'.repeat(64),
+      result,
+      replayed: false,
+    },
+  };
+}

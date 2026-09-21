@@ -29,11 +29,6 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
       { name: 'queue_creator_import', method: 'POST', path: '/api/inbox' },
       { name: 'create_visit', method: 'POST', path: '/api/journal' },
       {
-        name: 'list_visit_media',
-        method: 'GET',
-        path: '/api/media?visitId={visitId}',
-      },
-      {
         name: 'upload_visit_media',
         method: 'POST',
         contentType: 'multipart/form-data',

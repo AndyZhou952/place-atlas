@@ -1,4 +1,5 @@
 import type { AtlasItem } from '../catalog/atlas-item.ts';
+import type { AtomicMutationCommit } from '../atlas-application.ts';
 import type {
   AtlasItemOverrideRecord,
   PlaceAssessmentRecord,
@@ -21,7 +22,10 @@ export interface DestructiveItemProjection {
 export interface DestructiveRecordState {
   readVisitDeletion(id: string): Promise<DestructiveItemContext | undefined>;
   /** Atomically removes the Visit, legacy row, and its media metadata. */
-  commitVisitDeletion(id: string): Promise<void>;
+  commitVisitDeletion(
+    id: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void>;
   readItemDeletion(id: string): Promise<DestructiveItemContext>;
   /** Atomically removes all structured item records and writes its tombstone. */
   commitItemDeletion(id: string, deletedAt: string): Promise<void>;

@@ -2,14 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createBrowserAtlasApplication } from './atlas-api-client.ts';
+import { subscribeOwnerLoginRequired } from './owner-session-client.ts';
 
 test('Browser AtlasApplication maps typed operations through an injected transport', async () => {
   const calls = [];
-  const item = { id: 'place-1', title: '店' };
+  const item = {
+    id: 'place-1',
+    title: '店',
+    overallComment: 'A quiet counter worth revisiting.',
+  };
   const application = createBrowserAtlasApplication({
     async request(url, init) {
       calls.push({ url, init });
-      return Response.json(url === '/api/items' ? [item] : item);
+      return url === '/api/items'
+        ? Response.json([item])
+        : mutationResponse(init, { item });
     },
   });
 
@@ -21,7 +28,11 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
     key: 'assessment.update',
     input: {
       itemId: 'place-1',
-      patch: { isFavorite: true, manualVisited: false },
+      patch: {
+        isFavorite: true,
+        manualVisited: false,
+        summary: 'A quiet counter worth revisiting.',
+      },
     },
   });
 
@@ -34,7 +45,35 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
   assert.deepEqual(JSON.parse(calls[1].init.body), {
     isFavorite: true,
     hasVisited: false,
+    summary: 'A quiet counter worth revisiting.',
   });
+  assert.match(
+    new Headers(calls[1].init.headers).get('x-atlas-mutation-id'),
+    /^[0-9a-f-]+$/u,
+  );
+});
+
+test('an unauthorized Atlas write requests Owner login and rejects without reporting success', async () => {
+  let loginRequests = 0;
+  const unsubscribe = subscribeOwnerLoginRequired(() => {
+    loginRequests += 1;
+  });
+  const application = createBrowserAtlasApplication({
+    async request() {
+      return new Response('Owner login is required.', { status: 401 });
+    },
+  });
+
+  await assert.rejects(
+    application.execute({
+      key: 'assessment.update',
+      input: { itemId: 'place-1', patch: { isFavorite: true } },
+    }),
+    /Owner login is required\./,
+  );
+  unsubscribe();
+
+  assert.equal(loginRequests, 1);
 });
 
 test('Browser AtlasApplication preserves every existing JSON route shape', async () => {
@@ -53,7 +92,11 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
           url.startsWith('/api/media?') ||
           url.startsWith('/api/nearby?')) &&
         (init?.method === undefined || init.method === 'GET');
-      return Response.json(isList ? [] : { ok: true });
+      const isCoordinatedWrite =
+        url.startsWith('/api/journal') || url.startsWith('/api/media/');
+      return isCoordinatedWrite && init?.method !== undefined
+        ? mutationResponse(init, { ok: true })
+        : Response.json(isList ? [] : { ok: true });
     },
   });
 
@@ -205,6 +248,7 @@ test('Browser media attach accepts 24 files, sends four per request, and publish
     input: {
       visitId: 'visit-1',
       files,
+      uploadIds: files.map((_, index) => `media-${index}`),
       captions: files.map((_, index) => `dish ${index}`),
       onBatchCompleted: (batch) => completedBatches.push(batch),
     },
@@ -215,7 +259,7 @@ test('Browser media attach accepts 24 files, sends four per request, and publish
   assert.equal(requests[0].url, '/api/media');
   assert.equal(requests[0].init.body.getAll('files').length, 4);
 
-  pending.shift()(Response.json([{ id: 'media-1' }], { status: 201 }));
+  pending.shift()(mutationResponse(requests[0].init, [{ id: 'media-1' }], 201));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(completedBatches, [[{ id: 'media-1' }]]);
   assert.equal(requests.length, 2);
@@ -226,11 +270,11 @@ test('Browser media attach accepts 24 files, sends four per request, and publish
     'dish 7',
   ]);
 
-  pending.shift()(Response.json([{ id: 'media-2' }], { status: 201 }));
+  pending.shift()(mutationResponse(requests[1].init, [{ id: 'media-2' }], 201));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(requests.length, 3);
   assert.equal(requests[2].init.body.getAll('files').length, 2);
-  pending.shift()(Response.json([{ id: 'media-3' }], { status: 201 }));
+  pending.shift()(mutationResponse(requests[2].init, [{ id: 'media-3' }], 201));
 
   assert.deepEqual(await upload, [
     { id: 'media-1' },
@@ -249,6 +293,10 @@ test('Browser media attach accepts 24 files, sends four per request, and publish
       input: {
         visitId: 'visit-1',
         files: Array.from({ length: 25 }, (_, index) => files[index % 10]),
+        uploadIds: Array.from(
+          { length: 25 },
+          (_, index) => `too-many-${index}`,
+        ),
       },
     }),
     /Select no more than 24 photos at once/,
@@ -260,10 +308,10 @@ test('a later upload failure keeps earlier completed batches observable', async 
   let requestCount = 0;
   const completedBatches = [];
   const application = createBrowserAtlasApplication({
-    async request() {
+    async request(_url, init) {
       requestCount += 1;
       return requestCount === 1
-        ? Response.json([{ id: 'stored' }], { status: 201 })
+        ? mutationResponse(init, [{ id: 'stored' }], 201)
         : new Response('Visit photos could not be saved.', { status: 500 });
     },
   });
@@ -278,6 +326,7 @@ test('a later upload failure keeps earlier completed batches observable', async 
       input: {
         visitId: 'visit-1',
         files,
+        uploadIds: files.map((_, index) => `later-${index}`),
         onBatchCompleted: (batch) => completedBatches.push(batch),
       },
     }),
@@ -287,3 +336,17 @@ test('a later upload failure keeps earlier completed batches observable', async 
   assert.equal(requestCount, 2);
   assert.deepEqual(completedBatches, [[{ id: 'stored' }]]);
 });
+
+function mutationResponse(init, result, status = 200) {
+  const mutationId = new Headers(init?.headers).get('x-atlas-mutation-id');
+  assert.ok(mutationId);
+  return Response.json(
+    {
+      mutationId,
+      payloadDigest: 'a'.repeat(64),
+      result,
+      replayed: false,
+    },
+    { status },
+  );
+}

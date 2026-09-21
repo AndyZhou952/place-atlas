@@ -1,6 +1,6 @@
 # Japan Atlas 决策登记册
 
-最后更新：2026-09-15
+最后更新：2026-09-21
 
 本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
 
@@ -162,6 +162,16 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 **重审条件：** OpenClaw/runtime/plugin/channel 版本或入站执行顺序改变，native command 或 ingress probe 失败，或者新增项目需要共享写权限时，关闭相关 capability gate 并重新评审。OpenClaw 2026.7.1 已证明 skill direct-dispatch 会把 optional tool 受普通 allowlist 约束，因此不得用全局 allowlist 作为回退。
 
+### D-022：Owner PoC 公开读取投影与 Owner 写门
+
+**状态：Accepted（2026-09-21）**
+
+用户已明确确认非敏感 PoC 展示内容可公开。Public Read v1 只开放 feature 005 规格定义的闭合 `PublicCatalogItemV1`、`PublicAssessmentV1`、`PublicVisitV1`、`PublicVisitMediaV1` 与照片二进制；授权必须先于 Application/R2，投影禁止领域对象直出。不得公开或由公开标识推导 object key、原文件名、hash、内部存储 ID、审计、receipt 或维护字段；未知读取默认要求 Owner session。所有浏览器写入仍要求 Owner session，Agent 使用独立 HMAC/scope。
+
+这是对 D-018 默认私人语义的有意 PoC 例外，不改变保留期限，也不承诺永久公开。录入真实敏感评论、Visit 或图片，或改变公开 DTO 前，必须收窄投影并重新安全评审。
+
+**重审条件：** 出现真实敏感内容、新读取 operation／字段、朋友分享之外的公开传播、多用户身份或匿名写入需求。
+
 ## 2. 提议中决策
 
 ### D-P01：OpenClaw 作为首个微信 runtime
@@ -213,6 +223,18 @@ Google 调用仍必须经过已批准的 provider policy、字段许可与 warn/
 **接受条件：** 用户明确接受上述受限偏离；独立架构／安全评审通过；contract tests 对三个允许 tuple 分别提供正测，并对 host、port、path、method 的每类变体提供负测，同时证明输入不能影响 endpoint、所有 redirect 拒绝、字段与 quota 失败关闭、缺 secret 失败关闭，以及 secret／原始响应不被记录、持久化或返回。供应商 policy 仍须在条款、credential scope、attribution 与预算证据通过后另行批准，之后才可启用真实调用。
 
 **重审条件：** 超出隔离只读 PoC；新增或改变 Google origin/path/method；需要跟随 redirect；任何用户、模型或 provider 数据开始影响目标 URL；复用本例外到其他 provider 或主动抓取返回 URL；Cloudflare 的 DNS/fetch/TLS 行为变化；发生 DNS、证书或 egress 安全异常。命中任一条件即关闭该 transport 并重新比较通用 gateway、B 或 C。
+
+### D-P05：独立只读 Google Route Sidecar
+
+**状态：Proposed（2026-09-21；上线前须独立评审）**
+
+Owner 写 Worker 不继承 D-P04 的隔离只读 egress 结论。Google Geocoding/walking Route Matrix 放入独立 Cloudflare Route Sidecar：Sidecar 配置 `workers_dev=false` 且无 routes，只持 Google key，不绑定 Owner 密码、owner D1/R2 或 Agent HMAC；owner-poc 通过窄结构化 service binding 发送本次位置线索与 Catalog shortlist 坐标。D-P04 的固定 endpoint、禁 redirect、字段许可仅在 Sidecar 内继续适用。
+
+owner-poc 在 service binding 调用前按 provider + SKU + UTC period 原子预留用量：Geocoding 8,000 requests/月、walking Route Matrix 8,000 billable elements/月，provider 失败不退款；Google Cloud quota 是第二道门。Transit Routes 暂不启用，启用前另定 cap、费用映射和 fixtures。Sidecar 只返回带 attribution/source/checkedAt 的闭合 evidence；原始 JSON、解析地址/坐标与路线 payload不写 D1/R2、日志、prompt 或 Leaflet。
+
+**接受条件：** 独立威胁模型与安全评审通过；preflight 证明配置无公网 route、直接公网 URL 不可达、未绑定 Worker 无法调用；固定 endpoint/redirect/secret、两个 hard cap、Matrix elements、并发、失败不退款、request-only、attribution 与公开 ToS/Privacy contract tests 全绿。
+
+**重审条件：** Sidecar 获得 Owner/Agent 凭证或业务存储、出现公共 route、启用 Transit/其他 provider、改变 Google endpoint，或任何请求数据能影响目标 URL。
 
 ## 3. 已替代决策
 

@@ -197,6 +197,104 @@
   justify-self: end;
 }
 
+.header-actions {
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.owner-access-trigger {
+  min-height: 2.75rem;
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--paper-raised);
+}
+
+.owner-access-panel {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 1.35fr);
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 2.2rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--secondary);
+}
+
+.owner-access-copy h2 {
+  margin: 0.2rem 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.owner-access-copy > p:last-child,
+.owner-access-help,
+.owner-access-success,
+.owner-access-error {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.owner-access-copy > p:last-child,
+.owner-access-help {
+  color: var(--ink-soft);
+}
+
+.owner-access-form,
+.owner-access-session {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.owner-access-form > label {
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.owner-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+}
+
+.owner-password-row [data-slot='input'],
+.owner-password-row [data-slot='button'] {
+  height: 100%;
+  min-height: 2.75rem;
+}
+
+.owner-access-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+}
+
+.owner-access-actions [data-slot='button'] {
+  min-height: 2.75rem;
+}
+
+.owner-access-success {
+  color: var(--moss);
+  font-weight: 700;
+}
+
+.owner-access-error {
+  color: var(--vermilion-dark);
+  font-weight: 650;
+  outline: none;
+}
+
+.owner-access-error:focus-visible {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent);
+}
+
 .command-strip {
   display: flex;
   align-items: center;
@@ -1434,6 +1532,100 @@ button.personal-rating-inline:focus-visible {
   padding-left: 0;
 }
 
+.overall-comment {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.9rem 0 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.overall-comment > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.overall-comment h3 {
+  margin: 0.12rem 0 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+.overall-comment > header [data-slot='button'] {
+  min-height: 2.75rem;
+}
+
+.overall-comment-copy {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.overall-comment-editor {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.overall-comment-editor label {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.overall-comment-editor textarea {
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.7rem 0.75rem;
+  resize: vertical;
+  border: 1px solid var(--input);
+  border-radius: 0.45rem;
+  color: var(--ink);
+  background: var(--paper-raised);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.overall-comment-editor textarea:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 2px;
+}
+
+.overall-comment-editor textarea[aria-invalid='true'] {
+  border-color: var(--vermilion-dark);
+}
+
+.overall-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.overall-comment-actions [data-slot='button'] {
+  min-height: 2.75rem;
+}
+
+.overall-comment-error,
+.overall-comment-success {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.overall-comment-error {
+  color: var(--vermilion-dark);
+}
+
+.overall-comment-success {
+  color: var(--ink-soft);
+}
+
 .rating-strip-item > span,
 .rating-strip-item small,
 .rating-visit-count {
@@ -1941,6 +2133,13 @@ button.personal-rating-inline:focus-visible {
     padding: 0 1.2rem;
   }
 
+  .owner-access-panel {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    padding-right: 1.2rem;
+    padding-left: 1.2rem;
+  }
+
   .command-strip {
     padding-right: 1.2rem;
     padding-left: 1.2rem;
@@ -2007,6 +2206,29 @@ button.personal-rating-inline:focus-visible {
     width: 2.4rem;
     padding: 0;
     font-size: 0;
+  }
+
+  .owner-access-trigger {
+    width: 2.75rem;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .owner-access-trigger svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .header-actions {
+    gap: 0.35rem;
+  }
+
+  .owner-access-panel {
+    padding: 1rem;
+  }
+
+  .owner-password-row {
+    grid-template-columns: 1fr;
   }
 
   .atlas-header {

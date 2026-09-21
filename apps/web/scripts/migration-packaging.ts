@@ -44,18 +44,20 @@ export function verifyMigrationPackaging({
     stage === 'snapshot-only'
       ? manifest.snapshotOnly.activeMigrations
       : manifest.resetStage.activeMigrations;
-  assertExactMembership(
-    activeMigrations,
-    expectedMigrations,
-  );
+  assertExactMembership(activeMigrations, expectedMigrations);
 
-  const pendingReset = readRequiredFile(root, manifest.pendingReset.path);
+  const pendingReset = readRequiredBytes(root, manifest.pendingReset.path);
   const pendingResetSha256 = sha256(pendingReset);
   if (pendingResetSha256 !== manifest.pendingReset.sha256) {
-    throw new Error('Pending reset migration checksum does not match the reviewed value.');
+    throw new Error(
+      'Pending reset migration checksum does not match the reviewed value.',
+    );
   }
 
-  assertSiteVersionIsDeployable(candidateSiteVersion, manifest.retiredSiteVersions);
+  assertSiteVersionIsDeployable(
+    candidateSiteVersion,
+    manifest.retiredSiteVersions,
+  );
   if (stage === 'reset-stage') {
     assertExactActiveReset(root, manifest, pendingReset);
   }
@@ -78,7 +80,10 @@ export function assertSiteVersionIsDeployable(
 
 function readManifest(root: string): ProductionSnapshotMigrationManifest {
   const manifest = JSON.parse(
-    readRequiredFile(root, 'scripts/production-snapshot-migration-manifest.json'),
+    readRequiredText(
+      root,
+      'scripts/production-snapshot-migration-manifest.json',
+    ),
   ) as ProductionSnapshotMigrationManifest;
   if (manifest.schemaVersion !== 1) {
     throw new Error('Migration manifest schema version is not supported.');
@@ -108,25 +113,27 @@ function assertExactMembership(
 function assertExactActiveReset(
   root: string,
   manifest: ProductionSnapshotMigrationManifest,
-  pendingReset: Buffer,
+  pendingReset: Uint8Array,
 ): void {
   const activeResetPath = path.join(
     root,
     'drizzle',
     manifest.resetStage.activeMigration,
   );
-  let activeReset: Buffer;
+  let activeReset: Uint8Array;
   try {
     activeReset = readFileSync(activeResetPath);
   } catch {
     throw new Error('Reset-stage active reset migration is missing.');
   }
-  if (!activeReset.equals(pendingReset)) {
-    throw new Error('Reset-stage active reset migration does not match pending bytes.');
+  if (!bytesEqual(activeReset, pendingReset)) {
+    throw new Error(
+      'Reset-stage active reset migration does not match pending bytes.',
+    );
   }
 }
 
-function readRequiredFile(root: string, relativePath: string): Buffer {
+function readRequiredBytes(root: string, relativePath: string): Uint8Array {
   try {
     return readFileSync(path.join(root, relativePath));
   } catch {
@@ -134,7 +141,22 @@ function readRequiredFile(root: string, relativePath: string): Buffer {
   }
 }
 
-function sha256(bytes: Buffer): string {
+function readRequiredText(root: string, relativePath: string): string {
+  try {
+    return readFileSync(path.join(root, relativePath), 'utf8');
+  } catch {
+    throw new Error('Required migration packaging artifact is missing.');
+  }
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  return (
+    left.byteLength === right.byteLength &&
+    left.every((byte, index) => byte === right[index])
+  );
+}
+
+function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
@@ -144,7 +166,9 @@ function parseCandidateSiteVersion(argv: readonly string[]): number {
   }
   const candidateSiteVersion = Number(argv[1]);
   if (!Number.isSafeInteger(candidateSiteVersion) || candidateSiteVersion < 0) {
-    throw new Error('Deploy candidate Site version must be a non-negative integer.');
+    throw new Error(
+      'Deploy candidate Site version must be a non-negative integer.',
+    );
   }
   return candidateSiteVersion;
 }

@@ -8,6 +8,9 @@ import type {
   VisitRecordState,
 } from '@/product/application/visits/visit-state';
 import type { Visit } from '@/product/application/visits/visit';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface VisitRow {
   readonly id: string;
@@ -77,14 +80,26 @@ export class D1VisitState implements VisitRecordState {
     return row ? { ...toItemContext(row), visit: toVisit(row) } : undefined;
   }
 
-  async create({ visit, assessment }: CreateVisitRecords) {
-    const statements = [this.insertVisitStatement(visit)];
+  async create(
+    { visit, assessment }: CreateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ) {
+    const statements = [
+      this.insertVisitStatement(visit, Boolean(atomicCommit)),
+    ];
     if (assessment) statements.push(this.upsertRatingStatement(assessment));
-    const results = await this.#database.batch(statements);
+    const results = await commitD1MutationAtomically(
+      this.#database,
+      statements,
+      atomicCommit,
+    );
     return { inserted: (results[0]?.meta.changes ?? 0) > 0 };
   }
 
-  async update({ visit, assessment }: UpdateVisitRecords): Promise<void> {
+  async update(
+    { visit, assessment }: UpdateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
     const statements = [
       this.#database
         .prepare(
@@ -94,16 +109,19 @@ export class D1VisitState implements VisitRecordState {
         .bind(visit.visitedAt, visit.note ?? null, visit.updatedAt, visit.id),
     ];
     if (assessment) statements.push(this.upsertRatingStatement(assessment));
-    await this.#database.batch(statements);
+    await commitD1MutationAtomically(this.#database, statements, atomicCommit);
   }
 
-  private insertVisitStatement(visit: Visit): D1PreparedStatement {
+  private insertVisitStatement(
+    visit: Visit,
+    requireInsert: boolean,
+  ): D1PreparedStatement {
     return this.#database
       .prepare(
         `INSERT INTO visits
          (id, item_id, item_title, visited_at, note, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO NOTHING`,
+         ${requireInsert ? '' : 'ON CONFLICT(id) DO NOTHING'}`,
       )
       .bind(
         visit.id,

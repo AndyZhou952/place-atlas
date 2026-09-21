@@ -50,6 +50,43 @@ test('optimistic item mutations converge on success and roll back independently 
   assert.deepEqual(state.items, [{ ...item, personalRating: 4.3 }]);
 });
 
+test('an optimistic overall comment is visible immediately and restores the public value on failure', () => {
+  const original = {
+    ...item,
+    overallComment: 'The original public comment.',
+  };
+  let state = createAtlasViewModelState({ items: [original] });
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.started',
+    itemId: item.id,
+    mutationId: 'comment',
+    patch: { overallComment: 'A new draft comment.' },
+  });
+  assert.equal(state.items[0].overallComment, 'A new draft comment.');
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.failed',
+    itemId: item.id,
+    mutationId: 'comment',
+  });
+  assert.equal(state.items[0].overallComment, 'The original public comment.');
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.started',
+    itemId: item.id,
+    mutationId: 'comment-retry',
+    patch: { overallComment: 'A confirmed comment.' },
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.succeeded',
+    itemId: item.id,
+    mutationId: 'comment-retry',
+    item: { ...original, overallComment: 'A confirmed comment.' },
+  });
+  assert.equal(state.items[0].overallComment, 'A confirmed comment.');
+});
+
 test('a late initial read does not erase an in-flight optimistic mutation', () => {
   let state = createAtlasViewModelState({ items: [item] });
   state = reduceAtlasViewModelState(state, {

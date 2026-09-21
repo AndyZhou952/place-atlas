@@ -37,6 +37,10 @@ export class InMemoryVisitMediaState implements VisitMediaRecordState {
     return this.#records.find((record) => record.id === id);
   }
 
+  async findByDisplayId(displayId: string) {
+    return this.#records.find((record) => record.displayId === displayId);
+  }
+
   async getVisitContext(visitId: string) {
     const visit = this.#visits.get(visitId);
     if (!visit) return undefined;

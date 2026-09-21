@@ -256,6 +256,7 @@ export function useAtlasViewModel() {
         const result = await browserAtlasApplication.execute({
           key: 'visit.create',
           input: { ...input, id: visitId },
+          mutationId,
         });
         dispatch({
           type: 'visit.received',
@@ -331,6 +332,7 @@ export function useAtlasViewModel() {
         const result = await browserAtlasApplication.execute({
           key: 'visit.update',
           input: { id, ...input },
+          mutationId,
         });
         if (result.visit) {
           dispatch({
@@ -379,6 +381,7 @@ export function useAtlasViewModel() {
       );
       if (!previousItem) throw new Error('Atlas item not found');
       const previousMedia = media.filter((entry) => entry.visitId === id);
+      const mutationId = crypto.randomUUID();
 
       setJournalBusy(true);
       setNotice('');
@@ -388,6 +391,7 @@ export function useAtlasViewModel() {
         const result = await browserAtlasApplication.execute({
           key: 'visit.delete',
           input: { id },
+          mutationId,
         });
         dispatch({ type: 'item.received', item: result.item });
         return result;
@@ -412,6 +416,7 @@ export function useAtlasViewModel() {
 
   const addVisitMedia = useCallback(
     async (visitId: string, files: readonly File[]) => {
+      const mutationId = crypto.randomUUID();
       setMediaVisitPending(visitId, true);
       setNotice('');
       try {
@@ -420,10 +425,14 @@ export function useAtlasViewModel() {
           input: {
             visitId,
             files,
+            uploadIds: files.map(
+              (_file, index) => `${mutationId}:media:${index}`,
+            ),
             onBatchCompleted: (completed) => {
               dispatch({ type: 'media.appended', media: completed });
             },
           },
+          mutationId,
         });
         return uploaded;
       } catch (error) {
@@ -443,11 +452,13 @@ export function useAtlasViewModel() {
       const previous = media.find((entry) => entry.id === id);
       if (!previous) throw new Error('Photo not found');
       const optimistic = { ...previous, caption: caption.trim() || undefined };
+      const mutationId = crypto.randomUUID();
       dispatch({ type: 'media.received', media: optimistic });
       try {
         const updated = await browserAtlasApplication.execute({
           key: 'media.caption',
           input: { id, caption: caption.trim() },
+          mutationId,
         });
         dispatch({ type: 'media.received', media: updated });
         return updated;
@@ -467,10 +478,12 @@ export function useAtlasViewModel() {
       const previous = media.find((entry) => entry.id === id);
       if (!previous) throw new Error('Photo not found');
       dispatch({ type: 'media.removed', mediaId: id });
+      const mutationId = crypto.randomUUID();
       try {
         await browserAtlasApplication.execute({
           key: 'media.delete',
           input: { id },
+          mutationId,
         });
       } catch (error) {
         dispatch({ type: 'media.restored', media: previous });
@@ -510,6 +523,9 @@ export function useAtlasViewModel() {
           ...(patch.hasVisited === undefined
             ? {}
             : { hasVisited: patch.hasVisited }),
+          ...(patch.summary === undefined
+            ? {}
+            : { overallComment: patch.summary?.trim() || undefined }),
         },
       });
       try {
@@ -525,6 +541,7 @@ export function useAtlasViewModel() {
                 : { manualVisited: hasVisited }),
             },
           },
+          mutationId,
         });
         dispatch({
           type: 'item.mutation.succeeded',

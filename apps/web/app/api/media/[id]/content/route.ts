@@ -1,13 +1,11 @@
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { authorizeOwnerRead } from '@/lib/server/auth/owner-auth';
 
-import { openVisitMediaResponse } from './open-visit-media-response';
+import { createMediaContentGet } from './media-content-route';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  _request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
-  const { id } = await context.params;
-  return openVisitMediaResponse(getServerAtlasApplication(), id);
-}
+export const GET = createMediaContentGet({
+  authorizeOwnerRead,
+  getApplication: getServerAtlasApplication,
+});

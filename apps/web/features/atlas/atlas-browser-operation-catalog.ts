@@ -81,10 +81,6 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     method: 'GET',
     path: '/api/media',
     bodyKind: 'none',
-    capability: {
-      name: 'list_visit_media',
-      pathSuffix: '?visitId={visitId}',
-    },
   },
   'media.attach': {
     key: 'media.attach',

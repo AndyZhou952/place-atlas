@@ -1,12 +1,11 @@
-import type { AtlasApplication } from '@/product/application/atlas-application';
-import type { createMediaOperationGroup } from '@/product/application/media/media-operations';
+import { ownerMutationResponse } from '../../owner-mutation-response.ts';
+import type { createInvocationCoordinator } from '../../../../product/application/invocation/invocation-coordinator.ts';
 
-type MediaApplication = AtlasApplication<
-  ReturnType<typeof createMediaOperationGroup>
->;
+type InvocationCoordinator = ReturnType<typeof createInvocationCoordinator>;
 
 export async function updateVisitMediaCaptionResponse(
-  application: MediaApplication,
+  coordinator: InvocationCoordinator,
+  request: Request,
   id: string,
   input: unknown,
 ): Promise<Response> {
@@ -21,36 +20,33 @@ export async function updateVisitMediaCaptionResponse(
   ) {
     return new Response('Caption must be text.', { status: 400 });
   }
-  const result = await application.execute({
-    key: 'media.caption',
-    input: { id, caption },
-  });
-  if (result.ok) return Response.json(result.value);
-  if (result.error.kind === 'invalid_input') {
-    return new Response(result.error.message, { status: 400 });
-  }
-  if (result.error.kind === 'not_found') {
-    return new Response('Photo not found', { status: 404 });
-  }
-  return new Response('The photo caption could not be updated.', {
-    status: 400,
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'media.caption',
+    operationInput: { id, caption },
+    errors: {
+      invalidInput: 'Caption must be text.',
+      notFound: 'Photo not found',
+      dependencyFailure: 'The photo caption could not be updated.',
+    },
   });
 }
 
 export async function deleteVisitMediaResponse(
-  application: MediaApplication,
+  coordinator: InvocationCoordinator,
+  request: Request,
   id: string,
 ): Promise<Response> {
-  const result = await application.execute({
-    key: 'media.delete',
-    input: { id },
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'media.delete',
+    operationInput: { id },
+    errors: {
+      invalidInput: 'Photo ID is required',
+      notFound: 'Photo not found',
+      dependencyFailure: 'The photo could not be deleted.',
+    },
   });
-  if (result.ok) return Response.json(result.value);
-  if (result.error.kind === 'invalid_input') {
-    return new Response('Photo ID is required', { status: 400 });
-  }
-  if (result.error.kind === 'not_found') {
-    return new Response('Photo not found', { status: 404 });
-  }
-  return new Response('The photo could not be deleted.', { status: 500 });
 }

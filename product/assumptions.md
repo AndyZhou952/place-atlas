@@ -28,3 +28,15 @@
 - A-28 2026-09-13 [已确认] Record 最终包含总体评分、总体评语、照片和每张照片的细分评分，并需处理输入店名与已录入规范名称不同；逐图评分的业务含义／量表／归属／展示、店名候选匹配与歧义阈值、以及多段内容推断规则在 record 实现前另过规格与架构增量评审，不阻塞 Nearby 和 Catalog 切片 — 用户明确选择先进入 ticketing、稍后细化 record。
 - A-29 2026-09-13 [已确认] Nearby 只查询 Japan Atlas 已录入且已验证的餐厅，Foursquare／Places discovery 与模型均不得扩大候选全集；位置与已存餐厅的步行／电车时间由确定性路线 adapter 计算。Foursquare 不进入 Nearby 主链，是否用于 Catalog intake 留待供应商许可与数据质量比较。— 用户纠正此前把餐厅发现与已收藏 Nearby 混为一谈。
 - A-30 2026-09-17 [已确认] 隔离只读 Nearby PoC 的 Google egress 采用 D-P04：Cloudflare 仅可调用三条构建时闭合的 Google 官方 endpoint tuple，拒绝全部 redirect，不提供逐 DNS／IP pin；该例外不得扩展到其他 provider 或任意 URL。— 用户在独立架构评审通过后确认继续采用推荐方案。
+- A-31 2026-09-21 [已确认] Owner PoC 的 Web 与 Agent 以同一个 `AtlasApplication` 和同一个 owner-poc D1 作为业务事实源；Web Cookie 与 Agent HMAC 只是不同入口鉴权，不能各自实现或保存一套业务规则／地点／个人事实。— 用户明确要求网页按钮与微信交互调用同一业务能力。
+- A-32 2026-09-21 [已确认] 第一阶段网页保持公开读取，浏览器的业务 `POST/PUT/PATCH/DELETE` 只允许已登录 Owner；不引入多用户、OAuth、角色或编辑模式切换，登录后沿用现有控件。— 用户只要求防止未登录写入并优先快速完成个人 PoC。
+- A-33 2026-09-21 [已取代] 原不可逆 verifier 方案由 A-38 的 Cloudflare encrypted raw Secret 契约取代；仍保留凭证不进入源码、数据库、日志、fixture 或文档的要求。
+- A-34 2026-09-21 [已确认] 正式个人 PoC 使用蓝绿 owner-poc D1/config 与完整应用 schema；旧 read-only fixture D1/Worker 保留且不原地升级，只有新环境冒烟通过后才切换入口，失败时回退旧 URL。— 用于修复当前页面与 fixture schema 不匹配且保留已跑通的只读链路。
+- A-35 2026-09-21 [已确认] owner-poc 的规范地点只存于 `atlas_items`，个人事实只存于 `place_assessments`、`visits`、`visit_media`；Agent fixture rows、`agent_catalog_items` 和 presenter 文本不构成第二事实源。— 用户确认 Web 与微信应看到同一数据和处理结果。
+- A-36 2026-09-21 [已取代] 原把 Google adapter 组合进 owner-poc 的方向由 A-40 的独立只读 Route Sidecar 取代；Foursquare 保持未配置、未调用。
+- A-37 2026-09-21 [已确认] 精确 `/jpmap` 命令优先走确定性 parser 且不调用 DeepSeek；模型只可在项目、身份、scope 和允许 operation 已确定后把模糊语义转换为 schema 受限 proposal。Add confirm 继续等待供应商／稳定事件 ID／原子回执门，Record 继续等待逐图评分语义与 capture/publish 门。— 用户同意确定性功能与 Agent 连接可并行，模糊语义由 DeepSeek 辅助而不取代业务规则。
+- A-38 2026-09-21 [已确认] 单密码登录使用 Cloudflare encrypted raw Secrets：`ATLAS_OWNER_PASSWORD` 与至少 256-bit 随机 `ATLAS_OWNER_SESSION_SECRET`；口令常量时间比较，session version/secret 轮换使旧 Cookie 失效，缺 Secret 失败关闭。
+- A-39 2026-09-21 [已确认] 用户确认所有非敏感 PoC 展示内容可公开：闭合 Catalog、个人总体状态/评论、Visit 展示、媒体展示元数据与照片二进制；严禁 object key、原文件名、hash、内部存储 ID 与审计数据。未知读取默认私有，真实敏感内容前收窄并重审。
+- A-40 2026-09-21 [已确认] Google egress 位于独立只读 Route Sidecar，只持 Google key，配置 `workers_dev=false` 且无 routes/owner bindings；preflight 证明公网不可达和未绑定 Worker 不可调用。Geocoding 与 walking Matrix hard cap 各为每月 8,000 单位，按 provider+SKU+period 预留且失败不退款。
+- A-41 2026-09-21 [已确认] Web 与 Agent 都生成统一 InvocationContext；协调器在 schema normalization 后用唯一版本 canonicalizer 对 `{operation,input}` 计算权威 digest。Web 不提交 digest，Agent transport digest 只校验/比对；所有非幂等 mutation 使用稳定 ID 与可重放 receipt。
+- A-42 2026-09-21 [已确认] owner-poc 初始 seed manifest 固定为 v1、5 条及已记录源 SHA-256；Web URL 与 OpenClaw endpoint/HMAC 分别切换和回退，回退是只读降级且不把 owner-poc 新写入反向迁移至 fixture。

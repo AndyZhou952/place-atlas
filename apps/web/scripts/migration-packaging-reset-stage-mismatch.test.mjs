@@ -41,7 +41,8 @@ test('reset-stage packaging rejects an active 0004 whose bytes differ from pendi
       snapshotOnly: { activeMigrations: activeMigrations.slice(0, -1) },
       pendingReset: {
         path: 'drizzle/pending/0004_reset_test_place_assessments.sql',
-        sha256: 'c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16',
+        sha256:
+          'c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16',
       },
       resetStage: {
         activeMigration: activeMigrations.at(-1),

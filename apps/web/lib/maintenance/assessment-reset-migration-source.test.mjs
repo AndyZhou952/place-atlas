@@ -14,6 +14,9 @@ const retiredActiveResetUrl = new URL(
 );
 
 test('offline reset rehearsal reads only the pending immutable reset artifact', () => {
-  assert.equal(readAssessmentResetMigration(), readFileSync(pendingResetUrl, 'utf8'));
+  assert.equal(
+    readAssessmentResetMigration(),
+    readFileSync(pendingResetUrl, 'utf8'),
+  );
   assert.equal(existsSync(retiredActiveResetUrl), false);
 });

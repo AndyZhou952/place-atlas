@@ -27,10 +27,7 @@ test('reset-stage packaging accepts the reviewed pending bytes as the sole activ
     writeFileSync(path.join(drizzle, migration), 'SELECT 1;\n');
   }
   const reset = readFileSync(
-    path.join(
-      webRoot,
-      'drizzle/pending/0004_reset_test_place_assessments.sql',
-    ),
+    path.join(webRoot, 'drizzle/pending/0004_reset_test_place_assessments.sql'),
   );
   writeFileSync(path.join(drizzle, activeMigrations.at(-1)), reset);
   writeFileSync(
@@ -44,7 +41,8 @@ test('reset-stage packaging accepts the reviewed pending bytes as the sole activ
       snapshotOnly: { activeMigrations: activeMigrations.slice(0, -1) },
       pendingReset: {
         path: 'drizzle/pending/0004_reset_test_place_assessments.sql',
-        sha256: 'c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16',
+        sha256:
+          'c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16',
       },
       resetStage: {
         activeMigration: activeMigrations.at(-1),
@@ -54,9 +52,12 @@ test('reset-stage packaging accepts the reviewed pending bytes as the sole activ
     }),
   );
 
-  assert.deepEqual(verifyMigrationPackaging({
-    root,
-    stage: 'reset-stage',
-    candidateSiteVersion: 17,
-  }).activeMigrations, activeMigrations);
+  assert.deepEqual(
+    verifyMigrationPackaging({
+      root,
+      stage: 'reset-stage',
+      candidateSiteVersion: 17,
+    }).activeMigrations,
+    activeMigrations,
+  );
 });

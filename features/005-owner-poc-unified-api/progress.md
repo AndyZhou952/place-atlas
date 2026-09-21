@@ -17,8 +17,11 @@
 - 已完成: 远端公开 Catalog 返回 5 条记录且 Journal 可读；匿名同源写入与错误登录 fail closed，用户已实测 Owner 登录、总体评论、喜欢与去过状态可写入并读回
 - 已完成: AWS signed Agent smoke 到达 route-service-pending 并产生预期 nonce/receipt/audit；非 Owner sender 被拒绝且计数不变
 - 已记录: Owner 写入体感延迟不影响正确性验收，后续性能诊断移交 GitHub #10
-- 未完成: T-05、T-06、T-07、T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
-- 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-05–T-08 阻塞
-- 保留门禁: D-P05 仍为 Proposed；T-06 独立安全证据通过前真实 Google 调用继续 fail closed
-- 保留门禁: 当前 owner Agent 只是兼容性 Nearby 骨架，仍返回渠道专用 reply；结构化 `nearby.recommend` 尚未实现，T-05 保持未完成
-- 下一步: 进入 T-05，实现渠道无关的结构化 `nearby.recommend`；当前不进入 ship/done
+- 已完成: T-05 渠道无关的结构化 `nearby.recommend` 已实现；Web 与微信 presenter 适配同一闭合 result，独立第 2 轮代码评审通过
+- 已完成: T-06 本地实现与安全代码门通过；17/17 Sidecar tests、私有 dry-run `No bindings found`、bundle least-privilege、双 8,000 hard cap 与 fail-closed preflight 均获独立第 2 轮评审确认
+- 已完成: 最终本地回归 456/456 tests 通过，owner-poc production build 通过
+- 未完成: T-06 仍待远端加密 Google Secret、strict deploy、直接公网不可达、Owner Worker service binding 与真实 provider smoke 证据；尚未部署、调用真实 Google provider 或使用真实 key
+- 未完成: T-07、T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
+- 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-06–T-08 阻塞
+- 保留门禁: D-P05 仍为 Proposed；T-06 只有本地代码门通过，远端部署与真实 Google 证据完成前继续 fail closed
+- 下一步: 准备 T-06 远端 Secret、strict deploy、公网不可达与 service binding/真实 provider 证据，然后进入 T-07；当前不进入 ship/done

@@ -1,6 +1,6 @@
 # 任务票 — Owner PoC 统一应用操作
 
-- 状态：implement；第 2 轮独立代码评审与 owner-poc 远端基础部署 smoke 已通过；下一步 T-05，D-P05/T-06 安全门保持有效，当前不进入 ship/done
+- 状态：implement；T-05 独立代码评审通过，T-06 本地实现与安全代码门通过但远端证据未完成；下一步准备 T-06 远端部署证据再进入 T-07，D-P05 保持 Proposed，当前不进入 ship/done
 - 执行方式：垂直切片优先；中央 composition、migration journal 与 operation catalog 由主任务串行汇合
 - 公开/权限确认：持 URL 者可查看 Catalog、总体评论、Visit 展示与照片原图；internal ID、存储 key、hash、audit 保持私有；只有 Owner 可以写入
 
@@ -13,8 +13,8 @@
 
 ## 第二门：Web 与微信共享真实 Nearby
 
-- [ ] T-05 渠道无关 Nearby operation 预重构 — Blocked by: T-01 — 用结构化 `nearby.recommend` 取代 owner-poc 中渠道专用 reply contract；Web 与微信 presenter 各自适配同一 result，删除 composition 对 `agent_catalog_items`/fixture personal facts 的依赖。保留兼容 adapter 直到 contract tests 全绿。
-- [ ] T-06 独立 Google Route Sidecar 与双 hard cap — Blocked by: T-01, T-05 — Sidecar 设置 `workers_dev=false` 且无 routes/owner bindings，只经窄 service binding 接受 typed request；preflight 负测公网 URL 不可达、未绑定 Worker 不可调用。按 provider+SKU+UTC period 预留 8,000 Geocoding requests/月与 8,000 walking elements/月，失败不退款；Transit/Foursquare 零调用，独立评审前 fail closed。
+- [x] T-05 渠道无关 Nearby operation 预重构 — Blocked by: T-01 — 已用结构化 `nearby.recommend` 取代 owner-poc 中渠道专用 reply contract；Web 与微信 presenter 适配同一闭合 result，composition 不再依赖 `agent_catalog_items`/fixture personal facts；独立第 2 轮代码评审通过。
+- [ ] T-06 独立 Google Route Sidecar 与双 hard cap — Blocked by: T-01, T-05 — 本地实现与安全代码门已由独立第 2 轮评审通过：17/17 tests、私有 dry-run `No bindings found`、bundle least-privilege、双 8,000 hard cap 与 fail-closed preflight 均成立。仍待远端加密 Google Secret、strict deploy、直接公网不可达、Owner Worker service binding、Google Cloud quota 与真实 provider smoke 证据；尚未部署、调用真实 Google provider 或使用真实 key，D-P05 保持 Proposed。
 - [ ] T-07 Web/Agent/Sidecar 等价与 request-only 契约 — Blocked by: T-03, T-05, T-06 — 同一 Catalog、个人事实与位置文字分别通过 browser adapter 与 HMAC gateway，断言候选、路线层、到访/评分、warning 与 attribution 等价；证明 Sidecar 原始 JSON、地址/坐标/路线不进入 D1/R2/log/prompt/Leaflet，并验证公开 ToS/Privacy probe。
 - [ ] T-08 确定性 `/jpmap nearby` owner-poc E2E — Blocked by: T-07 — 精确命令零模型调用，覆盖 `银座/銀座/ginza`、owner DM、第二账号、群聊、错误 scope、nonce replay 与 Worker audit；旧 fixture 保持可回退。
 
@@ -22,7 +22,7 @@
 
 - [ ] T-09 受限 DeepSeek semantic proposal — Blocked by: T-08 — 在项目与 phase allowlist 已确定后，允许模型把模糊位置文字翻译为 schema 受限 proposal；拒绝模型提供的 operation、权限、坐标、路线与评分事实。模型失败时精确 `/jpmap` 命令继续可用。
 - [x] T-10 非 modal Owner Login UI 真实渲染门 — Blocked by: T-03 — 本地 UI 门与远端 smoke 均完成；用户已确认 Owner 登录以及总体评论、喜欢、去过状态的写入与读回。体感写入延迟另由 GitHub #10 跟踪。
-- [ ] T-11 双入口蓝绿部署与回退演练 — Blocked by: T-04, T-07, T-08, T-10 — 新 Web Worker 的 strict deploy、公开/Owner smoke 与 AWS signed Agent 正负 probe 已完成；但 T-05–T-08 尚未完成，永久 OpenClaw endpoint 切换及其回退演练仍未执行，因此不得标记完成。
+- [ ] T-11 双入口蓝绿部署与回退演练 — Blocked by: T-04, T-07, T-08, T-10 — 新 Web Worker 的 strict deploy、公开/Owner smoke 与 AWS signed Agent 正负 probe 已完成；但 T-06–T-08 尚未完成，永久 OpenClaw endpoint 切换及其回退演练仍未执行，因此不得标记完成。
 
 ## 后续受门禁约束的共享写入
 

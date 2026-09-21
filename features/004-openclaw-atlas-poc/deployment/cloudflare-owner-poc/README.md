@@ -87,6 +87,10 @@ Save secret names only:
 npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json > .wrangler/owner-poc-secret-names.json
 ```
 
+On a fresh target, the first `wrangler secret put` can create a placeholder Worker
+using Wrangler's default configuration. This is expected; do not modify or deploy
+the old Worker.
+
 ## 4. Build, preflight, and deploy
 
 Build first. Then, immediately before preflight, query the canonical
@@ -96,11 +100,13 @@ wrap it with that config's D1 `database_id` and the current capture time:
 
 ```text
 npm run build:owner-poc
-npx wrangler d1 execute japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --file scripts/owner-poc-seed-evidence.sql --json > .wrangler/owner-poc-seed-rows.json
+npx wrangler d1 execute japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --command "$(cat scripts/owner-poc-seed-evidence.sql)" --json > .wrangler/owner-poc-seed-rows.json
 node --experimental-strip-types scripts/owner-poc-seed-evidence-envelope.ts --config wrangler.owner-poc.local.jsonc --rows .wrangler/owner-poc-seed-rows.json > .wrangler/owner-poc-seed-evidence.json
 npm run preflight:owner-poc
-npx wrangler deploy --config dist/server/wrangler.json --strict
 ```
+
+Use query mode for seed evidence. Wrangler's `--file ... --json` output reports
+upload progress and execution summary rather than returning the selected rows.
 
 Do not reuse the evidence file for a later preflight or a different database.
 Preflight requires the evidence database ID to equal the current target D1 and
@@ -112,6 +118,25 @@ even when the legacy row is unchanged, blocks deployment.
 Preflight rejects the D1 sentinel, mismatched blue-green bindings, missing
 owner/Agent secret names, seed drift, Sites metadata, the old fixture binding,
 and any Google, Transit, or Foursquare runtime metadata or secret.
+
+If secret setup created a fresh placeholder Worker and preflight passed,
+bootstrap that new owner Worker exactly once without strict mode, then
+immediately repeat the same deployment with strict mode:
+
+```text
+npx wrangler deploy --config dist/server/wrangler.json
+npx wrangler deploy --config dist/server/wrangler.json --strict
+```
+
+The non-strict command is only for replacing that fresh placeholder's default
+configuration. Later deployments use strict mode only:
+
+```text
+npx wrangler deploy --config dist/server/wrangler.json --strict
+```
+
+Both commands target only the new owner-poc config. The old Worker remains untouched
+as the rollback target.
 
 ## 5. Smoke test and cut over
 

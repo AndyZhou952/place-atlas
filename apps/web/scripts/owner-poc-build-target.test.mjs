@@ -86,10 +86,9 @@ void test('owner-poc runbook captures fresh target-D1 evidence immediately befor
   const runbook = await readFile(ownerRunbookUrl, 'utf8');
   const gatedDeployment = [
     'npm run build:owner-poc',
-    'npx wrangler d1 execute japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --file scripts/owner-poc-seed-evidence.sql --json > .wrangler/owner-poc-seed-rows.json',
+    'npx wrangler d1 execute japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --command "$(cat scripts/owner-poc-seed-evidence.sql)" --json > .wrangler/owner-poc-seed-rows.json',
     'node --experimental-strip-types scripts/owner-poc-seed-evidence-envelope.ts --config wrangler.owner-poc.local.jsonc --rows .wrangler/owner-poc-seed-rows.json > .wrangler/owner-poc-seed-evidence.json',
     'npm run preflight:owner-poc',
-    'npx wrangler deploy --config dist/server/wrangler.json --strict',
   ].join('\n');
   const fence = String.fromCharCode(96).repeat(3);
 
@@ -99,10 +98,34 @@ void test('owner-poc runbook captures fresh target-D1 evidence immediately befor
   );
   assert.doesNotMatch(
     runbook,
-    /owner-poc-seed-evidence\.sql[^\n]+> \.wrangler\/owner-poc-seed-evidence\.json/u,
+    /d1 execute[^\n]+--file scripts\/owner-poc-seed-evidence\.sql/u,
+    'seed evidence must use query mode because --file JSON is only an upload summary',
   );
   assert.ok(
     runbook.indexOf('wrangler secret list') < runbook.indexOf(gatedDeployment),
     'secret setup must happen before the fresh evidence gate',
+  );
+});
+
+void test('owner-poc runbook limits non-strict deploy to a fresh secret placeholder bootstrap', async () => {
+  const runbook = await readFile(ownerRunbookUrl, 'utf8');
+  const deploy = 'npx wrangler deploy --config dist/server/wrangler.json';
+  const bootstrap = [deploy, `${deploy} --strict`].join('\n');
+
+  assert.match(runbook, /secret put[^\n]*can create a placeholder Worker/iu);
+  assert.ok(
+    runbook.includes(`${bootstrap}`),
+    'fresh placeholder bootstrap must immediately converge to a strict deploy',
+  );
+  assert.equal(
+    runbook.split(`\n${deploy}\n`).length - 1,
+    1,
+    'the non-strict command must appear exactly once',
+  );
+  assert.match(runbook, /Later deployments use strict mode only/iu);
+  assert.match(runbook, /old Worker remains untouched/iu);
+  assert.ok(
+    runbook.indexOf('npm run preflight:owner-poc') < runbook.indexOf(bootstrap),
+    'bootstrap deploy must remain behind preflight',
   );
 });

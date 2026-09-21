@@ -47,7 +47,7 @@ command, config, evidence file, shell history, or repository:
 ```sh
 npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc
 mkdir -p .wrangler
-npx wrangler secret list --config wrangler.route-sidecar.jsonc --json > .wrangler/route-sidecar-secret-names.json
+npx wrangler secret list --config wrangler.route-sidecar.jsonc --format json > .wrangler/route-sidecar-secret-names.json
 ```
 
 The ignored secret-list evidence contains names and types only. Inspect it
@@ -63,7 +63,7 @@ returns `404`:
 export ROUTE_SIDECAR_PUBLIC_URL='https://japan-atlas-route-sidecar.<account-subdomain>.workers.dev/'
 npm run preflight:route-sidecar
 npx wrangler deploy --config wrangler.route-sidecar.jsonc --strict
-npx wrangler secret list --config wrangler.route-sidecar.jsonc --json > .wrangler/route-sidecar-secret-names.json
+npx wrangler secret list --config wrangler.route-sidecar.jsonc --format json > .wrangler/route-sidecar-secret-names.json
 npm run preflight:route-sidecar
 unset ROUTE_SIDECAR_PUBLIC_URL
 ```

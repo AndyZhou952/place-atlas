@@ -1,14 +1,14 @@
 -- Public media IDs must be independent of internal IDs and object keys. There
 -- is no secret-backed deterministic derivation available in SQLite, so this
 -- migration fails closed when legacy media exists instead of exposing it.
-CREATE TEMP TABLE owner_poc_public_media_migration_gate (
+CREATE TABLE owner_poc_public_media_migration_gate_0005 (
   existing_rows INTEGER NOT NULL CHECK (existing_rows = 0)
 );
 
-INSERT INTO owner_poc_public_media_migration_gate (existing_rows)
+INSERT INTO owner_poc_public_media_migration_gate_0005 (existing_rows)
 SELECT COUNT(*) FROM visit_media;
 
-DROP TABLE owner_poc_public_media_migration_gate;
+DROP TABLE owner_poc_public_media_migration_gate_0005;
 
 ALTER TABLE visit_media ADD COLUMN display_id TEXT;
 

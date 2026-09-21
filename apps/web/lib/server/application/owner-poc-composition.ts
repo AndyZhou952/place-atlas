@@ -4,29 +4,28 @@ import {
   createD1OwnerPocCatalogRead,
   createD1OwnerPocPersonalFactsRead,
 } from '../../../adapters/agent/d1-owner-poc-catalog.ts';
+import { createD1MeteredRouteSidecarClient } from '../../../route-sidecar/d1-metered-route-sidecar-client.ts';
+import type { RouteSidecarServiceBinding } from '../../../route-sidecar/metered-route-sidecar-client.ts';
+import { createRouteSidecarNearbyAdapter } from '../../../route-sidecar/route-sidecar-nearby-adapter.ts';
 
-export function createOwnerPocComposition(database: D1Database) {
+export function createOwnerPocComposition(
+  database: D1Database,
+  routeSidecarService?: RouteSidecarServiceBinding,
+) {
   const catalogRead = createD1OwnerPocCatalogRead(database);
+  const clock = { now: () => new Date() };
+  const routeEvidence = createRouteSidecarNearbyAdapter(
+    createD1MeteredRouteSidecarClient({
+      database,
+      service: routeSidecarService,
+      clock: clock.now,
+    }),
+  );
   const agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'> = {
-    clock: { now: () => new Date() },
+    clock,
     routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
-    locationResolver: {
-      async resolve() {
-        return {
-          status: 'unresolved',
-          reason: 'dependency_failure',
-          warning: 'Walking route service is not configured.',
-        };
-      },
-    },
-    routeProvider: {
-      async walking() {
-        return {
-          status: 'unavailable',
-          warning: 'Walking route service is not configured.',
-        };
-      },
-    },
+    locationResolver: routeEvidence.locationResolver,
+    routeProvider: routeEvidence.routeProvider,
     entryAccessProvider: {
       async inspectWalkIn() {
         return {

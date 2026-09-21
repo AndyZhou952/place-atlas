@@ -19,10 +19,12 @@
 - 已记录: Owner 写入体感延迟不影响正确性验收，后续性能诊断移交 GitHub #10
 - 已完成: T-05 渠道无关的结构化 `nearby.recommend` 已实现；Web 与微信 presenter 适配同一闭合 result，独立第 2 轮代码评审通过
 - 已完成: T-06 本地实现与安全代码门通过；17/17 Sidecar tests、私有 dry-run `No bindings found`、bundle least-privilege、双 8,000 hard cap 与 fail-closed preflight 均获独立第 2 轮评审确认
-- 已完成: 最终本地回归 456/456 tests 通过，owner-poc production build 通过
+- 已完成: 最新完整本地 test suite、无缓存 TypeScript、lint、format check 与 owner-poc production build 全部通过
 - 已完成: T-06 远端 Sidecar 加密 Secret 名称／类型、strict deploy 与部署前后公网不可达 preflight 通过；脱敏记录见 `evidence/route-sidecar-deployment-smoke-2026-09-21.md`
-- 未完成: T-06 仍待 Google Cloud 项目级 quota／预算确认、Owner Worker service binding 与真实 provider smoke；尚未调用真实 Google provider
-- 未完成: T-07、T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
+- 已完成: 用户已确认 Google Cloud key restriction、Geocoding/Route Matrix 日配额与 billing guard；Owner Worker 已通过精确 service binding preflight 并 strict deploy
+- 已完成: T-07 的 Browser/Agent 等价、request-only 负面边界、公开 Terms/Privacy、Nearby UI 与 `no-store`/查询状态一致性均已实现；独立最终代码/UI 评审通过
+- 已完成: 最新匿名远端 smoke 中 Terms/Privacy 均为 200，Nearby 鉴权为 401 且 `no-store`；聚合 SKU ledger 仍为空，因此尚未调用真实 Google provider
+- 未完成: T-06 只剩一次已登录 Owner 的真实 provider smoke；T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-06–T-08 阻塞
-- 保留门禁: D-P05 仍为 Proposed；T-06 的本地代码门与私有远端部署证据已通过，但 Google Cloud quota、Owner binding、真实 provider smoke 与 T-07 完成前继续 fail closed
-- 下一步: 实现 T-07 的 Owner service binding、双入口等价与 request-only 契约；Google Cloud 外部门确认前不部署 binding、不调用真实 provider，当前不进入 ship/done
+- 保留门禁: D-P05 仍为 Proposed；本地/远端隔离、Google Cloud 外部门、Owner binding 与 T-07 已通过，真实 provider smoke 前仍不进入 ship/done
+- 下一步: Owner 在 live 页面登录后仅执行一次 `銀座` Nearby；随后只检查闭合输出与聚合 ledger，关闭 T-06，并进入 T-08 的 `/jpmap nearby` owner-poc E2E

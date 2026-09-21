@@ -261,6 +261,107 @@ void test('owner-poc composition uses canonical catalog and Personal Memory inst
   assert.doesNotMatch(JSON.stringify({ catalog, facts }), /POISONED/u);
 });
 
+void test('owner-poc RouteEvidencePort fails closed without a binding and reserves each SKU before private RPC', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  for (const migration of [
+    '0001_owner_poc_schema.sql',
+    '0004_provider_usage_skus.sql',
+  ]) {
+    sqlite.exec(await readFile(new URL(migration, ownerRoot), 'utf8'));
+  }
+  const database = toD1(sqlite);
+
+  const missing = createOwnerPocComposition(database);
+  assert.deepEqual(await missing.agentNearby.locationResolver.resolve('銀座'), {
+    status: 'unresolved',
+    reason: 'dependency_failure',
+    warning: 'Walking route service is not configured.',
+  });
+  assert.equal(
+    sqlite
+      .prepare('SELECT COUNT(*) AS count FROM agent_provider_usage_by_sku')
+      .get().count,
+    0,
+  );
+
+  const callOrder = [];
+  const configured = createOwnerPocComposition(database, {
+    async geocode() {
+      callOrder.push([
+        'geocode',
+        sqlite
+          .prepare(
+            `SELECT billable_units
+             FROM agent_provider_usage_by_sku
+             WHERE sku = 'geocoding.requests'`,
+          )
+          .get()?.billable_units,
+      ]);
+      return {
+        ok: true,
+        evidence: {
+          candidates: [
+            {
+              formattedAddress: '東京都中央区銀座',
+              point: { latitude: 35.671, longitude: 139.765 },
+            },
+          ],
+          attribution: {
+            label: 'Google Maps',
+            url: 'https://www.google.com/maps',
+          },
+          source: {
+            providerId: 'google-maps-platform',
+            endpoint: 'https://maps.googleapis.com/maps/api/geocode/json',
+          },
+          checkedAt: '2026-09-21T00:00:00.000Z',
+        },
+      };
+    },
+    async walkingMatrix() {
+      callOrder.push([
+        'walking',
+        sqlite
+          .prepare(
+            `SELECT billable_units
+             FROM agent_provider_usage_by_sku
+             WHERE sku = 'walking_matrix.elements'`,
+          )
+          .get()?.billable_units,
+      ]);
+      return {
+        ok: true,
+        evidence: {
+          routes: [
+            { destinationIndex: 0, durationSeconds: 300, distanceMeters: 400 },
+          ],
+          attribution: {
+            label: 'Google Maps',
+            url: 'https://www.google.com/maps',
+          },
+          source: {
+            providerId: 'google-maps-platform',
+            endpoint:
+              'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
+          },
+          checkedAt: '2026-09-21T00:00:01.000Z',
+        },
+      };
+    },
+  });
+
+  await configured.agentNearby.locationResolver.resolve('銀座');
+  await configured.agentNearby.routeProvider.walking(
+    { latitude: 35.671, longitude: 139.765 },
+    { latitude: 35.672, longitude: 139.766 },
+  );
+
+  assert.deepEqual(callOrder, [
+    ['geocode', 1],
+    ['walking', 1],
+  ]);
+});
+
 function toD1(database) {
   return {
     prepare(sql) {
@@ -276,6 +377,10 @@ function toD1(database) {
             },
             async first() {
               return statement.get(...values) ?? null;
+            },
+            async run() {
+              const result = statement.run(...values);
+              return { meta: { changes: Number(result.changes) } };
             },
           };
         },

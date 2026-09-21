@@ -1,7 +1,8 @@
 import type { AtlasItem } from '../../product/application/catalog/atlas-item.ts';
 import type { CatalogRead } from '../../product/application/catalog/catalog-read.ts';
-import type { AgentNearbyOperationDependencies } from '../../product/application/decision/agent-nearby-operation.ts';
+import type { NearbyRecommendOperationDependencies } from '../../product/application/decision/agent-nearby-operation.ts';
 import type { AtlasApplication } from '../../product/application/atlas-application.ts';
+import type { RouteSidecarServiceBinding } from '../../route-sidecar/metered-route-sidecar-client.ts';
 import { createAgentServiceGateway } from '../../product/application/conversation/agent-service-gateway.ts';
 import {
   createAgentToolCatalog,
@@ -26,7 +27,9 @@ interface AgentGatewayBindings {
   readonly AGENT_OWNER_CONVERSATION_ID: string;
 }
 
-export type OwnerPocAgentBindings = AgentGatewayBindings;
+export interface OwnerPocAgentBindings extends AgentGatewayBindings {
+  readonly ROUTE_SIDECAR?: RouteSidecarServiceBinding;
+}
 
 export interface IsolatedReadonlyAgentBindings extends AgentGatewayBindings {
   readonly GOOGLE_MAPS_API_KEY?: string;
@@ -145,7 +148,7 @@ interface NearbyFixtureRow {
 
 export function createIsolatedReadonlyNearbyComposition(database: D1Database): {
   readonly catalogRead: CatalogRead;
-  readonly agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'>;
+  readonly agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'>;
 } {
   let fixtureRows: Promise<readonly NearbyFixtureRow[]> | undefined;
   const readRows = () => {

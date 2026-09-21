@@ -148,6 +148,38 @@ test('the Nearby GET adapter defaults to five verified Atlas items', async () =>
     (await response.json()).map((candidate) => candidate.id),
     ['item-0', 'item-1', 'item-2', 'item-3', 'item-4'],
   );
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('the Nearby GET adapter never caches request-only success or error responses', async () => {
+  const success = await nearbyAtlasItemsResponse(
+    {
+      async execute() {
+        return {
+          ok: true,
+          value: {
+            status: 'unresolved',
+            reason: 'not_found',
+            warning: 'No matching address was found.',
+            provenance: {
+              providerId: 'fixture-provider',
+              policyVersion: 'fixture-v1',
+              sourceUrl: 'https://fixture.invalid/provider',
+              checkedAt: '2026-09-21T12:00:00.000Z',
+            },
+          },
+        };
+      },
+    },
+    new URLSearchParams({ locationHint: '銀座' }),
+  );
+  const invalid = await nearbyAtlasItemsResponse(
+    application([]),
+    new URLSearchParams({ locationHint: '' }),
+  );
+
+  assert.equal(success.headers.get('cache-control'), 'no-store');
+  assert.equal(invalid.headers.get('cache-control'), 'no-store');
 });
 
 test('the Nearby GET adapter maps multilingual location hints to the closed nearby.recommend result', async () => {

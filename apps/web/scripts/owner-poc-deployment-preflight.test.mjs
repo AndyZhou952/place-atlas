@@ -30,6 +30,12 @@ void test('the owner PoC template selects only blue-green D1 and R2 resources', 
       bucket_name: 'japan-atlas-owner-poc-media',
     },
   ]);
+  assert.deepEqual(config.services, [
+    {
+      binding: 'ROUTE_SIDECAR',
+      service: 'japan-atlas-route-sidecar',
+    },
+  ]);
   assert.doesNotMatch(
     source,
     /foursquare|site-creator|appgprj_|openai.*sites|secret|sk-/iu,
@@ -117,7 +123,12 @@ void test('owner PoC rejects direct Google, Transit, or Foursquare runtime capab
       }),
       {
         ready: false,
-        blockers: ['built_runtime_metadata_forbidden'],
+        blockers: [
+          ...(forbidden.services
+            ? ['built_route_sidecar_binding_invalid']
+            : []),
+          'built_runtime_metadata_forbidden',
+        ],
       },
     );
   }
@@ -136,4 +147,83 @@ void test('owner PoC rejects direct Google, Transit, or Foursquare runtime capab
       blockers: ['forbidden_secret:GOOGLE_MAPS_API_KEY'],
     },
   );
+});
+
+void test('owner PoC preflight requires exactly one well-formed private Route Sidecar binding in source and built artifacts', async () => {
+  const template = JSON.parse(
+    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
+  );
+  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
+  const secrets = [
+    'AGENT_JPMAP_KEY_ID',
+    'AGENT_JPMAP_HMAC_SECRET',
+    'AGENT_OWNER_ACTOR_ID',
+    'AGENT_OWNER_CONVERSATION_ID',
+    'ATLAS_OWNER_PASSWORD',
+    'ATLAS_OWNER_SESSION_SECRET',
+  ].map((name) => ({ name, type: 'secret_text' }));
+
+  const cases = [
+    {
+      name: 'source missing',
+      sourceServices: [],
+      builtServices: template.services,
+      blocker: 'source_route_sidecar_binding_invalid',
+    },
+    {
+      name: 'source extra',
+      sourceServices: [
+        ...template.services,
+        { binding: 'OTHER', service: 'other-worker' },
+      ],
+      builtServices: template.services,
+      blocker: 'source_route_sidecar_binding_invalid',
+    },
+    {
+      name: 'built missing',
+      sourceServices: template.services,
+      builtServices: [],
+      blocker: 'built_route_sidecar_binding_invalid',
+    },
+    {
+      name: 'built wrong service',
+      sourceServices: template.services,
+      builtServices: [
+        { binding: 'ROUTE_SIDECAR', service: 'not-the-route-sidecar' },
+      ],
+      blocker: 'built_route_sidecar_binding_invalid',
+    },
+    {
+      name: 'built malformed extra field',
+      sourceServices: template.services,
+      builtServices: [
+        {
+          binding: 'ROUTE_SIDECAR',
+          service: 'japan-atlas-route-sidecar',
+          entrypoint: 'UnexpectedEntrypoint',
+        },
+      ],
+      blocker: 'built_route_sidecar_binding_invalid',
+    },
+  ];
+
+  for (const scenario of cases) {
+    const sourceConfig = {
+      ...structuredClone(template),
+      services: scenario.sourceServices,
+    };
+    const builtConfig = {
+      ...structuredClone(template),
+      services: scenario.builtServices,
+    };
+    assert.deepEqual(
+      inspectOwnerPocDeployment({
+        sourceConfig,
+        builtConfig,
+        remoteSecrets: secrets,
+      }),
+      { ready: false, blockers: [scenario.blocker] },
+      scenario.name,
+    );
+  }
 });

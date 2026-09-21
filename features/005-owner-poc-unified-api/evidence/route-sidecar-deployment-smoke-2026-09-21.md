@@ -12,10 +12,11 @@
 
 - strict deploy 成功上传经评审的 Sidecar bundle；上传大小 13.17 KiB、gzip 3.43 KiB。
 - Wrangler 报告没有 deployment targets；部署后再次核验 Secret name/type 与 private-route preflight，均通过。
-- 本次没有部署 Owner service binding，没有调用真实 Google provider，也没有产生 Geocoding 或 Route Matrix 用量。
+- 本次 Sidecar 独立部署阶段没有部署 Owner service binding，没有调用真实 Google provider，也没有产生 Geocoding 或 Route Matrix 用量。
 
-## 尚未关闭的门
+## 后续门禁状态
 
-- Google Cloud 项目级 quota／预算限制仍需由项目 Owner 确认；应用侧双 8,000 UTC 月度 hard cap 不能替代该外部门。
-- T-07 的 Owner service binding、Web/Agent 等价、request-only 与公开 ToS/Privacy 契约尚未完成。
-- 完成以上门禁前，D-P05 保持 Proposed，T-06 保持未完成，真实 provider smoke 不执行。
+- 项目 Owner 后续已确认 Google Cloud key restriction、Geocoding/Route Matrix 日配额、billing guard；应用侧双 8,000 UTC 月度 hard cap 继续作为第二道门。
+- T-07 后续已完成 Owner 精确 service binding、Web/Agent 等价、request-only 负面契约与公开 Terms/Privacy，并通过独立最终评审。
+- 最新匿名 smoke 后聚合 SKU ledger 仍为空，因此尚未调用真实 Google provider。
+- D-P05 继续保持 Proposed，T-06 只剩一次已登录 Owner 的真实 provider smoke。

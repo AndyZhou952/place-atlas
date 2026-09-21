@@ -1,3 +1,4 @@
+import type { NearbyRecommendResult } from '../decision/agent-nearby-operation.ts';
 import { createAgentToolCatalog } from './project-command-router.ts';
 import {
   agentSignatureHeaders,
@@ -133,6 +134,7 @@ type AgentAuditResultKind = 'success' | AgentServiceErrorKind;
 interface ProjectCommandReply {
   readonly projectId: 'jpmap';
   readonly operation: 'nearby';
+  readonly nearby: NearbyRecommendResult;
   readonly replyText: string;
 }
 
@@ -190,7 +192,6 @@ export function createAgentServiceGateway(
             readonly key: AgentServiceKey;
           }
         | undefined;
-      let activeClaim: AgentMutationIdentity | undefined;
       try {
         const authenticated = await authenticateRequest(
           request,
@@ -287,84 +288,11 @@ export function createAgentServiceGateway(
         const payloadDigest = await sha256Hex(
           encoder.encode(canonicalJson(body)),
         );
-        const mutationIdentity: AgentMutationIdentity = {
-          projectId: body.projectId,
-          mutationId: body.mutationId,
-          payloadDigest,
-          claimId: authenticated.nonce,
-        };
-        const claim = await dependencies.state.claimMutation(mutationIdentity);
-        if (claim.kind === 'conflict') {
-          await recordAudit(
-            dependencies,
-            body,
-            key,
-            'conflict',
-            false,
-            startedAt,
-          );
-          return errorResponse('conflict');
-        }
-        if (claim.kind === 'replay') {
-          const receipt = { ...claim.receipt, replayed: true };
-          await recordAudit(
-            dependencies,
-            body,
-            key,
-            'success',
-            true,
-            startedAt,
-          );
-          return { status: 200, body: { ok: true, receipt } };
-        }
-        if (claim.kind === 'pending') {
-          const settlement = await dependencies.state.waitForMutation({
-            projectId: body.projectId,
-            mutationId: body.mutationId,
-            payloadDigest,
-          });
-          if (settlement.kind === 'conflict') {
-            await recordAudit(
-              dependencies,
-              body,
-              key,
-              'conflict',
-              false,
-              startedAt,
-            );
-            return errorResponse('conflict');
-          }
-          if (settlement.kind === 'unavailable') {
-            await recordAudit(
-              dependencies,
-              body,
-              key,
-              'dependency_failure',
-              false,
-              startedAt,
-            );
-            return errorResponse('dependency_failure');
-          }
-          const receipt = { ...settlement.receipt, replayed: true };
-          await recordAudit(
-            dependencies,
-            body,
-            key,
-            'success',
-            true,
-            startedAt,
-          );
-          return { status: 200, body: { ok: true, receipt } };
-        }
-        activeClaim = mutationIdentity;
-
         const routed = await dependencies.router.dispatch(
           `/jpmap nearby ${locationHint}`,
         );
         if (!routed.ok) {
           const response = errorResponse(routed.error.kind);
-          await dependencies.state.releaseMutation(mutationIdentity);
-          activeClaim = undefined;
           await recordAudit(
             dependencies,
             body,
@@ -376,27 +304,15 @@ export function createAgentServiceGateway(
           return response;
         }
 
-        const proposedReceipt = {
+        const receipt = {
           mutationId: body.mutationId,
           payloadDigest,
           result: routed.value,
+          replayed: false,
         };
-        const storedReceipt = await dependencies.state.commitMutation({
-          identity: mutationIdentity,
-          receipt: proposedReceipt,
-        });
-        activeClaim = undefined;
-        const receipt = { ...storedReceipt, replayed: false };
         await recordAudit(dependencies, body, key, 'success', false, startedAt);
         return { status: 200, body: { ok: true, receipt } };
       } catch {
-        if (activeClaim) {
-          try {
-            await dependencies.state.releaseMutation(activeClaim);
-          } catch {
-            // Recovery errors must not expose internal state.
-          }
-        }
         if (auditContext) {
           try {
             await recordAudit(

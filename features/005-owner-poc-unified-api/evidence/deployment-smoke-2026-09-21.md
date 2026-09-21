@@ -22,7 +22,16 @@
 - 来自 AWS 的有效 signed Agent Nearby 请求到达预期的 route-service-pending 边界，并产生预期 nonce、receipt 与 audit 记录。
 - 非 Owner sender 被拒绝，相关计数保持不变。
 
+## T-07 strict redeploy smoke
+
+- 最新 owner-poc production build、fresh remote seed evidence 与 strict deployment preflight 通过；构建产物和源配置都只有一个指向私有 Route Sidecar 的精确 service binding。
+- 最新 strict deploy 成功；Owner Worker 仍只绑定隔离 D1、R2、Assets、环境 guard 与私有 Route Sidecar，不持有 Google/Foursquare/Transit secret。
+- 公开 Terms 与 Privacy 各返回 HTTP 200。
+- 匿名 Nearby 返回 HTTP 401 且 `Cache-Control: no-store`。
+- 匿名 smoke 后，SKU-aware provider usage ledger 的聚合结果仍为空；该 smoke 没有预留额度或调用 Google。
+- 本记录未执行真实 provider 调用，也未保存位置线索、坐标、路线 payload 或 provider 原始 JSON。
+
 ## 尚未关闭的门
 
-- T-05 的结构化 Nearby 已完成；Route Sidecar 已完成隔离 strict deploy，但 T-06 的外部 quota／真实 provider 证据和 T-07–T-08 尚未完成。
+- T-05 与 T-07 已完成；Route Sidecar、Google Cloud 外部门和 Owner binding 已完成，但 T-06 仍缺一次已登录 Owner 的真实 provider smoke，T-08 尚未完成。
 - 永久 OpenClaw endpoint 切换与回退演练尚未执行，因此 T-11 保持未完成。

@@ -13,6 +13,8 @@ account and the main integration has:
 - wired the canonical owner-poc Catalog and personal-facts adapters;
 - protected every browser mutation route with owner-session authentication;
 - added `wrangler.owner-poc.local.jsonc` to the app gitignore;
+- deployed and independently reviewed the private Route Sidecar;
+- confirmed the Google Cloud quota/budget guard and application hard caps;
 - passed the owner-poc build, tests, and independent code review.
 
 Never commit an account ID, database export, secret value, provider response,
@@ -44,7 +46,8 @@ npx wrangler r2 bucket create japan-atlas-owner-poc-media
 
 Copy `wrangler.owner-poc.jsonc` to the ignored
 `wrangler.owner-poc.local.jsonc` and replace only the D1 sentinel with the
-new database ID.
+new database ID. Keep the template's single `ROUTE_SIDECAR` service binding;
+do not add the Google key or any direct provider binding to the Owner Worker.
 
 Import the old export only into the empty new database, then apply the
 owner-poc migration chain:
@@ -77,9 +80,9 @@ npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.l
 ```
 
 The session secret must be independently generated. `GOOGLE_MAPS_API_KEY` must
-never be attached to this owner Worker. It belongs only to the future isolated
-Route Sidecar, after its separate security gate; any key shared in chat must be
-rotated before that later deployment.
+never be attached to this owner Worker. It belongs only to the independently
+deployed isolated Route Sidecar; any key shared in chat must be rotated before
+real private data is used.
 
 Save secret names only:
 
@@ -117,7 +120,10 @@ even when the legacy row is unchanged, blocks deployment.
 
 Preflight rejects the D1 sentinel, mismatched blue-green bindings, missing
 owner/Agent secret names, seed drift, Sites metadata, the old fixture binding,
-and any Google, Transit, or Foursquare runtime metadata or secret.
+any direct Google, Transit, or Foursquare runtime metadata or secret, and any
+missing, extra, or malformed Route Sidecar service binding. Source and built
+artifacts must each contain exactly
+`{binding: "ROUTE_SIDECAR", service: "japan-atlas-route-sidecar"}`.
 
 If secret setup created a fresh placeholder Worker and preflight passed,
 bootstrap that new owner Worker exactly once without strict mode, then
@@ -145,10 +151,21 @@ Keep the old URL live. Against the new URL, verify in order:
 1. anonymous browser writes are rejected and do not change row counts;
 2. owner login permits favorite, visited, rating, Visit, and media writes;
 3. refresh reads the same persisted state;
-4. a signed Agent Nearby call reads canonical `atlas_items` and the same
-   assessment and Visit facts, but returns the route-service-pending response;
-5. verify the SKU ledger migration separately. Do not run a Google probe until
-   the future Sidecar and structured Nearby tickets pass their own review.
+4. `/terms` and `/privacy` are anonymously readable;
+5. one Browser Nearby probe with a manual location returns only saved verified
+   food, Google attribution/check time, walking evidence, and the canonical
+   assessment/Visit facts;
+6. a signed Agent Nearby call with the same location returns the same closed
+   structured result plus the WeChat presentation, while the Agent receipt
+   table remains unchanged;
+7. the D1 SKU ledger increments geocoding requests and walking matrix elements
+   before provider egress, while R2 and business tables do not receive location
+   hints, parsed coordinates, route payloads, or raw provider JSON.
+
+Run the first real Google probe only after the Route Sidecar security review,
+request-only review, public policy pages, and Google Cloud quota/budget guard
+all pass. Use a single probe, inspect only closed application output and
+aggregate ledger counts, and never save or print raw provider responses.
 
 Only then switch the shared link or custom route to the new Worker.
 

@@ -6,7 +6,6 @@ import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
 import { matchesAtlasQuery } from './search';
 import type {
-  AtlasItem,
   AtlasItemEdit,
   AtlasKindFilter,
   AtlasPersonalFilter,
@@ -24,6 +23,7 @@ import {
   reduceAtlasViewModelState,
 } from './atlas-view-model-state';
 import { verifiedAtlasItems } from './verified-items';
+import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
@@ -41,7 +41,10 @@ export function useAtlasViewModel() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
   const [distances, setDistances] = useState<Record<string, number>>({});
-  const [locationStatus, setLocationStatus] = useState('');
+  const [nearbyLocationHint, setNearbyLocationHint] = useState('');
+  const [nearbyResult, setNearbyResult] = useState<NearbyRecommendResult>();
+  const [nearbyBusy, setNearbyBusy] = useState(false);
+  const [nearbyError, setNearbyError] = useState('');
   const [busy, setBusy] = useState(false);
   const [journalBusy, setJournalBusy] = useState(false);
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(
@@ -591,62 +594,52 @@ export function useAtlasViewModel() {
     [setItemPending],
   );
 
-  const locateNearby = useCallback(async () => {
-    setLocationStatus('Requesting your location…');
-    setView('map');
-    if (!navigator.geolocation) {
-      setLocationStatus('Location is not supported by this browser.');
-      return [];
-    }
-
-    return new Promise<AtlasItem[]>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          void browserAtlasApplication
-            .execute({
-              key: 'decision.nearby',
-              input: {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                limit: 20,
-              },
-            })
-            .then((results) => {
-              const nextDistances = Object.fromEntries(
-                results.map((item) => [item.id, item.distanceKm]),
-              );
-              const itemsById = new Map(items.map((item) => [item.id, item]));
-              const nearest = results.flatMap((result) => {
-                const item = itemsById.get(result.id);
-                return item ? [item] : [];
-              });
-              setDistances(nextDistances);
-              if (nearest[0]) setSelectedId(nearest[0].id);
-              setLocationStatus(
-                nearest[0]
-                  ? `Nearest verified place: ${nearest[0].title} · ${results[0].distanceKm.toFixed(1)} km`
-                  : 'No verified places found.',
-              );
-              resolve(nearest);
-            })
-            .catch((error) => {
-              setLocationStatus('Nearby places are temporarily unavailable.');
-              setNotice(
-                error instanceof Error
-                  ? error.message
-                  : 'Could not find nearby places.',
-              );
-              resolve([]);
-            });
-        },
-        () => {
-          setLocationStatus('Location permission was not granted.');
-          resolve([]);
-        },
-        { enableHighAccuracy: true, timeout: 10_000 },
-      );
-    });
-  }, [items]);
+  const locateNearby = useCallback(
+    async (locationHint = nearbyLocationHint) => {
+      const normalizedLocationHint = locationHint.trim();
+      setView('map');
+      setNearbyError('');
+      setDistances({});
+      if (!normalizedLocationHint) {
+        setNearbyResult(undefined);
+        setNearbyError('Enter a neighborhood or address to search nearby.');
+        return undefined;
+      }
+      setNearbyBusy(true);
+      setNearbyLocationHint(normalizedLocationHint);
+      try {
+        const result = await browserAtlasApplication.execute({
+          key: 'nearby.recommend',
+          input: { locationHint: normalizedLocationHint },
+        });
+        setNearbyResult(result);
+        if (result.status === 'resolved') {
+          const nextDistances = Object.fromEntries(
+            result.recommendations.map((candidate) => [
+              candidate.itemId,
+              candidate.straightLineDistanceKm,
+            ]),
+          );
+          setDistances(nextDistances);
+          if (result.recommendations[0]) {
+            setSelectedId(result.recommendations[0].itemId);
+          }
+        }
+        return result;
+      } catch (error) {
+        setNearbyResult(undefined);
+        setNearbyError(
+          error instanceof Error
+            ? error.message
+            : 'Nearby recommendations are temporarily unavailable.',
+        );
+        return undefined;
+      } finally {
+        setNearbyBusy(false);
+      }
+    },
+    [nearbyLocationHint],
+  );
 
   const webMcpActions = useMemo(
     () => ({
@@ -698,7 +691,10 @@ export function useAtlasViewModel() {
     visits,
     media,
     kind,
-    locationStatus,
+    nearbyBusy,
+    nearbyError,
+    nearbyLocationHint,
+    nearbyResult,
     notice,
     personalFilter,
     query,
@@ -712,6 +708,7 @@ export function useAtlasViewModel() {
     selectedItem,
     selectItem,
     setKind,
+    setNearbyLocationHint,
     setFavoriteOnly,
     setPersonalFilter,
     setQuery,

@@ -132,6 +132,9 @@ function createFakeD1() {
       },
     },
     audits,
+    get receiptCount() {
+      return receipts.size;
+    },
     get fixtureReads() {
       return fixtureReads;
     },
@@ -253,7 +256,7 @@ test('a signed Agent HTTP request reaches only the isolated D1 nearby fixture', 
   );
 });
 
-test('D1 unique claims serialize concurrent nonces and replay the committed receipt', async () => {
+test('D1 keeps transient reads out of receipts while distinct nonces execute independently', async () => {
   const database = createFakeD1();
   const handler = createHandler(bindings(database.value), {
     nowMs: () => Date.parse('2026-09-13T12:00:00.000Z'),
@@ -308,34 +311,36 @@ test('D1 unique claims serialize concurrent nonces and replay the committed rece
   const conflictPayload = await conflictResponse.json();
 
   assert.equal(replayResponse.status, 200);
-  assert.equal(replayPayload.receipt.replayed, true);
+  assert.equal(replayPayload.receipt.replayed, false);
   assert.equal(
     replayPayload.receipt.payloadDigest,
     payloads[0].receipt.payloadDigest,
   );
-  assert.equal(conflictResponse.status, 409);
-  assert.equal(conflictPayload.error.kind, 'conflict');
+  assert.equal(conflictResponse.status, 200);
+  assert.equal(conflictPayload.ok, true);
+  assert.equal(conflictPayload.receipt.replayed, false);
 
   assert.deepEqual(
     responses.map((response) => response.status),
     [200, 200],
   );
   assert.equal(database.fixtureReads, 1);
+  assert.equal(database.receiptCount, 0);
   assert.equal(
     payloads[0].receipt.payloadDigest,
     payloads[1].receipt.payloadDigest,
   );
   assert.deepEqual(
     payloads.map((payload) => payload.receipt.replayed),
-    [false, true],
+    [false, false],
   );
   assert.deepEqual(
     database.audits.map((audit) => [audit[7], audit[8]]),
     [
       ['success', 0],
-      ['success', 1],
-      ['success', 1],
-      ['conflict', 0],
+      ['success', 0],
+      ['success', 0],
+      ['success', 0],
     ],
   );
 });

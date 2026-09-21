@@ -49,6 +49,7 @@ function nearbyFixture(locationHint) {
 
 function createHarness(options = {}) {
   const providerCalls = [];
+  const dispatchCalls = [];
   const audits = [];
   const application = createAtlasApplication(
     createNearbyRecommendationOperationGroup(
@@ -63,8 +64,14 @@ function createHarness(options = {}) {
       }),
     ),
   );
+  const projectRouter = createProjectCommandRouter(application);
   const gateway = createAgentServiceGateway({
-    router: createProjectCommandRouter(application),
+    router: {
+      dispatch(command) {
+        dispatchCalls.push(command);
+        return projectRouter.dispatch(command);
+      },
+    },
     toolCatalog: createAgentToolCatalog(),
     keys: {
       async find(keyId) {
@@ -80,7 +87,7 @@ function createHarness(options = {}) {
         };
       },
     },
-    state: new InMemoryAgentGatewayState(),
+    state: options.state ?? new InMemoryAgentGatewayState(),
     audit: {
       async record(event) {
         audits.push(event);
@@ -92,6 +99,7 @@ function createHarness(options = {}) {
   });
   return {
     providerCalls,
+    dispatchCalls,
     audits,
     gateway,
     handle: createAgentHttpHandler(gateway),
@@ -161,7 +169,7 @@ test('canonical bytes and signed HTTP request cross the read-only gateway into A
   ]);
 });
 
-test('transport replay is rejected while a new nonce replays the same mutation receipt', async () => {
+test('transport replay is rejected while distinct nonces execute transient reads', async () => {
   const harness = createHarness();
   const first = await signAgentHttpRequest({
     url: 'https://atlas.test/api/agent/v1/tools',
@@ -214,32 +222,32 @@ test('transport replay is rejected while a new nonce replays the same mutation r
     },
   });
   assert.equal(retryResponse.status, 200);
-  assert.equal(retryPayload.receipt.replayed, true);
+  assert.equal(retryPayload.receipt.replayed, false);
   assert.equal(
     retryPayload.receipt.payloadDigest,
     firstPayload.receipt.payloadDigest,
   );
-  assert.equal(conflictResponse.status, 409);
-  assert.deepEqual(conflictPayload, {
-    ok: false,
-    error: {
-      kind: 'conflict',
-      message: 'The agent request conflicts with an earlier request.',
-    },
-  });
+  assert.equal(conflictResponse.status, 200);
+  assert.equal(conflictPayload.ok, true);
+  assert.equal(conflictPayload.receipt.replayed, false);
+  assert.deepEqual(harness.dispatchCalls, [
+    '/jpmap nearby 银座',
+    '/jpmap nearby 银座',
+    '/jpmap nearby 渋谷',
+  ]);
   assert.deepEqual(harness.providerCalls, [{ locationHint: '银座' }]);
   assert.deepEqual(
     harness.audits.map((event) => [event.resultKind, event.replayed]),
     [
       ['success', false],
       ['unauthorized', false],
-      ['success', true],
-      ['conflict', false],
+      ['success', false],
+      ['success', false],
     ],
   );
 });
 
-test('concurrent retries with distinct nonces execute one mutation and replay one receipt', async () => {
+test('concurrent reads with distinct nonces execute independently without stored replay', async () => {
   let releaseProvider;
   let signalProviderEntered;
   const providerRelease = new Promise((resolve) => {
@@ -292,10 +300,11 @@ test('concurrent retries with distinct nonces execute one mutation and replay on
     responses.map((response) => response.status),
     [200, 200],
   );
+  assert.equal(harness.dispatchCalls.length, 2);
   assert.equal(harness.providerCalls.length, 1);
   assert.deepEqual(
     payloads.map((payload) => payload.receipt.replayed),
-    [false, true],
+    [false, false],
   );
   assert.equal(
     payloads[0].receipt.payloadDigest,
@@ -305,7 +314,7 @@ test('concurrent retries with distinct nonces execute one mutation and replay on
     harness.audits.map((event) => [event.resultKind, event.replayed]),
     [
       ['success', false],
-      ['success', true],
+      ['success', false],
     ],
   );
 });
@@ -553,4 +562,48 @@ test('HTTP schema and dependency errors are stable, closed, and private', async 
   assert.equal(failedHarness.audits[0].resultKind, 'dependency_failure');
   assert.doesNotMatch(JSON.stringify(failedPayload), /secret|raw address/u);
   assert.doesNotMatch(serializedAudit, /fixture-secret|银座|raw address/u);
+});
+
+test('read-effect nearby keeps business request and result out of mutation state', async () => {
+  const nonceState = new InMemoryAgentGatewayState();
+  const calls = [];
+  const state = {
+    consumeNonce(input) {
+      calls.push('consumeNonce');
+      return nonceState.consumeNonce(input);
+    },
+    async claimMutation() {
+      calls.push('claimMutation');
+      return { kind: 'claimed' };
+    },
+    async waitForMutation() {
+      calls.push('waitForMutation');
+      return { kind: 'unavailable' };
+    },
+    async commitMutation({ receipt }) {
+      calls.push('commitMutation');
+      return receipt;
+    },
+    async releaseMutation() {
+      calls.push('releaseMutation');
+    },
+  };
+  const harness = createHarness({ state });
+  const request = await signAgentHttpRequest({
+    url: 'https://atlas.test/api/agent/v1/tools',
+    method: 'POST',
+    body: requestBody({ input: { locationHint: 'REQUEST-ONLY-GINZA' } }),
+    keyId: 'key-1',
+    secret,
+    timestamp: '1789300800',
+    nonce: 'request-only-read',
+  });
+
+  const response = await harness.handle(request);
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.receipt.replayed, false);
+  assert.deepEqual(calls, ['consumeNonce']);
+  assert.doesNotMatch(JSON.stringify(calls), /REQUEST-ONLY-GINZA|replyText/u);
 });

@@ -15,7 +15,10 @@ export async function POST(request: Request): Promise<Response> {
   const deployment = env as unknown as { ATLAS_DEPLOYMENT_ENV?: string };
   if (deployment.ATLAS_DEPLOYMENT_ENV === 'owner-poc') {
     const bindings = env as unknown as OwnerPocAgentBindings;
-    const composition = createOwnerPocComposition(bindings.DB);
+    const composition = createOwnerPocComposition(
+      bindings.DB,
+      bindings.ROUTE_SIDECAR,
+    );
     const application = createServerAtlasApplication(
       bindings.DB,
       bindings.MEDIA,

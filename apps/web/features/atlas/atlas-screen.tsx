@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Bot,
   Building2,
@@ -44,6 +45,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { isEffectivelyVisited } from '@/product/application/assessments/effective-visited';
 
 import type {
   AtlasItem,
@@ -61,6 +63,7 @@ import { normalizeRating, parseOptionalRating } from './rating';
 import { useAtlasViewModel } from './use-atlas-view-model';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
 import { useOwnerSession } from './use-owner-session';
+import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
 const filters: readonly {
   value: AtlasKindFilter;
@@ -88,6 +91,7 @@ const navItems: readonly { value: AtlasView; label: string }[] = [
 export function AtlasScreen() {
   const vm = useAtlasViewModel();
   const owner = useOwnerSession();
+  const [nearbyFocusRequest, setNearbyFocusRequest] = useState(0);
 
   return (
     <main className="atlas-shell">
@@ -121,7 +125,10 @@ export function AtlasScreen() {
           <Button
             className="ask-button"
             aria-label="Find nearby Atlas items"
-            onClick={() => void vm.locateNearby()}
+            onClick={() => {
+              vm.setView('map');
+              setNearbyFocusRequest((request) => request + 1);
+            }}
           >
             <Sparkles data-icon="inline-start" />
             Ask nearby
@@ -145,9 +152,18 @@ export function AtlasScreen() {
 
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}
 
-      {vm.view === 'map' ? <MapWorkspace vm={vm} /> : null}
+      {vm.view === 'map' ? (
+        <MapWorkspace vm={vm} nearbyFocusRequest={nearbyFocusRequest} />
+      ) : null}
       {vm.view === 'inbox' ? <InboxWorkspace vm={vm} /> : null}
       {vm.view === 'journal' ? <JournalWorkspace vm={vm} /> : null}
+      <footer className="site-footer">
+        <span>Japan Atlas · personal field guide</span>
+        <nav aria-label="Legal">
+          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy</Link>
+        </nav>
+      </footer>
     </main>
   );
 }
@@ -155,7 +171,13 @@ export function AtlasScreen() {
 type AtlasViewModel = ReturnType<typeof useAtlasViewModel>;
 type LayoutVariant = 'floating' | 'split' | 'bottom';
 
-function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
+function MapWorkspace({
+  vm,
+  nearbyFocusRequest,
+}: {
+  readonly vm: AtlasViewModel;
+  readonly nearbyFocusRequest: number;
+}) {
   const [listOpen, setListOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<AtlasItem>();
   const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>('split');
@@ -176,6 +198,17 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!nearbyFocusRequest) return;
+    const frame = window.requestAnimationFrame(() => {
+      setListOpen(true);
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>('#nearby-location')?.focus();
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [nearbyFocusRequest]);
 
   const layoutClass =
     layoutVariant === 'split'
@@ -239,6 +272,8 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
               tabIndex={listOpen ? 0 : -1}
             />
           </div>
+
+          <NearbySearch vm={vm} />
 
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
@@ -331,17 +366,10 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
               <p className="eyebrow">Tokyo · source checked 2026-09-06</p>
               <h2>{vm.visibleItems.length} real records</h2>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void vm.locateNearby()}
-            >
-              <LocateFixed data-icon="inline-start" /> Near me
-            </Button>
+            <a className="nearby-jump" href="#nearby-location">
+              <LocateFixed aria-hidden="true" /> Nearby
+            </a>
           </div>
-          {vm.locationStatus ? (
-            <p className="location-status">{vm.locationStatus}</p>
-          ) : null}
 
           <div className="place-list" aria-live="polite">
             {vm.visibleItems.length ? (
@@ -402,6 +430,248 @@ function MapWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
       />
     </section>
   );
+}
+
+function NearbySearch({ vm }: { readonly vm: AtlasViewModel }) {
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await vm.locateNearby();
+  }
+
+  return (
+    <section className="nearby-console" aria-labelledby="nearby-title">
+      <header>
+        <div>
+          <p className="eyebrow">Route check</p>
+          <h3 id="nearby-title">Nearby saved places</h3>
+        </div>
+        <span>Manual location</span>
+      </header>
+      <form
+        className="nearby-search"
+        aria-busy={vm.nearbyBusy}
+        onSubmit={submit}
+        noValidate
+      >
+        <label htmlFor="nearby-location">Neighborhood or address</label>
+        <div className="nearby-search-row">
+          <Input
+            id="nearby-location"
+            value={vm.nearbyLocationHint}
+            placeholder="e.g. 銀座, Ginza, or a copied address"
+            autoComplete="street-address"
+            aria-invalid={Boolean(vm.nearbyError)}
+            aria-describedby={
+              vm.nearbyError ? 'nearby-error' : 'nearby-location-help'
+            }
+            disabled={vm.nearbyBusy}
+            onChange={(event) => vm.setNearbyLocationHint(event.target.value)}
+          />
+          <Button
+            type="submit"
+            disabled={vm.nearbyBusy || !vm.nearbyLocationHint.trim()}
+          >
+            <LocateFixed data-icon="inline-start" />
+            {vm.nearbyBusy ? 'Checking…' : 'Check routes'}
+          </Button>
+        </div>
+        <small id="nearby-location-help">
+          Only saved Atlas places are compared. Your browser location is never
+          requested.
+        </small>
+      </form>
+
+      {vm.nearbyBusy ? (
+        <output className="nearby-progress" aria-live="polite">
+          <Clock3 aria-hidden="true" /> Searching saved places…
+        </output>
+      ) : null}
+      {vm.nearbyError ? (
+        <p id="nearby-error" className="nearby-error" role="alert">
+          {vm.nearbyError}
+        </p>
+      ) : null}
+      {!vm.nearbyBusy && !vm.nearbyError && vm.nearbyResult ? (
+        <NearbyResult
+          result={vm.nearbyResult}
+          onSelect={vm.selectItem}
+          onChooseLocation={(locationHint) => {
+            vm.setNearbyLocationHint(locationHint);
+            void vm.locateNearby(locationHint);
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function NearbyResult({
+  result,
+  onSelect,
+  onChooseLocation,
+}: {
+  readonly result: NearbyRecommendResult;
+  readonly onSelect: (itemId: string) => void;
+  readonly onChooseLocation: (locationHint: string) => void;
+}) {
+  if (result.status === 'unresolved') {
+    return (
+      <div className="nearby-state" role="alert">
+        <strong>Location could not be resolved.</strong>
+        <span>
+          {result.warning} Try a neighborhood plus city or a full address.
+        </span>
+      </div>
+    );
+  }
+
+  if (result.status === 'ambiguous') {
+    return (
+      <div className="nearby-state">
+        <strong>Choose a more specific location</strong>
+        <span>Copy one of these addresses into the field and check again.</span>
+        <ul className="nearby-address-options">
+          {result.candidates.map((candidate) => (
+            <li key={candidate.canonicalAddress}>
+              <button
+                type="button"
+                onClick={() => onChooseLocation(candidate.canonicalAddress)}
+              >
+                {candidate.canonicalAddress}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <ProviderEvidence
+          attribution={result.attribution}
+          checkedAt={result.provenance.checkedAt}
+          sourceUrl={result.provenance.sourceUrl}
+        />
+      </div>
+    );
+  }
+
+  if (!result.recommendations.length) {
+    return (
+      <div className="nearby-state">
+        <strong>No saved places are reachable from this location yet.</strong>
+        <span>
+          Try another nearby station, neighborhood, or copied address.
+        </span>
+        <ProviderEvidence
+          attribution={result.attribution}
+          checkedAt={result.provenance.checkedAt}
+          sourceUrl={result.provenance.sourceUrl}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="nearby-resolved">
+      <p className="nearby-resolution">
+        From <strong>{result.resolvedLocation}</strong>
+      </p>
+      <ol className="nearby-results" aria-label="Nearby recommendations">
+        {result.recommendations.map((candidate, index) => {
+          const visited = isEffectivelyVisited(
+            candidate.visit.manualVisited,
+            candidate.visit.visitCount,
+          );
+          const warnings = [
+            ...candidate.warnings,
+            candidate.entryAccess.walkInAssertion.warning,
+            candidate.entryAccess.queueAssertion.warning,
+          ].filter((warning): warning is string => Boolean(warning));
+          return (
+            <li key={candidate.itemId}>
+              <button
+                type="button"
+                className="nearby-candidate"
+                onClick={() => onSelect(candidate.itemId)}
+              >
+                <span className="nearby-order" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="nearby-candidate-copy">
+                  <strong>{candidate.name}</strong>
+                  <span>{candidate.address}</span>
+                </span>
+              </button>
+              <div className="nearby-facts">
+                <span>
+                  {candidate.route
+                    ? `${candidate.route.mode === 'walking' ? 'Walk' : 'Direct train'} · ${candidate.route.durationMinutes} min`
+                    : `${candidate.straightLineDistanceKm.toFixed(1)} km · distance layer`}
+                </span>
+                <span>
+                  {visited
+                    ? `Visited · ${candidate.visit.visitCount}`
+                    : 'Not visited'}
+                  {candidate.visit.personalRating === undefined
+                    ? ''
+                    : ` · My ${candidate.visit.personalRating}`}
+                </span>
+              </div>
+              <p className="nearby-reason">{candidate.reason}</p>
+              {warnings.length ? (
+                <ul className="nearby-warnings">
+                  {[...new Set(warnings)].map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {candidate.route ? (
+                <ProviderEvidence
+                  attribution={candidate.route.source}
+                  checkedAt={candidate.route.checkedAt}
+                  sourceUrl={candidate.route.source.url}
+                />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      <ProviderEvidence
+        attribution={result.attribution}
+        checkedAt={result.provenance.checkedAt}
+        sourceUrl={result.provenance.sourceUrl}
+      />
+    </div>
+  );
+}
+
+function ProviderEvidence({
+  attribution,
+  checkedAt,
+  sourceUrl,
+}: {
+  readonly attribution: { readonly label: string; readonly url: string };
+  readonly checkedAt: string;
+  readonly sourceUrl: string;
+}) {
+  return (
+    <small className="nearby-evidence">
+      <a href={attribution.url} target="_blank" rel="noreferrer">
+        {attribution.label}
+      </a>{' '}
+      · source {formatProviderSource(sourceUrl)} · checked{' '}
+      {formatCheckedAt(checkedAt)}
+    </small>
+  );
+}
+
+function formatProviderSource(value: string): string {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return 'provider endpoint';
+  }
+}
+
+function formatCheckedAt(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
 function PlaceRow({

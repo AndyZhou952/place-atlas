@@ -11,7 +11,10 @@ void test('Agent route selects canonical owner composition without giving it a G
   )?.[1];
 
   assert.ok(ownerBranch);
-  assert.match(ownerBranch, /createOwnerPocComposition\(bindings\.DB\)/u);
+  assert.match(
+    ownerBranch,
+    /createOwnerPocComposition\(\s*bindings\.DB,\s*bindings\.ROUTE_SIDECAR,?\s*\)/u,
+  );
   assert.match(ownerBranch, /createServerAtlasApplication/u);
   assert.match(ownerBranch, /createOwnerPocAgentHttpHandler/u);
   assert.doesNotMatch(ownerBranch, /GOOGLE_MAPS_API_KEY|transit|foursquare/iu);

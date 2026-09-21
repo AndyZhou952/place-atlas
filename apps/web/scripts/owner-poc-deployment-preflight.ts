@@ -18,6 +18,7 @@ interface WranglerConfig {
   readonly vars?: unknown;
   readonly d1_databases?: unknown;
   readonly r2_buckets?: unknown;
+  readonly services?: unknown;
   readonly [key: string]: unknown;
 }
 
@@ -47,6 +48,9 @@ export function inspectOwnerPocDeployment(input: {
   ) {
     blockers.push('source_bindings_not_owner_poc');
   }
+  if (!hasExactRouteSidecarBinding(input.sourceConfig.services)) {
+    blockers.push('source_route_sidecar_binding_invalid');
+  }
   if (isPlaceholderId(sourceDatabase?.database_id)) {
     blockers.push('d1_database_id_placeholder');
   }
@@ -59,6 +63,9 @@ export function inspectOwnerPocDeployment(input: {
     !hasOwnerPocGuard(input.builtConfig.vars)
   ) {
     blockers.push('built_bindings_not_owner_poc');
+  }
+  if (!hasExactRouteSidecarBinding(input.builtConfig.services)) {
+    blockers.push('built_route_sidecar_binding_invalid');
   }
   if (
     containsForbiddenRuntimeMetadata(input.sourceConfig) ||
@@ -320,6 +327,17 @@ function hasOwnerPocGuard(value: unknown): boolean {
     isRecord(value) &&
     value.ATLAS_DEPLOYMENT_ENV === 'owner-poc' &&
     value.ATLAS_DATASET === 'owner-poc'
+  );
+}
+
+function hasExactRouteSidecarBinding(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== 1) return false;
+  const binding = value[0];
+  return (
+    isRecord(binding) &&
+    Object.keys(binding).length === 2 &&
+    binding.binding === 'ROUTE_SIDECAR' &&
+    binding.service === 'japan-atlas-route-sidecar'
   );
 }
 

@@ -1,4 +1,9 @@
-import { getAtlasDeploymentEnvironment, getD1, getMediaBucket } from '@/db';
+import {
+  getAtlasDeploymentEnvironment,
+  getD1,
+  getMediaBucket,
+  getRouteSidecarServiceBinding,
+} from '@/db';
 import { verifiedAtlasItems } from '@/features/atlas/verified-items';
 import { createAtlasApplication } from '@/product/application/atlas-application';
 import { createPlaceAssessmentOperationGroup } from '@/product/application/assessments/place-assessment-operations';
@@ -100,7 +105,7 @@ export function getServerAtlasApplication() {
     return createServerAtlasApplication(
       database,
       mediaBucket,
-      createOwnerPocComposition(database),
+      createOwnerPocComposition(database, getRouteSidecarServiceBinding()),
     );
   }
   return createServerAtlasApplication(database, mediaBucket);

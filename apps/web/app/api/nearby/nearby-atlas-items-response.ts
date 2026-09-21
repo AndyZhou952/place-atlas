@@ -28,9 +28,10 @@ export async function nearbyAtlasItemsResponse(
     longitude < -180 ||
     longitude > 180
   ) {
-    return new Response('Valid lat and lon query parameters are required', {
-      status: 400,
-    });
+    return noStoreTextResponse(
+      'Valid lat and lon query parameters are required',
+      400,
+    );
   }
 
   const requestedLimit = Number(searchParams.get('limit') ?? 5);
@@ -41,7 +42,7 @@ export async function nearbyAtlasItemsResponse(
     requestedProfile !== 'verified_catalog' &&
     requestedProfile !== 'full_merged_catalog'
   ) {
-    return new Response('A valid catalog profile is required', { status: 400 });
+    return noStoreTextResponse('A valid catalog profile is required', 400);
   }
   const result = await application.execute({
     key: 'decision.nearby',
@@ -56,14 +57,14 @@ export async function nearbyAtlasItemsResponse(
     },
   });
   if (!result.ok) {
-    return new Response(
+    return noStoreTextResponse(
       result.error.kind === 'invalid_input'
         ? 'Valid lat and lon query parameters are required'
         : 'Nearby Atlas items are temporarily unavailable.',
-      { status: result.error.kind === 'invalid_input' ? 400 : 500 },
+      result.error.kind === 'invalid_input' ? 400 : 500,
     );
   }
-  return Response.json(result.value);
+  return noStoreJsonResponse(result.value);
 }
 
 async function nearbyRecommendationResponse(
@@ -76,9 +77,10 @@ async function nearbyRecommendationResponse(
     locationHint.length > 1_000 ||
     /[\r\n]/u.test(locationHint)
   ) {
-    return new Response('A valid locationHint query parameter is required', {
-      status: 400,
-    });
+    return noStoreTextResponse(
+      'A valid locationHint query parameter is required',
+      400,
+    );
   }
 
   const result = await application.execute({
@@ -86,16 +88,29 @@ async function nearbyRecommendationResponse(
     input: { locationHint },
   });
   if (!result.ok) {
-    return new Response(
+    return noStoreTextResponse(
       result.error.kind === 'invalid_input'
         ? 'A valid locationHint query parameter is required'
         : 'Nearby recommendations are temporarily unavailable.',
-      { status: result.error.kind === 'invalid_input' ? 400 : 503 },
+      result.error.kind === 'invalid_input' ? 400 : 503,
     );
   }
-  return Response.json(result.value);
+  return noStoreJsonResponse(result.value);
 }
 
 function parseRequiredCoordinate(value: string | null): number {
   return value === null || !value.trim() ? Number.NaN : Number(value);
+}
+
+function noStoreTextResponse(body: string, status: number): Response {
+  return new Response(body, {
+    status,
+    headers: { 'cache-control': 'no-store' },
+  });
+}
+
+function noStoreJsonResponse(value: unknown): Response {
+  return Response.json(value, {
+    headers: { 'cache-control': 'no-store' },
+  });
 }

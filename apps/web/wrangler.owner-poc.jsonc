@@ -27,4 +27,10 @@
       "bucket_name": "japan-atlas-owner-poc-media",
     },
   ],
+  "services": [
+    {
+      "binding": "ROUTE_SIDECAR",
+      "service": "japan-atlas-route-sidecar",
+    },
+  ],
 }

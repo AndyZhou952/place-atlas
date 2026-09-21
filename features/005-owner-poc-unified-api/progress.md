@@ -20,8 +20,9 @@
 - 已完成: T-05 渠道无关的结构化 `nearby.recommend` 已实现；Web 与微信 presenter 适配同一闭合 result，独立第 2 轮代码评审通过
 - 已完成: T-06 本地实现与安全代码门通过；17/17 Sidecar tests、私有 dry-run `No bindings found`、bundle least-privilege、双 8,000 hard cap 与 fail-closed preflight 均获独立第 2 轮评审确认
 - 已完成: 最终本地回归 456/456 tests 通过，owner-poc production build 通过
-- 未完成: T-06 仍待远端加密 Google Secret、strict deploy、直接公网不可达、Owner Worker service binding 与真实 provider smoke 证据；尚未部署、调用真实 Google provider 或使用真实 key
+- 已完成: T-06 远端 Sidecar 加密 Secret 名称／类型、strict deploy 与部署前后公网不可达 preflight 通过；脱敏记录见 `evidence/route-sidecar-deployment-smoke-2026-09-21.md`
+- 未完成: T-06 仍待 Google Cloud 项目级 quota／预算确认、Owner Worker service binding 与真实 provider smoke；尚未调用真实 Google provider
 - 未完成: T-07、T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-06–T-08 阻塞
-- 保留门禁: D-P05 仍为 Proposed；T-06 只有本地代码门通过，远端部署与真实 Google 证据完成前继续 fail closed
-- 下一步: 准备 T-06 远端 Secret、strict deploy、公网不可达与 service binding/真实 provider 证据，然后进入 T-07；当前不进入 ship/done
+- 保留门禁: D-P05 仍为 Proposed；T-06 的本地代码门与私有远端部署证据已通过，但 Google Cloud quota、Owner binding、真实 provider smoke 与 T-07 完成前继续 fail closed
+- 下一步: 实现 T-07 的 Owner service binding、双入口等价与 request-only 契约；Google Cloud 外部门确认前不部署 binding、不调用真实 provider，当前不进入 ship/done

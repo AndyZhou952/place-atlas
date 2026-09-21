@@ -24,5 +24,5 @@
 
 ## 尚未关闭的门
 
-- T-05–T-08 的结构化 Nearby、隔离 Route Sidecar、双端等价和确定性 E2E 尚未完成。
+- T-05 的结构化 Nearby 已完成；Route Sidecar 已完成隔离 strict deploy，但 T-06 的外部 quota／真实 provider 证据和 T-07–T-08 尚未完成。
 - 永久 OpenClaw endpoint 切换与回退演练尚未执行，因此 T-11 保持未完成。

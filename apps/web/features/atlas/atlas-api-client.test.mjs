@@ -151,6 +151,10 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     input: { id: 'media / 1' },
   });
   await application.execute({
+    key: 'nearby.recommend',
+    input: { locationHint: '銀座' },
+  });
+  await application.execute({
     key: 'decision.nearby',
     input: {
       latitude: 35.68,
@@ -215,6 +219,11 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     {
       url: '/api/media/media%20%2F%201',
       method: 'DELETE',
+      body: undefined,
+    },
+    {
+      url: '/api/nearby?locationHint=%E9%8A%80%E5%BA%A7',
+      method: 'GET',
       body: undefined,
     },
     {

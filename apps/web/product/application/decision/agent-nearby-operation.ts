@@ -21,19 +21,73 @@ import type {
   NearbyRecommendationOutcome,
   WalkingRecommendation,
 } from './nearby-recommendation.ts';
-import {
-  presentNearbyWechatReceipt,
-  type NearbyReceiptCandidate,
-} from './nearby-result-presenter.ts';
 
-export interface AgentNearbyInput {
+export interface NearbyRecommendInput {
   readonly locationHint: string;
 }
 
-export interface AgentNearbyResult {
-  readonly outcome: NearbyRecommendationOutcome;
-  readonly replyText: string;
+export interface NearbyRouteResult {
+  readonly mode: 'walking' | 'direct_transit';
+  readonly durationMinutes: number;
+  readonly checkedAt: string;
+  readonly source: ProviderAttribution;
 }
+
+export interface NearbyVisitResult {
+  readonly manualVisited: boolean;
+  readonly visitCount: number;
+  readonly latestVisitAt?: string;
+  readonly personalRating?: number;
+}
+
+export interface NearbyExternalRatingResult {
+  readonly platform: string;
+  readonly score: number;
+  readonly sourceUrl: string;
+  readonly checkedAt: string;
+  readonly reviewCount?: number;
+}
+
+export interface NearbyRecommendCandidate {
+  readonly itemId: string;
+  readonly name: string;
+  readonly kind: AtlasItem['kind'];
+  readonly area: string;
+  readonly address: string;
+  readonly straightLineDistanceKm: number;
+  readonly route?: NearbyRouteResult;
+  readonly visit: NearbyVisitResult;
+  readonly entryAccess: EntryAccessSnapshot;
+  readonly reservation: { readonly label: string; readonly checkedAt: string };
+  readonly externalRating?: NearbyExternalRatingResult;
+  readonly reason: string;
+  readonly warnings: readonly string[];
+  readonly mapDeepLink: string;
+}
+
+export type NearbyRecommendResult =
+  | {
+      readonly status: 'ambiguous';
+      readonly candidates: readonly {
+        readonly canonicalAddress: string;
+      }[];
+      readonly attribution: ProviderAttribution;
+      readonly provenance: LocationResolutionProvenance;
+    }
+  | {
+      readonly status: 'unresolved';
+      readonly reason: 'not_found' | 'dependency_failure';
+      readonly warning: string;
+      readonly provenance?: LocationResolutionProvenance;
+    }
+  | {
+      readonly status: 'resolved';
+      readonly requestedLocation: string;
+      readonly resolvedLocation: string;
+      readonly recommendations: readonly NearbyRecommendCandidate[];
+      readonly attribution: ProviderAttribution;
+      readonly provenance: LocationResolutionProvenance;
+    };
 
 export interface NearbyPersonalFacts {
   readonly manualVisited: boolean;
@@ -46,7 +100,7 @@ export interface NearbyPersonalFactsRead {
   read(itemId: string): Promise<NearbyPersonalFacts>;
 }
 
-export interface AgentNearbyOperationDependencies extends NearbyRecommendationDependencies {
+export interface NearbyRecommendOperationDependencies extends NearbyRecommendationDependencies {
   readonly entryAccessProvider: EntryAccessProvider;
   readonly entryAccessPolicy: EntryAccessVerificationPolicy;
   readonly personalFacts: NearbyPersonalFactsRead;
@@ -54,31 +108,39 @@ export interface AgentNearbyOperationDependencies extends NearbyRecommendationDe
   readonly nearbyRecommendation?: NearbyRecommendation;
 }
 
-export type AgentNearbyOperationDefinition = OperationDefinition<
-  'agent.nearby',
-  AgentNearbyInput,
-  AgentNearbyResult,
+/** @deprecated Use NearbyRecommendOperationDependencies. */
+export type AgentNearbyOperationDependencies =
+  NearbyRecommendOperationDependencies;
+
+export type NearbyRecommendOperationDefinition = OperationDefinition<
+  'nearby.recommend',
+  NearbyRecommendInput,
+  NearbyRecommendResult,
   'json'
 >;
 
-export type AgentNearbyApplicationDefinitions = {
-  readonly 'agent.nearby': AgentNearbyOperationDefinition;
+export type NearbyRecommendApplicationDefinitions = {
+  readonly 'nearby.recommend': NearbyRecommendOperationDefinition;
 };
 
+/** @deprecated Use NearbyRecommendApplicationDefinitions. */
+export type AgentNearbyApplicationDefinitions =
+  NearbyRecommendApplicationDefinitions;
+
 export function createNearbyRecommendationOperationGroup(
-  dependencies: AgentNearbyOperationDependencies,
+  dependencies: NearbyRecommendOperationDependencies,
 ) {
   const recommendation =
     dependencies.nearbyRecommendation ??
     createNearbyRecommendation(dependencies);
   const nearby: OperationDefinition<
-    'agent.nearby',
-    AgentNearbyInput,
-    AgentNearbyResult,
+    'nearby.recommend',
+    NearbyRecommendInput,
+    NearbyRecommendResult,
     'json'
   > = {
     descriptor: {
-      key: 'agent.nearby',
+      key: 'nearby.recommend',
       resultKind: 'json',
       effect: 'read',
       validate: validateNearbyInput,
@@ -93,37 +155,38 @@ export function createNearbyRecommendationOperationGroup(
       if (!result.ok) return result;
 
       try {
-        return success({
-          outcome: result.value,
-          replyText: await presentOutcome(result.value, dependencies),
-        });
+        return success(await structureOutcome(result.value, dependencies));
       } catch {
         return dependencyFailure();
       }
     },
   };
-  return defineOperationGroup({ 'agent.nearby': nearby });
+  return defineOperationGroup({ 'nearby.recommend': nearby });
 }
 
-async function presentOutcome(
+async function structureOutcome(
   outcome: NearbyRecommendationOutcome,
-  dependencies: AgentNearbyOperationDependencies,
-): Promise<string> {
+  dependencies: NearbyRecommendOperationDependencies,
+): Promise<NearbyRecommendResult> {
   if (outcome.status === 'ambiguous') {
-    const choices = outcome.candidates
-      .slice(0, 3)
-      .map((candidate, index) => `${index + 1}. ${candidate.canonicalAddress}`);
-    return [
-      'Japan Atlas｜这个位置有多个可能，请选择更具体的地址：',
-      ...choices,
-      attributionLine(outcome.attribution, outcome.provenance),
-    ].join('\n');
+    return {
+      status: 'ambiguous',
+      candidates: outcome.candidates.map(({ canonicalAddress }) => ({
+        canonicalAddress,
+      })),
+      attribution: projectAttribution(outcome.attribution),
+      provenance: projectProvenance(outcome.provenance),
+    };
   }
   if (outcome.status === 'unresolved') {
-    return [
-      `Japan Atlas｜无法确认位置：${outcome.warning}`,
-      provenanceFailureLine(outcome.provenance),
-    ].join('\n');
+    return {
+      status: 'unresolved',
+      reason: outcome.reason,
+      warning: outcome.warning,
+      ...(outcome.provenance
+        ? { provenance: projectProvenance(outcome.provenance) }
+        : {}),
+    };
   }
 
   const selected = selectFinalCandidates(outcome);
@@ -140,16 +203,17 @@ async function presentOutcome(
       return toReceiptCandidate(candidate, item, facts, dependencies);
     }),
   );
-  return [
-    attributionLine(outcome.attribution, outcome.provenance),
-    presentNearbyWechatReceipt({
-      resolvedLocation: outcome.resolvedLocation,
-      recommendations: recommendations.filter(
-        (candidate): candidate is NearbyReceiptCandidate =>
-          candidate !== undefined,
-      ),
-    }),
-  ].join('\n');
+  return {
+    status: 'resolved',
+    requestedLocation: outcome.requestedLocation,
+    resolvedLocation: outcome.resolvedLocation,
+    recommendations: recommendations.filter(
+      (candidate): candidate is NearbyRecommendCandidate =>
+        candidate !== undefined,
+    ),
+    attribution: projectAttribution(outcome.attribution),
+    provenance: projectProvenance(outcome.provenance),
+  };
 }
 
 type SelectedCandidate = (
@@ -188,17 +252,7 @@ async function readPersonalFacts(
   reader: NearbyPersonalFactsRead,
   item: AtlasItem,
 ): Promise<NearbyPersonalFacts> {
-  try {
-    return await reader.read(item.id);
-  } catch {
-    return {
-      manualVisited: item.hasVisited === true,
-      visitCount: item.hasVisited === true ? 1 : 0,
-      ...(item.hasVisited === true && item.personalRating !== undefined
-        ? { personalRating: item.personalRating }
-        : {}),
-    };
-  }
+  return reader.read(item.id);
 }
 
 function toReceiptCandidate(
@@ -207,22 +261,22 @@ function toReceiptCandidate(
   },
   item: AtlasItem,
   facts: NearbyPersonalFacts,
-  dependencies: AgentNearbyOperationDependencies,
-): NearbyReceiptCandidate {
+  dependencies: NearbyRecommendOperationDependencies,
+): NearbyRecommendCandidate {
   const route =
     candidate.layer === 'walking' && 'route' in candidate
       ? {
           mode: 'walking' as const,
           durationMinutes: Math.ceil(candidate.route.durationSeconds / 60),
           checkedAt: candidate.route.checkedAt,
-          source: candidate.route.attribution,
+          source: projectAttribution(candidate.route.attribution),
         }
       : candidate.layer === 'direct_transit' && 'route' in candidate
         ? {
             mode: 'direct_transit' as const,
             durationMinutes: Math.ceil(candidate.route.durationSeconds / 60),
             checkedAt: candidate.route.checkedAt,
-            source: candidate.route.attribution,
+            source: projectAttribution(candidate.route.attribution),
           }
         : undefined;
   return {
@@ -233,7 +287,7 @@ function toReceiptCandidate(
     address: item.address,
     straightLineDistanceKm: candidate.straightLineDistanceKm,
     ...(route ? { route } : {}),
-    visit: facts,
+    visit: projectPersonalFacts(facts),
     entryAccess: candidate.entryAccess,
     reservation: {
       label: item.reservation.label,
@@ -263,7 +317,40 @@ function toReceiptCandidate(
   };
 }
 
-function validateNearbyInput(input: unknown): Result<AgentNearbyInput> {
+function projectAttribution(
+  attribution: ProviderAttribution,
+): ProviderAttribution {
+  return {
+    label: attribution.label,
+    url: attribution.url,
+  };
+}
+
+function projectProvenance(
+  provenance: LocationResolutionProvenance,
+): LocationResolutionProvenance {
+  return {
+    providerId: provenance.providerId,
+    policyVersion: provenance.policyVersion,
+    sourceUrl: provenance.sourceUrl,
+    checkedAt: provenance.checkedAt,
+  };
+}
+
+function projectPersonalFacts(facts: NearbyPersonalFacts): NearbyVisitResult {
+  return {
+    manualVisited: facts.manualVisited,
+    visitCount: facts.visitCount,
+    ...(facts.latestVisitAt === undefined
+      ? {}
+      : { latestVisitAt: facts.latestVisitAt }),
+    ...(facts.personalRating === undefined
+      ? {}
+      : { personalRating: facts.personalRating }),
+  };
+}
+
+function validateNearbyInput(input: unknown): Result<NearbyRecommendInput> {
   if (
     !input ||
     typeof input !== 'object' ||
@@ -283,19 +370,4 @@ function dependencyFailure(): Result<never> {
     'dependency_failure',
     'Japan Atlas nearby is temporarily unavailable.',
   );
-}
-
-function attributionLine(
-  attribution: ProviderAttribution,
-  provenance: LocationResolutionProvenance,
-): string {
-  return `位置来源：${attribution.label} · 查询：${provenance.sourceUrl} · 核验：${provenance.checkedAt} · 策略：${provenance.providerId}/${provenance.policyVersion}`;
-}
-
-function provenanceFailureLine(
-  provenance: LocationResolutionProvenance | undefined,
-): string {
-  return provenance
-    ? `位置查询：${provenance.sourceUrl} · 核验：${provenance.checkedAt} · 策略：${provenance.providerId}/${provenance.policyVersion}`
-    : '位置来源：不可用（未获得本次查询的可审计来源）';
 }

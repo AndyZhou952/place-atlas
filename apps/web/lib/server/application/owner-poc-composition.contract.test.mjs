@@ -134,6 +134,133 @@ void test('owner-poc mutation lookup does not fall back to a missing static seed
   assert.equal(stateReads, 0);
 });
 
+void test('owner-poc composition uses canonical catalog and Personal Memory instead of poisoned legacy Agent fixtures', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(
+    await readFile(new URL('0001_owner_poc_schema.sql', ownerRoot), 'utf8'),
+  );
+  const canonical = {
+    id: 'canonical-place',
+    kind: 'food',
+    title: 'Canonical title',
+    area: 'Ginza',
+    address: 'Canonical address',
+    description: 'Canonical description',
+    latitude: 35.671,
+    longitude: 139.765,
+    verificationStatus: 'verified',
+    verifiedAt: '2026-09-21T00:00:00.000Z',
+    reservation: {
+      mode: 'unknown',
+      label: 'Canonical reservation',
+      checkedAt: '2026-09-21T00:00:00.000Z',
+    },
+    personalState: 'candidate',
+    tags: [],
+    sources: [],
+  };
+  const poisonedLegacy = {
+    ...canonical,
+    title: 'POISONED LEGACY TITLE',
+    address: 'POISONED LEGACY ADDRESS',
+    personalRating: 1,
+    hasVisited: false,
+  };
+  const legacyOnly = {
+    ...poisonedLegacy,
+    id: 'legacy-only-place',
+    title: 'POISONED LEGACY ONLY',
+  };
+
+  sqlite
+    .prepare(
+      `INSERT INTO atlas_items (
+        id, payload_json, verification_status, created_at, updated_at
+      ) VALUES (?, ?, 'verified', ?, ?)`,
+    )
+    .run(
+      canonical.id,
+      JSON.stringify(canonical),
+      '2026-09-21T00:00:00.000Z',
+      '2026-09-21T00:00:00.000Z',
+    );
+  const insertLegacy = sqlite.prepare(
+    `INSERT INTO agent_catalog_items (
+      id, kind, verification_status, latitude, longitude, payload_json,
+      record_origin, created_at, updated_at
+    ) VALUES (?, 'food', 'verified', ?, ?, ?, 'catalog_intake', ?, ?)`,
+  );
+  for (const legacy of [poisonedLegacy, legacyOnly]) {
+    insertLegacy.run(
+      legacy.id,
+      legacy.latitude,
+      legacy.longitude,
+      JSON.stringify(legacy),
+      '2026-09-21T00:00:00.000Z',
+      '2026-09-21T00:00:00.000Z',
+    );
+  }
+  sqlite
+    .prepare(
+      `INSERT INTO agent_nearby_fixtures (
+        fixture_set, fixture_rank, resolved_location, item_id, name, area,
+        address, walking_minutes, visited, reason, map_deep_link
+      ) VALUES ('default', 1, 'POISONED LOCATION', ?, 'POISONED FIXTURE',
+                'POISONED AREA', 'POISONED FIXTURE ADDRESS', 1, 0,
+                'POISONED REASON', 'https://poison.invalid')`,
+    )
+    .run(canonical.id);
+  sqlite
+    .prepare(
+      `INSERT INTO place_assessments (
+        item_id, overall_rating, is_favorite, has_visited, summary,
+        created_at, updated_at
+      ) VALUES (?, 4.75, 1, 1, 'Canonical assessment', ?, ?)`,
+    )
+    .run(canonical.id, '2026-09-21T01:00:00.000Z', '2026-09-21T01:00:00.000Z');
+  const insertVisit = sqlite.prepare(
+    `INSERT INTO visits (
+      id, item_id, item_title, visited_at, note, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, NULL, ?, ?)`,
+  );
+  for (const [id, visitedAt] of [
+    ['visit-older', '2026-09-19T12:00:00.000Z'],
+    ['visit-latest', '2026-09-20T12:00:00.000Z'],
+  ]) {
+    insertVisit.run(
+      id,
+      canonical.id,
+      canonical.title,
+      visitedAt,
+      visitedAt,
+      visitedAt,
+    );
+  }
+
+  const composition = createOwnerPocComposition(toD1(sqlite));
+  const catalog = await composition.catalogRead.list('verified_catalog');
+  const facts = await composition.agentNearby.personalFacts.read(canonical.id);
+
+  assert.equal(catalog.length, 1);
+  assert.equal(catalog[0].id, canonical.id);
+  assert.equal(catalog[0].title, canonical.title);
+  assert.equal(catalog[0].address, canonical.address);
+  assert.equal(catalog[0].personalRating, 4.75);
+  assert.equal(catalog[0].isFavorite, true);
+  assert.equal(catalog[0].hasVisited, true);
+  assert.equal(
+    catalog.some(({ id }) => id === legacyOnly.id),
+    false,
+  );
+  assert.deepEqual(facts, {
+    manualVisited: true,
+    visitCount: 2,
+    latestVisitAt: '2026-09-20T12:00:00.000Z',
+    personalRating: 4.75,
+  });
+  assert.doesNotMatch(JSON.stringify({ catalog, facts }), /POISONED/u);
+});
+
 function toD1(database) {
   return {
     prepare(sql) {
@@ -146,6 +273,9 @@ function toD1(database) {
           return {
             async all() {
               return { results: statement.all(...values) };
+            },
+            async first() {
+              return statement.get(...values) ?? null;
             },
           };
         },

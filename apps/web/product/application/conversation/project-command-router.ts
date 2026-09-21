@@ -1,6 +1,7 @@
 import type { AtlasApplication } from '../atlas-application.ts';
-import type { AgentNearbyApplicationDefinitions } from '../decision/agent-nearby-operation.ts';
+import type { NearbyRecommendApplicationDefinitions } from '../decision/agent-nearby-operation.ts';
 import { failure, success, type Result } from '../result.ts';
+import { presentNearbyWechatResult } from './nearby-wechat-presenter.ts';
 
 export interface NearbyRecommendationInput {
   readonly locationHint: string;
@@ -29,7 +30,8 @@ export interface NearbyRecommendationProvider {
   ): Promise<Result<NearbyRecommendationResult>>;
 }
 
-export type NearbyApplicationDefinitions = AgentNearbyApplicationDefinitions;
+export type NearbyApplicationDefinitions =
+  NearbyRecommendApplicationDefinitions;
 
 export function createProjectCommandRouter(
   application: AtlasApplication<NearbyApplicationDefinitions>,
@@ -40,7 +42,7 @@ export function createProjectCommandRouter(
       if (!parsed.ok) return parsed;
 
       const result = await application.execute({
-        key: 'agent.nearby',
+        key: 'nearby.recommend',
         input: { locationHint: parsed.value.locationHint },
       });
       if (!result.ok) {
@@ -57,7 +59,7 @@ export function createProjectCommandRouter(
       return success({
         projectId: 'jpmap',
         operation: 'nearby',
-        replyText: result.value.replyText,
+        replyText: presentNearbyWechatResult(result.value),
       });
     },
   };
@@ -74,7 +76,7 @@ export function createAgentToolCatalog() {
         tools: [
           {
             name: 'jpmap_nearby',
-            operation: 'agent.nearby',
+            operation: 'nearby.recommend',
             effect: 'read',
             requiredScope: 'atlas:nearby:read',
             confirmation: 'none',

@@ -1780,7 +1780,7 @@ test('fitness rejects a core record type literal in the feature adapter', () => 
 const expectedOperationKeys = [
   'assessment.display',
   'assessment.update',
-  'agent.nearby',
+  'nearby.recommend',
   'catalog.delete_item',
   'catalog.get',
   'catalog.list',

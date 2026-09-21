@@ -1,4 +1,4 @@
-import type { AgentNearbyOperationDependencies } from '../../../product/application/decision/agent-nearby-operation.ts';
+import type { NearbyRecommendOperationDependencies } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { createCatalogItemProjection } from '../../../product/application/catalog/catalog-item-projection.ts';
 import {
   createD1OwnerPocCatalogRead,
@@ -7,7 +7,7 @@ import {
 
 export function createOwnerPocComposition(database: D1Database) {
   const catalogRead = createD1OwnerPocCatalogRead(database);
-  const agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'> = {
+  const agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'> = {
     clock: { now: () => new Date() },
     routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
     locationResolver: {

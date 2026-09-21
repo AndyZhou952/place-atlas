@@ -75,7 +75,7 @@ test('read phase exposes only the nearby tool and no write or destructive operat
     tools: [
       {
         name: 'jpmap_nearby',
-        operation: 'agent.nearby',
+        operation: 'nearby.recommend',
         effect: 'read',
         requiredScope: 'atlas:nearby:read',
         confirmation: 'none',

@@ -788,7 +788,7 @@ async function recordAudit(
     actorId: body.actor.actorId,
     channel: body.actor.channel,
     conversationId: body.actor.conversationId,
-    operation: body.tool === 'jpmap_nearby' ? 'agent.nearby' : body.tool,
+    operation: body.tool === 'jpmap_nearby' ? 'nearby.recommend' : body.tool,
     mutationId: body.mutationId,
     resultKind,
     replayed,

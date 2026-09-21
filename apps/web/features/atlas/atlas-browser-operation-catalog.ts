@@ -41,6 +41,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
       pathSuffix: '?lat={lat}&lon={lon}',
     },
   },
+  'nearby.recommend': {
+    key: 'nearby.recommend',
+    method: 'GET',
+    path: '/api/nearby',
+    bodyKind: 'none',
+  },
   'catalog.update_item': {
     key: 'catalog.update_item',
     method: 'PATCH',

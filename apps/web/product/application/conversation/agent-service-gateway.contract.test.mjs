@@ -152,7 +152,7 @@ test('canonical bytes and signed HTTP request cross the read-only gateway into A
       actorId: 'wechat-owner',
       channel: 'wechat',
       conversationId: 'owner-dm',
-      operation: 'agent.nearby',
+      operation: 'nearby.recommend',
       mutationId: 'wechat-message-1',
       resultKind: 'success',
       replayed: false,

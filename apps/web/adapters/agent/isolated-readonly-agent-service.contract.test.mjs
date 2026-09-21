@@ -243,7 +243,7 @@ test('a signed Agent HTTP request reaches only the isolated D1 nearby fixture', 
     'wechat-owner',
     'openclaw-weixin',
     'owner-dm',
-    'agent.nearby',
+    'nearby.recommend',
     'wechat-event-1',
     'success',
   ]);

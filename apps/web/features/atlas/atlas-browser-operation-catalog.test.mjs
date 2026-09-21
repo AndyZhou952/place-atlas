@@ -59,6 +59,12 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
     browserOperationHttpCatalog['media.attach'].bodyKind,
     'multipart',
   );
+  assert.deepEqual(browserOperationHttpCatalog['nearby.recommend'], {
+    key: 'nearby.recommend',
+    method: 'GET',
+    path: '/api/nearby',
+    bodyKind: 'none',
+  });
   assert.equal(
     Object.values(browserOperationHttpCatalog).filter(
       (operation) => operation.capability?.name === 'upload_visit_media',

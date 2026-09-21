@@ -26,6 +26,7 @@ import {
   loadPublicVisits,
 } from './public-read-client.ts';
 import { publishOwnerLoginRequired } from './owner-session-client.ts';
+import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation.ts';
 
 export interface BrowserTransport {
   request(url: string, init?: RequestInit): Promise<Response>;
@@ -119,6 +120,10 @@ interface BrowserOperationMap {
       readonly area: string;
       readonly distanceKm: number;
     }[];
+  };
+  readonly 'nearby.recommend': {
+    readonly input: { readonly locationHint: string };
+    readonly output: NearbyRecommendResult;
   };
 }
 
@@ -267,6 +272,13 @@ export function createBrowserAtlasApplication(
       return requestJson(
         transport,
         `${browserOperationPath('decision.nearby')}?${search.toString()}`,
+      );
+    },
+    'nearby.recommend': ({ locationHint }) => {
+      const search = new URLSearchParams({ locationHint });
+      return requestJson(
+        transport,
+        `${browserOperationPath('nearby.recommend')}?${search.toString()}`,
       );
     },
   };

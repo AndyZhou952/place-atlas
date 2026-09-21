@@ -207,6 +207,8 @@ test('ambiguous and unresolved replies keep request-specific location provenance
   assert.match(ambiguous.value.replyText, /東京都新宿区西新宿/u);
   assert.match(ambiguous.value.replyText, /geocoder\?query=shinjuku/u);
   assert.match(ambiguous.value.replyText, /核验：2026-09-13T12:00:00.000Z/u);
+  assert.equal(ambiguous.value.replyText.includes('latitude'), false);
+  assert.equal(ambiguous.value.replyText.includes('longitude'), false);
   assert.equal(unresolved.ok, true);
   assert.match(unresolved.value.replyText, /无法确认位置/u);
   assert.match(unresolved.value.replyText, /geocoder\?query=shinjuku/u);

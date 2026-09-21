@@ -14,7 +14,7 @@ import {
 import { createDecisionOperationGroup } from '@/product/application/decision/decision-operations';
 import {
   createNearbyRecommendationOperationGroup,
-  type AgentNearbyOperationDependencies,
+  type NearbyRecommendOperationDependencies,
 } from '@/product/application/decision/agent-nearby-operation';
 import { createDestructiveOperationGroup } from '@/product/application/destructive/destructive-operations';
 import { createImportJobOperationGroup } from '@/product/application/import-jobs/import-job-operations';
@@ -110,7 +110,7 @@ export interface ServerAtlasDependencies
   extends ImportJobDependencies, MediaDependencies {
   readonly catalogRead?: CatalogRead;
   readonly catalogItemProjection?: CatalogItemProjection;
-  readonly agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'>;
+  readonly agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'>;
 }
 
 const systemServerAtlasDependencies: ServerAtlasDependencies = {

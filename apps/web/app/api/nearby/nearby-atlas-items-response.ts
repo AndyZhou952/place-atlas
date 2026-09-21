@@ -1,14 +1,21 @@
 import type { AtlasApplication } from '@/product/application/atlas-application';
 import type { createDecisionOperationGroup } from '@/product/application/decision/decision-operations';
+import type { createNearbyRecommendationOperationGroup } from '@/product/application/decision/agent-nearby-operation';
 
-type DecisionApplication = AtlasApplication<
-  ReturnType<typeof createDecisionOperationGroup>
+type NearbyHttpApplication = AtlasApplication<
+  ReturnType<typeof createDecisionOperationGroup> &
+    ReturnType<typeof createNearbyRecommendationOperationGroup>
 >;
 
 export async function nearbyAtlasItemsResponse(
-  application: DecisionApplication,
+  application: NearbyHttpApplication,
   searchParams: URLSearchParams,
 ): Promise<Response> {
+  const locationHintValue = searchParams.get('locationHint');
+  if (locationHintValue !== null) {
+    return nearbyRecommendationResponse(application, locationHintValue);
+  }
+
   const latitudeValue = searchParams.get('lat');
   const longitudeValue = searchParams.get('lon');
   const latitude = parseRequiredCoordinate(latitudeValue);
@@ -54,6 +61,36 @@ export async function nearbyAtlasItemsResponse(
         ? 'Valid lat and lon query parameters are required'
         : 'Nearby Atlas items are temporarily unavailable.',
       { status: result.error.kind === 'invalid_input' ? 400 : 500 },
+    );
+  }
+  return Response.json(result.value);
+}
+
+async function nearbyRecommendationResponse(
+  application: NearbyHttpApplication,
+  locationHintValue: string,
+): Promise<Response> {
+  const locationHint = locationHintValue.trim();
+  if (
+    !locationHint ||
+    locationHint.length > 1_000 ||
+    /[\r\n]/u.test(locationHint)
+  ) {
+    return new Response('A valid locationHint query parameter is required', {
+      status: 400,
+    });
+  }
+
+  const result = await application.execute({
+    key: 'nearby.recommend',
+    input: { locationHint },
+  });
+  if (!result.ok) {
+    return new Response(
+      result.error.kind === 'invalid_input'
+        ? 'A valid locationHint query parameter is required'
+        : 'Nearby recommendations are temporarily unavailable.',
+      { status: result.error.kind === 'invalid_input' ? 400 : 503 },
     );
   }
   return Response.json(result.value);

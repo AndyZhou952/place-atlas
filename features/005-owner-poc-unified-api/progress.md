@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: code-review
+- 当前阶段: implement
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -13,8 +13,12 @@
 - 已完成: 用户确认公开边界：持 URL 者可查看 Catalog、总体评论、Visit 展示与照片原图；internal ID、存储 key、hash、audit 保持私有；只有 Owner 可以写入
 - 已完成: 本地实现并验证 Public Read、Owner Auth、T-03 统一 coordinator、T-04 Visit/媒体统一 mutation 与公开投影、T-10 Owner Login 与总体评论 UI
 - 已完成: 第 2 轮独立代码评审通过；`POST /api/items` 在 owner-poc 中保持 fail closed，直到 T-12 提供统一 Add operation
-- 未完成: 远端 D1/R2 provision、migration/deploy 与 smoke 尚未执行，因此 T-01、T-11 保持未完成
+- 已完成: 新的隔离 owner-poc D1、R2 与 Worker 已 provision，旧资源保持不变；0001–0005 migrations、0005 D1 hotfix 独立评审、preflight 与最终 strict deploy 均通过
+- 已完成: 远端公开 Catalog 返回 5 条记录且 Journal 可读；匿名同源写入与错误登录 fail closed，用户已实测 Owner 登录、总体评论、喜欢与去过状态可写入并读回
+- 已完成: AWS signed Agent smoke 到达 route-service-pending 并产生预期 nonce/receipt/audit；非 Owner sender 被拒绝且计数不变
+- 已记录: Owner 写入体感延迟不影响正确性验收，后续性能诊断移交 GitHub #10
 - 未完成: T-05、T-06、T-07、T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
+- 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-05–T-08 阻塞
 - 保留门禁: D-P05 仍为 Proposed；T-06 独立安全证据通过前真实 Google 调用继续 fail closed
 - 保留门禁: 当前 owner Agent 只是兼容性 Nearby 骨架，仍返回渠道专用 reply；结构化 `nearby.recommend` 尚未实现，T-05 保持未完成
-- 下一步: 等待用户确认代码评审结果，再 provision 隔离 D1/R2 并执行 deploy/smoke；当前不进入 ship/done
+- 下一步: 进入 T-05，实现渠道无关的结构化 `nearby.recommend`；当前不进入 ship/done

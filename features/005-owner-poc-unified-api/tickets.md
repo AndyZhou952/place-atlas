@@ -1,13 +1,13 @@
 # 任务票 — Owner PoC 统一应用操作
 
-- 状态：code-review；第 2 轮独立代码评审通过，等待用户确认后 provision/deploy；D-P05/T-06 安全门保持有效，当前不进入 ship/done
+- 状态：implement；第 2 轮独立代码评审与 owner-poc 远端基础部署 smoke 已通过；下一步 T-05，D-P05/T-06 安全门保持有效，当前不进入 ship/done
 - 执行方式：垂直切片优先；中央 composition、migration journal 与 operation catalog 由主任务串行汇合
 - 公开/权限确认：持 URL 者可查看 Catalog、总体评论、Visit 展示与照片原图；internal ID、存储 key、hash、audit 保持私有；只有 Owner 可以写入
 
 ## 第一门：网页可安全保存
 
-- [ ] T-01 owner-poc 蓝绿 schema 与 seed manifest 行走骨架 — Blocked by: None — 本地 schema/config/seed manifest 与 migration contract 已验证；远端隔离 D1/R2 provision、migration、资源证据与 smoke 尚未执行，故不得标记完成。
-- [x] T-02 Public Read Manifest 与 OwnerCredential 行走骨架 — Blocked by: T-01 — 本地实现与合同验证完成：鉴权先于 Application/R2，公开闭合 DTO/媒体流不泄漏 object key/filename/hash/internal ID/audit；raw Secret、session 与匿名零写入边界已覆盖。远端验证随 T-01/T-11 执行。
+- [x] T-01 owner-poc 蓝绿 schema 与 seed manifest 行走骨架 — Blocked by: None — 新的隔离 D1/R2/Worker 已 provision，旧资源保持不变；0001–0005 migrations、seed evidence、preflight、fresh placeholder 一次性 bootstrap 与最终 strict deploy 均通过，脱敏证据见 `evidence/deployment-smoke-2026-09-21.md`。
+- [x] T-02 Public Read Manifest 与 OwnerCredential 行走骨架 — Blocked by: T-01 — 本地合同与远端 smoke 均通过：公开 Catalog/Journal 可读，鉴权先于 Application/R2，公开闭合 DTO/媒体流不泄漏 object key/filename/hash/internal ID/audit；匿名同源写入和错误登录 fail closed。
 - [x] T-03 统一 InvocationContext、mutation receipt 与网页个人状态 — Blocked by: T-02 — 本地实现与验证完成：schema normalization 后计算 authoritative digest，Web 不提交 digest，原子 claim/write/receipt 覆盖 replay、conflict、并发 pending、lease takeover 与 response-lost retry。
 - [x] T-04 Visit/媒体统一 mutation 与公开投影 — Blocked by: T-02, T-03 — 本地实现与验证完成：Visit/media 使用 Owner 门与统一 receipt，匿名媒体经 opaque display ID 读取，私有字段负测通过；Agent Record 仍未开放。
 
@@ -21,8 +21,8 @@
 ## 第三门：语义辅助与发布
 
 - [ ] T-09 受限 DeepSeek semantic proposal — Blocked by: T-08 — 在项目与 phase allowlist 已确定后，允许模型把模糊位置文字翻译为 schema 受限 proposal；拒绝模型提供的 operation、权限、坐标、路线与评分事实。模型失败时精确 `/jpmap` 命令继续可用。
-- [x] T-10 非 modal Owner Login UI 真实渲染门 — Blocked by: T-03 — 本地 Owner Login、总体评论 UI、登录后写入与共享回归已实现并验证；远端 URL 上的 smoke 随 T-11 执行。
-- [ ] T-11 双入口蓝绿部署与回退演练 — Blocked by: T-04, T-07, T-08, T-10 — 尚未 provision 远端 D1/R2，也未 deploy 或执行公开/Owner/Agent smoke；不得标记完成。待用户确认代码评审后执行并保存资源 ID、checksum、quota 与脱敏证据。
+- [x] T-10 非 modal Owner Login UI 真实渲染门 — Blocked by: T-03 — 本地 UI 门与远端 smoke 均完成；用户已确认 Owner 登录以及总体评论、喜欢、去过状态的写入与读回。体感写入延迟另由 GitHub #10 跟踪。
+- [ ] T-11 双入口蓝绿部署与回退演练 — Blocked by: T-04, T-07, T-08, T-10 — 新 Web Worker 的 strict deploy、公开/Owner smoke 与 AWS signed Agent 正负 probe 已完成；但 T-05–T-08 尚未完成，永久 OpenClaw endpoint 切换及其回退演练仍未执行，因此不得标记完成。
 
 ## 后续受门禁约束的共享写入
 

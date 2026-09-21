@@ -13,6 +13,7 @@ const geocodeResult = {
       geometry: { location: { lat: 35.6717, lng: 139.765 } },
     },
   ],
+  status: 'OK',
 };
 
 test('the fixed Google transport emits only the three D-P04 endpoint tuples', async () => {

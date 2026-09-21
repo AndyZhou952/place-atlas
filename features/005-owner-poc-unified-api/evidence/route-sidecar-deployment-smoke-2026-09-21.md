@@ -20,3 +20,12 @@
 - T-07 后续已完成 Owner 精确 service binding、Web/Agent 等价、request-only 负面契约与公开 Terms/Privacy，并通过独立最终评审。
 - 最新匿名 smoke 后聚合 SKU ledger 仍为空，因此尚未调用真实 Google provider。
 - D-P05 继续保持 Proposed，T-06 只剩一次已登录 Owner 的真实 provider smoke。
+
+## 首次 Owner smoke 与 v3 鉴权修复
+
+- Owner 输入一个完整东京地址后收到 false `not_found`；只检查聚合 ledger，确认 Geocoding 有 3 次预留而 walking 为 0。未读取或保存 provider 原始响应。
+- TDD 证明两个叠加问题：经典 Geocoding v3 未使用官方要求的 `key` query 鉴权；HTTP 200 的 `REQUEST_DENIED` 会被旧 mapper 错误折叠为空结果。
+- 修复后仅 `OK + 非空结果` 与 `ZERO_RESULTS + 空结果` 合法；其他状态或矛盾 payload 均关闭为 `dependency_failure`，provider 详情不外泄。
+- 独立安全复审确认 key 仅在最终固定 Geocoding fetch 注入，未进入日志、返回、持久化或 bundle；Routes header 鉴权、固定 endpoint、manual redirect 与 no-store 未回归。
+- Sidecar 23/23、dry-run bundle/preflight、typecheck、lint 与 format 通过。修复 bundle 已 strict deploy；部署前后 secret-name-only 和公网不可达 preflight 均通过。
+- 当前仍未宣称真实路线链路成功；须由 Owner 再执行一次相同地址查询，并只核对闭合 UI 输出与聚合 SKU ledger。

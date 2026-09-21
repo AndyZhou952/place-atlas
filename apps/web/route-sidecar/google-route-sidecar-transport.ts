@@ -53,6 +53,7 @@ export function createGoogleRouteSidecarTransport(input: {
         input,
         `${GOOGLE_ROUTE_SIDECAR_ENDPOINTS.geocoding}?${query}`,
         { method: 'GET' },
+        'query',
         (raw) => {
           const mapped = mapGoogleGeocodingResponse(raw);
           return mapped ? { ...mapped } : undefined;
@@ -75,6 +76,7 @@ export function createGoogleRouteSidecarTransport(input: {
             units: 'METRIC',
           }),
         },
+        'header',
         (raw) => {
           const mapped = mapGoogleRouteMatrixResponse(
             raw,
@@ -94,16 +96,19 @@ async function execute(
   },
   url: string,
   init: { readonly method: 'GET' | 'POST'; readonly body?: string },
+  credential: 'query' | 'header',
   map: (raw: unknown) => Readonly<Record<string, unknown>> | undefined,
 ): Promise<RouteSidecarTransportResponse> {
   if (!isConfiguredSecret(input.apiKey)) return notConfigured();
+  const requestUrl =
+    credential === 'query' ? withApiKeyQuery(url, input.apiKey) : url;
   let response: Response;
   try {
-    response = await input.fetch(url, {
+    response = await input.fetch(requestUrl, {
       ...init,
       headers: {
         'content-type': 'application/json',
-        'x-goog-api-key': input.apiKey,
+        ...(credential === 'header' ? { 'x-goog-api-key': input.apiKey } : {}),
       },
       redirect: 'manual',
       cache: 'no-store',
@@ -120,6 +125,12 @@ async function execute(
   }
   const body = map(raw);
   return body ? { status: 200, body } : unavailable();
+}
+
+function withApiKeyQuery(url: string, apiKey: string): string {
+  const requestUrl = new URL(url);
+  requestUrl.searchParams.set('key', apiKey);
+  return requestUrl.toString();
 }
 
 function matrixWaypoint(point: RouteSidecarPoint) {

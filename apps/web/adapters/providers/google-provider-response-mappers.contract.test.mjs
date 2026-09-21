@@ -18,6 +18,25 @@ test('Google geocoding fixture maps only approved address and request coordinate
   });
 });
 
+test('Google geocoding mapper enforces v3 status and result consistency', () => {
+  const result = {
+    formatted_address: '東京都中央区銀座4丁目',
+    geometry: { location: { lat: 35.6717, lng: 139.765 } },
+  };
+  for (const payload of [
+    { results: [result] },
+    { results: [result], status: 200 },
+    { results: [], status: 'OK' },
+    { results: [result], status: 'ZERO_RESULTS' },
+  ]) {
+    assert.equal(mapGoogleGeocodingResponse(payload), undefined);
+  }
+  assert.deepEqual(
+    mapGoogleGeocodingResponse({ results: [], status: 'ZERO_RESULTS' }),
+    { formattedAddress: [], coordinates: [] },
+  );
+});
+
 test('Google routes fixture maps duration and distance without geometry', () => {
   const result = mapGoogleRoutesResponse(googleRoutesResponseFixture);
 

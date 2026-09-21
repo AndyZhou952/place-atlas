@@ -18,6 +18,10 @@ Owner Worker service binding until the independent D-P05 security review passes.
   call is not refunded.
 - Only Geocoding and walking Route Matrix are enabled. Transit and Foursquare
   remain unconfigured and must receive zero calls.
+- The legacy Geocoding v3 endpoint authenticates with its required `key` query
+  parameter; Routes authenticates with `x-goog-api-key`. Never log, persist,
+  return, or include the final Geocoding request URL in evidence because it
+  contains the credential.
 - Location hints, coordinates, resolved addresses, raw Google payloads, and
   route payloads are request-only. Do not add them to D1/R2, logs, model
   prompts, or Leaflet. Only usage counters are persistent.

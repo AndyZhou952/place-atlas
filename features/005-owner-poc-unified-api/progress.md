@@ -23,8 +23,10 @@
 - 已完成: T-06 远端 Sidecar 加密 Secret 名称／类型、strict deploy 与部署前后公网不可达 preflight 通过；脱敏记录见 `evidence/route-sidecar-deployment-smoke-2026-09-21.md`
 - 已完成: 用户已确认 Google Cloud key restriction、Geocoding/Route Matrix 日配额与 billing guard；Owner Worker 已通过精确 service binding preflight 并 strict deploy
 - 已完成: T-07 的 Browser/Agent 等价、request-only 负面边界、公开 Terms/Privacy、Nearby UI 与 `no-store`/查询状态一致性均已实现；独立最终代码/UI 评审通过
-- 已完成: 最新匿名远端 smoke 中 Terms/Privacy 均为 200，Nearby 鉴权为 401 且 `no-store`；聚合 SKU ledger 仍为空，因此尚未调用真实 Google provider
-- 未完成: T-06 只剩一次已登录 Owner 的真实 provider smoke；T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
+- 已发现: 首次 Owner 真实 smoke 返回 false `not_found`；聚合 ledger 显示 Geocoding 已预留 3 次、walking 为 0，证明失败位于 Google v3 地址解析阶段
+- 已完成: TDD 修复 Geocoding v3 key query 鉴权与 HTTP-200 provider status 误分类；严格 status/result 状态机、Sidecar 23/23、bundle gate 与独立安全复审通过
+- 已完成: 修复后的私有 Sidecar 已 strict deploy，部署前后 secret-name-only 与公网不可达 preflight 通过；未轮换 secret、未改 Owner Worker
+- 未完成: T-06 仍待修复后的一次已登录 Owner provider smoke；T-08、T-09 及 T-12 之后的 Add/Record 工作均未实现
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-06–T-08 阻塞
 - 保留门禁: D-P05 仍为 Proposed；本地/远端隔离、Google Cloud 外部门、Owner binding 与 T-07 已通过，真实 provider smoke 前仍不进入 ship/done
-- 下一步: Owner 在 live 页面登录后仅执行一次 `銀座` Nearby；随后只检查闭合输出与聚合 ledger，关闭 T-06，并进入 T-08 的 `/jpmap nearby` owner-poc E2E
+- 下一步: Owner 在 live 页面登录后再次执行一次 `東京都中央区銀座4丁目` Nearby；随后只检查闭合输出与聚合 ledger，关闭 T-06，并进入 T-08 的 `/jpmap nearby` owner-poc E2E

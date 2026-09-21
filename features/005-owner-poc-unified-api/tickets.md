@@ -14,7 +14,7 @@
 ## 第二门：Web 与微信共享真实 Nearby
 
 - [x] T-05 渠道无关 Nearby operation 预重构 — Blocked by: T-01 — 已用结构化 `nearby.recommend` 取代 owner-poc 中渠道专用 reply contract；Web 与微信 presenter 适配同一闭合 result，composition 不再依赖 `agent_catalog_items`/fixture personal facts；独立第 2 轮代码评审通过。
-- [ ] T-06 独立 Google Route Sidecar 与双 hard cap — Blocked by: T-01, T-05 — 本地安全门、远端 encrypted Secret、private strict deploy、公网不可达、Google Cloud key/quota/billing guard、Owner Worker 精确 service binding 均已完成。匿名部署 smoke 后聚合 SKU ledger 仍为空；只剩一次已登录 Owner 的真实 provider smoke，完成前 D-P05 保持 Proposed。
+- [ ] T-06 独立 Google Route Sidecar 与双 hard cap — Blocked by: T-01, T-05 — 本地安全门、远端 encrypted Secret、private strict deploy、公网不可达、Google Cloud key/quota/billing guard、Owner Worker 精确 service binding 均已完成。首次 Owner smoke 暴露 v3 key 鉴权与 provider status 误分类，现已 TDD 修复、独立复审并重新 strict deploy；只剩一次修复后的 Owner provider smoke，完成前 D-P05 保持 Proposed。
 - [x] T-07 Web/Agent/Sidecar 等价与 request-only 契约 — Blocked by: T-03, T-05, T-06 — Browser adapter 与 HMAC gateway 已对同一 Catalog、个人事实和位置文字返回等价闭合结果；Sidecar 原始 JSON、地址/坐标/路线不进入 D1/R2/log/prompt/Leaflet。Terms/Privacy 远端 200，Nearby 全响应 `no-store`，新查询不会沿用旧距离；独立最终代码/UI 评审通过。
 - [ ] T-08 确定性 `/jpmap nearby` owner-poc E2E — Blocked by: T-07 — 精确命令零模型调用，覆盖 `银座/銀座/ginza`、owner DM、第二账号、群聊、错误 scope、nonce replay 与 Worker audit；旧 fixture 保持可回退。
 

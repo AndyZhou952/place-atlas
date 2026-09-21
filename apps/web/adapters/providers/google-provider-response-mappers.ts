@@ -16,6 +16,13 @@ export function mapGoogleGeocodingResponse(
 ): GoogleGeocodingFields | undefined {
   const record = asRecord(payload);
   if (!record || !Array.isArray(record.results)) return undefined;
+  if (
+    (record.status !== 'OK' && record.status !== 'ZERO_RESULTS') ||
+    (record.status === 'OK' && record.results.length === 0) ||
+    (record.status === 'ZERO_RESULTS' && record.results.length !== 0)
+  ) {
+    return undefined;
+  }
 
   const formattedAddress: string[] = [];
   const coordinates: {

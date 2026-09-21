@@ -139,6 +139,22 @@ test('empty recommendations and dependency failure have stable, private WeChat r
     value: {
       projectId: 'jpmap',
       operation: 'nearby',
+      nearby: {
+        status: 'resolved',
+        requestedLocation: '银座',
+        resolvedLocation: '东京都中央区银座',
+        recommendations: [],
+        attribution: {
+          label: 'Test location',
+          url: 'https://fixture.invalid/location',
+        },
+        provenance: {
+          providerId: 'test-location',
+          policyVersion: 'test-location-v1',
+          sourceUrl: 'https://fixture.invalid/location?query=fixture',
+          checkedAt: '2026-09-13T00:02:00.000Z',
+        },
+      },
       replyText:
         '位置来源：Test location · 查询：https://fixture.invalid/location?query=fixture · 核验：2026-09-13T00:02:00.000Z · 策略：test-location/test-location-v1\n' +
         'Japan Atlas｜附近推荐：东京都中央区银座\n暂时没有找到符合条件的地点。',

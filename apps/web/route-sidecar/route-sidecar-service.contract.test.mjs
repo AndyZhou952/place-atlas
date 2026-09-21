@@ -18,6 +18,7 @@ test('geocode returns only closed Google evidence from the fixed endpoint', asyn
             provider_internal_id: 'must-not-escape',
           },
         ],
+        status: 'OK',
         debug: { raw: 'must-not-escape' },
       });
     },
@@ -57,6 +58,73 @@ test('geocode returns only closed Google evidence from the fixed endpoint', asyn
     JSON.stringify(result),
     /provider_internal_id|debug|raw/u,
   );
+});
+
+test('geocode treats a Google configuration rejection as dependency failure instead of not found', async () => {
+  const service = createGoogleRouteSidecarService({
+    apiKey: 'test-only-key',
+    clock: () => new Date('2026-09-21T09:00:00.000Z'),
+    fetch: async () =>
+      Response.json({
+        results: [],
+        status: 'REQUEST_DENIED',
+        error_message: 'private provider configuration detail',
+      }),
+  });
+
+  const result = await service.geocode({
+    locationHint: '東京都中央区銀座4丁目',
+  });
+
+  assert.deepEqual(result, { ok: false, error: 'dependency_failure' });
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /private|provider|configuration/u,
+  );
+});
+
+test('fixed Google transport uses the credential style required by each API generation', async () => {
+  const requests = [];
+  const service = createGoogleRouteSidecarService({
+    apiKey: 'test-only-key',
+    clock: () => new Date('2026-09-21T09:00:00.000Z'),
+    fetch: async (url, init) => {
+      requests.push({ url: String(url), init });
+      return String(url).startsWith('https://maps.googleapis.com/')
+        ? Response.json({
+            results: [
+              {
+                formatted_address: '東京都中央区銀座4丁目',
+                geometry: { location: { lat: 35.6717, lng: 139.765 } },
+              },
+            ],
+            status: 'OK',
+          })
+        : Response.json([
+            {
+              originIndex: 0,
+              destinationIndex: 0,
+              status: {},
+              condition: 'ROUTE_EXISTS',
+              distanceMeters: 640,
+              duration: '481s',
+            },
+          ]);
+    },
+  });
+
+  await service.geocode({ locationHint: '東京都中央区銀座4丁目' });
+  await service.walkingMatrix({
+    origin: { latitude: 35.6717, longitude: 139.765 },
+    destinations: [{ latitude: 35.672, longitude: 139.766 }],
+  });
+
+  const geocodeUrl = new URL(requests[0].url);
+  const geocodeHeaders = new Headers(requests[0].init.headers);
+  assert.equal(geocodeUrl.searchParams.get('key'), 'test-only-key');
+  assert.equal(geocodeHeaders.has('x-goog-api-key'), false);
+  const routesHeaders = new Headers(requests[1].init.headers);
+  assert.equal(routesHeaders.get('x-goog-api-key'), 'test-only-key');
 });
 
 test('walkingMatrix returns ordered closed evidence for walking only', async () => {

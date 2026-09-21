@@ -9,6 +9,7 @@ import type {
 } from '../catalog/atlas-item.ts';
 import type { CatalogRead } from '../catalog/catalog-read.ts';
 import { failure, success, type Result } from '../result.ts';
+import { distanceInKm } from './geo-distance-policy.ts';
 import { matchesAtlasQuery } from './search-policy.ts';
 
 export interface SearchCatalogInput {
@@ -76,10 +77,11 @@ export function createDecisionOperationGroup(catalog: CatalogRead) {
                 kind: item.kind,
                 area: item.area,
                 distanceKm: distanceInKm(
-                  input.latitude,
-                  input.longitude,
-                  item.latitude,
-                  item.longitude,
+                  {
+                    latitude: input.latitude,
+                    longitude: input.longitude,
+                  },
+                  { latitude: item.latitude, longitude: item.longitude },
                 ),
                 tabelogScore: item.tabelog?.score,
                 reservation: item.reservation,
@@ -155,23 +157,6 @@ function isCoordinate(
   );
 }
 
-function distanceInKm(
-  latitudeA: number,
-  longitudeA: number,
-  latitudeB: number,
-  longitudeB: number,
-): number {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const latitudeDelta = toRadians(latitudeB - latitudeA);
-  const longitudeDelta = toRadians(longitudeB - longitudeA);
-  const value =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(toRadians(latitudeA)) *
-      Math.cos(toRadians(latitudeB)) *
-      Math.sin(longitudeDelta / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

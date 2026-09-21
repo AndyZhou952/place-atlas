@@ -413,6 +413,7 @@ function auditOperationCatalog(
     return entries;
   };
 
+
   const applicationArgument = unwrapExpression(applicationCall?.arguments[0]);
   const entries = applicationArgument
     ? evaluateCompositionExpression(

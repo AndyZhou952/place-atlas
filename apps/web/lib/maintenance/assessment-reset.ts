@@ -109,7 +109,7 @@ const resettableAssessmentColumns = new Map<string, SnapshotScalar>([
 ]);
 
 const assessmentResetMigrationUrl = new URL(
-  '../../drizzle/0003_reset_test_place_assessments.sql',
+  '../../drizzle/pending/0004_reset_test_place_assessments.sql',
   import.meta.url,
 );
 

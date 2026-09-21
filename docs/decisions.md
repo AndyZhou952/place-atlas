@@ -1,6 +1,6 @@
 # Japan Atlas 决策登记册
 
-最后更新：2026-09-12
+最后更新：2026-09-15
 
 本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
 
@@ -154,6 +154,14 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 这不是修改已部署 migration 的先例。任何已经部署的 migration 继续不可修改；已保存但未部署且带原 reset 0003 的 Site version 16 永不发布。详细门禁见 `features/003-production-snapshot/spec.md`。
 
+### D-021：确定性项目命令路由与微信入站门
+
+**状态：Accepted（2026-09-13）**
+
+单一微信前门使用显式项目注册表。规范入口 `/jpmap` 必须在模型参与前通过 OpenClaw 原生 plugin command 进入受信任路由，且不得注册模型可选择的 Atlas tool；平台 auth 后仍精确绑定 sender、channel、direct from/to 与无 thread 上下文。无斜杠 `jpmap` 与连续 capture 只有在代码自有的 `PreModelIngressRouter` 位于 agent loop 之前且通过真实渠道零模型探针后才启用。路由逐项目绑定独立凭证、scope 和状态命名空间；普通助手模型以及任何其他项目均不能取得 Atlas 凭证。
+
+**重审条件：** OpenClaw/runtime/plugin/channel 版本或入站执行顺序改变，native command 或 ingress probe 失败，或者新增项目需要共享写权限时，关闭相关 capability gate 并重新评审。OpenClaw 2026.7.1 已证明 skill direct-dispatch 会把 optional tool 受普通 allowlist 约束，因此不得用全局 allowlist 作为回退。
+
 ## 2. 提议中决策
 
 ### D-P01：OpenClaw 作为首个微信 runtime
@@ -175,6 +183,36 @@ OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin �
 **接受条件：** 微信 PoC 证明 24/7 需求，且本地 connector 同步协议可恢复。
 
 **重审条件：** 出现稳定官方 API、安全隔离的云浏览器，或本地可用性妨碍真实需求。
+
+### D-P03：Japan Atlas 云端核心与地点／路线供应商组合
+
+**状态：Proposed（2026-09-13）**
+
+PoC 将静态前端、Worker API、D1 与 R2 放在一个隔离 Cloudflare 环境。Nearby 的唯一候选全集来自 Japan Atlas Catalog；Google Geocoding/Routes 只提供请求内的位置与路线证据，DeepSeek 不参与距离或路线判断。地点发现仅属于 Catalog intake，Foursquare 已验证实验保留为未启用的可替换 adapter，最终供应商需在 Google Places、开放数据与用户确认数据之间按持久化许可、地图兼容、价格和日本分店质量另行决定。外部评分在许可证据完成前只瞬时显示或返回未知；walk-in／排队没有明确现时来源时一律 unknown。Lightsail 只承载 OpenClaw 与微信入口，因此未来可独立迁移到 Hetzner/OCI。
+
+**接受条件：** 完成条款/字段矩阵、固定日本样本校准、attribution/缓存合规检查、供应商 contract tests、配额与成本告警，并跑通隔离环境端到端测试。
+
+**重审条件：** 供应商条款、价格、覆盖或质量改变，出现可靠的 walk-in/queue 数据源，或真实流量超出 PoC 预算。
+
+### D-P04：Google 固定 origin 的 Cloudflare PoC 受限 egress 例外
+
+**状态：Proposed（2026-09-15；用户已于 2026-09-17 确认，仍待其余接受条件）**
+
+**用户确认：** 2026-09-17，同意隔离只读 PoC 采用本方案；其余接受条件仍须完成后才可转为 Accepted 或启用真实调用。
+
+**背景：** feature 004 规格要求 provider egress 在每次 DNS 解析和每一跳 redirect 上校验公网地址。`ProviderPolicyGateway` 因而把已校验的 `resolvedAddresses` 交给 transport；但 Cloudflare Workers 的标准 HTTPS `fetch` 只能按 URL 发起请求，不能把连接固定到这些地址，`resolveOverride` 对外部 Google 域名也不适用。显式校验与实际连接之间仍有 DNS TOCTOU 缝，不能把当前实现描述为满足逐 DNS／IP pin 保证。依据见 [Workers known issues](https://developers.cloudflare.com/workers/platform/known-issues/)、[Request `resolveOverride`](https://developers.cloudflare.com/workers/runtime-apis/request/#resolveoverride) 与 [Node DNS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/)。
+
+**提议：** 只在隔离的只读 Nearby PoC 中建立代码拥有的 Google 专用 transport adapter；构建时闭合的 endpoint tuple 仅为 `GET https://maps.googleapis.com:443/maps/api/geocode/json`、`POST https://routes.googleapis.com:443/distanceMatrix/v2:computeRouteMatrix`、`POST https://routes.googleapis.com:443/directions/v2:computeRoutes`，任何其他 host、port、path 或 method 组合都在发起网络请求前 fail closed。它的小接口只接受经过 schema 校验的 geocoding query、route matrix body 或 transit route body，不接受 URL；用户、模型和 provider 响应只能影响允许的 query/body 字段。Worker 使用平台 HTTPS/TLS 直接请求，设置 manual redirect，并把所有 3xx 当作 `dependency_failure`，不跟随任何跳转。
+
+这是相对现规格逐 DNS 校验并绑定已验证 IP 的**受限偏离**，不是等价实现。偏离只缩小固定 Google adapter 的网络威胁模型，不放宽通用 provider URL：任何其他 provider、payload 中返回的 URL 或未来任意 URL 抓取仍须经过原 `ProviderPolicyGateway` 的 origin/DNS/IP/redirect 契约；Cloudflare 无法兑现该契约时继续 fail closed。
+
+Google 调用仍必须经过已批准的 provider policy、字段许可与 warn/hard quota。secret 只在最终 transport 注入，缺失即 fail closed，且不得进入日志、D1/R2、prompt 或回执；Google 原始 JSON 只进入 adapter 内 mapper，只有批准的规范字段可离开 adapter；所有 Google 内容保持 request-only，不跨请求缓存或持久化。本提议不激活当前 `pending_review` policy，也不授权部署或使用真实凭证。
+
+**未选方案：** B 是增加能固定已验证 IP 并校验原 hostname TLS 的 egress proxy，可保留原保证，但会新增网络信任区、鉴权、证书、可用性、成本和部署运维，超出当前只读 PoC。C 是把 Google egress 放到 Lightsail/Node，以 custom DNS lookup 与 TLS `servername` 保留原保证；它会把 Google secret 和 Atlas 路线可用性绑定到目前只承载 OpenClaw 的 VM，增加跨区一跳和未来迁移耦合。两者在固定官方 origin、低流量、月预算 60 美元的 PoC 中收益不足，但仍是需要更强网络保证时的回退方案。
+
+**接受条件：** 用户明确接受上述受限偏离；独立架构／安全评审通过；contract tests 对三个允许 tuple 分别提供正测，并对 host、port、path、method 的每类变体提供负测，同时证明输入不能影响 endpoint、所有 redirect 拒绝、字段与 quota 失败关闭、缺 secret 失败关闭，以及 secret／原始响应不被记录、持久化或返回。供应商 policy 仍须在条款、credential scope、attribution 与预算证据通过后另行批准，之后才可启用真实调用。
+
+**重审条件：** 超出隔离只读 PoC；新增或改变 Google origin/path/method；需要跟随 redirect；任何用户、模型或 provider 数据开始影响目标 URL；复用本例外到其他 provider 或主动抓取返回 URL；Cloudflare 的 DNS/fetch/TLS 行为变化；发生 DNS、证书或 egress 安全异常。命中任一条件即关闭该 transport 并重新比较通用 gateway、B 或 C。
 
 ## 3. 已替代决策
 

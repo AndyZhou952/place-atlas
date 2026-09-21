@@ -517,6 +517,64 @@ test('fitness rejects a floating operation group call', () => {
   );
 });
 
+test('fitness rejects an operation group that is not composed into the central catalog', () => {
+  withArchitectureFixture(
+    {
+      'product/application/conversation/isolated-operations.ts': `
+        import { defineOperationGroup, type OperationDefinition } from '../atlas-application.ts';
+        const isolated: OperationDefinition<'isolated.read', {}, {}, 'json'> = {
+          descriptor: {
+            key: 'isolated.read',
+            resultKind: 'json',
+            effect: 'read',
+            validate: (input) => input,
+          },
+          async handle() { return {}; },
+        };
+        export function createIsolatedOperationGroup() {
+          return defineOperationGroup({ 'isolated.read': isolated });
+        }
+      `,
+    },
+    ({ root, manifest }) => {
+      const owner = path.join(
+        root,
+        'product/application/conversation/isolated-operations.ts',
+      );
+      const baseline = auditArchitecture(manifest);
+      assert.ok(
+        baseline.some(({ rule }) => rule === 'unowned_operation_group'),
+      );
+
+      const registered = auditArchitecture({
+        ...manifest,
+        isolatedOperationGroupOwners: {
+          createIsolatedOperationGroup: owner,
+        },
+      });
+      assert.ok(
+        registered.some(
+          ({ rule }) =>
+            rule === 'unowned_operation_group' ||
+            rule === 'unowned_operation_definition',
+        ),
+      );
+
+      const wrongOwner = auditArchitecture({
+        ...manifest,
+        isolatedOperationGroupOwners: {
+          createIsolatedOperationGroup: path.join(
+            root,
+            'product/application/sample-operations.ts',
+          ),
+        },
+      });
+      assert.ok(
+        wrongOwner.some(({ rule }) => rule === 'unowned_operation_group'),
+      );
+    },
+  );
+});
 test('fitness rejects an empty composed application catalog', () => {
   withArchitectureFixture(
     {
@@ -1686,6 +1744,7 @@ test('fitness rejects a core record type literal in the feature adapter', () => 
 
 const expectedOperationKeys = [
   'assessment.update',
+  'agent.nearby',
   'catalog.delete_item',
   'catalog.get',
   'catalog.list',
@@ -1713,6 +1772,7 @@ const expectedOperationGroupCreators = [
   'createPlaceAssessmentOperationGroup',
   'createDecisionOperationGroup',
   'createVisitOperationGroup',
+  'createNearbyRecommendationOperationGroup',
   'createDestructiveOperationGroup',
   'createMediaOperationGroup',
 ];

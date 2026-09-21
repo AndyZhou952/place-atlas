@@ -58,6 +58,26 @@ _Avoid_：Atlas 条目、模型摘要
 把同一认证用户和对话中的连续评分、笔记与照片安全关联到一个明确地点／Visit 的短时上下文。
 _Avoid_：最近一次 Visit、聊天历史猜测
 
+**位置线索（Location Hint）**：
+用户手动输入的街区或地址文字，用于解析附近查询的候选地点；它不是可信坐标或路线事实。
+_Avoid_：当前位置、微信定位、模型坐标
+
+**可达候选（Reachable Candidate）**：
+具有可验证步行或公共交通路线证据的附近 Atlas 条目；没有路线证据的结果只能称为距离候选。
+_Avoid_：附近地点、模型推荐
+
+**地点建档会话（CatalogIntakeSession）**：
+把餐厅名解析为带来源证据的分店候选，经查重、消歧、预览和 owner 确认后创建或核验 AtlasItem 的短时上下文。
+_Avoid_：模型自动建店、只按名称合并、ImportJob
+
+**项目命令路由器（ProjectCommandRouter）**：
+在模型参与前，按显式项目命令和闭合子命令语法，把消息确定性分发到对应项目 adapter、凭证与状态命名空间。
+_Avoid_：模型意图路由、OpenClaw channel binding、通用工具选择
+
+**到店可行性快照（EntryAccessSnapshot）**：
+带来源与核验时间的 walk-in、预约要求和可选实时排队事实；未知信息保持未知。
+_Avoid_：可预约、模型估计排队、营业状态
+
 **第三方原始媒体（Third-party Raw Media）**：
 仅为提取证据临时取得的帖子图片、视频或音频，处理完成后最多保留 72 小时，不等同于可长期保存的 Evidence Manifest。
 _Avoid_：VisitMedia、来源证据

@@ -4,8 +4,15 @@ import { createAtlasApplication } from '@/product/application/atlas-application'
 import { createPlaceAssessmentOperationGroup } from '@/product/application/assessments/place-assessment-operations';
 import { createCatalogOperationGroup } from '@/product/application/catalog/catalog-operations';
 import { createCatalogItemProjection } from '@/product/application/catalog/catalog-item-projection';
-import { createCatalogRead } from '@/product/application/catalog/catalog-read';
+import {
+  createCatalogRead,
+  type CatalogRead,
+} from '@/product/application/catalog/catalog-read';
 import { createDecisionOperationGroup } from '@/product/application/decision/decision-operations';
+import {
+  createNearbyRecommendationOperationGroup,
+  type AgentNearbyOperationDependencies,
+} from '@/product/application/decision/agent-nearby-operation';
 import { createDestructiveOperationGroup } from '@/product/application/destructive/destructive-operations';
 import { createImportJobOperationGroup } from '@/product/application/import-jobs/import-job-operations';
 import type { ImportJobDependencies } from '@/product/application/import-jobs/import-job-operations';
@@ -26,10 +33,16 @@ import { D1VisitState } from './d1-visit-state';
 export function createServerAtlasApplication(
   database: D1Database,
   mediaBucket: R2Bucket,
-  dependencies: ServerAtlasDependencies = systemServerAtlasDependencies,
+  dependencyOverrides: Partial<ServerAtlasDependencies> = {},
 ) {
+  const dependencies = {
+    ...systemServerAtlasDependencies,
+    ...dependencyOverrides,
+  };
   const catalogState = new D1CatalogState(database);
-  const catalogRead = createCatalogRead(catalogState, verifiedAtlasItems);
+  const catalogRead =
+    dependencies.catalogRead ??
+    createCatalogRead(catalogState, verifiedAtlasItems);
   const catalogItemProjection = createCatalogItemProjection(verifiedAtlasItems);
   const mediaObjects = new R2MediaObjectStore(mediaBucket);
   return createAtlasApplication({
@@ -47,6 +60,10 @@ export function createServerAtlasApplication(
       { clock: dependencies.clock },
     ),
     ...createDecisionOperationGroup(catalogRead),
+    ...createNearbyRecommendationOperationGroup({
+      ...dependencies.agentNearby,
+      catalog: catalogRead,
+    }),
     ...createVisitOperationGroup(
       new D1VisitState(database),
       catalogItemProjection,
@@ -70,10 +87,56 @@ export function getServerAtlasApplication() {
   return createServerAtlasApplication(getD1(), getMediaBucket());
 }
 
-interface ServerAtlasDependencies
-  extends ImportJobDependencies, MediaDependencies {}
+export interface ServerAtlasDependencies
+  extends ImportJobDependencies, MediaDependencies {
+  readonly catalogRead?: CatalogRead;
+  readonly agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'>;
+}
 
 const systemServerAtlasDependencies: ServerAtlasDependencies = {
+  agentNearby: {
+    clock: { now: () => new Date() },
+    routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
+    locationResolver: {
+      async resolve() {
+        return {
+          status: 'unresolved',
+          reason: 'dependency_failure',
+          warning: 'Address lookup is temporarily unavailable.',
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        return {
+          status: 'unavailable',
+          warning: 'Walking route is temporarily unavailable.',
+        };
+      },
+    },
+    entryAccessProvider: {
+      async inspectWalkIn() {
+        return { status: 'unknown', warning: 'Walk-in status is unavailable.' };
+      },
+      async inspectQueue() {
+        return { status: 'unknown', warning: 'Queue status is unavailable.' };
+      },
+    },
+    entryAccessPolicy: {
+      policyVersion: 'atlas-entry-v1',
+      allowedSourceOrigins: [],
+      maximumAgeMs: 5 * 60 * 1000,
+      clock: { now: () => new Date() },
+    },
+    personalFacts: {
+      async read() {
+        return { manualVisited: false, visitCount: 0 };
+      },
+    },
+    mapDeepLink: (item) =>
+      item.officialUrl ??
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`,
+  },
   clock: { now: () => new Date().toISOString() },
   idSource: { nextId: () => crypto.randomUUID() },
   async digest(bytes) {

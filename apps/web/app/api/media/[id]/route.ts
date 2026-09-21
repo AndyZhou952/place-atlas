@@ -1,4 +1,3 @@
-import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
 import { getServerInvocationCoordinator } from '@/lib/server/application/server-invocation-coordinator';
 import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
 

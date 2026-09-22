@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: implement T-13（T-12 已通过代码评审并获用户确认；既有 Owner/Nearby 实现状态不回退）
+- 当前阶段: implement T-14（T-13 已通过第 2 轮代码评审并获用户确认；既有 Owner/Nearby 实现状态不回退）
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -44,8 +44,9 @@
 - 已修复待独立复审: T-12 首轮代码评审发现的 async rejection 泄露、provider/state 负测、最终 DTO/AddError、Tabelog URL/两位小数与 Unicode control 缺口均已修复；T-12 仍不勾选，复审 PASS 前不进入 T-13
 - 已修复待最终复审: T-12 第二轮仅余的 Tabelog URL finding 已以明确、有限的餐厅详情路径 allowlist 修复；无网络调用或 T-13+ 行为
 - 已完成: T-12 第 3 轮独立代码评审 PASS；完整测试 479/479、聚焦 CatalogIntake contract 10/10，TypeScript、lint、format-check 与 diff-check 均通过；用户于 2026-09-22 明确确认，T-12 已勾选并进入 T-13
-- 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；仍缺 Lightsail/OpenClaw live SSH 正反向证明，因此 T-08 保持未勾选
-- 未完成: T-08、T-09 及 T-13–T-20 的 Add/Record 工作均未实现
+- 已完成: T-13 append-only D1 session/CAS、30 分钟 inactivity TTL、180 天 terminal/request retention、transient Google Top-3 与 owner-poc daily cleanup 已实现；第 2 轮独立代码评审 PASS，聚焦 contracts 27/27、完整测试 496/496、TypeScript、lint、format-check、diff-check 与 owner-poc production build 全部通过；用户于 2026-09-22 明确确认，T-13 已勾选并进入 T-14
+- 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
+- 未完成: T-08、T-09 及 T-14–T-20 的 Add/Record 工作均未实现
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
-- 阶段门禁: Add 增量规格、架构与 T-12 代码门及用户确认均已关闭；可开始 T-13；D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待 live SSH 证明
-- 下一步: T-13 在已确认的 `AtlasApplication catalog.intake.*` / state-port seam 写出第一个持久 session/CAS 行为的失败测试（RED）；另行取得 T-08 Lightsail/OpenClaw live SSH 正反向证明
+- 阶段门禁: Add 增量规格、架构、T-12/T-13 代码门及用户确认均已关闭；可开始 T-14；D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
+- 下一步: T-14 在已确认的 `AtlasApplication catalog.intake.*` / provider-port seam 写出 only-name、durable geocoder 与可访问 Web preview 的第一个失败测试（RED）

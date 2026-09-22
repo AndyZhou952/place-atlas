@@ -12,6 +12,14 @@ import {
   createUnavailableCatalogIntakeModule,
 } from './catalog-intake-coordinator.ts';
 
+const ownerConversation = {
+  invocation: {
+    ownerId: 'owner-1',
+    channel: 'web',
+    conversationId: 'conversation-1',
+  },
+};
+
 test('AtlasApplication awaits rejected handlers and returns one sanitized failure', async () => {
   const application = createAtlasApplication(
     defineOperationGroup({
@@ -70,7 +78,7 @@ test('the production-default intake module exposes all four operations but fails
   ];
 
   for (const operation of operations) {
-    const result = await application.execute(operation);
+    const result = await application.execute(operation, ownerConversation);
     assert.deepEqual(result, {
       ok: false,
       error: {
@@ -240,6 +248,245 @@ test('catalog.intake.cancel returns one stable closed result and replays it', as
     ok: true,
     value: { status: 'cancelled', sessionId: 'session-1', replayed: true },
   });
+});
+
+test('catalog.intake session expires at the exact 30 minute inactivity boundary', async () => {
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    clock: { now: () => now },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'request-expiry' },
+  });
+
+  now = new Date('2026-09-22T10:30:00.000Z');
+  const result = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '鮨 さいとう' },
+      requestResearch: false,
+    },
+  });
+
+  assertClosedAddFailure(result, 'expired');
+});
+
+test('discover retry also expires at the exact 30 minute inactivity boundary', async () => {
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  let refetchCalls = 0;
+  const base = discoveryFixture();
+  const application = createFixtureApplication({
+    discoveryPort: {
+      discover: (input) => base.discover(input),
+      async refetch(input) {
+        refetchCalls += 1;
+        return base.refetch(input);
+      },
+    },
+    clock: { now: () => now },
+  });
+  const operation = {
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'request-expiry-retry' },
+  };
+  assert.equal((await application.execute(operation)).ok, true);
+
+  now = new Date('2026-09-22T10:30:00.000Z');
+  assertClosedAddFailure(await application.execute(operation), 'expired');
+  assert.equal(refetchCalls, 0);
+});
+
+test('expiration CAS resolves renewed, expired, and cancelled concurrent state without false expiry', async () => {
+  for (const race of ['renewed', 'expired', 'cancelled']) {
+    let now = new Date('2026-09-22T10:00:00.000Z');
+    const base = createInMemoryCatalogIntakeStatePort();
+    const application = createFixtureApplication({
+      discoveryPort: discoveryFixture(),
+      statePort: expirationRacePort(base, race),
+      clock: { now: () => now },
+    });
+    await application.execute({
+      key: 'catalog.intake.discover',
+      input: { query: '銀座 鮨', requestToken: `request-${race}` },
+    });
+    now = new Date('2026-09-22T10:30:00.000Z');
+
+    const result = await application.execute(
+      race === 'cancelled'
+        ? {
+            key: 'catalog.intake.cancel',
+            input: { sessionId: 'session-1', expectedSessionVersion: 1 },
+          }
+        : {
+            key: 'catalog.intake.select',
+            input: {
+              sessionId: 'session-1',
+              expectedSessionVersion: 1,
+              ordinal: 1,
+              ownerFields: { title: '銀座 鮨' },
+              requestResearch: false,
+            },
+          },
+    );
+
+    if (race === 'renewed') assertClosedAddFailure(result, 'conflict');
+    if (race === 'expired') assertClosedAddFailure(result, 'expired');
+    if (race === 'cancelled') {
+      assert.deepEqual(result, {
+        ok: true,
+        value: { status: 'cancelled', sessionId: 'session-1', replayed: true },
+      });
+    }
+  }
+});
+
+test('discover retry reuses its immutable candidate mapping and a new discover replaces the active conversation session', async () => {
+  let nextId = 0;
+  let discoverCalls = 0;
+  let refetchCalls = 0;
+  const base = discoveryFixture();
+  const application = createFixtureApplication({
+    discoveryPort: {
+      async discover(input) {
+        discoverCalls += 1;
+        return base.discover(input);
+      },
+      async refetch(input) {
+        refetchCalls += 1;
+        return base.refetch(input);
+      },
+    },
+    idSource: { nextId: () => `session-${++nextId}` },
+  });
+  const first = {
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨', requestToken: 'request-1' },
+  };
+
+  const created = await application.execute(first);
+  const replayed = await application.execute(first);
+  assert.deepEqual(replayed, created);
+  assert.equal(discoverCalls, 1);
+  assert.equal(refetchCalls, 1);
+
+  const conflictingToken = await application.execute({
+    ...first,
+    input: { query: 'Ginza sushi', requestToken: 'request-1' },
+  });
+  assertClosedAddFailure(conflictingToken, 'conflict');
+
+  const replacement = await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: 'Ginza sushi', requestToken: 'request-2' },
+  });
+  assert.equal(replacement.ok, true);
+  assert.equal(replacement.value.sessionId, 'session-2');
+  const oldSession = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '銀座 鮨' },
+      requestResearch: false,
+    },
+  });
+  assertClosedAddFailure(oldSession, 'conflict');
+});
+
+test('select accepted activity renews inactivity TTL and same-version retry is stable while changed payload conflicts', async () => {
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  let refetchCalls = 0;
+  const base = discoveryFixture();
+  const application = createFixtureApplication({
+    discoveryPort: {
+      discover: (input) => base.discover(input),
+      async refetch(input) {
+        refetchCalls += 1;
+        return base.refetch(input);
+      },
+    },
+    clock: { now: () => now },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨', requestToken: 'request-select-retry' },
+  });
+  now = new Date('2026-09-22T10:29:59.000Z');
+  const operation = {
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '銀座 鮨' },
+      requestResearch: false,
+    },
+  };
+  const selected = await application.execute(operation);
+  assert.equal(selected.ok, true);
+  assert.equal(selected.value.expiresAt, '2026-09-22T10:59:59.000Z');
+  assert.deepEqual(await application.execute(operation), selected);
+  assert.equal(refetchCalls, 1);
+
+  const conflict = await application.execute({
+    ...operation,
+    input: {
+      ...operation.input,
+      ownerFields: { title: 'Different owner draft' },
+    },
+  });
+  assertClosedAddFailure(conflict, 'conflict');
+});
+
+test('catalog intake sessions are isolated by owner, channel, and conversation', async () => {
+  const application = createFixtureApplication(discoveryFixture());
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨', requestToken: 'request-scope' },
+  });
+
+  for (const invocation of [
+    { ownerId: 'owner-2', channel: 'web', conversationId: 'conversation-1' },
+    { ownerId: 'owner-1', channel: 'wechat', conversationId: 'conversation-1' },
+    { ownerId: 'owner-1', channel: 'web', conversationId: 'conversation-2' },
+  ]) {
+    const result = await application.execute(
+      {
+        key: 'catalog.intake.cancel',
+        input: { sessionId: 'session-1', expectedSessionVersion: 1 },
+      },
+      { invocation },
+    );
+    assertClosedAddFailure(result, 'not_found');
+  }
+});
+
+test('state cleanup expires active sessions and keeps only a minimal terminal reference', async () => {
+  const state = createInMemoryCatalogIntakeStatePort();
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨', requestToken: 'request-cleanup' },
+  });
+
+  assert.deepEqual(await state.cleanup(new Date('2026-09-23T10:30:00.000Z')), {
+    expired: 1,
+    removed: 0,
+  });
+  const terminal = await state.get(ownerConversation.invocation, 'session-1');
+  assert.equal(terminal.state, 'expired');
+  assert.equal('candidates' in terminal, false);
+  assert.equal('preview' in terminal, false);
+  assert.equal(JSON.stringify(terminal).includes('Transient Google'), false);
 });
 
 test('port rejections become closed AddError results without leaking raw details or performing later writes', async () => {
@@ -491,27 +738,45 @@ function createFixtureApplication(options) {
   const intakeModule = createCatalogIntakeModule({
     discoveryPort: normalized.discoveryPort,
     statePort: normalized.statePort ?? createInMemoryCatalogIntakeStatePort(),
-    clock: { now: () => new Date('2026-09-22T10:00:00.000Z') },
+    clock: normalized.clock ?? {
+      now: () => new Date('2026-09-22T10:00:00.000Z'),
+    },
     idSource: { nextId: () => 'session-1' },
+    ...(normalized.idSource ? { idSource: normalized.idSource } : {}),
     catalogRevision: normalized.catalogRevision ?? {
       read: async () => 'catalog-r1',
     },
   });
-  return createAtlasApplication(
+  const application = createAtlasApplication(
     createCatalogIntakeOperationGroup(intakeModule),
   );
+  return {
+    ...application,
+    execute(operation, context = ownerConversation) {
+      return application.execute(operation, context);
+    },
+  };
 }
 
 function discoveryFixture(options = {}) {
+  const candidate = discoveryCandidate(options);
   return {
     async discover() {
       return {
         ok: true,
         value: {
-          candidates: [discoveryCandidate(options)],
+          candidates: [candidate],
           hasMore: false,
         },
       };
+    },
+    async refetch({ providerNamespace, placeId }) {
+      assert.equal(
+        providerNamespace,
+        candidate.durableIdentity.providerNamespace,
+      );
+      assert.equal(placeId, candidate.durableIdentity.placeId);
+      return { ok: true, value: candidate };
     },
   };
 }
@@ -539,6 +804,51 @@ function rejectingDiscovery(message) {
     async discover() {
       throw new Error(message);
     },
+    async refetch() {
+      throw new Error(message);
+    },
+  };
+}
+
+function expirationRacePort(base, race) {
+  return {
+    findByRequest: (...arguments_) => base.findByRequest(...arguments_),
+    createReplacingActive: (...arguments_) =>
+      base.createReplacingActive(...arguments_),
+    get: (...arguments_) => base.get(...arguments_),
+    cleanup: (...arguments_) => base.cleanup(...arguments_),
+    async compareAndSwap(input) {
+      if (input.next.state !== 'expired') return base.compareAndSwap(input);
+      if (race === 'expired') {
+        return { kind: 'conflict', current: input.next };
+      }
+      if (race === 'cancelled') {
+        return {
+          kind: 'conflict',
+          current: {
+            sessionId: input.sessionId,
+            sessionVersion: input.expectedVersion + 1,
+            state: 'cancelled',
+            ...input.scope,
+            cancelledFromVersion: input.expectedVersion,
+            requestToken: input.next.requestToken,
+            normalizedOwnerQuery: input.next.normalizedOwnerQuery,
+            terminalAt: '2026-09-22T10:30:00.000Z',
+            retainUntil: '2027-03-21T10:30:00.000Z',
+          },
+        };
+      }
+      const current = await base.get(input.scope, input.sessionId);
+      return {
+        kind: 'conflict',
+        current: {
+          ...current,
+          sessionVersion: input.expectedVersion + 1,
+          lastAcceptedActivityAt: '2026-09-22T10:29:59.000Z',
+          expiresAt: '2026-09-22T10:59:59.000Z',
+        },
+      };
+    },
   };
 }
 
@@ -550,21 +860,55 @@ function recordingStatePort() {
     sessions: new Map(),
   };
   state.port = {
-    async create(session) {
+    async findByRequest(scope, requestToken) {
+      const session = [...state.sessions.values()].find(
+        (candidate) =>
+          candidate.ownerId === scope.ownerId &&
+          candidate.channel === scope.channel &&
+          candidate.conversationId === scope.conversationId &&
+          candidate.requestToken === requestToken,
+      );
+      return session ? structuredClone(session) : undefined;
+    },
+    async createReplacingActive(session) {
       if (state.failOn === 'create') throw new Error('private create text');
       const copy = structuredClone(session);
       state.created.push(copy);
       state.sessions.set(session.sessionId, copy);
+      return { kind: 'created', session: copy };
     },
-    async get(sessionId) {
+    async get(scope, sessionId) {
       if (state.failOn === 'get') throw new Error('private get text');
       const session = state.sessions.get(sessionId);
-      return session ? structuredClone(session) : undefined;
+      return session &&
+        session.ownerId === scope.ownerId &&
+        session.channel === scope.channel &&
+        session.conversationId === scope.conversationId
+        ? structuredClone(session)
+        : undefined;
     },
-    async replace(session) {
+    async compareAndSwap({ scope, sessionId, expectedVersion, next }) {
       if (state.failOn === 'replace') throw new Error('private replace text');
       state.replaceCalls += 1;
-      state.sessions.set(session.sessionId, structuredClone(session));
+      const current = state.sessions.get(sessionId);
+      if (
+        !current ||
+        current.ownerId !== scope.ownerId ||
+        current.channel !== scope.channel ||
+        current.conversationId !== scope.conversationId ||
+        current.sessionVersion !== expectedVersion
+      ) {
+        return {
+          kind: 'conflict',
+          ...(current ? { current: structuredClone(current) } : {}),
+        };
+      }
+      const copy = structuredClone(next);
+      state.sessions.set(sessionId, copy);
+      return { kind: 'applied', session: copy };
+    },
+    async cleanup() {
+      return { expired: 0, removed: 0 };
     },
   };
   return state;
@@ -577,7 +921,7 @@ function assertClosedAddFailure(result, code) {
     'message',
     'retryable',
   ]);
-  assert.equal(result.error.kind, code);
+  assert.equal(result.error.kind, code === 'expired' ? 'conflict' : code);
   assert.equal(result.error.code, code);
   assert.equal(typeof result.error.retryable, 'boolean');
 }

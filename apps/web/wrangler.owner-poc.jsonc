@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "japan-atlas-owner-poc",
-  "main": "vinext/server/fetch-handler",
+  "main": "owner-poc-worker.ts",
   "compatibility_date": "2026-09-21",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -12,6 +12,9 @@
   "vars": {
     "ATLAS_DATASET": "owner-poc",
     "ATLAS_DEPLOYMENT_ENV": "owner-poc",
+  },
+  "triggers": {
+    "crons": ["0 3 * * *"],
   },
   "d1_databases": [
     {

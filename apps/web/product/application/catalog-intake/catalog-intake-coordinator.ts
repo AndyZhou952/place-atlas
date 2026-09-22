@@ -1,5 +1,6 @@
 import {
   defineOperationGroup,
+  type ApplicationExecutionContext,
   type OperationDefinition,
 } from '../atlas-application.ts';
 import {
@@ -56,6 +57,16 @@ export interface GooglePlaceDiscoveryPort {
       readonly hasMore: boolean;
     }>
   >;
+  refetch(input: {
+    readonly providerNamespace: string;
+    readonly placeId: string;
+  }): Promise<Result<GooglePlaceDiscoveryCandidate>>;
+}
+
+export interface CatalogIntakeScope {
+  readonly ownerId: string;
+  readonly channel: string;
+  readonly conversationId: string;
 }
 
 export interface CatalogIntakeDiscoverInput {
@@ -329,65 +340,124 @@ export interface CatalogIntakeCancelOutput {
   readonly replayed: boolean;
 }
 
-interface CatalogIntakeStoredCandidate {
+export interface CatalogIntakeStoredCandidate {
   readonly providerNamespace: string;
   readonly placeId: string;
   readonly ordinal: number;
   readonly createdAt: string;
 }
 
-interface CatalogIntakeCandidatesSession {
+interface CatalogIntakeActiveSessionBase extends CatalogIntakeScope {
+  readonly ownerQuery: string;
+  readonly normalizedOwnerQuery: string;
+  readonly requestToken: string;
+  readonly hasMore: boolean;
+  readonly candidates: readonly CatalogIntakeStoredCandidate[];
+  readonly catalogRevision: string;
+  readonly createdAt: string;
+  readonly discoverExpiresAt: string;
+  readonly lastAcceptedActivityAt: string;
+  readonly expiresAt: string;
+  readonly lastTransition?: {
+    readonly operation: 'select';
+    readonly fromVersion: number;
+    readonly inputJson: string;
+  };
+}
+
+export interface CatalogIntakeCandidatesSession extends CatalogIntakeActiveSessionBase {
   readonly sessionId: string;
   readonly sessionVersion: number;
   readonly state: 'candidates_ready';
-  readonly ownerQuery: string;
-  readonly requestToken: string;
-  readonly candidates: readonly CatalogIntakeStoredCandidate[];
-  readonly catalogRevision: string;
-  readonly expiresAt: string;
 }
 
-interface CatalogIntakePreviewSession {
+export interface CatalogIntakePreviewSession extends CatalogIntakeActiveSessionBase {
   readonly sessionId: string;
   readonly sessionVersion: number;
   readonly state: 'preview_ready';
-  readonly ownerQuery: string;
-  readonly requestToken: string;
-  readonly candidates: readonly CatalogIntakeStoredCandidate[];
-  readonly catalogRevision: string;
-  readonly expiresAt: string;
   readonly preview: CatalogIntakePreview;
 }
 
-interface CatalogIntakeCancelledSession {
+export interface CatalogIntakeCancelledSession extends CatalogIntakeScope {
   readonly sessionId: string;
+  readonly sessionVersion: number;
   readonly state: 'cancelled';
   readonly cancelledFromVersion: number;
+  readonly requestToken: string;
+  readonly normalizedOwnerQuery: string;
+  readonly terminalAt: string;
+  readonly retainUntil: string;
 }
 
-type CatalogIntakeStoredSession =
+export interface CatalogIntakeExpiredSession extends CatalogIntakeScope {
+  readonly sessionId: string;
+  readonly sessionVersion: number;
+  readonly state: 'expired';
+  readonly expiredFromVersion: number;
+  readonly expiredAt: string;
+  readonly requestToken: string;
+  readonly normalizedOwnerQuery: string;
+  readonly terminalAt: string;
+  readonly retainUntil: string;
+}
+
+export type CatalogIntakeStoredSession =
   | CatalogIntakeCandidatesSession
   | CatalogIntakePreviewSession
-  | CatalogIntakeCancelledSession;
+  | CatalogIntakeCancelledSession
+  | CatalogIntakeExpiredSession;
 
 export interface CatalogIntakeStatePort {
-  create(session: CatalogIntakeStoredSession): Promise<void>;
-  get(sessionId: string): Promise<CatalogIntakeStoredSession | undefined>;
-  replace(session: CatalogIntakeStoredSession): Promise<void>;
+  findByRequest(
+    scope: CatalogIntakeScope,
+    requestToken: string,
+  ): Promise<CatalogIntakeStoredSession | undefined>;
+  createReplacingActive(session: CatalogIntakeCandidatesSession): Promise<
+    | {
+        readonly kind: 'created';
+        readonly session: CatalogIntakeCandidatesSession;
+      }
+    | { readonly kind: 'replay'; readonly session: CatalogIntakeStoredSession }
+    | { readonly kind: 'conflict' }
+  >;
+  get(
+    scope: CatalogIntakeScope,
+    sessionId: string,
+  ): Promise<CatalogIntakeStoredSession | undefined>;
+  compareAndSwap(input: {
+    readonly scope: CatalogIntakeScope;
+    readonly sessionId: string;
+    readonly expectedVersion: number;
+    readonly next: CatalogIntakeStoredSession;
+  }): Promise<
+    | { readonly kind: 'applied'; readonly session: CatalogIntakeStoredSession }
+    | {
+        readonly kind: 'conflict';
+        readonly current?: CatalogIntakeStoredSession;
+      }
+  >;
+  cleanup(now: Date): Promise<{
+    readonly expired: number;
+    readonly removed: number;
+  }>;
 }
 
 export interface CatalogIntakeModule {
   discover(
     input: CatalogIntakeDiscoverInput,
+    scope: CatalogIntakeScope,
   ): Promise<AddResult<CatalogIntakeDiscoverOutput>>;
   select(
     input: CatalogIntakeSelectInput,
+    scope: CatalogIntakeScope,
   ): Promise<AddResult<CatalogIntakeSelectOutput>>;
   confirm(
     input: CatalogIntakeConfirmInput,
+    scope: CatalogIntakeScope,
   ): Promise<AddResult<CatalogIntakeConfirmOutput>>;
   cancel(
     input: CatalogIntakeCancelInput,
+    scope: CatalogIntakeScope,
   ): Promise<AddResult<CatalogIntakeCancelOutput>>;
 }
 
@@ -399,8 +469,50 @@ export function createCatalogIntakeModule(options: {
   readonly catalogRevision: { read(): Promise<string> };
 }): CatalogIntakeModule {
   return {
-    async discover(input) {
+    async discover(input, scope) {
       try {
+        const prior = await options.statePort.findByRequest(
+          scope,
+          input.requestToken,
+        );
+        if (prior) {
+          if (prior.normalizedOwnerQuery !== input.query) {
+            return addFailure(
+              'conflict',
+              'The request token was already used for another query.',
+              false,
+            );
+          }
+          if (
+            prior.state !== 'candidates_ready' &&
+            prior.state !== 'preview_ready'
+          ) {
+            return addFailure(
+              prior.state === 'expired' ? 'expired' : 'conflict',
+              prior.state === 'expired'
+                ? 'Catalog intake session has expired.'
+                : 'Catalog intake session is no longer active.',
+              false,
+            );
+          }
+          const expiration = await expireIfNeeded(prior, scope, options);
+          if (expiration.kind === 'expired') {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
+          if (expiration.kind !== 'active') {
+            return addFailure(
+              'conflict',
+              'Catalog intake session has changed.',
+              false,
+            );
+          }
+          return replayDiscover(expiration.session, options.discoveryPort);
+        }
+
         const discovered = await options.discoveryPort.discover({
           query: input.query,
         });
@@ -422,23 +534,68 @@ export function createCatalogIntakeModule(options: {
 
         const now = options.clock.now();
         const sessionId = options.idSource.nextId();
-        const expiresAt = new Date(
-          now.getTime() + 30 * 60 * 1000,
-        ).toISOString();
+        const expiresAt = acceptedExpiry(now);
         const catalogRevision = await options.catalogRevision.read();
-        await options.statePort.create({
+        const session: CatalogIntakeCandidatesSession = {
           sessionId,
           sessionVersion: 1,
           state: 'candidates_ready',
+          ...scope,
           ownerQuery: input.query,
+          normalizedOwnerQuery: input.query,
           requestToken: input.requestToken,
+          hasMore: discovery.hasMore,
           candidates: discovery.candidates.map(({ durableIdentity }) => ({
             ...durableIdentity,
             createdAt: now.toISOString(),
           })),
           catalogRevision,
+          createdAt: now.toISOString(),
+          discoverExpiresAt: expiresAt,
+          lastAcceptedActivityAt: now.toISOString(),
           expiresAt,
-        });
+        };
+        const created = await options.statePort.createReplacingActive(session);
+        if (created.kind === 'conflict') {
+          return addFailure(
+            'conflict',
+            'The request token conflicts with an earlier request.',
+            false,
+          );
+        }
+        if (created.kind === 'replay') {
+          if (
+            created.session.normalizedOwnerQuery !== input.query ||
+            (created.session.state !== 'candidates_ready' &&
+              created.session.state !== 'preview_ready')
+          ) {
+            return addFailure(
+              'conflict',
+              'The request token conflicts with an earlier request.',
+              false,
+            );
+          }
+          const expiration = await expireIfNeeded(
+            created.session,
+            scope,
+            options,
+          );
+          if (expiration.kind === 'expired') {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
+          if (expiration.kind !== 'active') {
+            return addFailure(
+              'conflict',
+              'Catalog intake session has changed.',
+              false,
+            );
+          }
+          return replayDiscover(expiration.session, options.discoveryPort);
+        }
 
         return success({
           status:
@@ -466,9 +623,9 @@ export function createCatalogIntakeModule(options: {
         );
       }
     },
-    async select(input) {
+    async select(input, scope) {
       try {
-        const session = await options.statePort.get(input.sessionId);
+        let session = await options.statePort.get(scope, input.sessionId);
         if (!session) {
           return addFailure(
             'not_found',
@@ -476,8 +633,53 @@ export function createCatalogIntakeModule(options: {
             false,
           );
         }
+        if (session.state === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        if (session.state === 'cancelled') {
+          return addFailure(
+            'conflict',
+            'Catalog intake session is cancelled.',
+            false,
+          );
+        }
+        const expiration = await expireIfNeeded(session, scope, options);
+        if (expiration.kind === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        if (expiration.kind !== 'active') {
+          return addFailure(
+            'conflict',
+            'Catalog intake session has changed.',
+            false,
+          );
+        }
+        session = expiration.session;
+        const inputJson = canonicalSelectInput(input);
         if (
-          session.state !== 'candidates_ready' ||
+          session.lastTransition?.operation === 'select' &&
+          session.lastTransition.fromVersion === input.expectedSessionVersion
+        ) {
+          if (session.lastTransition.inputJson !== inputJson) {
+            return addFailure(
+              'conflict',
+              'Catalog intake selection conflicts with an earlier request.',
+              false,
+            );
+          }
+          return replaySelect(session);
+        }
+        if (
+          (session.state !== 'candidates_ready' &&
+            session.state !== 'preview_ready') ||
           session.sessionVersion !== input.expectedSessionVersion
         ) {
           return addFailure(
@@ -496,22 +698,74 @@ export function createCatalogIntakeModule(options: {
             false,
           );
         }
+        const refreshed = await options.discoveryPort.refetch({
+          providerNamespace: candidate.providerNamespace,
+          placeId: candidate.placeId,
+        });
+        if (!refreshed.ok) {
+          return addFailure(
+            'dependency_failure',
+            'Place discovery is temporarily unavailable.',
+            true,
+          );
+        }
+        const refreshedCandidate = validateDiscoveryCandidate(refreshed.value);
+        if (
+          !refreshedCandidate ||
+          refreshedCandidate.durableIdentity.providerNamespace !==
+            candidate.providerNamespace ||
+          refreshedCandidate.durableIdentity.placeId !== candidate.placeId
+        ) {
+          return addFailure(
+            'dependency_failure',
+            'Place discovery returned an invalid response.',
+            false,
+          );
+        }
+
         const ownerFields = input.ownerFields ?? {};
+        const acceptedAt = options.clock.now();
+        const nextVersion = session.sessionVersion + 1;
         if (!ownerFields.title && !ownerFields.address) {
+          const next: CatalogIntakeCandidatesSession = {
+            ...session,
+            state: 'candidates_ready',
+            sessionVersion: nextVersion,
+            lastAcceptedActivityAt: acceptedAt.toISOString(),
+            expiresAt: acceptedExpiry(acceptedAt),
+            lastTransition: {
+              operation: 'select',
+              fromVersion: input.expectedSessionVersion,
+              inputJson,
+            },
+          };
+          const transitioned = await options.statePort.compareAndSwap({
+            scope,
+            sessionId: session.sessionId,
+            expectedVersion: input.expectedSessionVersion,
+            next,
+          });
+          if (transitioned.kind === 'conflict') {
+            return replayOrConflictSelect(
+              transitioned.current,
+              input,
+              inputJson,
+            );
+          }
           return success({
             status: 'clarification_required',
             sessionId: session.sessionId,
-            sessionVersion: session.sessionVersion,
+            sessionVersion: nextVersion,
             clarification: {
               code: 'missing_area_or_address',
               prompt: 'Add a restaurant name, area, or address to continue.',
               fields: ['title', 'area', 'address'],
             },
-            expiresAt: session.expiresAt,
+            expiresAt: next.expiresAt,
           });
         }
 
-        const assertedAt = options.clock.now().toISOString();
+        const assertedAt = acceptedAt.toISOString();
         const locationEvidence =
           ownerFields.coordinates && ownerFields.address
             ? {
@@ -544,7 +798,10 @@ export function createCatalogIntakeModule(options: {
             : { status: 'unknown' as const };
         const previewWithoutDigest = {
           sessionId: session.sessionId,
-          previewVersion: 1,
+          previewVersion:
+            session.state === 'preview_ready'
+              ? session.preview.previewVersion + 1
+              : 1,
           state: 'preview_ready' as const,
           candidateIdentity: {
             providerNamespace: candidate.providerNamespace,
@@ -572,24 +829,40 @@ export function createCatalogIntakeModule(options: {
             },
           ],
           catalogRevision: session.catalogRevision,
-          expiresAt: session.expiresAt,
+          expiresAt: acceptedExpiry(acceptedAt),
         };
         const preview: CatalogIntakePreview = {
           ...previewWithoutDigest,
           evidenceDigest: await digestCanonical(previewWithoutDigest),
         };
-        await options.statePort.replace({
+        const next: CatalogIntakePreviewSession = {
           ...session,
           state: 'preview_ready',
-          sessionVersion: 2,
+          sessionVersion: nextVersion,
+          lastAcceptedActivityAt: acceptedAt.toISOString(),
+          expiresAt: preview.expiresAt,
+          lastTransition: {
+            operation: 'select',
+            fromVersion: input.expectedSessionVersion,
+            inputJson,
+          },
           preview,
+        };
+        const transitioned = await options.statePort.compareAndSwap({
+          scope,
+          sessionId: session.sessionId,
+          expectedVersion: input.expectedSessionVersion,
+          next,
         });
+        if (transitioned.kind === 'conflict') {
+          return replayOrConflictSelect(transitioned.current, input, inputJson);
+        }
         return success({
           status: 'preview_ready',
           sessionId: session.sessionId,
-          sessionVersion: 2,
+          sessionVersion: nextVersion,
           preview,
-          expiresAt: session.expiresAt,
+          expiresAt: next.expiresAt,
         });
       } catch {
         return addFailure(
@@ -599,9 +872,9 @@ export function createCatalogIntakeModule(options: {
         );
       }
     },
-    async confirm(input) {
+    async confirm(input, scope) {
       try {
-        const session = await options.statePort.get(input.sessionId);
+        let session = await options.statePort.get(scope, input.sessionId);
         if (!session) {
           return addFailure(
             'not_found',
@@ -609,6 +882,36 @@ export function createCatalogIntakeModule(options: {
             false,
           );
         }
+        if (session.state === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        if (session.state === 'cancelled') {
+          return addFailure(
+            'conflict',
+            'Catalog intake session is cancelled.',
+            false,
+          );
+        }
+        const expiration = await expireIfNeeded(session, scope, options);
+        if (expiration.kind === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        if (expiration.kind !== 'active') {
+          return addFailure(
+            'conflict',
+            'Catalog intake session has changed.',
+            false,
+          );
+        }
+        session = expiration.session;
         if (
           session.state !== 'preview_ready' ||
           session.preview.previewVersion !== input.expectedPreviewVersion
@@ -631,9 +934,9 @@ export function createCatalogIntakeModule(options: {
         );
       }
     },
-    async cancel(input) {
+    async cancel(input, scope) {
       try {
-        const session = await options.statePort.get(input.sessionId);
+        let session = await options.statePort.get(scope, input.sessionId);
         if (!session) {
           return addFailure(
             'not_found',
@@ -654,6 +957,43 @@ export function createCatalogIntakeModule(options: {
                 false,
               );
         }
+        if (session.state === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        const expiration = await expireIfNeeded(session, scope, options);
+        if (expiration.kind === 'expired') {
+          return addFailure(
+            'expired',
+            'Catalog intake session has expired.',
+            false,
+          );
+        }
+        if (expiration.kind === 'cancelled') {
+          return expiration.session.cancelledFromVersion ===
+            input.expectedSessionVersion
+            ? success({
+                status: 'cancelled',
+                sessionId: expiration.session.sessionId,
+                replayed: true,
+              })
+            : addFailure(
+                'conflict',
+                'Catalog intake session has changed.',
+                false,
+              );
+        }
+        if (expiration.kind !== 'active') {
+          return addFailure(
+            'conflict',
+            'Catalog intake session has changed.',
+            false,
+          );
+        }
+        session = expiration.session;
         if (session.sessionVersion !== input.expectedSessionVersion) {
           return addFailure(
             'conflict',
@@ -661,11 +1001,42 @@ export function createCatalogIntakeModule(options: {
             false,
           );
         }
-        await options.statePort.replace({
+        const terminalAt = options.clock.now();
+        const next: CatalogIntakeCancelledSession = {
           state: 'cancelled',
           sessionId: session.sessionId,
+          sessionVersion: session.sessionVersion + 1,
+          ...scope,
           cancelledFromVersion: input.expectedSessionVersion,
+          requestToken: session.requestToken,
+          normalizedOwnerQuery: session.normalizedOwnerQuery,
+          terminalAt: terminalAt.toISOString(),
+          retainUntil: receiptRetention(terminalAt),
+        };
+        const transitioned = await options.statePort.compareAndSwap({
+          scope,
+          sessionId: session.sessionId,
+          expectedVersion: input.expectedSessionVersion,
+          next,
         });
+        if (transitioned.kind === 'conflict') {
+          const current = transitioned.current;
+          if (
+            current?.state === 'cancelled' &&
+            current.cancelledFromVersion === input.expectedSessionVersion
+          ) {
+            return success({
+              status: 'cancelled',
+              sessionId: current.sessionId,
+              replayed: true,
+            });
+          }
+          return addFailure(
+            'conflict',
+            'Catalog intake session has changed.',
+            false,
+          );
+        }
         return success({
           status: 'cancelled',
           sessionId: session.sessionId,
@@ -712,7 +1083,8 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
       effect: 'write',
       validate: validateDiscoverInput,
     },
-    handle: (input) => module.discover(input),
+    handle: (input, context) =>
+      executeWithScope(context, (scope) => module.discover(input, scope)),
   };
 
   const select: OperationDefinition<
@@ -727,7 +1099,8 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
       effect: 'write',
       validate: validateSelectInput,
     },
-    handle: (input) => module.select(input),
+    handle: (input, context) =>
+      executeWithScope(context, (scope) => module.select(input, scope)),
   };
 
   const confirm: OperationDefinition<
@@ -742,7 +1115,8 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
       effect: 'write',
       validate: validateConfirmInput,
     },
-    handle: (input) => module.confirm(input),
+    handle: (input, context) =>
+      executeWithScope(context, (scope) => module.confirm(input, scope)),
   };
 
   const cancel: OperationDefinition<
@@ -757,7 +1131,8 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
       effect: 'write',
       validate: validateCancelInput,
     },
-    handle: (input) => module.cancel(input),
+    handle: (input, context) =>
+      executeWithScope(context, (scope) => module.cancel(input, scope)),
   };
 
   return defineOperationGroup({
@@ -771,17 +1146,316 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
 export function createInMemoryCatalogIntakeStatePort(): CatalogIntakeStatePort {
   const sessions = new Map<string, CatalogIntakeStoredSession>();
   return {
-    async create(session) {
-      sessions.set(session.sessionId, structuredClone(session));
-    },
-    async get(sessionId) {
-      const session = sessions.get(sessionId);
+    async findByRequest(scope, requestToken) {
+      const session = [...sessions.values()].find(
+        (candidate) =>
+          sameScope(candidate, scope) &&
+          candidate.requestToken === requestToken,
+      );
       return session ? structuredClone(session) : undefined;
     },
-    async replace(session) {
+    async createReplacingActive(session) {
+      const priorRequest = [...sessions.values()].find(
+        (candidate) =>
+          sameScope(candidate, session) &&
+          candidate.requestToken === session.requestToken,
+      );
+      if (priorRequest) {
+        return priorRequest.normalizedOwnerQuery ===
+          session.normalizedOwnerQuery
+          ? { kind: 'replay' as const, session: structuredClone(priorRequest) }
+          : { kind: 'conflict' as const };
+      }
+      for (const [id, active] of sessions) {
+        if (
+          sameScope(active, session) &&
+          (active.state === 'candidates_ready' ||
+            active.state === 'preview_ready')
+        ) {
+          const terminalAt = new Date(session.createdAt);
+          sessions.set(id, {
+            state: 'cancelled',
+            sessionId: active.sessionId,
+            sessionVersion: active.sessionVersion + 1,
+            ownerId: active.ownerId,
+            channel: active.channel,
+            conversationId: active.conversationId,
+            cancelledFromVersion: active.sessionVersion,
+            requestToken: active.requestToken,
+            normalizedOwnerQuery: active.normalizedOwnerQuery,
+            terminalAt: terminalAt.toISOString(),
+            retainUntil: receiptRetention(terminalAt),
+          });
+        }
+      }
       sessions.set(session.sessionId, structuredClone(session));
+      return { kind: 'created' as const, session: structuredClone(session) };
+    },
+    async get(scope, sessionId) {
+      const session = sessions.get(sessionId);
+      return session && sameScope(session, scope)
+        ? structuredClone(session)
+        : undefined;
+    },
+    async compareAndSwap({ scope, sessionId, expectedVersion, next }) {
+      const current = sessions.get(sessionId);
+      if (
+        !current ||
+        !sameScope(current, scope) ||
+        current.sessionVersion !== expectedVersion
+      ) {
+        return {
+          kind: 'conflict' as const,
+          ...(current && sameScope(current, scope)
+            ? { current: structuredClone(current) }
+            : {}),
+        };
+      }
+      sessions.set(sessionId, structuredClone(next));
+      return { kind: 'applied' as const, session: structuredClone(next) };
+    },
+    async cleanup(now) {
+      let expired = 0;
+      let removed = 0;
+      for (const [id, session] of sessions) {
+        if (
+          (session.state === 'candidates_ready' ||
+            session.state === 'preview_ready') &&
+          now.getTime() >= Date.parse(session.expiresAt)
+        ) {
+          sessions.set(id, expiredSession(session, now));
+          expired += 1;
+          continue;
+        }
+        if (
+          (session.state === 'cancelled' || session.state === 'expired') &&
+          now.getTime() >= Date.parse(session.retainUntil)
+        ) {
+          sessions.delete(id);
+          removed += 1;
+        }
+      }
+      return { expired, removed };
     },
   };
+}
+
+function executeWithScope<T>(
+  context: ApplicationExecutionContext | undefined,
+  execute: (scope: CatalogIntakeScope) => Promise<AddResult<T>>,
+): Promise<AddResult<T>> {
+  const invocation = context?.invocation;
+  if (
+    !invocation ||
+    !normalizeBoundedText(invocation.ownerId, 1, 200) ||
+    !normalizeBoundedText(invocation.channel, 1, 120) ||
+    !normalizeBoundedText(invocation.conversationId, 1, 200)
+  ) {
+    return Promise.resolve(
+      addFailure(
+        'unauthorized',
+        'Catalog intake requires an authenticated conversation.',
+        false,
+      ),
+    );
+  }
+  return execute({
+    ownerId: invocation.ownerId.normalize('NFC').trim(),
+    channel: invocation.channel.normalize('NFC').trim(),
+    conversationId: invocation.conversationId.normalize('NFC').trim(),
+  });
+}
+
+async function replayDiscover(
+  session: CatalogIntakeCandidatesSession | CatalogIntakePreviewSession,
+  discoveryPort: GooglePlaceDiscoveryPort,
+): Promise<AddResult<CatalogIntakeDiscoverOutput>> {
+  const candidates: CatalogIntakeCandidateOutput[] = [];
+  for (const stored of session.candidates) {
+    const result = await discoveryPort.refetch({
+      providerNamespace: stored.providerNamespace,
+      placeId: stored.placeId,
+    });
+    if (!result.ok) {
+      return addFailure(
+        'dependency_failure',
+        'Place discovery is temporarily unavailable.',
+        true,
+      );
+    }
+    const candidate = validateDiscoveryCandidate(result.value);
+    if (
+      !candidate ||
+      candidate.durableIdentity.providerNamespace !==
+        stored.providerNamespace ||
+      candidate.durableIdentity.placeId !== stored.placeId
+    ) {
+      return addFailure(
+        'dependency_failure',
+        'Place discovery returned an invalid response.',
+        false,
+      );
+    }
+    candidates.push({
+      ordinal: stored.ordinal,
+      transientName: candidate.transientPresentation.name,
+      transientAddress: candidate.transientPresentation.address,
+      attribution: candidate.transientPresentation.attribution,
+    });
+  }
+  return success({
+    status:
+      candidates.length === 0 ? 'clarification_required' : 'candidates_ready',
+    sessionId: session.sessionId,
+    sessionVersion: 1,
+    candidates,
+    hasMore: session.hasMore,
+    expiresAt: session.discoverExpiresAt,
+  });
+}
+
+function replaySelect(
+  session: CatalogIntakeCandidatesSession | CatalogIntakePreviewSession,
+): AddResult<CatalogIntakeSelectOutput> {
+  if (session.state === 'preview_ready') {
+    return success({
+      status: 'preview_ready',
+      sessionId: session.sessionId,
+      sessionVersion: session.sessionVersion,
+      preview: session.preview,
+      expiresAt: session.expiresAt,
+    });
+  }
+  return success({
+    status: 'clarification_required',
+    sessionId: session.sessionId,
+    sessionVersion: session.sessionVersion,
+    clarification: {
+      code: 'missing_area_or_address',
+      prompt: 'Add a restaurant name, area, or address to continue.',
+      fields: ['title', 'area', 'address'],
+    },
+    expiresAt: session.expiresAt,
+  });
+}
+
+function replayOrConflictSelect(
+  current: CatalogIntakeStoredSession | undefined,
+  input: CatalogIntakeSelectInput,
+  inputJson: string,
+): AddResult<CatalogIntakeSelectOutput> {
+  if (
+    current &&
+    (current.state === 'candidates_ready' ||
+      current.state === 'preview_ready') &&
+    current.lastTransition?.operation === 'select' &&
+    current.lastTransition.fromVersion === input.expectedSessionVersion &&
+    current.lastTransition.inputJson === inputJson
+  ) {
+    return replaySelect(current);
+  }
+  return addFailure('conflict', 'Catalog intake session has changed.', false);
+}
+
+function canonicalSelectInput(input: CatalogIntakeSelectInput): string {
+  return JSON.stringify(input);
+}
+
+async function expireIfNeeded(
+  session: CatalogIntakeCandidatesSession | CatalogIntakePreviewSession,
+  scope: CatalogIntakeScope,
+  options: {
+    readonly statePort: CatalogIntakeStatePort;
+    readonly clock: { now(): Date };
+  },
+): Promise<
+  | {
+      readonly kind: 'active';
+      readonly session:
+        | CatalogIntakeCandidatesSession
+        | CatalogIntakePreviewSession;
+    }
+  | { readonly kind: 'expired'; readonly session: CatalogIntakeExpiredSession }
+  | {
+      readonly kind: 'cancelled';
+      readonly session: CatalogIntakeCancelledSession;
+    }
+  | { readonly kind: 'conflict' }
+> {
+  const now = options.clock.now();
+  if (now.getTime() < Date.parse(session.expiresAt)) {
+    return { kind: 'active', session };
+  }
+  const transitioned = await options.statePort.compareAndSwap({
+    scope,
+    sessionId: session.sessionId,
+    expectedVersion: session.sessionVersion,
+    next: expiredSession(session, now),
+  });
+  if (transitioned.kind === 'applied') {
+    return {
+      kind: 'expired',
+      session: transitioned.session as CatalogIntakeExpiredSession,
+    };
+  }
+  const current = transitioned.current;
+  if (!current) return { kind: 'conflict' };
+  if (current.state === 'expired') return { kind: 'expired', session: current };
+  if (current.state === 'cancelled') {
+    return { kind: 'cancelled', session: current };
+  }
+  if (now.getTime() < Date.parse(current.expiresAt)) {
+    return { kind: 'active', session: current };
+  }
+  return { kind: 'conflict' };
+}
+
+function expiredSession(
+  session: CatalogIntakeCandidatesSession | CatalogIntakePreviewSession,
+  now: Date,
+): CatalogIntakeExpiredSession {
+  return {
+    state: 'expired',
+    sessionId: session.sessionId,
+    sessionVersion: session.sessionVersion + 1,
+    ownerId: session.ownerId,
+    channel: session.channel,
+    conversationId: session.conversationId,
+    expiredFromVersion: session.sessionVersion,
+    requestToken: session.requestToken,
+    normalizedOwnerQuery: session.normalizedOwnerQuery,
+    expiredAt: now.toISOString(),
+    terminalAt: now.toISOString(),
+    retainUntil: receiptRetention(now),
+  };
+}
+
+function sameScope(
+  left: CatalogIntakeScope,
+  right: CatalogIntakeScope,
+): boolean {
+  return (
+    left.ownerId === right.ownerId &&
+    left.channel === right.channel &&
+    left.conversationId === right.conversationId
+  );
+}
+
+function acceptedExpiry(now: Date): string {
+  return new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+}
+
+function receiptRetention(now: Date): string {
+  return new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function validateDiscoveryCandidate(
+  value: unknown,
+): GooglePlaceDiscoveryCandidate | undefined {
+  return validateDiscoveryResult({
+    candidates: [value],
+    hasMore: false,
+  })?.candidates[0];
 }
 
 function addFailure(
@@ -824,6 +1498,7 @@ function validateDiscoveryResult(value: unknown):
     return undefined;
   }
   const ordinals = new Set<number>();
+  const identities = new Set<string>();
   const candidates: GooglePlaceDiscoveryCandidate[] = [];
   for (const candidate of value.candidates) {
     if (
@@ -880,6 +1555,7 @@ function validateDiscoveryResult(value: unknown):
       !placeId ||
       !isPositiveInteger(ordinal) ||
       ordinals.has(ordinal) ||
+      identities.has(`${providerNamespace}\u0000${placeId}`) ||
       !name ||
       !address ||
       !label ||
@@ -888,6 +1564,7 @@ function validateDiscoveryResult(value: unknown):
       return undefined;
     }
     ordinals.add(ordinal);
+    identities.add(`${providerNamespace}\u0000${placeId}`);
     candidates.push({
       durableIdentity: { providerNamespace, placeId, ordinal },
       transientPresentation: {

@@ -1,6 +1,6 @@
 # 任务票 — Owner PoC 统一应用操作
 
-- 状态：implement T-13；T-12 第 3 轮 code-review PASS 且用户于 2026-09-22 明确确认；T-08 本地代码 PASS 但仍缺 live SSH 证明
+- 状态：implement T-14；T-13 第 2 轮 code-review PASS 且用户于 2026-09-22 明确确认；T-08 只读 SSH 已健康，但仍缺切换后的 live 正反向证明
 - 执行方式：垂直切片优先；中央 composition、migration journal 与 operation catalog 由主任务串行汇合
 - 公开/权限确认：持 URL 者可查看 Catalog、总体评论、Visit 展示与照片原图；internal ID、存储 key、hash、audit 保持私有；只有 Owner 可以写入
 
@@ -16,7 +16,7 @@
 - [x] T-05 渠道无关 Nearby operation 预重构 — Blocked by: T-01 — 已用结构化 `nearby.recommend` 取代 owner-poc 中渠道专用 reply contract；Web 与微信 presenter 适配同一闭合 result，composition 不再依赖 `agent_catalog_items`/fixture personal facts；独立第 2 轮代码评审通过。
 - [x] T-06 独立 Google Route Sidecar 与双 hard cap — Blocked by: T-01, T-05 — 本地安全门、远端 encrypted Secret、private strict deploy、公网不可达、Google Cloud key/quota/billing guard 与 Owner Worker 精确 service binding 均已完成。v3 key 鉴权与 provider status 误分类已 TDD 修复、独立复审并重新 strict deploy；修复后 live Owner smoke 以 `東京都江東区平野2-16-14` 成功返回 `コーヒー マメヤ カケル`，确认真实 provider 链路闭合。
 - [x] T-07 Web/Agent/Sidecar 等价与 request-only 契约 — Blocked by: T-03, T-05, T-06 — Browser adapter 与 HMAC gateway 已对同一 Catalog、个人事实和位置文字返回等价闭合结果；Sidecar 原始 JSON、地址/坐标/路线不进入 D1/R2/log/prompt/Leaflet。Terms/Privacy 远端 200，Nearby 全响应 `no-store`，新查询不会沿用旧距离；独立最终代码/UI 评审通过。
-- [ ] T-08 确定性 `/jpmap nearby` owner-poc E2E（本地代码评审 PASS，仍缺 live SSH 证明）— Blocked by: T-07 — 精确命令零模型调用，覆盖 `银座/銀座/ginza`、owner DM、第二账号、群聊、错误 scope、nonce replay 与 Worker audit；旧 fixture 保持可回退。本地坐标粗筛／Top-N 性能优化由 GitHub #11 跟踪并交叉引用 feature004/T-06A，不阻塞本票。
+- [ ] T-08 确定性 `/jpmap nearby` owner-poc E2E（本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 健康）— Blocked by: T-07 — 当前仍使用旧 endpoint；尚未授权执行 owner-poc endpoint/key 切换、重启与 signed 正反向 probes，因此现场验收未关闭。精确命令零模型调用，覆盖 `银座/銀座/ginza`、owner DM、第二账号、群聊、错误 scope、nonce replay 与 Worker audit；旧 fixture 保持可回退。本地坐标粗筛／Top-N 性能优化由 GitHub #11 跟踪并交叉引用 feature004/T-06A，不阻塞本票。
 
 ## 第三门：语义辅助与发布
 
@@ -27,7 +27,7 @@
 ## 后续受门禁约束的共享写入
 
 - [x] T-12 Add CatalogIntake walking skeleton 与闭合 contracts（第 3 轮 code-review PASS；用户于 2026-09-22 确认）— Blocked by: T-03 — 原地深化 `catalog-intake-coordinator.ts` 为 Application Operations 的 `CatalogIntakeModule`，注册 `catalog.intake.discover/select/confirm/cancel` 闭合 input/output/error 与内存 fixture ports；迁移遗留 full-evidence 测试到 `AtlasApplication catalog.intake.*` 和 provider contract tests，删除旧 session/map evidence persistence，证明无平行 coordinator、Foursquare/底层 save/update/delete/direct POST 旁路且 `POST /api/items` 仍 503。验收证据：完整测试 479/479、聚焦 contract 10/10；用户确认后进入 T-13。
-- [ ] T-13 持久 session/CAS 与 transient Google discover/select — Blocked by: T-12 — 以 append-only migration 实现 owner/channel/conversation 单 active session、固定 30 分钟 inactivity TTL、状态/version/CAS/terminal reference 和 stable retry；Google Top-3 按稳定排序返回当次带 attribution 的 `transientPresentation`，D1/digest 仅保存 Owner query 与 `durableIdentity` Place ID tuple。验收覆盖 >=30:00 expiry、replacement/concurrency/cleanup、三语 query、>3/tie-break、response retry，以及 transient content/hash 永不持久化或进入 Leaflet。
+- [x] T-13 持久 session/CAS 与 transient Google discover/select（第 2 轮 code-review PASS；用户于 2026-09-22 确认）— Blocked by: T-12 — append-only D1 session/CAS、30 分钟 inactivity TTL、180 天 terminal/request retention、Google Top-3 transient projection 与 owner-poc daily cleanup 均已完成；并发续期不会被误报过期或被清理误删。验收证据：聚焦 contracts 27/27、完整测试 496/496、TypeScript、lint、format-check、diff-check 与 owner-poc production build 全部通过。
 - [ ] T-14 durable geocoder、only-name 与可访问 Web preview — Blocked by: T-13 — 接入可替换 `DurableGeocoderPort`，以 Owner query/draft 形成 title/address/location proposal；PoC Nominatim adapter 满足直接用户触发、全应用 <=1 req/s、有效 UA/Referer、cache、OSM attribution、禁止 autocomplete/systematic scraping，失败可 Owner 手填并保存 needs_review。Web 复用 operations，验收 only-name 正常预览/追问、provenance/LatLng/unknown/conflict、loading/empty/error/expired/success、原生 listbox/radio、ARIA/focus/44px；匿名写与 direct POST 继续 fail closed。
 - [ ] T-15 签名 Research Relay 与 Tabelog/预约 preview — Blocked by: T-13 — 实现 D-P06 `WebResearchPort` adapter：D1 先原子消费 phase allowance，Relay 经 protected Tunnel/auth 使用 OpenClaw search 仅产 URL candidate，并以自有 HTTPS:443 A+AAAA/IP-pin/SNI hardened transport 抓 canonical page；会话 preview 只接收闭合 scalar proposal，Catalog snapshot 必须等 T-16 Owner confirm。preflight/threat tests 覆盖 1 search/5 pages/60s 分阶段预算、无退款/自动 retry、allowance 篡改/过期/重放、response-loss 单次 egress、URL credentials/scheme/port/禁止地址/metadata/逐跳 redirect/DNS rebinding、零 raw/产品存储；任何保证失败即 Relay disabled、manual/unknown，启用前 D-P06 保持 Proposed。
 - [ ] T-16 Atlas Catalog 原子 confirm/publish 五结果 — Blocked by: T-14 — 以 fixture `WebResearchPort` 独立实现深接口 `AtlasCatalogIntakePort.publish(preview,mutationKey,expectedSessionVersion,catalogRevision)`：同一 D1 transaction 重读/CAS session/revision/强 Place identity、执行 duplicate/verification/publication policy，并原子写 identity/item/snapshots/receipt/terminal。验收服务端 `add-confirm:v1` key、confirm refresh/new-preview conflict、180 天 receipt replay，以及 `committed_verified | committed_needs_review | reused_existing | conflict | failed_no_write`；needs_review 不进地图/Nearby，Add 不等待 channel event ID。
@@ -44,9 +44,9 @@
 | W1 | T-03、T-04、T-05 | Invocation/mutation coordinator、`AtlasApplication` 与 migration journal |
 | W2 | T-06、T-10 | Route Sidecar/security review 与非 modal UI shell |
 | W3 | T-07 | Nearby presenter 与 request-only 契约 |
-| W4（现在） | T-08、T-12 | Nearby E2E 与 Add walking skeleton 无共享阻塞，可并行 |
+| W4 | T-08、T-12 | Nearby E2E 与 Add walking skeleton 无共享阻塞，可并行 |
 | W5 | T-09、T-11（T-08 后）；T-13（T-12 后） | Nearby/部署旧门与 Add persistent session 分别汇合 |
-| W6 | T-14、T-15 的 leaf adapter/provider contract tests（T-13 后） | leaf 可并行；共享 preview/session DTO、composition 与 migration 由中央串行汇合 |
+| W6（现在） | T-14、T-15 的 leaf adapter/provider contract tests（T-13 后） | leaf 可并行；共享 preview/session DTO、composition 与 migration 由中央串行汇合 |
 | W7 | T-16（T-14 后）；T-15 中央集成 | 先稳定 durable preview/fixture research 的原子发布，再于 T-17 前串行合入真实 research |
 | W8 | T-17 | 确定性 Web/Agent Add 本地双入口汇合 |
 | W9 | T-18 | Add 生产 provider preflight、蓝绿切换与回退 |

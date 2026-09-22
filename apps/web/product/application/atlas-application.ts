@@ -123,6 +123,11 @@ export interface AtomicMutationCommit {
 }
 
 export interface ApplicationExecutionContext {
+  readonly invocation?: {
+    readonly ownerId: string;
+    readonly channel: string;
+    readonly conversationId: string;
+  };
   readonly atomicMutation?: {
     readonly receiptFor: (result: unknown) => AtomicMutationCommit;
   };

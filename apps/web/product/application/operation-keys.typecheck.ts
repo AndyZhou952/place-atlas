@@ -89,6 +89,7 @@ void fixtureApplication.openMedia({ key: 'fixture.json', input: {} });
 const exhaustiveErrorLabels = {
   invalid_input: 'Invalid input',
   not_found: 'Not found',
+  conflict: 'Conflict',
   dependency_failure: 'Dependency failure',
   unexpected_failure: 'Unexpected failure',
 } satisfies Record<ApplicationErrorKind, string>;

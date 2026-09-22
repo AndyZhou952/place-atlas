@@ -182,7 +182,12 @@ async function dispatch<
   try {
     const prepared = normalize(definitions, operation, resultKind);
     if (!prepared.ok) return prepared;
-    return dispatchPrepared(definitions, prepared.value, resultKind, context);
+    return await dispatchPrepared(
+      definitions,
+      prepared.value,
+      resultKind,
+      context,
+    );
   } catch {
     return failure(
       'unexpected_failure',

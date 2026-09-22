@@ -147,6 +147,7 @@ interface ProjectCommandRouter {
           readonly kind:
             | 'invalid_input'
             | 'not_found'
+            | 'conflict'
             | 'dependency_failure'
             | 'unexpected_failure';
           readonly message: string;

@@ -236,6 +236,20 @@ owner-poc 在 service binding 调用前按 provider + SKU + UTC period 原子预
 
 **重审条件：** Sidecar 获得 Owner/Agent 凭证或业务存储、出现公共 route、启用 Transit/其他 provider、改变 Google endpoint，或任何请求数据能影响目标 URL。
 
+### D-P06：OpenClaw 同机的受限 Research Relay 信任区
+
+**状态：Proposed（2026-09-22；T-15 preflight 与独立威胁评审前不得启用）**
+
+Add 的 `CatalogIntakeModule` 与 D1 保持 research 预算权威，production `WebResearchPort` 暂提议由与 OpenClaw 同机的无状态 Research Relay 实现，以复用其 search/browser capability，而不把联网编排或写权限交给 Agent。每个 phase 外呼前，D1 transaction 必须原子标记整个 phase spent（失败不退款、无自动 retry），再签发短时 allowance，闭合包含 session、phase、Owner query 或 preview canonical URLs digest、max counts、deadline 与 requestId。Relay 只经 protected Cloudflare Tunnel/auth endpoint 接收 allowance，校验签名、期限、URL/redirect/count，关闭 transport retry，只返回签名的闭合 scalar evidence + usage 并立即丢弃 raw；response loss 视为 spent，回退 unknown/manual，绝不再次 egress。
+
+Relay 不持 D1、Owner Cookie/HMAC、Catalog 写凭证或产品数据；可为 transport replay defense 保留短时 requestId，但不能持久化 intake 内容。core 仍独占 session、phase reserve、preview digest、confirm refresh、provenance assignment、幂等与 Catalog publication 调用；Relay/OpenClaw 不执行 confirm。独立 relay secret 只在 Worker Secret 与 root-only host store；实现可在不改变 port 的情况下替换为批准的 Cloudflare search adapter。
+
+Relay-owned transport 只允许 HTTPS:443，拒绝 URL credentials、IP literal、非批准 scheme/port 与云 metadata hostname。初始 host 与每次 redirect 均解析 A+AAAA，拒绝 loopback、private、link-local、multicast、unspecified、CGNAT、ULA 及云 metadata ranges/hostnames；连接固定到验证后的 IP，同时保留原 hostname 的 TLS SNI/Host，每跳重新验证且最多 3 跳。OpenClaw search tool 只能提供 URL candidates；canonical page content 必须经该 hardened transport 抓取，不能由通用 browser fetch 旁路。
+
+**接受条件：** T-15 preflight 证明 exact OpenClaw tool binding、Tunnel/relay 身份、无公网旁路、allowance tamper/expiry/replay 拒绝、每阶段单次消费、response-loss 不重试、签名 scalar/usage、raw 丢弃与零产品存储；SSRF tests 覆盖 A+AAAA、禁止地址/metadata、TLS SNI/Host pin、逐跳 redirect 与 DNS rebinding fixtures；独立架构与安全评审通过。
+
+**重审／拒绝条件：** OpenClaw/transport 无法兑现上述闭合 binding 或 DNS/IP pin；Relay 需要 Owner/Catalog/D1 凭证或持久产品数据；存在公网/通用 browser fetch 旁路、自动 retry、未签名结果或 phase 二次 egress；Tunnel/host、DNS 或工具行为改变。命中任一条件即关闭 Relay并回退 unknown/manual，重新比较同 port 的替代 adapter。
+
 ## 3. 已替代决策
 
 | 旧方向 | 状态 | 当前方向 |

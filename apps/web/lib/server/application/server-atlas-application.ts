@@ -9,6 +9,11 @@ import { createAtlasApplication } from '@/product/application/atlas-application'
 import { createPlaceAssessmentOperationGroup } from '@/product/application/assessments/place-assessment-operations';
 import { createCatalogOperationGroup } from '@/product/application/catalog/catalog-operations';
 import {
+  createCatalogIntakeOperationGroup,
+  createUnavailableCatalogIntakeModule,
+  type CatalogIntakeModule,
+} from '@/product/application/catalog-intake/catalog-intake-coordinator';
+import {
   createCatalogItemProjection,
   type CatalogItemProjection,
 } from '@/product/application/catalog/catalog-item-projection';
@@ -69,6 +74,10 @@ export function createServerAtlasApplication(
       state: catalogState,
       clock: dependencies.clock,
     }),
+    ...createCatalogIntakeOperationGroup(
+      dependencies.catalogIntakeModule ??
+        createUnavailableCatalogIntakeModule(),
+    ),
     ...createPlaceAssessmentOperationGroup(catalogRead, assessmentState, {
       clock: dependencies.clock,
     }),
@@ -115,6 +124,7 @@ export interface ServerAtlasDependencies
   extends ImportJobDependencies, MediaDependencies {
   readonly catalogRead?: CatalogRead;
   readonly catalogItemProjection?: CatalogItemProjection;
+  readonly catalogIntakeModule?: CatalogIntakeModule;
   readonly agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'>;
 }
 

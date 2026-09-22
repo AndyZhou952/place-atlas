@@ -1783,6 +1783,10 @@ const expectedOperationKeys = [
   'nearby.recommend',
   'catalog.delete_item',
   'catalog.get',
+  'catalog.intake.cancel',
+  'catalog.intake.confirm',
+  'catalog.intake.discover',
+  'catalog.intake.select',
   'catalog.list',
   'catalog.save_discovered',
   'catalog.search',
@@ -1808,6 +1812,7 @@ const expectedOperationKeys = [
 const expectedOperationGroupCreators = [
   'createImportJobOperationGroup',
   'createCatalogOperationGroup',
+  'createCatalogIntakeOperationGroup',
   'createPlaceAssessmentOperationGroup',
   'createPublicDisplayOperationGroup',
   'createDecisionOperationGroup',

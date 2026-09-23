@@ -94,6 +94,27 @@ export function createOwnerAuth(
   };
 }
 
+export async function deriveOwnerWebConversationId(
+  request: Request,
+  secrets: OwnerAuthSecrets,
+  clock: OwnerAuthClock = { now: () => new Date() },
+): Promise<string | undefined> {
+  if (!(await hasValidOwnerSession(request, secrets, clock))) return undefined;
+  const token = readCookie(
+    request.headers.get('cookie'),
+    ownerSessionCookieName,
+  );
+  if (!token || !hasConfiguredSecrets(secrets)) return undefined;
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await importHmacKey(secrets.ATLAS_OWNER_SESSION_SECRET),
+    textEncoder.encode(`atlas:web-conversation:v1:${token}`),
+  );
+  return Array.from(new Uint8Array(signature).slice(0, 16), (value) =>
+    value.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
 async function hasValidOwnerSession(
   request: Request,
   secrets: OwnerAuthSecrets,

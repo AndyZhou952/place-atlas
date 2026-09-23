@@ -61,6 +61,7 @@ import { AtlasMap } from './atlas-map';
 import { filterJournalVisits } from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
 import { useAtlasViewModel } from './use-atlas-view-model';
+import { CatalogIntakePanel } from './catalog-intake-panel';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
 import { useOwnerSession } from './use-owner-session';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
@@ -245,6 +246,7 @@ function MapWorkspace({
           className={cn('collection-panel', listOpen && 'is-open')}
           aria-label="Atlas collection"
           aria-hidden={!listOpen}
+          inert={!listOpen}
         >
           <div className="collection-heading">
             <div>
@@ -260,6 +262,8 @@ function MapWorkspace({
               <X />
             </Button>
           </div>
+
+          <CatalogIntakePanel />
 
           <div className="search-field">
             <Search aria-hidden="true" />

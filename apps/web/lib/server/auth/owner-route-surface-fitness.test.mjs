@@ -11,6 +11,10 @@ const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const closedRouteSurface = [
   route('agent/v1/tools/route.ts', ['POST'], 'agent_hmac'),
   route('auth/owner/route.ts', ['DELETE', 'POST'], 'owner_auth'),
+  route('catalog-intake/cancel/route.ts', ['POST'], 'owner_cookie'),
+  route('catalog-intake/confirm/route.ts', ['POST'], 'owner_cookie'),
+  route('catalog-intake/discover/route.ts', ['POST'], 'owner_cookie'),
+  route('catalog-intake/select/route.ts', ['POST'], 'owner_cookie'),
   route('inbox/[id]/route.ts', ['DELETE'], 'owner_cookie'),
   route('inbox/route.ts', ['POST'], 'owner_cookie'),
   route('items/[id]/personal/route.ts', ['PATCH'], 'owner_cookie'),
@@ -23,6 +27,26 @@ const closedRouteSurface = [
 ];
 
 const ownerPocBusinessWriteSurface = [
+  ownerPocRoute(
+    'catalog-intake/cancel/route.ts',
+    ['POST'],
+    'application_operation',
+  ),
+  ownerPocRoute(
+    'catalog-intake/confirm/route.ts',
+    ['POST'],
+    'application_operation',
+  ),
+  ownerPocRoute(
+    'catalog-intake/discover/route.ts',
+    ['POST'],
+    'application_operation',
+  ),
+  ownerPocRoute(
+    'catalog-intake/select/route.ts',
+    ['POST'],
+    'application_operation',
+  ),
   ownerPocRoute('inbox/[id]/route.ts', ['DELETE'], 'fail_closed'),
   ownerPocRoute('inbox/route.ts', ['POST'], 'fail_closed'),
   ownerPocRoute('items/[id]/personal/route.ts', ['PATCH'], 'coordinator'),
@@ -112,6 +136,11 @@ void test('every owner business write is coordinated or fails closed before lega
           /getServerInvocationCoordinator\(\)/u,
           `${expected.filename} ${methodName} must use the mutation coordinator`,
         );
+        continue;
+      }
+      if (expected.ownerPocPolicy === 'application_operation') {
+        assert.match(handler, /getServerAtlasApplication\(\)/u);
+        assert.match(handler, /catalogIntakeResponse/u);
         continue;
       }
 

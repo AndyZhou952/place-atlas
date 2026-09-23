@@ -65,6 +65,23 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
     path: '/api/nearby',
     bodyKind: 'none',
   });
+  for (const operation of ['discover', 'select', 'confirm', 'cancel']) {
+    assert.deepEqual(
+      browserOperationHttpCatalog[`catalog.intake.${operation}`],
+      {
+        key: `catalog.intake.${operation}`,
+        method: 'POST',
+        path: `/api/catalog-intake/${operation}`,
+        bodyKind: 'json',
+      },
+    );
+  }
+  assert.equal(
+    createAgentCapabilitiesDocument().operations.some(({ name }) =>
+      name.includes('intake'),
+    ),
+    false,
+  );
   assert.equal(
     Object.values(browserOperationHttpCatalog).filter(
       (operation) => operation.capability?.name === 'upload_visit_media',

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createBrowserAtlasApplication } from './atlas-api-client.ts';
+import {
+  CatalogIntakeRequestError,
+  createBrowserAtlasApplication,
+} from './atlas-api-client.ts';
 import { subscribeOwnerLoginRequired } from './owner-session-client.ts';
 
 test('Browser AtlasApplication maps typed operations through an injected transport', async () => {
@@ -73,6 +76,113 @@ test('an unauthorized Atlas write requests Owner login and rejects without repor
   );
   unsubscribe();
 
+  assert.equal(loginRequests, 1);
+});
+
+test('catalog intake stores the server conversation, returns it on the next operation, and never sends owner identity', async () => {
+  const calls = [];
+  let storedConversation;
+  const application = createBrowserAtlasApplication(
+    {
+      async request(url, init) {
+        calls.push({
+          url,
+          headers: Object.fromEntries(new Headers(init?.headers)),
+          body: JSON.parse(init.body),
+        });
+        return new Response(
+          JSON.stringify(
+            url.endsWith('/discover')
+              ? {
+                  status: 'candidates_ready',
+                  sessionId: 'session-1',
+                  sessionVersion: 1,
+                  candidates: [],
+                  hasMore: false,
+                  expiresAt: '2026-09-22T10:30:00.000Z',
+                }
+              : {
+                  status: 'cancelled',
+                  sessionId: 'session-1',
+                  sessionVersion: 2,
+                },
+          ),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+              'x-atlas-web-conversation-id': '000102030405060708090a0b0c0d0e0f',
+            },
+          },
+        );
+      },
+    },
+    {
+      read: () => storedConversation,
+      write: (value) => {
+        storedConversation = value;
+      },
+    },
+  );
+
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨青空', requestToken: 'request-1' },
+  });
+  await application.execute({
+    key: 'catalog.intake.cancel',
+    input: { sessionId: 'session-1', expectedSessionVersion: 1 },
+  });
+
+  assert.equal(calls[0].url, '/api/catalog-intake/discover');
+  assert.equal(calls[0].headers['x-atlas-web-conversation-id'], undefined);
+  assert.deepEqual(calls[0].body, {
+    input: { query: '鮨青空', requestToken: 'request-1' },
+  });
+  assert.equal(calls[1].url, '/api/catalog-intake/cancel');
+  assert.equal(
+    calls[1].headers['x-atlas-web-conversation-id'],
+    '000102030405060708090a0b0c0d0e0f',
+  );
+  assert.equal(JSON.stringify(calls).includes('ownerId'), false);
+});
+
+test('catalog intake exposes a typed closed error and requests login without dropping client state', async () => {
+  let loginRequests = 0;
+  const unsubscribe = subscribeOwnerLoginRequired(() => {
+    loginRequests += 1;
+  });
+  const application = createBrowserAtlasApplication(
+    {
+      async request() {
+        return Response.json(
+          {
+            code: 'unauthorized',
+            message: 'Owner login is required.',
+            retryable: false,
+            internal: 'do not trust',
+          },
+          { status: 401 },
+        );
+      },
+    },
+    { read: () => undefined, write() {} },
+  );
+
+  await assert.rejects(
+    application.execute({
+      key: 'catalog.intake.discover',
+      input: { query: '鮨青空', requestToken: 'request-1' },
+    }),
+    (error) => {
+      assert.ok(error instanceof CatalogIntakeRequestError);
+      assert.equal(error.code, 'unauthorized');
+      assert.equal(error.retryable, false);
+      assert.deepEqual(Object.keys(error), ['code', 'retryable']);
+      return true;
+    },
+  );
+  unsubscribe();
   assert.equal(loginRequests, 1);
 });
 

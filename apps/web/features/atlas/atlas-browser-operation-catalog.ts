@@ -47,6 +47,30 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     path: '/api/nearby',
     bodyKind: 'none',
   },
+  'catalog.intake.discover': {
+    key: 'catalog.intake.discover',
+    method: 'POST',
+    path: '/api/catalog-intake/discover',
+    bodyKind: 'json',
+  },
+  'catalog.intake.select': {
+    key: 'catalog.intake.select',
+    method: 'POST',
+    path: '/api/catalog-intake/select',
+    bodyKind: 'json',
+  },
+  'catalog.intake.confirm': {
+    key: 'catalog.intake.confirm',
+    method: 'POST',
+    path: '/api/catalog-intake/confirm',
+    bodyKind: 'json',
+  },
+  'catalog.intake.cancel': {
+    key: 'catalog.intake.cancel',
+    method: 'POST',
+    path: '/api/catalog-intake/cancel',
+    bodyKind: 'json',
+  },
   'catalog.update_item': {
     key: 'catalog.update_item',
     method: 'PATCH',

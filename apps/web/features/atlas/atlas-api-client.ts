@@ -27,6 +27,17 @@ import {
 } from './public-read-client.ts';
 import { publishOwnerLoginRequired } from './owner-session-client.ts';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation.ts';
+import type {
+  AddErrorCode,
+  CatalogIntakeCancelInput,
+  CatalogIntakeCancelOutput,
+  CatalogIntakeConfirmInput,
+  CatalogIntakeConfirmOutput,
+  CatalogIntakeDiscoverInput,
+  CatalogIntakeDiscoverOutput,
+  CatalogIntakeSelectInput,
+  CatalogIntakeSelectOutput,
+} from '../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 
 export interface BrowserTransport {
   request(url: string, init?: RequestInit): Promise<Response>;
@@ -125,6 +136,22 @@ interface BrowserOperationMap {
     readonly input: { readonly locationHint: string };
     readonly output: NearbyRecommendResult;
   };
+  readonly 'catalog.intake.discover': {
+    readonly input: CatalogIntakeDiscoverInput;
+    readonly output: CatalogIntakeDiscoverOutput;
+  };
+  readonly 'catalog.intake.select': {
+    readonly input: CatalogIntakeSelectInput;
+    readonly output: CatalogIntakeSelectOutput;
+  };
+  readonly 'catalog.intake.confirm': {
+    readonly input: CatalogIntakeConfirmInput;
+    readonly output: CatalogIntakeConfirmOutput;
+  };
+  readonly 'catalog.intake.cancel': {
+    readonly input: CatalogIntakeCancelInput;
+    readonly output: CatalogIntakeCancelOutput;
+  };
 }
 
 type BrowserOperationInput<Key extends BrowserOperationKey> =
@@ -140,6 +167,26 @@ export interface BrowserAtlasApplication {
   }): Promise<BrowserOperationOutput<Key>>;
 }
 
+export interface WebConversationStore {
+  read(): string | undefined;
+  write(value: string): void;
+}
+
+export class CatalogIntakeRequestError extends Error {
+  readonly code: AddErrorCode;
+  readonly retryable?: boolean;
+
+  constructor(code: AddErrorCode, message: string, retryable?: boolean) {
+    super(message);
+    Object.defineProperty(this, 'name', {
+      configurable: true,
+      value: 'CatalogIntakeRequestError',
+    });
+    this.code = code;
+    if (retryable !== undefined) this.retryable = retryable;
+  }
+}
+
 type BrowserOperationHandlers = {
   readonly [Key in BrowserOperationKey]: (
     input: BrowserOperationInput<Key>,
@@ -153,6 +200,7 @@ const fetchBrowserTransport: BrowserTransport = {
 
 export function createBrowserAtlasApplication(
   transport: BrowserTransport = fetchBrowserTransport,
+  conversationStore: WebConversationStore = defaultBrowserConversationStore(),
 ): BrowserAtlasApplication {
   const handlers: BrowserOperationHandlers = {
     'catalog.list': () => loadPublicCatalog(transport),
@@ -281,6 +329,34 @@ export function createBrowserAtlasApplication(
         `${browserOperationPath('nearby.recommend')}?${search.toString()}`,
       );
     },
+    'catalog.intake.discover': (input) =>
+      requestCatalogIntakeJson(
+        transport,
+        conversationStore,
+        'catalog.intake.discover',
+        input,
+      ),
+    'catalog.intake.select': (input) =>
+      requestCatalogIntakeJson(
+        transport,
+        conversationStore,
+        'catalog.intake.select',
+        input,
+      ),
+    'catalog.intake.confirm': (input) =>
+      requestCatalogIntakeJson(
+        transport,
+        conversationStore,
+        'catalog.intake.confirm',
+        input,
+      ),
+    'catalog.intake.cancel': (input) =>
+      requestCatalogIntakeJson(
+        transport,
+        conversationStore,
+        'catalog.intake.cancel',
+        input,
+      ),
   };
 
   return {
@@ -315,6 +391,135 @@ async function requestMutationJson<T>(
 }
 
 export const browserAtlasApplication = createBrowserAtlasApplication();
+
+const conversationHeader = 'x-atlas-web-conversation-id';
+const conversationStorageKey = 'atlas.catalog-intake.conversation-v1';
+
+function defaultBrowserConversationStore(): WebConversationStore {
+  return {
+    read() {
+      try {
+        const value =
+          typeof window === 'undefined'
+            ? undefined
+            : (window.sessionStorage.getItem(conversationStorageKey) ??
+              undefined);
+        return isConversationId(value) ? value : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    write(value) {
+      try {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(conversationStorageKey, value);
+        }
+      } catch {
+        // A blocked sessionStorage must not widen the API or leak identity.
+      }
+    },
+  };
+}
+
+async function requestCatalogIntakeJson<
+  Key extends
+    | 'catalog.intake.discover'
+    | 'catalog.intake.select'
+    | 'catalog.intake.confirm'
+    | 'catalog.intake.cancel',
+>(
+  transport: BrowserTransport,
+  conversationStore: WebConversationStore,
+  key: Key,
+  input: BrowserOperationInput<Key>,
+): Promise<BrowserOperationOutput<Key>> {
+  const headers = new Headers({ 'content-type': 'application/json' });
+  const existingConversation = conversationStore.read();
+  if (isConversationId(existingConversation)) {
+    headers.set(conversationHeader, existingConversation);
+  }
+  const response = await transport.request(browserOperationPath(key), {
+    method: browserOperationHttpCatalog[key].method,
+    headers,
+    body: JSON.stringify({ input }),
+  });
+  const responseConversation = response.headers.get(conversationHeader);
+  if (response.ok && !isConversationId(responseConversation)) {
+    throw new CatalogIntakeRequestError(
+      'unexpected_failure',
+      'The catalog intake conversation response was invalid.',
+      false,
+    );
+  }
+  if (isConversationId(responseConversation)) {
+    conversationStore.write(responseConversation);
+  }
+  if (!response.ok) {
+    if (response.status === 401) publishOwnerLoginRequired();
+    const error = await readCatalogIntakeError(response);
+    throw new CatalogIntakeRequestError(
+      error.code,
+      error.message,
+      error.retryable,
+    );
+  }
+  return (await response.json()) as BrowserOperationOutput<Key>;
+}
+
+async function readCatalogIntakeError(response: Response): Promise<{
+  readonly code: AddErrorCode;
+  readonly message: string;
+  readonly retryable?: boolean;
+}> {
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    value = undefined;
+  }
+  if (
+    isRecord(value) &&
+    isAddErrorCode(value.code) &&
+    typeof value.message === 'string' &&
+    (value.retryable === undefined || typeof value.retryable === 'boolean')
+  ) {
+    return {
+      code: value.code,
+      message: value.message,
+      ...(value.retryable === undefined ? {} : { retryable: value.retryable }),
+    };
+  }
+  return {
+    code: 'unexpected_failure',
+    message: 'The catalog intake request could not be completed.',
+    retryable: response.status >= 500,
+  };
+}
+
+function isConversationId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{32}$/u.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isAddErrorCode(value: unknown): value is AddErrorCode {
+  return (
+    typeof value === 'string' &&
+    [
+      'invalid_input',
+      'unauthorized',
+      'forbidden',
+      'not_found',
+      'conflict',
+      'expired',
+      'dependency_failure',
+      'rate_limited',
+      'unexpected_failure',
+    ].includes(value)
+  );
+}
 
 async function requestJson<T>(
   transport: BrowserTransport,

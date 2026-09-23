@@ -213,6 +213,193 @@ test('catalog.intake.select returns a closed no-provider preview without persist
   );
 });
 
+test('only-name select uses durable geocoder evidence to create a closed proposal preview', async () => {
+  const geocoderInputs = [];
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture({
+      transientName: 'GOOGLE TRANSIENT MUST NOT BECOME DURABLE',
+    }),
+    durableGeocoderPort: {
+      async propose(input) {
+        geocoderInputs.push(input);
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress: '東京都中央区銀座4丁目1-2',
+            latitude: 35.6717,
+            longitude: 139.765,
+            provider: 'fixture-osm-geocoder',
+            sourceUrl: 'https://www.openstreetmap.org/node/123',
+            license: 'ODbL-1.0',
+            checkedAt: '2026-09-22T10:00:00.000Z',
+          },
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨青空', requestToken: 'request-only-name' },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      requestResearch: false,
+    },
+  });
+
+  assert.deepEqual(geocoderInputs, [
+    {
+      trigger: 'owner_intake_select',
+      dataClassification: 'public_place_query',
+      ownerQuery: '銀座 鮨青空',
+      ownerDraft: {},
+    },
+  ]);
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'preview_ready');
+  assert.deepEqual(result.value.preview.titleProposal, {
+    provenance: 'owner_query',
+    value: '銀座 鮨青空',
+  });
+  assert.deepEqual(result.value.preview.addressProposal, {
+    provenance: 'durable_geocoder_observed',
+    value: '東京都中央区銀座4丁目1-2',
+    sourceUrl: 'https://www.openstreetmap.org/node/123',
+    license: 'ODbL-1.0',
+    checkedAt: '2026-09-22T10:00:00.000Z',
+  });
+  assert.deepEqual(result.value.preview.locationEvidence, {
+    status: 'known',
+    provenance: 'durable_geocoder_observed',
+    normalizedAddress: '東京都中央区銀座4丁目1-2',
+    latitude: 35.6717,
+    longitude: 139.765,
+    provider: 'fixture-osm-geocoder',
+    sourceUrl: 'https://www.openstreetmap.org/node/123',
+    license: 'ODbL-1.0',
+    checkedAt: '2026-09-22T10:00:00.000Z',
+  });
+  assert.deepEqual(result.value.preview.unknownFields, [
+    'tabelog',
+    'reservation',
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(result.value.preview),
+    /GOOGLE TRANSIENT MUST NOT BECOME DURABLE/u,
+  );
+});
+
+test('ambiguous durable location asks for area or address without using Google transient facts', async () => {
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture({
+      transientName: 'GOOGLE TRANSIENT MUST NOT BECOME A TITLE',
+    }),
+    durableGeocoderPort: {
+      async propose() {
+        return { ok: true, value: { status: 'ambiguous' } };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨青空', requestToken: 'request-ambiguous' },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      requestResearch: false,
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    value: {
+      status: 'clarification_required',
+      sessionId: 'session-1',
+      sessionVersion: 2,
+      clarification: {
+        code: 'ambiguous_location',
+        prompt: 'Add an area or address to identify the right place.',
+        fields: ['area', 'address'],
+      },
+      expiresAt: '2026-09-22T10:30:00.000Z',
+    },
+  });
+  assert.doesNotMatch(JSON.stringify(result), /GOOGLE TRANSIENT/u);
+});
+
+test('unavailable durable geocoder keeps the owner query in a needs-review preview', async () => {
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    durableGeocoderPort: {
+      async propose() {
+        return {
+          ok: false,
+          error: {
+            kind: 'dependency_failure',
+            message: 'private provider failure',
+          },
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨青空', requestToken: 'request-unavailable-geocoder' },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      requestResearch: false,
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'preview_ready');
+  assert.deepEqual(result.value.preview.ownerFields, {});
+  assert.deepEqual(result.value.preview.titleProposal, {
+    provenance: 'owner_query',
+    value: '鮨青空',
+  });
+  assert.equal('addressProposal' in result.value.preview, false);
+  assert.deepEqual(result.value.preview.locationEvidence, {
+    status: 'unknown',
+  });
+  assert.deepEqual(result.value.preview.unknownFields, [
+    'address',
+    'coordinates',
+    'tabelog',
+    'reservation',
+  ]);
+  assert.deepEqual(result.value.preview.warnings, [
+    {
+      code: 'provider_unavailable',
+      message:
+        'Durable location lookup is unavailable; review the owner-provided details.',
+    },
+    {
+      code: 'needs_review',
+      message:
+        'Confirm or complete the durable place details before publishing.',
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(result), /private provider failure/u);
+});
+
 test('catalog.intake.confirm stays fail-closed and performs no Catalog publication in the T-12 skeleton', async () => {
   const application = createFixtureApplication(discoveryFixture());
   await discoverAndSelect(application);
@@ -746,6 +933,9 @@ function createFixtureApplication(options) {
     catalogRevision: normalized.catalogRevision ?? {
       read: async () => 'catalog-r1',
     },
+    ...(normalized.durableGeocoderPort
+      ? { durableGeocoderPort: normalized.durableGeocoderPort }
+      : {}),
   });
   const application = createAtlasApplication(
     createCatalogIntakeOperationGroup(intakeModule),

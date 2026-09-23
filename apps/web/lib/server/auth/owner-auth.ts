@@ -1,6 +1,10 @@
 import { env } from 'cloudflare:workers';
 
-import { createOwnerAuth, type OwnerAuthSecrets } from './owner-session.ts';
+import {
+  createOwnerAuth,
+  deriveOwnerWebConversationId,
+  type OwnerAuthSecrets,
+} from './owner-session.ts';
 import { protectOwnerRead } from './owner-read-guard.ts';
 import { protectOwnerWrite } from './owner-write-guard.ts';
 
@@ -41,10 +45,20 @@ export function withOwnerWriteAuth<Arguments extends readonly unknown[]>(
     protectOwnerWrite(currentOwnerAuth(), handler)(request, ...arguments_);
 }
 
+export function getOwnerWebConversationId(
+  request: Request,
+): Promise<string | undefined> {
+  return deriveOwnerWebConversationId(request, currentOwnerSecrets());
+}
+
 function currentOwnerAuth() {
+  return createOwnerAuth(currentOwnerSecrets());
+}
+
+function currentOwnerSecrets(): OwnerAuthSecrets {
   const bindings = env as unknown as OwnerAuthSecrets;
-  return createOwnerAuth({
+  return {
     ATLAS_OWNER_PASSWORD: bindings.ATLAS_OWNER_PASSWORD,
     ATLAS_OWNER_SESSION_SECRET: bindings.ATLAS_OWNER_SESSION_SECRET,
-  });
+  };
 }

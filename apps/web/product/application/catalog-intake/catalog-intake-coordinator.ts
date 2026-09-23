@@ -63,6 +63,29 @@ export interface GooglePlaceDiscoveryPort {
   }): Promise<Result<GooglePlaceDiscoveryCandidate>>;
 }
 
+export type DurableGeocoderProposal =
+  | {
+      readonly status: 'resolved';
+      readonly normalizedAddress: string;
+      readonly latitude: number;
+      readonly longitude: number;
+      readonly provider: string;
+      readonly sourceUrl: string;
+      readonly license: string;
+      readonly checkedAt: string;
+    }
+  | { readonly status: 'ambiguous' }
+  | { readonly status: 'no_match' };
+
+export interface DurableGeocoderPort {
+  propose(input: {
+    readonly trigger: 'owner_intake_select';
+    readonly dataClassification: 'public_place_query';
+    readonly ownerQuery: string;
+    readonly ownerDraft: CatalogIntakeOwnerFields;
+  }): Promise<Result<DurableGeocoderProposal>>;
+}
+
 export interface CatalogIntakeScope {
   readonly ownerId: string;
   readonly channel: string;
@@ -463,6 +486,7 @@ export interface CatalogIntakeModule {
 
 export function createCatalogIntakeModule(options: {
   readonly discoveryPort: GooglePlaceDiscoveryPort;
+  readonly durableGeocoderPort?: DurableGeocoderPort;
   readonly statePort: CatalogIntakeStatePort;
   readonly clock: { now(): Date };
   readonly idSource: { nextId(): string };
@@ -726,7 +750,47 @@ export function createCatalogIntakeModule(options: {
         const ownerFields = input.ownerFields ?? {};
         const acceptedAt = options.clock.now();
         const nextVersion = session.sessionVersion + 1;
-        if (!ownerFields.title && !ownerFields.address) {
+        let geocoderOutcome: DurableGeocoderProposal | undefined;
+        let geocoderUnavailable = !options.durableGeocoderPort;
+        if (
+          !ownerFields.address &&
+          !ownerFields.coordinates &&
+          options.durableGeocoderPort
+        ) {
+          const proposed = await options.durableGeocoderPort.propose({
+            trigger: 'owner_intake_select',
+            dataClassification: 'public_place_query',
+            ownerQuery: session.ownerQuery,
+            ownerDraft: ownerFields,
+          });
+          if (proposed.ok) {
+            geocoderOutcome = validateDurableGeocoderProposal(proposed.value);
+            geocoderUnavailable = !geocoderOutcome;
+          } else {
+            geocoderUnavailable = true;
+          }
+        }
+        const geocoderProposal =
+          geocoderOutcome?.status === 'resolved' ? geocoderOutcome : undefined;
+        const clarification =
+          geocoderOutcome?.status === 'ambiguous'
+            ? ({
+                code: 'ambiguous_location' as const,
+                prompt: 'Add an area or address to identify the right place.',
+                fields: ['area', 'address'] as const,
+              } satisfies CatalogIntakeClarification)
+            : !ownerFields.title &&
+                !ownerFields.address &&
+                !geocoderProposal &&
+                !geocoderUnavailable
+              ? ({
+                  code: 'missing_area_or_address' as const,
+                  prompt:
+                    'Add a restaurant name, area, or address to continue.',
+                  fields: ['title', 'area', 'address'] as const,
+                } satisfies CatalogIntakeClarification)
+              : undefined;
+        if (clarification) {
           const next: CatalogIntakeCandidatesSession = {
             ...session,
             state: 'candidates_ready',
@@ -756,16 +820,27 @@ export function createCatalogIntakeModule(options: {
             status: 'clarification_required',
             sessionId: session.sessionId,
             sessionVersion: nextVersion,
-            clarification: {
-              code: 'missing_area_or_address',
-              prompt: 'Add a restaurant name, area, or address to continue.',
-              fields: ['title', 'area', 'address'],
-            },
+            clarification,
             expiresAt: next.expiresAt,
           });
         }
 
         const assertedAt = acceptedAt.toISOString();
+        const titleProposal = !ownerFields.title
+          ? ({
+              provenance: 'owner_query' as const,
+              value: session.ownerQuery,
+            } satisfies CatalogIntakeTitleProposal)
+          : undefined;
+        const addressProposal = geocoderProposal
+          ? ({
+              provenance: 'durable_geocoder_observed' as const,
+              value: geocoderProposal.normalizedAddress,
+              sourceUrl: geocoderProposal.sourceUrl,
+              license: geocoderProposal.license,
+              checkedAt: geocoderProposal.checkedAt,
+            } satisfies CatalogIntakeAddressProposal)
+          : undefined;
         const locationEvidence =
           ownerFields.coordinates && ownerFields.address
             ? {
@@ -775,7 +850,19 @@ export function createCatalogIntakeModule(options: {
                 ...ownerFields.coordinates,
                 assertedAt,
               }
-            : { status: 'unknown' as const };
+            : geocoderProposal
+              ? {
+                  status: 'known' as const,
+                  provenance: 'durable_geocoder_observed' as const,
+                  normalizedAddress: geocoderProposal.normalizedAddress,
+                  latitude: geocoderProposal.latitude,
+                  longitude: geocoderProposal.longitude,
+                  provider: geocoderProposal.provider,
+                  sourceUrl: geocoderProposal.sourceUrl,
+                  license: geocoderProposal.license,
+                  checkedAt: geocoderProposal.checkedAt,
+                }
+              : { status: 'unknown' as const };
         const tabelog =
           input.tabelog && input.tabelog !== 'unknown'
             ? {
@@ -808,12 +895,16 @@ export function createCatalogIntakeModule(options: {
             placeId: candidate.placeId,
           },
           ownerFields,
+          ...(titleProposal ? { titleProposal } : {}),
+          ...(addressProposal ? { addressProposal } : {}),
           locationEvidence,
           tabelog,
           reservation,
           suspectedDuplicates: [] as const,
           unknownFields: [
-            ...(!ownerFields.address ? (['address'] as const) : []),
+            ...(!ownerFields.address && !addressProposal
+              ? (['address'] as const)
+              : []),
             ...(locationEvidence.status === 'unknown'
               ? (['coordinates'] as const)
               : []),
@@ -823,9 +914,19 @@ export function createCatalogIntakeModule(options: {
               : []),
           ],
           warnings: [
+            ...(geocoderUnavailable
+              ? ([
+                  {
+                    code: 'provider_unavailable' as const,
+                    message:
+                      'Durable location lookup is unavailable; review the owner-provided details.',
+                  },
+                ] as const)
+              : []),
             {
               code: 'needs_review' as const,
-              message: 'Provider enrichment is not enabled for this preview.',
+              message:
+                'Confirm or complete the durable place details before publishing.',
             },
           ],
           catalogRevision: session.catalogRevision,
@@ -1458,6 +1559,63 @@ function validateDiscoveryCandidate(
   })?.candidates[0];
 }
 
+export function validateDurableGeocoderProposal(
+  value: unknown,
+): DurableGeocoderProposal | undefined {
+  if (
+    isRecordWithExactKeys(value, ['status']) &&
+    (value.status === 'ambiguous' || value.status === 'no_match')
+  ) {
+    return { status: value.status };
+  }
+  if (
+    !isRecordWithExactKeys(value, [
+      'status',
+      'normalizedAddress',
+      'latitude',
+      'longitude',
+      'provider',
+      'sourceUrl',
+      'license',
+      'checkedAt',
+    ]) ||
+    value.status !== 'resolved'
+  ) {
+    return undefined;
+  }
+  const normalizedAddress = normalizeBoundedText(
+    value.normalizedAddress,
+    1,
+    500,
+  );
+  const coordinates = validateCoordinates({
+    latitude: value.latitude,
+    longitude: value.longitude,
+  });
+  const provider = normalizeBoundedText(value.provider, 1, 120);
+  const license = normalizeBoundedText(value.license, 1, 200);
+  const checkedAt = normalizeIsoTimestamp(value.checkedAt);
+  if (
+    !normalizedAddress ||
+    !coordinates ||
+    !provider ||
+    !isCanonicalHttpsUrl(value.sourceUrl) ||
+    !license ||
+    !checkedAt
+  ) {
+    return undefined;
+  }
+  return {
+    status: 'resolved',
+    normalizedAddress,
+    ...coordinates,
+    provider,
+    sourceUrl: value.sourceUrl,
+    license,
+    checkedAt,
+  };
+}
+
 function addFailure(
   code: AddErrorCode,
   message: string,
@@ -1856,6 +2014,15 @@ function validateCoordinates(value: unknown) {
 
 function isPositiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0;
+}
+
+function normalizeIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const timestamp = new Date(value);
+  return Number.isFinite(timestamp.getTime()) &&
+    timestamp.toISOString() === value
+    ? value
+    : undefined;
 }
 
 function isOptionalBoundedText(

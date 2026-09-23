@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createOwnerAuth, ownerSessionCookieName } from './owner-session.ts';
+import {
+  createOwnerAuth,
+  deriveOwnerWebConversationId,
+  ownerSessionCookieName,
+} from './owner-session.ts';
 
 const secrets = {
   ATLAS_OWNER_PASSWORD: 'dummy-owner-password',
@@ -97,6 +101,36 @@ void test('unsafe browser requests require the exact origin and a valid owner co
     }),
   );
   assert.equal(allowed, undefined);
+});
+
+void test('the server derives a stable opaque Web conversation only from a valid owner session', async () => {
+  const clock = { now: () => new Date('2026-09-21T12:00:00.000Z') };
+  const auth = createOwnerAuth(secrets, clock);
+  const login = await auth.login(
+    jsonRequest('https://atlas.example/api/auth/owner', {
+      password: 'dummy-owner-password',
+    }),
+  );
+  const cookie = (login.headers.get('set-cookie') ?? '').split(';', 1)[0];
+  const request = new Request(
+    'https://atlas.example/api/catalog-intake/discover',
+    { headers: { cookie } },
+  );
+
+  const first = await deriveOwnerWebConversationId(request, secrets, clock);
+  const retry = await deriveOwnerWebConversationId(request, secrets, clock);
+  assert.match(first ?? '', /^[a-f0-9]{32}$/u);
+  assert.equal(retry, first);
+
+  const tampered = `${cookie.slice(0, -1)}${cookie.endsWith('a') ? 'b' : 'a'}`;
+  assert.equal(
+    await deriveOwnerWebConversationId(
+      new Request(request.url, { headers: { cookie: tampered } }),
+      secrets,
+      clock,
+    ),
+    undefined,
+  );
 });
 
 void test('logout clears the owner cookie and never caches its response', async () => {

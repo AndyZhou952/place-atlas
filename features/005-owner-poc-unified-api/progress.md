@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: implement T-14（T-13 已通过第 2 轮代码评审并获用户确认；既有 Owner/Nearby 实现状态不回退）
+- 当前阶段: T-16 implement（T-14 第 2 轮独立 code/UI review PASS，并于 2026-09-23 获用户确认；既有 Owner/Nearby 实现状态不回退）
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -45,8 +45,13 @@
 - 已修复待最终复审: T-12 第二轮仅余的 Tabelog URL finding 已以明确、有限的餐厅详情路径 allowlist 修复；无网络调用或 T-13+ 行为
 - 已完成: T-12 第 3 轮独立代码评审 PASS；完整测试 479/479、聚焦 CatalogIntake contract 10/10，TypeScript、lint、format-check 与 diff-check 均通过；用户于 2026-09-22 明确确认，T-12 已勾选并进入 T-13
 - 已完成: T-13 append-only D1 session/CAS、30 分钟 inactivity TTL、180 天 terminal/request retention、transient Google Top-3 与 owner-poc daily cleanup 已实现；第 2 轮独立代码评审 PASS，聚焦 contracts 27/27、完整测试 496/496、TypeScript、lint、format-check、diff-check 与 owner-poc production build 全部通过；用户于 2026-09-22 明确确认，T-13 已勾选并进入 T-14
+- 已实现待独立 code/UI review: T-14 only-name durable proposal、歧义追问与 provider-unavailable needs_review preview 已进入 `CatalogIntakeModule`；可替换 `DurableGeocoderPort` 与 public Nominatim offline adapter contracts 覆盖 Owner 直接触发、official endpoint、全应用 D1 原子 1 req/s、共享 cache、有效 UA/Referer、OSM provenance/license/attribution、禁止 expanded/private input、damaged cache fail closed 与 provider replacement seam；0007 migration 尚未部署
+- 已实现待独立 code/UI review: Web 增加四个 Owner-cookie `catalog.intake.*` POST adapters、服务端派生 128-bit conversation、sessionStorage 往返、闭合 typed error 与 existing Owner-login trigger；Add panel 位于 collection heading 后、普通 Catalog search 前，覆盖 loading/empty/candidates/clarification/error/preview/expired/conflict/success shell、原生 radio、inline errors、focus/live region、disabled confirm reason 与 >=44px controls；未向 Agent capabilities/WebMCP 暴露 intake，遗留 `POST /api/items` 继续 fail closed
+- 已完成独立代码/UI 门: T-14 第 1 轮的两项一般发现均已 TDD 收口：collection 关闭时由 `inert` 统一隔离全部隐藏交互控件；Web conversation 改为从已验证的签名 HttpOnly Owner session 在服务端域分隔派生 128-bit opaque ID，discover 替换伪造的合法 header，select/confirm/cancel 拒绝不匹配 ID。第 2 轮独立评审 PASS，严重 0 / 一般 0 / 建议 0
+- 本地验证: 评审者独立复跑 focused 14/14、完整测试 515/515、TypeScript、lint、format-check、diff-check、owner-poc production build 与 migration-check，全部通过。主任务用 `/dev/shm` 临时 Chromium 完成 1440×1107 desktop、390×1038 mobile initial render 与标准 401 Owner-login state，并目视确认 warm editorial 方向、排版、overflow、44px 控件以及 401 后输入 `鮨青空` 保留且 Owner password panel 可见；截图保存在 workspace 外 `t14-add-desktop.png` / `t14-add-mobile.png` / `t14-add-401.png`。owner-poc production composition 仍故意使用 unavailable intake module，真实 provider wiring/deploy 属 T-18，因此当前线上 Add preview 继续 fail closed
+- 已完成: 用户于 2026-09-23 接受 T-14 演示并授权继续；验收记录见 `reviews/t14-demo-acceptance-2026-09-23.md`。T-14 已勾选，线上不可用与 T-18 边界保持不变
 - 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
-- 未完成: T-08、T-09 及 T-14–T-20 的 Add/Record 工作均未实现
+- 未完成: T-08、T-09，以及 T-15–T-20 的 Add/Record 工作
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
-- 阶段门禁: Add 增量规格、架构、T-12/T-13 代码门及用户确认均已关闭；可开始 T-14；D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
-- 下一步: T-14 在已确认的 `AtlasApplication catalog.intake.*` / provider-port seam 写出 only-name、durable geocoder 与可访问 Web preview 的第一个失败测试（RED）
+- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14 的代码门与用户确认均已关闭；T-16 可进入实现，D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
+- 下一步: 提交并推送已确认的 T-14，然后按红→绿→重构实现 T-16 的 Atlas Catalog 原子 confirm/publish 五结果；不提前接入 T-15 research 或 T-18 production provider/deploy

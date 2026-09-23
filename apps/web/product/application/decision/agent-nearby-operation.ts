@@ -58,7 +58,7 @@ export interface NearbyRecommendCandidate {
   readonly route?: NearbyRouteResult;
   readonly visit: NearbyVisitResult;
   readonly entryAccess: EntryAccessSnapshot;
-  readonly reservation: { readonly label: string; readonly checkedAt: string };
+  readonly reservation: { readonly label: string; readonly checkedAt?: string };
   readonly externalRating?: NearbyExternalRatingResult;
   readonly reason: string;
   readonly warnings: readonly string[];
@@ -195,10 +195,18 @@ async function structureOutcome(
     dependencies.entryAccessProvider,
     dependencies.entryAccessPolicy,
   );
+  const verifiedItems = await dependencies.catalog.list('verified_catalog');
+  const verifiedItemsById = new Map(
+    verifiedItems
+      .filter((item) => item.verificationStatus === 'verified')
+      .map((item) => [item.id, item] as const),
+  );
   const recommendations = await Promise.all(
     withAccess.map(async (candidate) => {
-      const item = await dependencies.catalog.get(candidate.itemId);
-      if (!item) return undefined;
+      const item = verifiedItemsById.get(candidate.itemId);
+      if (!item) {
+        return undefined;
+      }
       const facts = await readPersonalFacts(dependencies.personalFacts, item);
       return toReceiptCandidate(candidate, item, facts, dependencies);
     }),

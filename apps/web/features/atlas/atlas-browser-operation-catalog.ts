@@ -31,6 +31,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     bodyKind: 'none',
     capability: { name: 'list_atlas_items' },
   },
+  'catalog.review_candidates.list': {
+    key: 'catalog.review_candidates.list',
+    method: 'GET',
+    path: '/api/owner/catalog/review-candidates',
+    bodyKind: 'none',
+  },
   'decision.nearby': {
     key: 'decision.nearby',
     method: 'GET',

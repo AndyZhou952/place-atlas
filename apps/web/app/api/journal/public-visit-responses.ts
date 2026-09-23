@@ -27,19 +27,22 @@ export function listDisplayVisitsResponse(
   });
 }
 
-export function getDisplayVisitResponse(
+export async function getDisplayVisitResponse(
   application: DisplayApplication,
   id: string,
 ): Promise<Response> {
+  const result = await application.execute({
+    key: 'visit.getDisplay',
+    input: { id },
+  });
+  if (!result.ok && result.error.kind === 'not_found') {
+    return new Response('Public resource not found.', { status: 404 });
+  }
   return executePublicJsonRead({
     manifest: createPublicReadManifest(),
     operation: 'visit.getDisplay',
     principal: { kind: 'anonymous' },
     async load() {
-      const result = await application.execute({
-        key: 'visit.getDisplay',
-        input: { id },
-      });
       if (!result.ok) throw new Error('visit unavailable');
       return result.value;
     },

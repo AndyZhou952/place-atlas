@@ -270,8 +270,14 @@ export function createIsolatedReadonlyNearbyComposition(database: D1Database): {
         async read(itemId) {
           const item = await catalogRead.get(itemId);
           return {
-            manualVisited: item?.hasVisited === true,
-            visitCount: item?.hasVisited === true ? 1 : 0,
+            manualVisited:
+              item !== undefined &&
+              'hasVisited' in item &&
+              item.hasVisited === true,
+            visitCount:
+              item !== undefined && 'hasVisited' in item && item.hasVisited
+                ? 1
+                : 0,
           };
         },
       },

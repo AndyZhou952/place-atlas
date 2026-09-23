@@ -139,6 +139,183 @@ void test('catalog projection is a closed v1 DTO and drops domain sentinel and i
   });
 });
 
+void test('intake catalog projection preserves exact provenance, time, license, and unknown evidence branches', async () => {
+  const response = await executePublicJsonRead({
+    manifest: createPublicReadManifest(),
+    operation: 'catalog.get',
+    principal: anonymous,
+    async load() {
+      return {
+        id: 'intake-place',
+        kind: 'food',
+        title: 'Owner place',
+        area: 'Ginza',
+        address: '1 Ginza, Tokyo',
+        description: 'Added through intake',
+        latitude: 35.671,
+        longitude: 139.765,
+        verificationStatus: 'verified',
+        verifiedAt: '2026-09-23T12:00:00.000Z',
+        tabelog: {
+          score: 4.12,
+          url: 'https://tabelog.com/tokyo/A0000/A000000/00000000/',
+          checkedAt: '2026-09-23T12:00:00.000Z',
+        },
+        reservation: {
+          mode: 'unknown',
+          label: 'Legacy display only',
+          checkedAt: '2026-09-23T12:00:00.000Z',
+        },
+        tags: [],
+        sources: [
+          {
+            role: 'discovery',
+            label: 'Legacy display only',
+            url: 'https://legacy.invalid/',
+          },
+        ],
+        intakeEvidence: {
+          candidateIdentity: {
+            providerNamespace: 'google-places',
+            placeId: 'place-1',
+          },
+          ownerFields: { title: 'Owner place' },
+          locationEvidence: {
+            status: 'known',
+            provenance: 'durable_geocoder_observed',
+            normalizedAddress: '1 Ginza, Tokyo',
+            latitude: 35.671,
+            longitude: 139.765,
+            provider: 'OpenStreetMap Nominatim',
+            sourceUrl:
+              'https://nominatim.openstreetmap.org/ui/details.html?place_id=1',
+            license: 'ODbL-1.0',
+            checkedAt: '2026-09-23T10:00:00.000Z',
+          },
+          tabelog: {
+            status: 'known',
+            score: 4.12,
+            url: 'https://tabelog.com/tokyo/A0000/A000000/00000000/',
+            provenance: 'owner_asserted',
+            assertedAt: '2026-09-23T11:00:00.000Z',
+            freshness: 'fresh',
+          },
+          reservation: { status: 'unknown' },
+          unknownFields: ['reservation'],
+          warnings: [],
+        },
+      };
+    },
+  });
+
+  assert.equal(response.status, 200);
+  const projected = await response.json();
+  assert.deepEqual(projected.tabelog, {
+    status: 'known',
+    score: 4.12,
+    url: 'https://tabelog.com/tokyo/A0000/A000000/00000000/',
+    provenance: 'owner_asserted',
+    assertedAt: '2026-09-23T11:00:00.000Z',
+    freshness: 'fresh',
+  });
+  assert.deepEqual(projected.reservation, { status: 'unknown' });
+  assert.deepEqual(projected.sources, [
+    {
+      role: 'location',
+      label: 'OpenStreetMap Nominatim',
+      url: 'https://nominatim.openstreetmap.org/ui/details.html?place_id=1',
+      provenance: 'durable_geocoder_observed',
+      checkedAt: '2026-09-23T10:00:00.000Z',
+      license: 'ODbL-1.0',
+    },
+    {
+      role: 'tabelog',
+      label: 'Tabelog',
+      url: 'https://tabelog.com/tokyo/A0000/A000000/00000000/',
+      provenance: 'owner_asserted',
+      assertedAt: '2026-09-23T11:00:00.000Z',
+    },
+  ]);
+  assert.equal(
+    JSON.stringify(projected).includes('checkedAt":"2026-09-23T12'),
+    false,
+  );
+});
+
+void test('authoritative intake unknown evidence never falls back to inconsistent legacy fields', async () => {
+  const response = await executePublicJsonRead({
+    manifest: createPublicReadManifest(),
+    operation: 'catalog.get',
+    principal: anonymous,
+    async load() {
+      return {
+        id: 'inconsistent-intake',
+        kind: 'food',
+        title: 'Unknown evidence place',
+        area: 'Ginza',
+        address: '1 Ginza, Tokyo',
+        description: 'Awaiting evidence.',
+        latitude: 35.671,
+        longitude: 139.765,
+        verificationStatus: 'verified',
+        verifiedAt: '2026-09-23T12:00:00.000Z',
+        tabelog: {
+          score: 4.99,
+          url: 'https://tabelog.com/tokyo/A0000/A000000/99999999/',
+          checkedAt: '2026-09-23T12:00:00.000Z',
+        },
+        reservation: {
+          mode: 'advance',
+          label: 'Legacy reservation',
+          checkedAt: '2026-09-23T12:00:00.000Z',
+        },
+        tags: [],
+        sources: [
+          {
+            role: 'tabelog',
+            label: 'Legacy Tabelog',
+            url: 'https://tabelog.com/tokyo/A0000/A000000/99999999/',
+          },
+        ],
+        intakeEvidence: {
+          candidateIdentity: {
+            providerNamespace: 'google-places',
+            placeId: 'place-unknown',
+          },
+          ownerFields: { title: 'Unknown evidence place' },
+          locationEvidence: { status: 'unknown' },
+          tabelog: { status: 'unknown' },
+          reservation: { status: 'unknown' },
+          unknownFields: ['tabelog', 'reservation'],
+          warnings: [],
+        },
+      };
+    },
+  });
+
+  assert.equal(response.status, 200);
+  const projected = await response.json();
+  assert.equal(projected.tabelog, undefined);
+  assert.deepEqual(projected.reservation, { status: 'unknown' });
+  assert.deepEqual(projected.sources, []);
+  assert.deepEqual(Object.keys(projected).sort(), [
+    'address',
+    'area',
+    'description',
+    'id',
+    'kind',
+    'latitude',
+    'longitude',
+    'reservation',
+    'sources',
+    'tags',
+    'title',
+    'verificationStatus',
+    'verifiedAt',
+  ]);
+  assert.doesNotMatch(JSON.stringify(projected), /4\.99|Legacy/u);
+});
+
 void test('assessment and visit projections expose only approved display fields', async () => {
   const manifest = createPublicReadManifest();
   const assessment = await executePublicJsonRead({

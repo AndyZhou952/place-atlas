@@ -24,6 +24,15 @@ const metadata = {
   updatedAt: '2026-09-10T08:00:00.000Z',
 };
 
+const verifiedDisplayAccess = {
+  async allowsItem(itemId) {
+    return itemId === metadata.itemId;
+  },
+  async filterAllowed(records) {
+    return records.filter(({ itemId }) => itemId === metadata.itemId);
+  },
+};
+
 test('the media content adapter preserves bytes and emits fixed public headers', async () => {
   const body = new ReadableStream({
     start(controller) {
@@ -37,6 +46,8 @@ test('the media content adapter preserves bytes and emits fixed public headers',
       new InMemoryMediaObjectStore(
         new Map([[metadata.objectKey, { body, etag: '"etag-1"' }]]),
       ),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 
@@ -62,12 +73,16 @@ test('the media content adapter maps missing metadata and objects separately', a
     createMediaOperationGroup(
       new InMemoryVisitMediaState(),
       new InMemoryMediaObjectStore(),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
   const missingObjectApplication = createAtlasApplication(
     createMediaOperationGroup(
       new InMemoryVisitMediaState([metadata]),
       new InMemoryMediaObjectStore(),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 
@@ -97,6 +112,8 @@ test('cancelling the HTTP response body cancels the storage stream', async () =>
     createMediaOperationGroup(
       new InMemoryVisitMediaState([metadata]),
       new InMemoryMediaObjectStore(new Map([[metadata.objectKey, { body }]])),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 

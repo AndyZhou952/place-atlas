@@ -19,7 +19,7 @@ export async function listAtlasItemsResponse(
     async load() {
       const result = await application.execute({
         key: 'catalog.list',
-        input: { profile: 'full_merged_catalog' },
+        input: { profile: 'verified_catalog' },
       });
       if (!result.ok) throw new Error('catalog unavailable');
       return result.value;

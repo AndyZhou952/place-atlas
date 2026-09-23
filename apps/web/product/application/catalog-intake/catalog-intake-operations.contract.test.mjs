@@ -416,6 +416,721 @@ test('catalog.intake.confirm stays fail-closed and performs no Catalog publicati
   );
 });
 
+test('catalog.intake.confirm derives a server mutation key and publishes one verified result through Atlas Catalog', async () => {
+  const publications = [];
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    atlasCatalogIntakePort: {
+      async publish(
+        preview,
+        mutationKey,
+        expectedSessionVersion,
+        catalogRevision,
+      ) {
+        publications.push({
+          preview,
+          mutationKey,
+          expectedSessionVersion,
+          catalogRevision,
+        });
+        return {
+          status: 'committed_verified',
+          itemId: 'atlas-item-1',
+          receiptRef: 'catalog-receipt-1',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await discoverAndSelect(application, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    value: {
+      status: 'committed_verified',
+      itemId: 'atlas-item-1',
+      receiptRef: 'catalog-receipt-1',
+      replayed: false,
+    },
+  });
+  assert.equal(publications.length, 1);
+  assert.deepEqual(
+    {
+      expectedSessionVersion: publications[0].expectedSessionVersion,
+      catalogRevision: publications[0].catalogRevision,
+    },
+    { expectedSessionVersion: 3, catalogRevision: 'catalog-r1' },
+  );
+  assert.match(publications[0].mutationKey, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(publications[0].preview.candidateIdentity, {
+    providerNamespace: 'google-places',
+    placeId: 'place-1',
+  });
+});
+
+test('catalog.intake.confirm turns confirm-time strong identity drift into a new preview conflict without publishing', async () => {
+  const base = discoveryFixture();
+  let refetchCalls = 0;
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: {
+      discover: (input) => base.discover(input),
+      async refetch(input) {
+        refetchCalls += 1;
+        if (refetchCalls === 1) return base.refetch(input);
+        return {
+          ok: true,
+          value: {
+            ...discoveryCandidate(),
+            durableIdentity: {
+              providerNamespace: 'google-places',
+              placeId: 'place-confirm-refresh',
+              ordinal: 1,
+            },
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'must-not-publish',
+          receiptRef: 'must-not-publish',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await discoverAndSelect(application, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'conflict');
+  assert.equal(result.value.newPreview.previewVersion, 2);
+  assert.deepEqual(result.value.newPreview.candidateIdentity, {
+    providerNamespace: 'google-places',
+    placeId: 'place-confirm-refresh',
+  });
+  assert.notEqual(result.value.newPreview.evidenceDigest, 'b'.repeat(64));
+  assert.equal(publishCalls, 0);
+});
+
+test('catalog.intake.confirm returns a new preview when fixture Web research changes authoritative evidence', async () => {
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        assert.equal(input.phase, 'confirm');
+        return {
+          ok: true,
+          value: {
+            tabelog: {
+              status: 'known',
+              score: 4.31,
+              reviewCount: 140,
+              url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+              provenance: 'agent_observed',
+              observedAt: '2026-09-22T10:00:00.000Z',
+              freshness: 'fresh',
+            },
+            reservation: input.preview.reservation,
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'must-not-publish',
+          receiptRef: 'must-not-publish',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await discoverAndSelect(application, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'conflict');
+  assert.equal(result.value.newPreview.previewVersion, 2);
+  assert.equal(result.value.newPreview.tabelog.status, 'known');
+  assert.equal(result.value.newPreview.tabelog.provenance, 'agent_observed');
+  assert.equal(result.value.newPreview.tabelog.score, 4.31);
+  assert.equal(publishCalls, 0);
+  const stableRetry = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(stableRetry.ok, true);
+  assert.equal(stableRetry.value.status, 'committed_verified');
+  assert.equal(publishCalls, 1);
+});
+
+test('catalog.intake.confirm rejects expanded Web research output without persisting or publishing it', async () => {
+  const state = recordingStatePort();
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state.port,
+    webResearchPort: {
+      async research(input) {
+        return {
+          ok: true,
+          value: {
+            tabelog: {
+              ...input.preview.tabelog,
+              rawHtml: '<article>private review text</article>',
+            },
+            reservation: input.preview.reservation,
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'must-not-publish',
+          receiptRef: 'must-not-publish',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await discoverAndSelect(application, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+  const before = structuredClone(state.sessions.get('session-1'));
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    value: { status: 'failed_no_write', reason: 'dependency' },
+  });
+  assert.equal(publishCalls, 0);
+  assert.deepEqual(state.sessions.get('session-1'), before);
+  assert.doesNotMatch(
+    JSON.stringify(state.sessions.get('session-1')),
+    /rawHtml|private review text/u,
+  );
+});
+
+test('catalog.intake.confirm rejects illegal Web research URL, time, range, provenance, and freshness fields', async () => {
+  const validTabelog = {
+    status: 'known',
+    score: 4.31,
+    reviewCount: 140,
+    url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+    provenance: 'agent_observed',
+    observedAt: '2026-09-22T09:55:00.000Z',
+    freshness: 'fresh',
+  };
+  const maliciousOutputs = [
+    { ...validTabelog, reviewText: 'private copied review' },
+    { ...validTabelog, url: 'http://tabelog.com/tokyo/A1307/A130701/1/' },
+    { ...validTabelog, observedAt: 'yesterday' },
+    { ...validTabelog, score: 5.01 },
+    { ...validTabelog, provenance: 'untrusted_scrape' },
+    { ...validTabelog, freshness: 'forever' },
+  ];
+
+  for (const tabelog of maliciousOutputs) {
+    const state = recordingStatePort();
+    let publishCalls = 0;
+    const application = createFixtureApplication({
+      discoveryPort: discoveryFixture(),
+      statePort: state.port,
+      webResearchPort: {
+        async research(input) {
+          return {
+            ok: true,
+            value: { tabelog, reservation: input.preview.reservation },
+          };
+        },
+      },
+      atlasCatalogIntakePort: {
+        async publish() {
+          publishCalls += 1;
+          return {
+            status: 'committed_verified',
+            itemId: 'must-not-publish',
+            receiptRef: 'must-not-publish',
+            replayed: false,
+          };
+        },
+      },
+    });
+    await discoverAndSelect(application, {
+      coordinates: { latitude: 35.6654, longitude: 139.7298 },
+    });
+    const before = structuredClone(state.sessions.get('session-1'));
+
+    assert.deepEqual(
+      await application.execute({
+        key: 'catalog.intake.confirm',
+        input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+      }),
+      {
+        ok: true,
+        value: { status: 'failed_no_write', reason: 'dependency' },
+      },
+    );
+    assert.equal(publishCalls, 0);
+    assert.deepEqual(state.sessions.get('session-1'), before);
+  }
+});
+
+test('catalog.intake.confirm refreshes durable geocoder evidence and conflicts instead of publishing changed coordinates', async () => {
+  let geocoderCalls = 0;
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    durableGeocoderPort: {
+      async propose(input) {
+        geocoderCalls += 1;
+        assert.equal(
+          input.trigger,
+          geocoderCalls === 1 ? 'owner_intake_select' : 'owner_intake_confirm',
+        );
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress:
+              geocoderCalls === 1
+                ? '東京都中央区銀座4丁目1-2'
+                : '東京都中央区銀座4丁目1-3',
+            latitude: geocoderCalls === 1 ? 35.6717 : 35.6718,
+            longitude: 139.765,
+            provider: 'fixture-osm-geocoder',
+            sourceUrl: 'https://www.openstreetmap.org/node/123',
+            license: 'ODbL-1.0',
+            checkedAt:
+              geocoderCalls === 1
+                ? '2026-09-22T09:59:00.000Z'
+                : '2026-09-22T10:00:00.000Z',
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'must-not-publish',
+          receiptRef: 'must-not-publish',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨青空', requestToken: 'request-geocoder-refresh' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      requestResearch: false,
+    },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'conflict');
+  assert.equal(result.value.newPreview.previewVersion, 2);
+  assert.equal(
+    result.value.newPreview.locationEvidence.normalizedAddress,
+    '東京都中央区銀座4丁目1-3',
+  );
+  assert.equal(result.value.newPreview.locationEvidence.latitude, 35.6718);
+  assert.equal(geocoderCalls, 2);
+  assert.equal(publishCalls, 0);
+  const stableRetry = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(stableRetry.ok, true);
+  assert.equal(stableRetry.value.status, 'committed_verified');
+  assert.equal(geocoderCalls, 3);
+  assert.equal(publishCalls, 1);
+});
+
+test('catalog.intake.confirm retries enabled geocoding for unknown evidence and turns provider failure into one stable conflict preview', async () => {
+  let geocoderCalls = 0;
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    durableGeocoderPort: {
+      async propose() {
+        geocoderCalls += 1;
+        return geocoderCalls === 1
+          ? { ok: true, value: { status: 'no_match' } }
+          : {
+              ok: false,
+              error: {
+                kind: 'dependency_failure',
+                message: 'private geocoder outage',
+              },
+            };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_needs_review',
+          itemId: 'atlas-review-candidate-1',
+          receiptRef: 'receipt-1',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨青空', requestToken: 'request-geocoder-unknown' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '鮨青空' },
+      requestResearch: false,
+    },
+  });
+
+  const failedRefresh = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(failedRefresh.ok, true);
+  assert.equal(failedRefresh.value.status, 'conflict');
+  assert.equal(failedRefresh.value.newPreview.previewVersion, 2);
+  assert.deepEqual(failedRefresh.value.newPreview.locationEvidence, {
+    status: 'unknown',
+  });
+  assert.deepEqual(failedRefresh.value.newPreview.warnings, [
+    {
+      code: 'provider_unavailable',
+      message:
+        'One or more enabled evidence providers could not be refreshed; retained evidence is stale or unknown.',
+    },
+    {
+      code: 'needs_review',
+      message:
+        'Confirm or complete the durable place details before publishing.',
+    },
+  ]);
+  assert.equal(publishCalls, 0);
+
+  const stableRetry = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(stableRetry.ok, true);
+  assert.equal(stableRetry.value.status, 'committed_needs_review');
+  assert.equal(geocoderCalls, 3);
+  assert.equal(publishCalls, 1);
+  assert.doesNotMatch(
+    JSON.stringify(failedRefresh),
+    /private geocoder outage/u,
+  );
+});
+
+test('catalog.intake.confirm terminates when geocoding fails while Web research succeeds', async () => {
+  let geocoderCalls = 0;
+  let researchCalls = 0;
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    durableGeocoderPort: {
+      async propose() {
+        geocoderCalls += 1;
+        return geocoderCalls === 1
+          ? { ok: true, value: { status: 'no_match' } }
+          : {
+              ok: false,
+              error: { kind: 'dependency_failure', message: 'private outage' },
+            };
+      },
+    },
+    webResearchPort: {
+      async research({ preview }) {
+        researchCalls += 1;
+        return {
+          ok: true,
+          value: {
+            tabelog: preview.tabelog,
+            reservation: preview.reservation,
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_needs_review',
+          itemId: 'review-one',
+          receiptRef: 'receipt-one',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨青空', requestToken: 'dual-provider-one' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '鮨青空' },
+      requestResearch: false,
+    },
+  });
+
+  const refreshed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(refreshed.ok && refreshed.value.status, 'conflict');
+  const committed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+
+  assert.equal(
+    committed.ok && committed.value.status,
+    'committed_needs_review',
+  );
+  assert.equal(geocoderCalls, 3);
+  assert.equal(researchCalls, 2);
+  assert.equal(publishCalls, 1);
+});
+
+test('catalog.intake.confirm terminates when geocoding succeeds while Web research fails without changing observation time', async () => {
+  let geocoderCalls = 0;
+  let researchCalls = 0;
+  let publishCalls = 0;
+  const observedAt = '2026-09-22T09:55:00.000Z';
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    durableGeocoderPort: {
+      async propose() {
+        geocoderCalls += 1;
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress: '東京都中央区銀座4丁目1-2',
+            latitude: 35.6717,
+            longitude: 139.765,
+            provider: 'fixture-osm-geocoder',
+            sourceUrl: 'https://www.openstreetmap.org/node/123',
+            license: 'ODbL-1.0',
+            checkedAt: '2026-09-22T09:59:00.000Z',
+          },
+        };
+      },
+    },
+    webResearchPort: {
+      async research({ preview }) {
+        researchCalls += 1;
+        return researchCalls === 1
+          ? {
+              ok: true,
+              value: {
+                tabelog: {
+                  status: 'known',
+                  score: 4.31,
+                  url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+                  provenance: 'agent_observed',
+                  observedAt,
+                  freshness: 'fresh',
+                },
+                reservation: preview.reservation,
+              },
+            }
+          : {
+              ok: false,
+              error: { kind: 'dependency_failure', message: 'private outage' },
+            };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'verified-one',
+          receiptRef: 'receipt-one',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '銀座 鮨青空', requestToken: 'dual-provider-two' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      requestResearch: false,
+    },
+  });
+  const researched = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(researched.ok && researched.value.status, 'conflict');
+  const failedRefresh = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(failedRefresh.ok && failedRefresh.value.status, 'conflict');
+  assert.equal(failedRefresh.value.newPreview.tabelog.freshness, 'stale');
+  assert.equal(failedRefresh.value.newPreview.tabelog.observedAt, observedAt);
+
+  const committed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 3 },
+  });
+
+  assert.equal(committed.ok && committed.value.status, 'committed_verified');
+  assert.equal(geocoderCalls, 4);
+  assert.equal(researchCalls, 3);
+  assert.equal(publishCalls, 1);
+});
+
+test('catalog.intake.confirm makes failed Web research evidence stale once without changing its observation time', async () => {
+  let researchCalls = 0;
+  let publishCalls = 0;
+  const observedAt = '2026-09-22T09:55:00.000Z';
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        researchCalls += 1;
+        if (researchCalls === 1) {
+          return {
+            ok: true,
+            value: {
+              tabelog: {
+                status: 'known',
+                score: 4.31,
+                url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+                provenance: 'agent_observed',
+                observedAt,
+                freshness: 'fresh',
+              },
+              reservation: input.preview.reservation,
+            },
+          };
+        }
+        return {
+          ok: false,
+          error: {
+            kind: 'dependency_failure',
+            message: 'private research outage',
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        return {
+          status: 'committed_verified',
+          itemId: 'atlas-item-1',
+          receiptRef: 'receipt-1',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await discoverAndSelect(application, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+  const researched = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(researched.value.status, 'conflict');
+
+  const failedRefresh = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(failedRefresh.ok, true);
+  assert.equal(failedRefresh.value.status, 'conflict');
+  assert.equal(failedRefresh.value.newPreview.previewVersion, 3);
+  assert.equal(failedRefresh.value.newPreview.tabelog.freshness, 'stale');
+  assert.equal(failedRefresh.value.newPreview.tabelog.observedAt, observedAt);
+  assert.equal(publishCalls, 0);
+
+  const stableRetry = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 3 },
+  });
+  assert.equal(stableRetry.ok, true);
+  assert.equal(stableRetry.value.status, 'committed_verified');
+  assert.equal(researchCalls, 3);
+  assert.equal(publishCalls, 1);
+  assert.doesNotMatch(
+    JSON.stringify(failedRefresh),
+    /private research outage/u,
+  );
+});
+
 test('catalog.intake.cancel returns one stable closed result and replays it', async () => {
   const application = createFixtureApplication(discoveryFixture());
   await application.execute({
@@ -898,7 +1613,7 @@ test('closed input validation accepts two-decimal Tabelog values and rejects for
   }
 });
 
-async function discoverAndSelect(application) {
+async function discoverAndSelect(application, ownerFields = {}) {
   await application.execute({
     key: 'catalog.intake.discover',
     input: { query: '鮨 さいとう', requestToken: 'request-1' },
@@ -912,6 +1627,7 @@ async function discoverAndSelect(application) {
       ownerFields: {
         title: '鮨 さいとう',
         address: '東京都港区六本木1-4-5',
+        ...ownerFields,
       },
       requestResearch: false,
     },
@@ -935,6 +1651,12 @@ function createFixtureApplication(options) {
     },
     ...(normalized.durableGeocoderPort
       ? { durableGeocoderPort: normalized.durableGeocoderPort }
+      : {}),
+    ...(normalized.atlasCatalogIntakePort
+      ? { atlasCatalogIntakePort: normalized.atlasCatalogIntakePort }
+      : {}),
+    ...(normalized.webResearchPort
+      ? { webResearchPort: normalized.webResearchPort }
       : {}),
   });
   const application = createAtlasApplication(

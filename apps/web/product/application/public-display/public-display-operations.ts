@@ -10,6 +10,7 @@ import type { VisitMediaMetadata } from '../media/visit-media.ts';
 import { failure, success, type Result } from '../result.ts';
 import type { VisitRecordState } from '../visits/visit-state.ts';
 import type { Visit } from '../visits/visit.ts';
+import { createPublicDisplayAccess } from './public-display-access.ts';
 
 type EmptyInput = Readonly<Record<string, never>>;
 
@@ -36,6 +37,7 @@ export interface PublicDisplayDependencies {
 export function createPublicDisplayOperationGroup(
   dependencies: PublicDisplayDependencies,
 ) {
+  const access = createPublicDisplayAccess(dependencies.catalog);
   const displayAssessment: OperationDefinition<
     'assessment.display',
     { readonly itemId: string },
@@ -50,7 +52,7 @@ export function createPublicDisplayOperationGroup(
     },
     async handle({ itemId }) {
       try {
-        if (!(await dependencies.catalog.get(itemId))) {
+        if (!(await access.allowsItem(itemId))) {
           return failure('not_found', 'Atlas item not found.');
         }
         const context = await dependencies.assessments.read(itemId);
@@ -95,7 +97,7 @@ export function createPublicDisplayOperationGroup(
       try {
         return success(
           await assembleVisits(
-            await dependencies.visits.list(),
+            await access.filterAllowed(await dependencies.visits.list()),
             dependencies.media,
           ),
         );
@@ -125,7 +127,9 @@ export function createPublicDisplayOperationGroup(
         const visit = (await dependencies.visits.list()).find(
           (candidate) => candidate.id === id,
         );
-        if (!visit) return failure('not_found', 'Journal entry not found.');
+        if (!visit || !(await access.allowsItem(visit.itemId))) {
+          return failure('not_found', 'Journal entry not found.');
+        }
         return success({
           ...visit,
           media: await dependencies.media.list({ visitId: visit.id }),

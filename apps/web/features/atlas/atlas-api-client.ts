@@ -11,6 +11,7 @@ import type {
   VisitRecord,
   VisitUpdate,
 } from './model';
+import type { OwnerReviewCandidateView } from './owner-review-candidate-view';
 import {
   chunkMediaSelection,
   maxMediaFilesPerSelection,
@@ -24,7 +25,9 @@ import {
   loadPublicCatalog,
   loadPublicMedia,
   loadPublicVisits,
+  loadOwnerReviewCandidates,
 } from './public-read-client.ts';
+export { OwnerAuthenticationRequiredError } from './public-read-client.ts';
 import { publishOwnerLoginRequired } from './owner-session-client.ts';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation.ts';
 import type {
@@ -47,6 +50,10 @@ interface BrowserOperationMap {
   readonly 'catalog.list': {
     readonly input: { readonly profile: 'full_merged_catalog' };
     readonly output: readonly AtlasItem[];
+  };
+  readonly 'catalog.review_candidates.list': {
+    readonly input: Readonly<Record<string, never>>;
+    readonly output: readonly OwnerReviewCandidateView[];
   };
   readonly 'assessment.update': {
     readonly input: {
@@ -204,6 +211,8 @@ export function createBrowserAtlasApplication(
 ): BrowserAtlasApplication {
   const handlers: BrowserOperationHandlers = {
     'catalog.list': () => loadPublicCatalog(transport),
+    'catalog.review_candidates.list': () =>
+      loadOwnerReviewCandidates(transport),
     'assessment.update': ({ itemId, patch }, mutationId) => {
       const { manualVisited, ...rest } = patch;
       return requestMutationJson<{

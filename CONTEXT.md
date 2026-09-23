@@ -20,6 +20,7 @@ _Avoid_：自动抓取结果
 
 **审核候选（Review Candidate）**：
 证据不足或冲突、必须由用户确认后才能成为可信条目的候选身份。
+只在 Owner Catalog／详情中可见；可承载 Owner 的 Visit 等个人记忆，但不得进入匿名 Public Read、地图或 Nearby。
 _Avoid_：低分条目、错误条目
 
 ### 个人记忆
@@ -92,6 +93,7 @@ _Avoid_：Cookie、HMAC secret、模型自报身份
 
 **公开读取投影（Public Read Projection）**：
 Owner PoC 对匿名访问者显式开放的版本化闭合 DTO allowlist。v1 公开 Catalog、个人总体状态与评论、Visit 展示、媒体展示元数据和照片二进制；禁止 object key、原文件名、hash、内部存储 ID 与审计数据。授权先于任何 Application/R2 调用，投影禁止领域对象直出；未知读取默认私有。
+Catalog 访问集合只包含 Verified Item；Review Candidate 及其评价、Visit、笔记与媒体始终保持 Owner-only。
 _Avoid_：所有 GET 自动公开、数据库行直出、永久公开承诺
 
 **渠道适配器（ChannelAdapter）**：

@@ -27,40 +27,122 @@ export interface PublicCatalogItemV1 {
   readonly verificationStatus: 'verified' | 'needs_review';
   readonly verifiedAt?: string;
   readonly officialUrl?: string;
-  readonly tabelog?: {
-    readonly score: number;
-    readonly reviewCount?: number;
-    readonly url: string;
-    readonly checkedAt: string;
-  };
-  readonly reservation: {
-    readonly mode:
-      | 'walk-in'
-      | 'same-day'
-      | 'advance'
-      | 'ticketed'
-      | 'unavailable'
-      | 'unknown';
-    readonly label: string;
-    readonly checkedAt: string;
-    readonly channel?: string;
-    readonly url?: string;
-    readonly advanceDays?: number;
-    readonly bookingWindowLabel?: string;
-    readonly releaseNote?: string;
-  };
+  readonly tabelog?: PublicTabelogEvidenceV1;
+  readonly reservation: PublicReservationEvidenceV1;
   readonly event?: {
     readonly startDate: string;
     readonly endDate: string;
     readonly displayDate: string;
   };
   readonly tags: readonly string[];
-  readonly sources: readonly {
-    readonly label: string;
-    readonly url: string;
-    readonly role: 'official' | 'tabelog' | 'reservation' | 'discovery';
-  }[];
+  readonly sources: readonly PublicSourceEvidenceV1[];
 }
+
+type PublicTabelogEvidenceV1 =
+  | {
+      readonly score: number;
+      readonly reviewCount?: number;
+      readonly url: string;
+      readonly checkedAt: string;
+    }
+  | {
+      readonly status: 'known';
+      readonly score: number;
+      readonly reviewCount?: number;
+      readonly url: string;
+      readonly provenance: 'owner_asserted';
+      readonly assertedAt: string;
+      readonly freshness: 'fresh' | 'stale';
+    }
+  | {
+      readonly status: 'known';
+      readonly score: number;
+      readonly reviewCount?: number;
+      readonly url: string;
+      readonly provenance: 'agent_observed';
+      readonly observedAt: string;
+      readonly freshness: 'fresh' | 'stale';
+    };
+
+type PublicReservationEvidenceV1 =
+  | { readonly status: 'unknown' }
+  | {
+      readonly mode:
+        | 'walk-in'
+        | 'same-day'
+        | 'advance'
+        | 'ticketed'
+        | 'unavailable'
+        | 'unknown';
+      readonly label: string;
+      readonly checkedAt: string;
+      readonly channel?: string;
+      readonly url?: string;
+      readonly advanceDays?: number;
+      readonly bookingWindowLabel?: string;
+      readonly releaseNote?: string;
+    }
+  | {
+      readonly status: 'known';
+      readonly mode: 'reservable' | 'reservation_required';
+      readonly label: string;
+      readonly advanceDays?: number;
+      readonly bookingWindowLabel?: string;
+      readonly releaseNote?: string;
+      readonly channel?: string;
+      readonly url: string;
+      readonly provenance: 'owner_asserted';
+      readonly assertedAt: string;
+      readonly freshness: 'fresh' | 'stale';
+    }
+  | {
+      readonly status: 'known';
+      readonly mode: 'reservable' | 'reservation_required';
+      readonly label: string;
+      readonly advanceDays?: number;
+      readonly bookingWindowLabel?: string;
+      readonly releaseNote?: string;
+      readonly channel?: string;
+      readonly url: string;
+      readonly provenance: 'agent_observed';
+      readonly observedAt: string;
+      readonly freshness: 'fresh' | 'stale';
+    };
+
+type PublicSourceEvidenceV1 =
+  | {
+      readonly label: string;
+      readonly url: string;
+      readonly role:
+        | 'identity'
+        | 'location'
+        | 'official'
+        | 'tabelog'
+        | 'reservation'
+        | 'discovery';
+    }
+  | {
+      readonly role: 'identity' | 'location' | 'tabelog' | 'reservation';
+      readonly label: string;
+      readonly url?: string;
+      readonly provenance: 'owner_asserted';
+      readonly assertedAt: string;
+    }
+  | {
+      readonly role: 'identity' | 'location' | 'tabelog' | 'reservation';
+      readonly label: string;
+      readonly url: string;
+      readonly provenance: 'agent_observed';
+      readonly observedAt: string;
+    }
+  | {
+      readonly role: 'location';
+      readonly label: string;
+      readonly url: string;
+      readonly provenance: 'durable_geocoder_observed';
+      readonly checkedAt: string;
+      readonly license: string;
+    };
 
 export interface PublicAssessmentV1 {
   readonly itemId: string;
@@ -202,6 +284,13 @@ export async function executePublicMediaRead({
 }
 
 function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
+  const intakeEvidence =
+    source.intakeEvidence === undefined
+      ? undefined
+      : asRecord(source.intakeEvidence);
+  const intakeTabelog = intakeEvidence
+    ? asRecord(intakeEvidence.tabelog)
+    : undefined;
   const reservation = asRecord(source.reservation);
   const projected: PublicCatalogItemV1 = {
     id: asString(source.id),
@@ -222,19 +311,85 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     ...(optionalString(source.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(source.officialUrl) }),
-    ...(source.tabelog === undefined
-      ? {}
-      : { tabelog: projectTabelog(asRecord(source.tabelog)) }),
-    reservation: projectReservation(reservation),
+    ...(intakeEvidence
+      ? intakeTabelog?.status === 'known'
+        ? { tabelog: projectTabelog(intakeTabelog) }
+        : {}
+      : source.tabelog === undefined
+        ? {}
+        : { tabelog: projectTabelog(asRecord(source.tabelog)) }),
+    reservation: projectReservation(
+      intakeEvidence ? asRecord(intakeEvidence.reservation) : reservation,
+    ),
     ...(source.event === undefined
       ? {}
       : { event: projectEvent(asRecord(source.event)) }),
     tags: asArray(source.tags).map(asString),
-    sources: asArray(source.sources).map((entry) =>
-      projectSource(asRecord(entry)),
-    ),
+    sources: intakeEvidence
+      ? projectIntakeSources(intakeEvidence)
+      : asArray(source.sources).map((entry) => projectSource(asRecord(entry))),
   };
   return projected;
+}
+
+function projectIntakeSources(
+  evidence: Readonly<Record<string, unknown>>,
+): readonly PublicSourceEvidenceV1[] {
+  const candidates: Record<string, unknown>[] = [];
+  const location = asRecord(evidence.locationEvidence);
+  if (
+    location.status === 'known' &&
+    location.provenance === 'durable_geocoder_observed'
+  ) {
+    candidates.push({
+      role: 'location',
+      label: asString(location.provider),
+      url: asString(location.sourceUrl),
+      provenance: 'durable_geocoder_observed',
+      checkedAt: asString(location.checkedAt),
+      license: asString(location.license),
+    });
+  } else if (
+    location.status === 'known' &&
+    location.provenance === 'owner_asserted'
+  ) {
+    candidates.push({
+      role: 'location',
+      label: 'Owner provided location',
+      ...(location.sourceUrl === undefined
+        ? {}
+        : { url: asString(location.sourceUrl) }),
+      provenance: 'owner_asserted',
+      assertedAt: asString(location.assertedAt),
+    });
+  }
+
+  const tabelog = asRecord(evidence.tabelog);
+  if (tabelog.status === 'known') {
+    candidates.push({
+      role: 'tabelog',
+      label: 'Tabelog',
+      url: asString(tabelog.url),
+      provenance: tabelog.provenance,
+      ...(tabelog.provenance === 'owner_asserted'
+        ? { assertedAt: asString(tabelog.assertedAt) }
+        : { observedAt: asString(tabelog.observedAt) }),
+    });
+  }
+
+  const reservation = asRecord(evidence.reservation);
+  if (reservation.status === 'known') {
+    candidates.push({
+      role: 'reservation',
+      label: asString(reservation.label),
+      url: asString(reservation.url),
+      provenance: reservation.provenance,
+      ...(reservation.provenance === 'owner_asserted'
+        ? { assertedAt: asString(reservation.assertedAt) }
+        : { observedAt: asString(reservation.observedAt) }),
+    });
+  }
+  return candidates.map((candidate) => projectSource(candidate));
 }
 
 function projectAssessment(
@@ -286,6 +441,32 @@ function projectVisitMedia(
 }
 
 function projectTabelog(source: Readonly<Record<string, unknown>>) {
+  if (source.status === 'known') {
+    const shared = {
+      status: 'known' as const,
+      score: asNumber(source.score),
+      ...(source.reviewCount === undefined
+        ? {}
+        : { reviewCount: asNumber(source.reviewCount) }),
+      url: asString(source.url),
+      freshness: asFreshness(source.freshness),
+    };
+    if (source.provenance === 'owner_asserted') {
+      return {
+        ...shared,
+        provenance: 'owner_asserted' as const,
+        assertedAt: asString(source.assertedAt),
+      };
+    }
+    if (source.provenance === 'agent_observed') {
+      return {
+        ...shared,
+        provenance: 'agent_observed' as const,
+        observedAt: asString(source.observedAt),
+      };
+    }
+    throw new TypeError('Expected Tabelog provenance');
+  }
   return {
     score: asNumber(source.score),
     ...(source.reviewCount === undefined
@@ -296,7 +477,46 @@ function projectTabelog(source: Readonly<Record<string, unknown>>) {
   };
 }
 
-function projectReservation(source: Readonly<Record<string, unknown>>) {
+function projectReservation(
+  source: Readonly<Record<string, unknown>>,
+): PublicReservationEvidenceV1 {
+  if (source.status === 'unknown') return { status: 'unknown' as const };
+  if (source.status === 'known') {
+    const shared = {
+      status: 'known' as const,
+      mode: asIntakeReservationMode(source.mode),
+      label: asString(source.label),
+      ...(source.advanceDays === undefined
+        ? {}
+        : { advanceDays: asNumber(source.advanceDays) }),
+      ...(optionalString(source.bookingWindowLabel) === undefined
+        ? {}
+        : { bookingWindowLabel: optionalString(source.bookingWindowLabel) }),
+      ...(optionalString(source.releaseNote) === undefined
+        ? {}
+        : { releaseNote: optionalString(source.releaseNote) }),
+      ...(optionalString(source.channel) === undefined
+        ? {}
+        : { channel: optionalString(source.channel) }),
+      url: asString(source.url),
+      freshness: asFreshness(source.freshness),
+    };
+    if (source.provenance === 'owner_asserted') {
+      return {
+        ...shared,
+        provenance: 'owner_asserted' as const,
+        assertedAt: asString(source.assertedAt),
+      };
+    }
+    if (source.provenance === 'agent_observed') {
+      return {
+        ...shared,
+        provenance: 'agent_observed' as const,
+        observedAt: asString(source.observedAt),
+      };
+    }
+    throw new TypeError('Expected reservation provenance');
+  }
   return {
     mode: asReservationMode(source.mode),
     label: asString(source.label),
@@ -327,7 +547,40 @@ function projectEvent(source: Readonly<Record<string, unknown>>) {
   };
 }
 
-function projectSource(source: Readonly<Record<string, unknown>>) {
+function projectSource(
+  source: Readonly<Record<string, unknown>>,
+): PublicSourceEvidenceV1 {
+  if (source.provenance === 'owner_asserted') {
+    return {
+      role: asIntakeSourceRole(source.role),
+      label: asString(source.label),
+      ...(source.url === undefined ? {} : { url: asString(source.url) }),
+      provenance: 'owner_asserted' as const,
+      assertedAt: asString(source.assertedAt),
+    };
+  }
+  if (source.provenance === 'agent_observed') {
+    return {
+      role: asIntakeSourceRole(source.role),
+      label: asString(source.label),
+      url: asString(source.url),
+      provenance: 'agent_observed' as const,
+      observedAt: asString(source.observedAt),
+    };
+  }
+  if (source.provenance === 'durable_geocoder_observed') {
+    if (source.role !== 'location') {
+      throw new TypeError('Durable geocoder source must be location');
+    }
+    return {
+      role: 'location' as const,
+      label: asString(source.label),
+      url: asString(source.url),
+      provenance: 'durable_geocoder_observed' as const,
+      checkedAt: asString(source.checkedAt),
+      license: asString(source.license),
+    };
+  }
   return {
     label: asString(source.label),
     url: asString(source.url),
@@ -421,7 +674,7 @@ function asVerificationStatus(
 
 function asReservationMode(
   value: unknown,
-): PublicCatalogItemV1['reservation']['mode'] {
+): 'walk-in' | 'same-day' | 'advance' | 'ticketed' | 'unavailable' | 'unknown' {
   if (
     value === 'walk-in' ||
     value === 'same-day' ||
@@ -433,6 +686,32 @@ function asReservationMode(
     return value;
   }
   throw new TypeError('Expected reservation mode');
+}
+
+function asIntakeReservationMode(
+  value: unknown,
+): 'reservable' | 'reservation_required' {
+  if (value === 'reservable' || value === 'reservation_required') return value;
+  throw new TypeError('Expected intake reservation mode');
+}
+
+function asFreshness(value: unknown): 'fresh' | 'stale' {
+  if (value === 'fresh' || value === 'stale') return value;
+  throw new TypeError('Expected evidence freshness');
+}
+
+function asIntakeSourceRole(
+  value: unknown,
+): 'identity' | 'location' | 'tabelog' | 'reservation' {
+  if (
+    value === 'identity' ||
+    value === 'location' ||
+    value === 'tabelog' ||
+    value === 'reservation'
+  ) {
+    return value;
+  }
+  throw new TypeError('Expected intake source role');
 }
 
 function asSourceRole(

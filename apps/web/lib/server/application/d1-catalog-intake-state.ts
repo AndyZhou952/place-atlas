@@ -4,6 +4,7 @@ import type {
   CatalogIntakeStatePort,
   CatalogIntakeStoredSession,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
+import { hasCanonicalCatalogIntakeWarningOrder } from '../../../product/application/catalog-intake/catalog-intake-warning-policy.ts';
 
 interface JsonRow {
   readonly value_json: string;
@@ -16,9 +17,14 @@ interface RequestRow {
 
 export class D1CatalogIntakeState implements CatalogIntakeStatePort {
   readonly #database: D1Database;
+  readonly #clock: { now(): Date };
 
-  constructor(database: D1Database) {
+  constructor(
+    database: D1Database,
+    clock: { now(): Date } = { now: () => new Date() },
+  ) {
     this.#database = database;
+    this.#clock = clock;
   }
 
   async findByRequest(scope: CatalogIntakeScope, requestToken: string) {
@@ -79,7 +85,13 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
     if (active) return parseStored(active.value_json);
     const terminal = await this.#database
       .prepare(findTerminalSql)
-      .bind(sessionId, scope.ownerId, scope.channel, scope.conversationId)
+      .bind(
+        sessionId,
+        scope.ownerId,
+        scope.channel,
+        scope.conversationId,
+        this.#clock.now().getTime(),
+      )
       .first<JsonRow>();
     return terminal ? parseStored(terminal.value_json) : undefined;
   }
@@ -116,6 +128,11 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
         kind: 'conflict' as const,
         ...(current ? { current } : {}),
       };
+    }
+    if (next.state === 'committed') {
+      throw new Error(
+        'Committed intake sessions are written only by Atlas Catalog publish.',
+      );
     }
 
     const sourceVersion =
@@ -185,6 +202,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
       this.#database.prepare(deleteExpiredActiveSql).bind(nowMs),
       this.#database.prepare(deleteTerminalSql).bind(nowMs),
       this.#database.prepare(deleteTokensSql).bind(nowMs),
+      this.#database.prepare(deletePublishReceiptsSql).bind(nowMs),
     ]);
     return {
       expired: changes(results[1]),
@@ -234,7 +252,8 @@ const findActiveSql =
 const findTerminalSql =
   'SELECT terminal_json AS value_json FROM catalog_intake_terminal_refs ' +
   'WHERE session_id = ? AND ' +
-  scopeWhere;
+  scopeWhere +
+  ' AND retain_until_ms > ?';
 const updateActiveSql =
   'UPDATE catalog_intake_sessions SET state = ?, session_version = ?, ' +
   'session_json = ?, last_accepted_activity_at_ms = ?, expires_at_ms = ?, ' +
@@ -279,6 +298,8 @@ const deleteTerminalSql =
   'DELETE FROM catalog_intake_terminal_refs WHERE retain_until_ms <= ?';
 const deleteTokensSql =
   'DELETE FROM catalog_intake_request_tokens WHERE retain_until_ms <= ?';
+const deletePublishReceiptsSql =
+  'DELETE FROM catalog_intake_publish_receipts WHERE retain_until_ms <= ?';
 
 function insertSession(
   database: D1Database,
@@ -319,7 +340,20 @@ function replayOrConflict(
 }
 
 function parseStored(json: string): CatalogIntakeStoredSession {
-  return JSON.parse(json) as CatalogIntakeStoredSession;
+  const parsed: unknown = JSON.parse(json);
+  if (
+    isRecord(parsed) &&
+    parsed.state === 'preview_ready' &&
+    (!isRecord(parsed.preview) ||
+      !hasCanonicalCatalogIntakeWarningOrder(parsed.preview.warnings))
+  ) {
+    throw new Error('Catalog intake session has invalid warning order.');
+  }
+  return parsed as CatalogIntakeStoredSession;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function changes(result: D1Result<unknown>): number {

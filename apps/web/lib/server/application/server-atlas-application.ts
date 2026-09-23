@@ -34,7 +34,12 @@ import {
   type MediaDependencies,
 } from '@/product/application/media/media-operations';
 import { createPublicDisplayOperationGroup } from '@/product/application/public-display/public-display-operations';
+import { createPublicDisplayAccess } from '@/product/application/public-display/public-display-access';
 import { createVisitOperationGroup } from '@/product/application/visits/visit-operations';
+import {
+  createVisitTargetProjection,
+  type VisitItemProjection,
+} from '@/product/application/visits/visit-item-projection';
 
 import { D1CatalogState } from './d1-catalog-state';
 import { D1DestructiveState } from './d1-destructive-state';
@@ -61,10 +66,14 @@ export function createServerAtlasApplication(
   const catalogItemProjection =
     dependencies.catalogItemProjection ??
     createCatalogItemProjection(verifiedAtlasItems);
+  const visitItemProjection =
+    dependencies.visitItemProjection ??
+    createVisitTargetProjection(verifiedAtlasItems);
   const mediaObjects = new R2MediaObjectStore(mediaBucket);
   const assessmentState = new D1PlaceAssessmentState(database);
   const visitState = new D1VisitState(database);
   const mediaState = new D1VisitMediaState(database);
+  const publicDisplayAccess = createPublicDisplayAccess(catalogRead);
   return createAtlasApplication({
     ...createImportJobOperationGroup(
       new D1ImportJobState(database),
@@ -92,18 +101,20 @@ export function createServerAtlasApplication(
       ...dependencies.agentNearby,
       catalog: catalogRead,
     }),
-    ...createVisitOperationGroup(
-      visitState,
-      catalogItemProjection,
-      dependencies,
-    ),
+    ...createVisitOperationGroup(visitState, visitItemProjection, dependencies),
     ...createDestructiveOperationGroup(
       new D1DestructiveState(database),
       catalogItemProjection,
+      visitItemProjection,
       mediaObjects,
       { clock: dependencies.clock },
     ),
-    ...createMediaOperationGroup(mediaState, mediaObjects, dependencies),
+    ...createMediaOperationGroup(
+      mediaState,
+      mediaObjects,
+      dependencies,
+      publicDisplayAccess,
+    ),
   });
 }
 
@@ -124,6 +135,7 @@ export interface ServerAtlasDependencies
   extends ImportJobDependencies, MediaDependencies {
   readonly catalogRead?: CatalogRead;
   readonly catalogItemProjection?: CatalogItemProjection;
+  readonly visitItemProjection?: VisitItemProjection;
   readonly catalogIntakeModule?: CatalogIntakeModule;
   readonly agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'>;
 }

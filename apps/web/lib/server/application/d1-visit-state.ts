@@ -25,6 +25,7 @@ interface VisitRow {
 interface ItemContextRow {
   readonly item_id: string;
   readonly payload_json?: string | null;
+  readonly review_candidate_payload_json?: string | null;
   readonly override_title?: string | null;
   readonly override_description?: string | null;
   readonly override_personal_state?: PersonalState | null;
@@ -175,7 +176,8 @@ function toItemContext(row: ItemContextRow): VisitItemRecordContext {
   const hasAssessment = row.assessment_updated_at != null;
   return {
     itemId: row.item_id,
-    dynamicPayload: row.payload_json ?? undefined,
+    dynamicPayload:
+      row.payload_json ?? row.review_candidate_payload_json ?? undefined,
     override: hasOverride
       ? {
           itemId: row.item_id,
@@ -203,6 +205,7 @@ function toItemContext(row: ItemContextRow): VisitItemRecordContext {
 const itemContextSql = `WITH requested(item_id) AS (VALUES (?))
   SELECT requested.item_id,
          items.payload_json,
+         review_candidates.payload_json AS review_candidate_payload_json,
          overrides.title AS override_title,
          overrides.description AS override_description,
          overrides.personal_state AS override_personal_state,
@@ -216,6 +219,8 @@ const itemContextSql = `WITH requested(item_id) AS (VALUES (?))
          (SELECT COUNT(*) FROM visits WHERE item_id = requested.item_id) AS visit_count
   FROM requested
   LEFT JOIN atlas_items AS items ON items.id = requested.item_id
+  LEFT JOIN atlas_review_candidates AS review_candidates
+    ON review_candidates.id = requested.item_id
   LEFT JOIN atlas_item_overrides AS overrides ON overrides.item_id = requested.item_id
   LEFT JOIN place_assessments AS assessments ON assessments.item_id = requested.item_id
   LEFT JOIN atlas_item_tombstones AS tombstones ON tombstones.item_id = requested.item_id`;
@@ -226,6 +231,7 @@ const visitContextSql = `WITH requested_visit AS (
   )
   SELECT requested_visit.*,
          items.payload_json,
+         review_candidates.payload_json AS review_candidate_payload_json,
          overrides.title AS override_title,
          overrides.description AS override_description,
          overrides.personal_state AS override_personal_state,
@@ -239,6 +245,8 @@ const visitContextSql = `WITH requested_visit AS (
          (SELECT COUNT(*) FROM visits WHERE item_id = requested_visit.item_id) AS visit_count
   FROM requested_visit
   LEFT JOIN atlas_items AS items ON items.id = requested_visit.item_id
+  LEFT JOIN atlas_review_candidates AS review_candidates
+    ON review_candidates.id = requested_visit.item_id
   LEFT JOIN atlas_item_overrides AS overrides ON overrides.item_id = requested_visit.item_id
   LEFT JOIN place_assessments AS assessments ON assessments.item_id = requested_visit.item_id
   LEFT JOIN atlas_item_tombstones AS tombstones ON tombstones.item_id = requested_visit.item_id`;

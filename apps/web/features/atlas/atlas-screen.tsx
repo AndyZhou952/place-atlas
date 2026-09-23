@@ -90,8 +90,8 @@ const navItems: readonly { value: AtlasView; label: string }[] = [
 ];
 
 export function AtlasScreen() {
-  const vm = useAtlasViewModel();
   const owner = useOwnerSession();
+  const vm = useAtlasViewModel(owner.state.authenticated);
   const [nearbyFocusRequest, setNearbyFocusRequest] = useState(0);
 
   return (
@@ -156,7 +156,9 @@ export function AtlasScreen() {
       {vm.view === 'map' ? (
         <MapWorkspace vm={vm} nearbyFocusRequest={nearbyFocusRequest} />
       ) : null}
-      {vm.view === 'inbox' ? <InboxWorkspace vm={vm} /> : null}
+      {vm.view === 'inbox' ? (
+        <InboxWorkspace vm={vm} onRequestOwnerLogin={owner.toggle} />
+      ) : null}
       {vm.view === 'journal' ? <JournalWorkspace vm={vm} /> : null}
       <footer className="site-footer">
         <span>Japan Atlas · personal field guide</span>
@@ -1335,7 +1337,13 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
-function InboxWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
+function InboxWorkspace({
+  vm,
+  onRequestOwnerLogin,
+}: {
+  readonly vm: AtlasViewModel;
+  readonly onRequestOwnerLogin: () => void;
+}) {
   const [creatorName, setCreatorName] = useState('');
   const [sourceRef, setSourceRef] = useState('');
 
@@ -1430,6 +1438,77 @@ function InboxWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
           </CardContent>
         </Card>
       </div>
+
+      <section
+        className="job-section"
+        aria-labelledby="review-candidates-title"
+        aria-busy={vm.reviewCandidateLoadState === 'loading'}
+      >
+        <h3 id="review-candidates-title">Review candidates</h3>
+        {vm.reviewCandidateLoadState === 'loading' ? (
+          <output className="empty-panel" aria-live="polite">
+            <Clock3 aria-hidden="true" />
+            <strong>Checking the Owner review desk…</strong>
+            <span>Verified places remain available while this loads.</span>
+          </output>
+        ) : null}
+        {vm.reviewCandidateLoadState === 'signed_out' ? (
+          <div className="empty-panel">
+            <CircleHelp aria-hidden="true" />
+            <strong>Sign in as Owner to see review candidates.</strong>
+            <span>Unverified records stay private and off the map.</span>
+            <Button type="button" onClick={onRequestOwnerLogin}>
+              Owner login
+            </Button>
+          </div>
+        ) : null}
+        {vm.reviewCandidateLoadState === 'error' ? (
+          <div className="empty-panel" role="alert">
+            <CircleHelp aria-hidden="true" />
+            <strong>Review candidates could not be loaded.</strong>
+            <span>
+              Verified places are unaffected. Try this private read again.
+            </span>
+            <Button type="button" onClick={vm.reloadReviewCandidates}>
+              Try again
+            </Button>
+          </div>
+        ) : null}
+        {vm.reviewCandidateLoadState === 'ready' &&
+        !vm.reviewCandidates.length ? (
+          <div className="empty-panel">
+            <CheckCircle2 aria-hidden="true" />
+            <strong>No places need review.</strong>
+            <span>Add another place or continue with the verified map.</span>
+            <Button type="button" onClick={() => vm.setView('map')}>
+              Open Add
+            </Button>
+          </div>
+        ) : null}
+        {vm.reviewCandidateLoadState === 'ready' &&
+        vm.reviewCandidates.length ? (
+          <ul className="job-list" aria-label="Places requiring Owner review">
+            {vm.reviewCandidates.map((candidate) => (
+              <li key={candidate.id} className="job-row">
+                <CircleHelp aria-hidden="true" />
+                <div>
+                  <strong>{candidate.title}</strong>
+                  <span>
+                    {candidate.location.status === 'known'
+                      ? candidate.location.address
+                      : 'Address unknown'}
+                    {' · '}
+                    {candidate.area.status === 'known'
+                      ? candidate.area.value
+                      : 'Area unknown'}
+                  </span>
+                </div>
+                <span className="job-status">Needs review</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <div className="job-section">
         <h3>Import jobs</h3>

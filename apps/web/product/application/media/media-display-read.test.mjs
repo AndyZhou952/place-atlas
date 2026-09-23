@@ -7,6 +7,7 @@ import {
   InMemoryVisitMediaState,
 } from './media-read-memory.ts';
 import { createMediaOperationGroup } from './media-operations.ts';
+import { createPublicDisplayAccess } from '../public-display/public-display-access.ts';
 
 const metadata = {
   id: 'internal-media-1',
@@ -26,21 +27,33 @@ const metadata = {
 void test('media.openDisplay resolves an opaque display ID before object storage', async () => {
   const objectReads = [];
   const application = createAtlasApplication(
-    createMediaOperationGroup(new InMemoryVisitMediaState([metadata]), {
-      async get(objectKey) {
-        objectReads.push(objectKey);
-        return {
-          body: new ReadableStream({
-            start(controller) {
-              controller.enqueue(Uint8Array.of(1, 2, 3));
-              controller.close();
-            },
-          }),
-        };
+    createMediaOperationGroup(
+      new InMemoryVisitMediaState([metadata]),
+      {
+        async get(objectKey) {
+          objectReads.push(objectKey);
+          return {
+            body: new ReadableStream({
+              start(controller) {
+                controller.enqueue(Uint8Array.of(1, 2, 3));
+                controller.close();
+              },
+            }),
+          };
+        },
+        async put() {},
+        async delete() {},
       },
-      async put() {},
-      async delete() {},
-    }),
+      undefined,
+      {
+        async allowsItem() {
+          return true;
+        },
+        async filterAllowed(records) {
+          return records;
+        },
+      },
+    ),
   );
 
   const missing = await application.openMedia({
@@ -57,6 +70,42 @@ void test('media.openDisplay resolves an opaque display ID before object storage
   assert.deepEqual(objectReads, [metadata.objectKey]);
   assert.equal(found.ok, true);
   assert.equal(found.value.contentType, 'image/jpeg');
+});
+
+void test('media.openDisplay rejects candidate media before reading object storage', async () => {
+  const objectReads = [];
+  const application = createAtlasApplication(
+    createMediaOperationGroup(
+      new InMemoryVisitMediaState([metadata]),
+      {
+        async get(objectKey) {
+          objectReads.push(objectKey);
+          throw new Error('must not read candidate object');
+        },
+        async put() {},
+        async delete() {},
+      },
+      undefined,
+      createPublicDisplayAccess({
+        async list(profile) {
+          assert.equal(profile, 'verified_catalog');
+          return [];
+        },
+        async get() {
+          throw new Error('must use verified profile');
+        },
+      }),
+    ),
+  );
+
+  const result = await application.openMedia({
+    key: 'media.openDisplay',
+    input: { displayId: metadata.displayId },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.kind, 'not_found');
+  assert.deepEqual(objectReads, []);
 });
 
 void test('media.attach creates an opaque display ID independently of the internal ID', async () => {

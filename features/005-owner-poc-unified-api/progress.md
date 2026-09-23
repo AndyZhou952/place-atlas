@@ -1,9 +1,9 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: T-16 implement（T-14 第 2 轮独立 code/UI review PASS，并于 2026-09-23 获用户确认；既有 Owner/Nearby 实现状态不回退）
+- 当前阶段: T-16 done（第 7 轮独立 code/UI review PASS，并于 2026-09-23 获用户确认；下一张中央汇合票为 T-15）
 - 执行模式: interactive
-- 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review
+- 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
 - 已完成: 用户确认统一应用操作、简单 Owner Login、Web/Agent 不同鉴权、Google 路线与 DeepSeek 职责
 - 已完成: 起草 feature、spec、architecture 与内部 ticket graph
@@ -50,8 +50,10 @@
 - 已完成独立代码/UI 门: T-14 第 1 轮的两项一般发现均已 TDD 收口：collection 关闭时由 `inert` 统一隔离全部隐藏交互控件；Web conversation 改为从已验证的签名 HttpOnly Owner session 在服务端域分隔派生 128-bit opaque ID，discover 替换伪造的合法 header，select/confirm/cancel 拒绝不匹配 ID。第 2 轮独立评审 PASS，严重 0 / 一般 0 / 建议 0
 - 本地验证: 评审者独立复跑 focused 14/14、完整测试 515/515、TypeScript、lint、format-check、diff-check、owner-poc production build 与 migration-check，全部通过。主任务用 `/dev/shm` 临时 Chromium 完成 1440×1107 desktop、390×1038 mobile initial render 与标准 401 Owner-login state，并目视确认 warm editorial 方向、排版、overflow、44px 控件以及 401 后输入 `鮨青空` 保留且 Owner password panel 可见；截图保存在 workspace 外 `t14-add-desktop.png` / `t14-add-mobile.png` / `t14-add-401.png`。owner-poc production composition 仍故意使用 unavailable intake module，真实 provider wiring/deploy 属 T-18，因此当前线上 Add preview 继续 fail closed
 - 已完成: 用户于 2026-09-23 接受 T-14 演示并授权继续；验收记录见 `reviews/t14-demo-acceptance-2026-09-23.md`。T-14 已勾选，线上不可用与 T-18 边界保持不变
+- 已完成: T-16 原子 confirm/publish 五路结果、server-only mutation key、full preview/digest/scope/exact-TTL CAS、Catalog revision/identity race、同 key 并发与 response-loss replay、180 天 receipt cleanup、精确 provenance/time/license 以及双 provider 可终止 refresh 均已实现；verified item 与 Owner-only Review Candidate 分离，Candidate 的 Visit 生命周期可用但不会进入匿名 Public Read、地图或 Nearby
+- 已完成: T-16 第 7 轮独立 code/UI review PASS；changed/new focused 144/144、架构与边界 64/64、完整测试 564/564、TypeScript、lint、format、migration、diff 与 owner-poc build 全部通过。用户于 2026-09-23 指示 `continue` 并确认收口；验收记录见 `reviews/t16-demo-acceptance-2026-09-23.md`
 - 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
-- 未完成: T-08、T-09，以及 T-15–T-20 的 Add/Record 工作
+- 未完成: T-08、T-09、T-15，以及 T-17–T-20 的 Add/Record 工作
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
-- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14 的代码门与用户确认均已关闭；T-16 可进入实现，D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
-- 下一步: 提交并推送已确认的 T-14，然后按红→绿→重构实现 T-16 的 Atlas Catalog 原子 confirm/publish 五结果；不提前接入 T-15 research 或 T-18 production provider/deploy
+- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14/T-16 的代码门与用户确认均已关闭；D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
+- 下一步: 提交并推送已确认的 T-16，然后按红→绿→重构实现 T-15 的签名 Research Relay 与 Tabelog／预约 preview；不提前开放 T-17 Agent manifest 或执行 T-18 production provider/deploy

@@ -10,7 +10,7 @@ test('the React ViewModel sends every persistent operation through the Browser A
 
   assert.match(
     source,
-    /import \{ browserAtlasApplication \} from '.\/atlas-api-client'/,
+    /import \{[^}]*\bbrowserAtlasApplication\b[^}]*\} from '.\/atlas-api-client'/u,
   );
   assert.match(source, /reduceAtlasViewModelState/);
   assert.doesNotMatch(source, /fetch\(|['"]\/api\//);

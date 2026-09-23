@@ -1,15 +1,20 @@
-import type { AtlasItem } from './atlas-item.ts';
+import type {
+  AtlasCatalogEntry,
+  AtlasItem,
+  AtlasReviewCandidate,
+} from './atlas-item.ts';
 import type { CatalogStateSnapshot } from './catalog-state.ts';
 import { isEffectivelyVisited } from '../assessments/effective-visited.ts';
+import { hasCanonicalCatalogIntakeWarningOrder } from '../catalog-intake/catalog-intake-warning-policy.ts';
 
 export function projectCatalog(
   snapshot: CatalogStateSnapshot,
   seedItems: readonly AtlasItem[],
-): readonly AtlasItem[] {
+): readonly AtlasCatalogEntry[] {
   const dynamicItems = snapshot.dynamicPayloads.flatMap((payload) => {
     try {
       const candidate: unknown = JSON.parse(payload);
-      return isAtlasItem(candidate) ? [candidate] : [];
+      return isAtlasCatalogEntry(candidate) ? [candidate] : [];
     } catch {
       return [];
     }
@@ -58,6 +63,391 @@ export function projectCatalog(
   return [...itemsById.values()];
 }
 
+export function isAtlasCatalogEntry(
+  value: unknown,
+): value is AtlasCatalogEntry {
+  return isAtlasItem(value) || isAtlasReviewCandidate(value);
+}
+
+export function isAtlasReviewCandidate(
+  value: unknown,
+): value is AtlasReviewCandidate {
+  if (
+    !hasAllowedKeys(
+      value,
+      [
+        'recordType',
+        'id',
+        'kind',
+        'title',
+        'area',
+        'description',
+        'verificationStatus',
+        'personalState',
+        'personalRating',
+        'isFavorite',
+        'hasVisited',
+        'tags',
+        'reviewEvidence',
+        'updatedAt',
+      ],
+      [
+        'recordType',
+        'id',
+        'kind',
+        'title',
+        'description',
+        'verificationStatus',
+        'personalState',
+        'tags',
+        'reviewEvidence',
+        'updatedAt',
+      ],
+    ) ||
+    value.recordType !== 'review_candidate' ||
+    typeof value.id !== 'string' ||
+    value.kind !== 'food' ||
+    typeof value.title !== 'string' ||
+    value.title.length === 0 ||
+    (value.area !== undefined && typeof value.area !== 'string') ||
+    typeof value.description !== 'string' ||
+    value.verificationStatus !== 'needs_review' ||
+    !isPersonalState(value.personalState) ||
+    (value.personalRating !== undefined &&
+      (typeof value.personalRating !== 'number' ||
+        !Number.isFinite(value.personalRating))) ||
+    (value.isFavorite !== undefined && typeof value.isFavorite !== 'boolean') ||
+    (value.hasVisited !== undefined && typeof value.hasVisited !== 'boolean') ||
+    !Array.isArray(value.tags) ||
+    !value.tags.every((tag) => typeof tag === 'string') ||
+    !isIsoTimestamp(value.updatedAt)
+  ) {
+    return false;
+  }
+  return isReviewEvidence(value.reviewEvidence);
+}
+
+function isReviewEvidence(value: unknown): boolean {
+  if (
+    !hasAllowedKeys(
+      value,
+      [
+        'candidateIdentity',
+        'ownerFields',
+        'titleProposal',
+        'addressProposal',
+        'locationEvidence',
+        'tabelog',
+        'reservation',
+        'unknownFields',
+        'warnings',
+      ],
+      [
+        'candidateIdentity',
+        'ownerFields',
+        'locationEvidence',
+        'tabelog',
+        'reservation',
+        'unknownFields',
+        'warnings',
+      ],
+    ) ||
+    !hasExactKeys(value.candidateIdentity, ['providerNamespace', 'placeId']) ||
+    typeof value.candidateIdentity.providerNamespace !== 'string' ||
+    typeof value.candidateIdentity.placeId !== 'string' ||
+    !isReviewOwnerFields(value.ownerFields) ||
+    (value.titleProposal !== undefined &&
+      !isReviewTitleProposal(value.titleProposal)) ||
+    (value.addressProposal !== undefined &&
+      !isReviewAddressProposal(value.addressProposal)) ||
+    !isReviewLocation(value.locationEvidence) ||
+    !isReviewTabelog(value.tabelog) ||
+    !isReviewReservation(value.reservation) ||
+    !isOrderedUniqueValues(value.unknownFields, [
+      'address',
+      'coordinates',
+      'tabelog',
+      'reservation',
+    ]) ||
+    !hasCanonicalCatalogIntakeWarningOrder(value.warnings) ||
+    !value.warnings.every(isReviewWarning)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isReviewOwnerFields(value: unknown): boolean {
+  return (
+    hasAllowedKeys(value, ['title', 'address', 'area', 'coordinates'], []) &&
+    (value.title === undefined || typeof value.title === 'string') &&
+    (value.address === undefined || typeof value.address === 'string') &&
+    (value.area === undefined || typeof value.area === 'string') &&
+    (value.coordinates === undefined || isCoordinates(value.coordinates))
+  );
+}
+
+function isReviewTitleProposal(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.provenance === 'owner_query') {
+    return (
+      hasExactKeys(value, ['provenance', 'value']) &&
+      typeof value.value === 'string'
+    );
+  }
+  return (
+    value.provenance === 'agent_observed' &&
+    hasExactKeys(value, ['provenance', 'value', 'sourceUrl', 'observedAt']) &&
+    typeof value.value === 'string' &&
+    isCanonicalHttpsUrl(value.sourceUrl) &&
+    isIsoTimestamp(value.observedAt)
+  );
+}
+
+function isReviewAddressProposal(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.provenance === 'durable_geocoder_observed') {
+    return (
+      hasExactKeys(value, [
+        'provenance',
+        'value',
+        'sourceUrl',
+        'license',
+        'checkedAt',
+      ]) &&
+      typeof value.value === 'string' &&
+      isCanonicalHttpsUrl(value.sourceUrl) &&
+      typeof value.license === 'string' &&
+      isIsoTimestamp(value.checkedAt)
+    );
+  }
+  return (
+    value.provenance === 'agent_observed' &&
+    hasExactKeys(value, ['provenance', 'value', 'sourceUrl', 'observedAt']) &&
+    typeof value.value === 'string' &&
+    isCanonicalHttpsUrl(value.sourceUrl) &&
+    isIsoTimestamp(value.observedAt)
+  );
+}
+
+function isReviewLocation(value: unknown): boolean {
+  if (hasExactKeys(value, ['status'])) return value.status === 'unknown';
+  if (!isRecord(value) || value.status !== 'known') return false;
+  if (value.provenance === 'durable_geocoder_observed') {
+    return (
+      hasExactKeys(value, [
+        'status',
+        'provenance',
+        'normalizedAddress',
+        'latitude',
+        'longitude',
+        'provider',
+        'sourceUrl',
+        'license',
+        'checkedAt',
+      ]) &&
+      typeof value.normalizedAddress === 'string' &&
+      isCoordinates(value) &&
+      typeof value.provider === 'string' &&
+      isCanonicalHttpsUrl(value.sourceUrl) &&
+      typeof value.license === 'string' &&
+      isIsoTimestamp(value.checkedAt)
+    );
+  }
+  return (
+    value.provenance === 'owner_asserted' &&
+    hasAllowedKeys(
+      value,
+      [
+        'status',
+        'provenance',
+        'address',
+        'latitude',
+        'longitude',
+        'assertedAt',
+        'sourceUrl',
+      ],
+      [
+        'status',
+        'provenance',
+        'address',
+        'latitude',
+        'longitude',
+        'assertedAt',
+      ],
+    ) &&
+    typeof value.address === 'string' &&
+    isCoordinates(value) &&
+    isIsoTimestamp(value.assertedAt) &&
+    (value.sourceUrl === undefined || isCanonicalHttpsUrl(value.sourceUrl))
+  );
+}
+
+function isReviewTabelog(value: unknown): boolean {
+  if (hasExactKeys(value, ['status'])) return value.status === 'unknown';
+  if (!isRecord(value) || value.status !== 'known') return false;
+  const timeKey =
+    value.provenance === 'owner_asserted'
+      ? 'assertedAt'
+      : value.provenance === 'agent_observed'
+        ? 'observedAt'
+        : undefined;
+  return Boolean(
+    timeKey &&
+    hasAllowedKeys(
+      value,
+      [
+        'status',
+        'score',
+        'reviewCount',
+        'url',
+        'provenance',
+        timeKey,
+        'freshness',
+      ],
+      ['status', 'score', 'url', 'provenance', timeKey, 'freshness'],
+    ) &&
+    typeof value.score === 'number' &&
+    Number.isFinite(value.score) &&
+    value.score >= 0 &&
+    value.score <= 5 &&
+    (value.reviewCount === undefined ||
+      (typeof value.reviewCount === 'number' &&
+        Number.isInteger(value.reviewCount) &&
+        value.reviewCount >= 0)) &&
+    isCanonicalHttpsUrl(value.url) &&
+    isIsoTimestamp(value[timeKey]) &&
+    (value.freshness === 'fresh' || value.freshness === 'stale'),
+  );
+}
+
+function isReviewReservation(value: unknown): boolean {
+  if (hasExactKeys(value, ['status'])) return value.status === 'unknown';
+  if (!isRecord(value) || value.status !== 'known') return false;
+  const timeKey =
+    value.provenance === 'owner_asserted'
+      ? 'assertedAt'
+      : value.provenance === 'agent_observed'
+        ? 'observedAt'
+        : undefined;
+  return Boolean(
+    timeKey &&
+    hasAllowedKeys(
+      value,
+      [
+        'status',
+        'mode',
+        'label',
+        'advanceDays',
+        'bookingWindowLabel',
+        'releaseNote',
+        'channel',
+        'url',
+        'provenance',
+        timeKey,
+        'freshness',
+      ],
+      ['status', 'mode', 'label', 'url', 'provenance', timeKey, 'freshness'],
+    ) &&
+    (value.mode === 'reservable' || value.mode === 'reservation_required') &&
+    typeof value.label === 'string' &&
+    (value.advanceDays === undefined ||
+      (typeof value.advanceDays === 'number' &&
+        Number.isInteger(value.advanceDays) &&
+        value.advanceDays >= 0)) &&
+    (value.bookingWindowLabel === undefined ||
+      typeof value.bookingWindowLabel === 'string') &&
+    (value.releaseNote === undefined ||
+      typeof value.releaseNote === 'string') &&
+    (value.channel === undefined || typeof value.channel === 'string') &&
+    isCanonicalHttpsUrl(value.url) &&
+    isIsoTimestamp(value[timeKey]) &&
+    (value.freshness === 'fresh' || value.freshness === 'stale'),
+  );
+}
+
+function isReviewWarning(value: unknown): boolean {
+  return (
+    hasExactKeys(value, ['code', 'message']) &&
+    (value.code === 'stale_evidence' ||
+      value.code === 'provider_unavailable' ||
+      value.code === 'source_conflict' ||
+      value.code === 'needs_review') &&
+    typeof value.message === 'string' &&
+    value.message.length >= 1 &&
+    value.message.length <= 300
+  );
+}
+
+function isOrderedUniqueValues(value: unknown, order: readonly string[]) {
+  return (
+    Array.isArray(value) &&
+    value.length <= order.length &&
+    value.every(
+      (entry, index) =>
+        typeof entry === 'string' &&
+        order.includes(entry) &&
+        (index === 0 || order.indexOf(value[index - 1]) < order.indexOf(entry)),
+    )
+  );
+}
+
+function isCoordinates(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.latitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    value.latitude >= -90 &&
+    value.latitude <= 90 &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.longitude) &&
+    value.longitude >= -180 &&
+    value.longitude <= 180
+  );
+}
+
+function isIsoTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value;
+}
+
+function isCanonicalHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === 'https:' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.hash &&
+      parsed.toString() === value
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasExactKeys(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
+  return hasAllowedKeys(value, keys, keys);
+}
+
+function hasAllowedKeys(
+  value: unknown,
+  allowed: readonly string[],
+  required: readonly string[],
+): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  return (
+    keys.every((key) => allowed.includes(key)) &&
+    required.every((key) => keys.includes(key))
+  );
+}
+
 export function isAtlasItem(value: unknown): value is AtlasItem {
   if (!isRecord(value)) return false;
   return (
@@ -95,6 +485,8 @@ export function isAtlasItem(value: unknown): value is AtlasItem {
     value.tags.every((tag) => typeof tag === 'string') &&
     Array.isArray(value.sources) &&
     value.sources.every(isSourceLink) &&
+    (value.intakeEvidence === undefined ||
+      isReviewEvidence(value.intakeEvidence)) &&
     (value.updatedAt === undefined || typeof value.updatedAt === 'string')
   );
 }
@@ -118,7 +510,7 @@ function isReservation(value: unknown): boolean {
       typeof value.bookingWindowLabel === 'string') &&
     (value.releaseNote === undefined ||
       typeof value.releaseNote === 'string') &&
-    typeof value.checkedAt === 'string'
+    (value.checkedAt === undefined || typeof value.checkedAt === 'string')
   );
 }
 

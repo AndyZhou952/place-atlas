@@ -11,15 +11,35 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
   const calls = [];
   const item = {
     id: 'place-1',
+    kind: 'food',
     title: '店',
+    area: 'Ginza',
+    address: 'Tokyo',
+    description: 'A quiet counter.',
+    latitude: 35.67,
+    longitude: 139.76,
+    verificationStatus: 'verified',
+    reservation: {
+      mode: 'walk-in',
+      label: 'Walk in',
+      checkedAt: '2026-09-23T12:00:00.000Z',
+    },
+    tags: [],
+    sources: [],
     overallComment: 'A quiet counter worth revisiting.',
   };
   const application = createBrowserAtlasApplication({
     async request(url, init) {
       calls.push({ url, init });
-      return url === '/api/items'
-        ? Response.json([item])
-        : mutationResponse(init, { item });
+      if (url === '/api/items') return Response.json([item]);
+      if (init?.method === undefined) {
+        return Response.json({
+          favorite: false,
+          effectiveVisited: false,
+          overallComment: item.overallComment,
+        });
+      }
+      return mutationResponse(init, { item });
     },
   });
 
@@ -39,19 +59,30 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
     },
   });
 
-  assert.deepEqual(items, [item]);
+  assert.deepEqual(items, [
+    {
+      ...item,
+      verifiedAt: item.reservation.checkedAt,
+      personalState: 'candidate',
+      personalRating: undefined,
+      isFavorite: false,
+      hasVisited: false,
+    },
+  ]);
   assert.deepEqual(updated, item);
   assert.equal(calls[0].url, '/api/items');
   assert.equal(calls[0].init?.method, undefined);
   assert.equal(calls[1].url, '/api/items/place-1/personal');
-  assert.equal(calls[1].init?.method, 'PATCH');
-  assert.deepEqual(JSON.parse(calls[1].init.body), {
+  assert.equal(calls[1].init?.method, undefined);
+  assert.equal(calls[2].url, '/api/items/place-1/personal');
+  assert.equal(calls[2].init?.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[2].init.body), {
     isFavorite: true,
     hasVisited: false,
     summary: 'A quiet counter worth revisiting.',
   });
   assert.match(
-    new Headers(calls[1].init.headers).get('x-atlas-mutation-id'),
+    new Headers(calls[2].init.headers).get('x-atlas-mutation-id'),
     /^[0-9a-f-]+$/u,
   );
 });
@@ -199,6 +230,7 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       const isList =
         (url === '/api/inbox' ||
           url === '/api/journal' ||
+          url === '/api/owner/catalog/review-candidates' ||
           url.startsWith('/api/media?') ||
           url.startsWith('/api/nearby?')) &&
         (init?.method === undefined || init.method === 'GET');
@@ -229,6 +261,10 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     input: { creatorName: 'Creator', sourceRef: 'https://example.test' },
   });
   await application.execute({ key: 'visit.list', input: {} });
+  await application.execute({
+    key: 'catalog.review_candidates.list',
+    input: {},
+  });
   await application.execute({
     key: 'visit.create',
     input: {
@@ -296,6 +332,11 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       body: { creatorName: 'Creator', sourceRef: 'https://example.test' },
     },
     { url: '/api/journal', method: 'GET', body: undefined },
+    {
+      url: '/api/owner/catalog/review-candidates',
+      method: 'GET',
+      body: undefined,
+    },
     {
       url: '/api/journal',
       method: 'POST',

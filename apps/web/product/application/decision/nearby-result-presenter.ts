@@ -33,7 +33,7 @@ export interface NearbyReceiptCandidate {
   readonly route?: NearbyRouteReceipt;
   readonly visit: NearbyVisitReceipt;
   readonly entryAccess: EntryAccessSnapshot;
-  readonly reservation: { readonly label: string; readonly checkedAt: string };
+  readonly reservation: { readonly label: string; readonly checkedAt?: string };
   readonly externalRating?: NearbyExternalRatingReceipt;
   readonly reason: string;
   readonly warnings: readonly string[];
@@ -77,7 +77,11 @@ function presentCandidate(
     presentExternalRating(candidate.externalRating),
     presentWalkIn(candidate.entryAccess),
     presentQueue(candidate.entryAccess),
-    `预约：${candidate.reservation.label} · 核验：${candidate.reservation.checkedAt}`,
+    `预约：${candidate.reservation.label}${
+      candidate.reservation.checkedAt
+        ? ` · 核验：${candidate.reservation.checkedAt}`
+        : ''
+    }`,
     `推荐理由：${candidate.reason}`,
     ...candidate.warnings.map((warning) => `警告：${warning}`),
     `地图：${candidate.mapDeepLink}`,

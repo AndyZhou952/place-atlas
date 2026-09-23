@@ -1,15 +1,13 @@
 import type { AtlasItem } from '../catalog/atlas-item.ts';
 import type { AtomicMutationCommit } from '../atlas-application.ts';
-import type {
-  AtlasItemOverrideRecord,
-  PlaceAssessmentRecord,
-} from '../catalog/catalog-state.ts';
+import type { PlaceAssessment } from '../assessments/place-assessment.ts';
+import type { AtlasItemOverrideRecord } from '../catalog/catalog-state.ts';
 
 export interface DestructiveItemContext {
   readonly itemId: string;
   readonly dynamicPayload?: string;
   readonly override?: AtlasItemOverrideRecord;
-  readonly assessment?: PlaceAssessmentRecord;
+  readonly assessment?: PlaceAssessment;
   readonly tombstoned: boolean;
   readonly visitCount: number;
   readonly mediaObjectKeys: readonly string[];

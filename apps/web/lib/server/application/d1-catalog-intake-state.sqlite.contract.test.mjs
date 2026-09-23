@@ -9,6 +9,10 @@ const migration = new URL(
   '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0006_catalog_intake_sessions.sql',
   import.meta.url,
 );
+const publicationMigration = new URL(
+  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0008_catalog_intake_publication.sql',
+  import.meta.url,
+);
 const scope = {
   ownerId: 'owner-1',
   channel: 'wechat',
@@ -20,6 +24,9 @@ test('D1 intake state persists scoped minimal candidates, replaces active sessio
   const sql = await readFile(migration, 'utf8');
   sqlite.exec(sql);
   sqlite.exec(sql);
+  const publicationSql = await readFile(publicationMigration, 'utf8');
+  sqlite.exec(publicationSql);
+  sqlite.exec(publicationSql);
   const database = toD1(sqlite);
   const state = new D1CatalogIntakeState(database);
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
@@ -107,9 +114,46 @@ test('D1 intake state persists scoped minimal candidates, replaces active sessio
   );
 });
 
+test('D1 intake state rejects a persisted preview with duplicate or noncanonical warnings', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  const database = toD1(sqlite);
+  const state = new D1CatalogIntakeState(database);
+  const session = candidateSession(
+    'session-warning-order',
+    'request-warning',
+    '鮨',
+  );
+  await state.createReplacingActive(session);
+  sqlite
+    .prepare(
+      'UPDATE catalog_intake_sessions SET state = ?, session_json = ? WHERE session_id = ?',
+    )
+    .run(
+      'preview_ready',
+      JSON.stringify({
+        ...session,
+        state: 'preview_ready',
+        preview: {
+          warnings: [
+            { code: 'needs_review', message: 'Owner review required.' },
+            { code: 'provider_unavailable', message: 'Provider unavailable.' },
+          ],
+        },
+      }),
+      session.sessionId,
+    );
+
+  await assert.rejects(
+    state.get(scope, session.sessionId),
+    /invalid warning order/u,
+  );
+});
+
 test('D1 cleanup converts expired payloads to minimal terminal references and retains request identity', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(publicationMigration, 'utf8'));
   const state = new D1CatalogIntakeState(toD1(sqlite));
   await state.createReplacingActive(
     candidateSession('session-1', 'request-1', '银座 寿司'),
@@ -159,6 +203,7 @@ test('D1 cleanup converts expired payloads to minimal terminal references and re
 test('D1 terminal collisions roll back replacement and terminal CAS without deleting the active session', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(publicationMigration, 'utf8'));
   const state = new D1CatalogIntakeState(toD1(sqlite));
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
   await state.createReplacingActive(first);
@@ -198,6 +243,7 @@ test('D1 terminal collisions roll back replacement and terminal CAS without dele
 test('D1 cleanup does not remove a session renewed before the scheduled sweep', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(publicationMigration, 'utf8'));
   const state = new D1CatalogIntakeState(toD1(sqlite));
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
   await state.createReplacingActive(first);

@@ -66,9 +66,10 @@ export function createDecisionOperationGroup(catalog: CatalogRead) {
     },
     async handle(input) {
       try {
-        const visibleItems = await catalog.list(input.profile);
+        const visibleItems = await catalog.list('verified_catalog');
         return success(
           visibleItems
+            .filter((item) => item.verificationStatus === 'verified')
             .map((item, catalogOrder) => ({
               catalogOrder,
               item: {

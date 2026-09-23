@@ -1,5 +1,9 @@
 import type { AtlasItem } from '../catalog/atlas-item.ts';
-import type { CatalogRead } from '../catalog/catalog-read.ts';
+import type {
+  CatalogEntryForProfile,
+  CatalogRead,
+} from '../catalog/catalog-read.ts';
+import type { CatalogProfile } from '../catalog/atlas-item.ts';
 import { createNearbyRecommendation } from './nearby-recommendation-operation.ts';
 import type {
   LocationResolution,
@@ -52,29 +56,32 @@ function shortlistCatalog(
   readResolution: () => LocationResolution | undefined,
   limit: number,
 ): CatalogRead {
+  const shortlistVerified = async () => {
+    const items = await catalog.list('verified_catalog');
+    const resolution = readResolution();
+    if (resolution?.status !== 'resolved' || !isPositiveInteger(limit)) {
+      return [];
+    }
+    return items
+      .filter(hasUsableCatalogCoordinates)
+      .map((item) => ({
+        item,
+        distanceKm: distanceInKm(resolution.location.point, {
+          latitude: item.latitude,
+          longitude: item.longitude,
+        }),
+      }))
+      .sort((left, right) =>
+        left.distanceKm !== right.distanceKm
+          ? left.distanceKm - right.distanceKm
+          : compareIds(left.item, right.item),
+      )
+      .slice(0, limit)
+      .map(({ item }) => item);
+  };
   return {
-    async list(profile) {
-      const items = await catalog.list(profile);
-      const resolution = readResolution();
-      if (resolution?.status !== 'resolved' || !isPositiveInteger(limit)) {
-        return [];
-      }
-      return items
-        .filter(hasUsableCatalogCoordinates)
-        .map((item) => ({
-          item,
-          distanceKm: distanceInKm(resolution.location.point, {
-            latitude: item.latitude,
-            longitude: item.longitude,
-          }),
-        }))
-        .sort((left, right) =>
-          left.distanceKm !== right.distanceKm
-            ? left.distanceKm - right.distanceKm
-            : compareIds(left.item, right.item),
-        )
-        .slice(0, limit)
-        .map(({ item }) => item);
+    async list<Profile extends CatalogProfile>(_profile: Profile) {
+      return (await shortlistVerified()) as readonly CatalogEntryForProfile<Profile>[];
     },
     get: (id) => catalog.get(id),
   };

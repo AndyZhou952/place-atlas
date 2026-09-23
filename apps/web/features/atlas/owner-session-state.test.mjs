@@ -45,6 +45,21 @@ void test('an unauthorized write opens Owner login and requests password focus',
   assert.match(requested.error ?? '', /log in/i);
 });
 
+void test('an expired cookie moves an initially authenticated Owner back to login-required', () => {
+  const authenticated = reduceOwnerSessionState(createOwnerSessionState(), {
+    type: 'status.received',
+    authenticated: true,
+  });
+  const requested = reduceOwnerSessionState(authenticated, {
+    type: 'login.required',
+  });
+
+  assert.equal(requested.authenticated, false);
+  assert.equal(requested.expanded, true);
+  assert.equal(requested.focusTarget, 'password');
+  assert.match(requested.error ?? '', /retry/i);
+});
+
 void test('login covers loading, inline error, visible-password, and success states without navigation', () => {
   let state = reduceOwnerSessionState(createOwnerSessionState(), {
     type: 'status.received',

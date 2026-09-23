@@ -11,6 +11,10 @@ import type {
   VisitMediaFilters,
   VisitMediaMetadata,
 } from './visit-media.ts';
+import {
+  type PublicDisplayAccess,
+  unavailablePublicDisplayAccess,
+} from '../public-display/public-display-access.ts';
 
 export interface VisitMediaUpload {
   readonly id?: string;
@@ -55,6 +59,7 @@ export function createMediaOperationGroup(
   state: VisitMediaRecordState,
   objects: MediaObjectStore,
   dependencies: MediaDependencies,
+  publicDisplayAccess: PublicDisplayAccess = unavailablePublicDisplayAccess,
 ) {
   const listVisitMedia: OperationDefinition<
     'media.list',
@@ -134,7 +139,12 @@ export function createMediaOperationGroup(
     async handle({ displayId }) {
       try {
         const metadata = await state.findByDisplayId(displayId);
-        if (!metadata) return failure('not_found', 'Photo not found.');
+        if (
+          !metadata ||
+          !(await publicDisplayAccess.allowsItem(metadata.itemId))
+        ) {
+          return failure('not_found', 'Photo not found.');
+        }
         const object = await objects.get(metadata.objectKey);
         if (!object) {
           return failure(

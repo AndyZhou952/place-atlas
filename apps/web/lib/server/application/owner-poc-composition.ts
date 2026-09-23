@@ -1,5 +1,6 @@
 import type { NearbyRecommendOperationDependencies } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { createCatalogItemProjection } from '../../../product/application/catalog/catalog-item-projection.ts';
+import { createVisitTargetProjection } from '../../../product/application/visits/visit-item-projection.ts';
 import {
   createD1OwnerPocCatalogRead,
   createD1OwnerPocPersonalFactsRead,
@@ -52,6 +53,7 @@ export function createOwnerPocComposition(
   return {
     catalogRead,
     catalogItemProjection: createCatalogItemProjection([]),
+    visitItemProjection: createVisitTargetProjection([]),
     agentNearby,
   };
 }

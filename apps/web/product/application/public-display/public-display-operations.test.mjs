@@ -111,3 +111,128 @@ void test('visit display operations assemble opaque media metadata without chang
   assert.equal(missing.ok, false);
   assert.equal(missing.error.kind, 'not_found');
 });
+
+void test('public display authorizes assessment and Visit data only for verified Catalog items', async () => {
+  const candidate = reviewCandidate('candidate-1');
+  const candidateVisit = {
+    id: 'candidate-visit',
+    itemId: candidate.id,
+    itemTitle: candidate.title,
+    visitedAt: '2026-09-21',
+    note: 'private candidate note',
+    createdAt: 'private-created',
+    updatedAt: 'private-updated',
+  };
+  const verifiedVisit = {
+    ...candidateVisit,
+    id: 'verified-visit',
+    itemId: item.id,
+    itemTitle: item.title,
+    note: 'public verified note',
+  };
+  const media = [candidateVisit, verifiedVisit].map((visit) => ({
+    id: `${visit.id}-media`,
+    displayId: `pm_${visit.id}`,
+    visitId: visit.id,
+    itemId: visit.itemId,
+    objectKey: `private/${visit.id}`,
+    originalFilename: 'private.jpg',
+    contentType: 'image/jpeg',
+    byteSize: 1,
+    contentSha256: 'private-hash',
+    caption: `${visit.note} media`,
+    displayOrder: 0,
+    createdAt: 'private-created',
+    updatedAt: 'private-updated',
+  }));
+  const catalog = createCatalogRead(
+    new InMemoryCatalogState({
+      dynamicPayloads: [JSON.stringify(candidate)],
+      overrides: [],
+      assessments: [],
+      tombstoneIds: [],
+      visitCounts: [],
+    }),
+    [item],
+  );
+  const application = createAtlasApplication(
+    createPublicDisplayOperationGroup({
+      catalog,
+      assessments: new InMemoryPlaceAssessmentState({
+        assessments: [
+          {
+            itemId: candidate.id,
+            overallRating: 4.8,
+            isFavorite: true,
+            manualVisited: true,
+            summary: 'private candidate summary',
+            updatedAt: 'private',
+          },
+        ],
+        visitCounts: [{ itemId: candidate.id, count: 1 }],
+      }),
+      visits: new InMemoryVisitState({
+        visits: [candidateVisit, verifiedVisit],
+      }),
+      media: new InMemoryVisitMediaState(media),
+    }),
+  );
+
+  const [assessment, visits, candidateDetail, verifiedDetail] =
+    await Promise.all([
+      application.execute({
+        key: 'assessment.display',
+        input: { itemId: candidate.id },
+      }),
+      application.execute({ key: 'visit.listDisplay', input: {} }),
+      application.execute({
+        key: 'visit.getDisplay',
+        input: { id: candidateVisit.id },
+      }),
+      application.execute({
+        key: 'visit.getDisplay',
+        input: { id: verifiedVisit.id },
+      }),
+    ]);
+
+  assert.equal(assessment.ok, false);
+  assert.equal(assessment.error.kind, 'not_found');
+  assert.equal(visits.ok, true);
+  assert.deepEqual(
+    visits.value.map(({ id, media: entries }) => ({
+      id,
+      media: entries.map(({ id: mediaId }) => mediaId),
+    })),
+    [{ id: verifiedVisit.id, media: [`${verifiedVisit.id}-media`] }],
+  );
+  assert.equal(candidateDetail.ok, false);
+  assert.equal(candidateDetail.error.kind, 'not_found');
+  assert.equal(verifiedDetail.ok, true);
+  assert.equal(verifiedDetail.value.note, 'public verified note');
+});
+
+function reviewCandidate(id) {
+  return {
+    recordType: 'review_candidate',
+    id,
+    kind: 'food',
+    title: 'Private candidate',
+    description: 'Awaiting review',
+    verificationStatus: 'needs_review',
+    personalState: 'candidate',
+    tags: [],
+    reviewEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google_places',
+        placeId: `place-${id}`,
+      },
+      ownerFields: { title: 'Private candidate' },
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: ['address', 'coordinates'],
+      warnings: [{ code: 'needs_review', message: 'Owner review required.' }],
+    },
+    updatedAt: '2026-09-23T12:00:00.000Z',
+  };
+}

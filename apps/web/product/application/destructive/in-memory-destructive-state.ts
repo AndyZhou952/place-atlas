@@ -1,7 +1,5 @@
-import type {
-  AtlasItemOverrideRecord,
-  PlaceAssessmentRecord,
-} from '../catalog/catalog-state.ts';
+import type { PlaceAssessment } from '../assessments/place-assessment.ts';
+import type { AtlasItemOverrideRecord } from '../catalog/catalog-state.ts';
 import type {
   DestructiveItemContext,
   DestructiveRecordState,
@@ -21,7 +19,7 @@ interface DeletionMediaRecord {
 interface InMemoryDestructiveInitialState {
   readonly dynamicPayloads?: readonly string[];
   readonly overrides?: readonly AtlasItemOverrideRecord[];
-  readonly assessments?: readonly PlaceAssessmentRecord[];
+  readonly assessments?: readonly PlaceAssessment[];
   readonly visits?: readonly DeletionVisitRecord[];
   readonly media?: readonly DeletionMediaRecord[];
   readonly tombstoneIds?: readonly string[];
@@ -30,7 +28,7 @@ interface InMemoryDestructiveInitialState {
 export class InMemoryDestructiveState implements DestructiveRecordState {
   private dynamicPayloads: string[];
   private overrides: AtlasItemOverrideRecord[];
-  private assessments: PlaceAssessmentRecord[];
+  private assessments: PlaceAssessment[];
   private visits: DeletionVisitRecord[];
   private media: DeletionMediaRecord[];
   private tombstoneIds: string[];

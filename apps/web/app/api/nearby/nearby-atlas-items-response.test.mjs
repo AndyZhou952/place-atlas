@@ -51,8 +51,9 @@ function structuredNearbyApplication(providerOutcome) {
       clock: { now: () => new Date('2026-09-21T12:00:00.000Z') },
       routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
       catalog: {
-        async list() {
-          throw new Error('catalog list must not be called');
+        async list(profile) {
+          assert.equal(profile, 'verified_catalog');
+          return [canonicalItem];
         },
         async get(id) {
           return id === canonicalItem.id ? canonicalItem : undefined;
@@ -426,7 +427,7 @@ test('the Nearby GET adapter rejects missing, invalid, or out-of-range coordinat
   );
 });
 
-test('the Nearby GET adapter keeps verified as default and allows only the explicit full merged profile', async () => {
+test('the Nearby GET adapter excludes review candidates even when the full profile is requested', async () => {
   const verified = item(0);
   const needsReview = item(1, {
     id: 'review-item',
@@ -470,7 +471,7 @@ test('the Nearby GET adapter keeps verified as default and allows only the expli
   );
   assert.deepEqual(
     (await full.json()).map((candidate) => candidate.id),
-    [verified.id, needsReview.id],
+    [verified.id],
   );
   assert.equal(invalid.status, 400);
   assert.equal(await invalid.text(), 'A valid catalog profile is required');

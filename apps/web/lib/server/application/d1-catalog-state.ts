@@ -11,6 +11,10 @@ interface ItemRow {
   readonly payload_json: string;
 }
 
+interface ReviewCandidateRow {
+  readonly payload_json: string;
+}
+
 interface OverrideRow {
   readonly item_id: string;
   readonly title: string;
@@ -43,28 +47,39 @@ export class D1CatalogState implements CatalogRecordState {
   }
 
   async readSnapshot(): Promise<CatalogStateSnapshot> {
-    const [itemRows, overrideRows, assessmentRows, tombstoneRows, visitRows] =
-      await Promise.all([
-        this.allOrEmpty<ItemRow>(
-          'SELECT id, payload_json FROM atlas_items ORDER BY created_at DESC',
-        ),
-        this.allOrEmpty<OverrideRow>(
-          'SELECT item_id, title, description, personal_state, updated_at FROM atlas_item_overrides',
-        ),
-        this.allOrEmpty<AssessmentRow>(
-          `SELECT item_id, overall_rating, is_favorite, has_visited
+    const [
+      itemRows,
+      reviewCandidateRows,
+      overrideRows,
+      assessmentRows,
+      tombstoneRows,
+      visitRows,
+    ] = await Promise.all([
+      this.allOrEmpty<ItemRow>(
+        'SELECT id, payload_json FROM atlas_items ORDER BY created_at DESC',
+      ),
+      this.allOrEmpty<ReviewCandidateRow>(
+        'SELECT id, payload_json FROM atlas_review_candidates ORDER BY created_at DESC',
+      ),
+      this.allOrEmpty<OverrideRow>(
+        'SELECT item_id, title, description, personal_state, updated_at FROM atlas_item_overrides',
+      ),
+      this.allOrEmpty<AssessmentRow>(
+        `SELECT item_id, overall_rating, is_favorite, has_visited
            FROM place_assessments`,
-        ),
-        this.allOrEmpty<TombstoneRow>(
-          'SELECT item_id FROM atlas_item_tombstones',
-        ),
-        this.allOrEmpty<VisitCountRow>(
-          'SELECT item_id, COUNT(*) AS visit_count FROM visits GROUP BY item_id',
-        ),
-      ]);
+      ),
+      this.allOrEmpty<TombstoneRow>(
+        'SELECT item_id FROM atlas_item_tombstones',
+      ),
+      this.allOrEmpty<VisitCountRow>(
+        'SELECT item_id, COUNT(*) AS visit_count FROM visits GROUP BY item_id',
+      ),
+    ]);
 
     return {
-      dynamicPayloads: itemRows.map((row) => row.payload_json),
+      dynamicPayloads: [...itemRows, ...reviewCandidateRows].map(
+        (row) => row.payload_json,
+      ),
       overrides: overrideRows.map((row) => ({
         itemId: row.item_id,
         title: row.title,
@@ -91,44 +106,48 @@ export class D1CatalogState implements CatalogRecordState {
   }
 
   async saveDynamicItem(item: AtlasItem, storedAt: string): Promise<void> {
-    await this.database
-      .prepare(
-        `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
+    await this.database.batch([
+      this.database
+        .prepare(
+          `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            payload_json = excluded.payload_json,
            verification_status = excluded.verification_status,
            updated_at = excluded.updated_at`,
-      )
-      .bind(
-        item.id,
-        JSON.stringify(item),
-        item.verificationStatus,
-        storedAt,
-        storedAt,
-      )
-      .run();
+        )
+        .bind(
+          item.id,
+          JSON.stringify(item),
+          item.verificationStatus,
+          storedAt,
+          storedAt,
+        ),
+      this.database.prepare(incrementCatalogRevisionSql),
+    ]);
   }
 
   async saveOverride(override: AtlasItemOverrideRecord): Promise<void> {
-    await this.database
-      .prepare(
-        `INSERT INTO atlas_item_overrides (item_id, title, description, personal_state, updated_at)
+    await this.database.batch([
+      this.database
+        .prepare(
+          `INSERT INTO atlas_item_overrides (item_id, title, description, personal_state, updated_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(item_id) DO UPDATE SET
            title = excluded.title,
            description = excluded.description,
            personal_state = excluded.personal_state,
            updated_at = excluded.updated_at`,
-      )
-      .bind(
-        override.itemId,
-        override.title,
-        override.description,
-        override.personalState,
-        override.updatedAt,
-      )
-      .run();
+        )
+        .bind(
+          override.itemId,
+          override.title,
+          override.description,
+          override.personalState,
+          override.updatedAt,
+        ),
+      this.database.prepare(incrementCatalogRevisionSql),
+    ]);
   }
 
   private async allOrEmpty<Row>(sql: string): Promise<Row[]> {
@@ -141,6 +160,10 @@ export class D1CatalogState implements CatalogRecordState {
     }
   }
 }
+
+const incrementCatalogRevisionSql =
+  'UPDATE atlas_catalog_revision SET revision_number = revision_number + 1 ' +
+  'WHERE singleton = 1';
 
 function isMissingTable(error: unknown): boolean {
   return error instanceof Error && error.message.includes('no such table');

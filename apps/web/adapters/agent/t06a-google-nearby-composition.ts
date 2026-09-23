@@ -104,8 +104,14 @@ export function createT06aGoogleNearbyComposition({
       async read(itemId: string) {
         const item = await catalogRead.get(itemId);
         return {
-          manualVisited: item?.hasVisited === true,
-          visitCount: item?.hasVisited ? 1 : 0,
+          manualVisited:
+            item !== undefined &&
+            'hasVisited' in item &&
+            item.hasVisited === true,
+          visitCount:
+            item !== undefined && 'hasVisited' in item && item.hasVisited
+              ? 1
+              : 0,
         };
       },
     },

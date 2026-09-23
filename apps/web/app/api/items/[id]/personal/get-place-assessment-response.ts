@@ -9,19 +9,22 @@ type DisplayApplication = AtlasApplication<
   ReturnType<typeof createPublicDisplayOperationGroup>
 >;
 
-export function getPlaceAssessmentResponse(
+export async function getPlaceAssessmentResponse(
   application: DisplayApplication,
   itemId: string,
 ): Promise<Response> {
+  const result = await application.execute({
+    key: 'assessment.display',
+    input: { itemId },
+  });
+  if (!result.ok && result.error.kind === 'not_found') {
+    return new Response('Public resource not found.', { status: 404 });
+  }
   return executePublicJsonRead({
     manifest: createPublicReadManifest(),
     operation: 'assessment.display',
     principal: { kind: 'anonymous' },
     async load() {
-      const result = await application.execute({
-        key: 'assessment.display',
-        input: { itemId },
-      });
       if (!result.ok) throw new Error('assessment unavailable');
       return result.value;
     },

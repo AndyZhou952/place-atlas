@@ -10,6 +10,7 @@ import {
   createCatalogIntakeOperationGroup,
   createInMemoryCatalogIntakeStatePort,
   createUnavailableCatalogIntakeModule,
+  deriveCatalogIntakeResearchInputDigest,
 } from './catalog-intake-coordinator.ts';
 
 const ownerConversation = {
@@ -146,6 +147,712 @@ test('catalog.intake.discover crosses AtlasApplication and returns only the clos
       expiresAt: '2026-09-22T10:30:00.000Z',
     },
   });
+});
+
+test('research phase digests commit only normalized owner query and preview canonical URLs', async () => {
+  const state = createInMemoryCatalogIntakeStatePort(fixedClock());
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '  鮨 さいとう  ', requestToken: 'request-digest' },
+  });
+  const candidates = await state.get(ownerConversation.invocation, 'session-1');
+  assert.equal(candidates.state, 'candidates_ready');
+  assert.equal(
+    candidates.researchPhaseDigests.initial,
+    await deriveCatalogIntakeResearchInputDigest({
+      phase: 'initial',
+      normalizedOwnerQuery: '鮨 さいとう',
+    }),
+  );
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope: ownerConversation.invocation,
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'f'.repeat(64),
+      requestId: 'substitution',
+    }),
+    { kind: 'conflict' },
+  );
+
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: 'not part of the research query' },
+      tabelog: { score: 4.2, url: tabelogUrl },
+      requestResearch: false,
+    },
+  });
+  const preview = await state.get(ownerConversation.invocation, 'session-1');
+  assert.equal(preview.state, 'preview_ready');
+  assert.equal(
+    preview.researchPhaseDigests.confirm,
+    await deriveCatalogIntakeResearchInputDigest({
+      phase: 'confirm',
+      canonicalUrls: [tabelogUrl, tabelogUrl],
+    }),
+  );
+  assert.equal(
+    await deriveCatalogIntakeResearchInputDigest({
+      phase: 'confirm',
+      canonicalUrls: [],
+    }),
+    undefined,
+  );
+});
+
+test('catalog.intake.select requests initial research only when explicitly enabled and builds the preview from closed evidence', async () => {
+  const calls = [];
+  const state = createInMemoryCatalogIntakeStatePort(fixedClock());
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+    webResearchPort: {
+      async research(input) {
+        calls.push(input);
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: {
+              status: 'known',
+              score: 4.2,
+              reviewCount: 120,
+              url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+              provenance: 'agent_observed',
+              observedAt: '2026-09-22T10:00:00.000Z',
+              freshness: 'fresh',
+            },
+            reservation: { status: 'unknown' },
+          },
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'request-initial-research' },
+  });
+  const candidates = await state.get(ownerConversation.invocation, 'session-1');
+
+  const selected = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { address: '東京都港区六本木1-4-5' },
+      requestResearch: true,
+    },
+  });
+
+  assert.equal(selected.ok, true);
+  assert.equal(selected.value.status, 'preview_ready');
+  assert.equal(selected.value.preview.tabelog.status, 'known');
+  assert.equal(selected.value.preview.tabelog.provenance, 'agent_observed');
+  assert.deepEqual(calls, [
+    {
+      phase: 'initial',
+      scope: ownerConversation.invocation,
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      queryOrUrlsDigest: candidates.researchPhaseDigests.initial,
+      normalizedOwnerQuery: '鮨 さいとう',
+    },
+  ]);
+  const initialEvidence = selected.value.preview.tabelog;
+  const edited = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 2,
+      ordinal: 1,
+      ownerFields: { address: '東京都港区六本木1-4-6' },
+      requestResearch: true,
+    },
+  });
+  assert.equal(edited.ok, true);
+  assert.equal(edited.value.status, 'preview_ready');
+  assert.deepEqual(edited.value.preview.tabelog, initialEvidence);
+  assert.equal(calls.length, 1);
+
+  const disabledCalls = [];
+  const disabled = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        disabledCalls.push(input);
+        throw new Error('must not call');
+      },
+    },
+  });
+  await disabled.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'request-no-research' },
+  });
+  await disabled.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { address: '東京都港区六本木1-4-5' },
+      requestResearch: false,
+    },
+  });
+  assert.deepEqual(disabledCalls, []);
+});
+
+test('catalog.intake.confirm researches only the authoritative canonical preview URLs', async () => {
+  const state = createInMemoryCatalogIntakeStatePort(fixedClock());
+  const researchCalls = [];
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+    webResearchPort: {
+      async research(input) {
+        researchCalls.push(input);
+        assert.equal(input.phase, 'confirm');
+        assert.deepEqual(input.canonicalUrls, [
+          'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+        ]);
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: input.preview.tabelog,
+            reservation: input.preview.reservation,
+          },
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'confirm-with-url' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      tabelog: {
+        score: 4.2,
+        url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+      },
+      requestResearch: false,
+    },
+  });
+  const previewSession = await state.get(
+    ownerConversation.invocation,
+    'session-1',
+  );
+  await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(researchCalls.length, 1);
+  assert.equal(researchCalls[0].sessionId, 'session-1');
+  assert.equal(
+    researchCalls[0].expectedSessionVersion,
+    previewSession.sessionVersion,
+  );
+  assert.equal(
+    researchCalls[0].queryOrUrlsDigest,
+    previewSession.researchPhaseDigests.confirm,
+  );
+  assert.deepEqual(researchCalls[0].scope, ownerConversation.invocation);
+
+  let emptyPreviewResearchCalls = 0;
+  const withoutUrls = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research() {
+        emptyPreviewResearchCalls += 1;
+        throw new Error('must not research an empty URL set');
+      },
+    },
+  });
+  await discoverAndSelect(withoutUrls, {
+    coordinates: { latitude: 35.6654, longitude: 139.7298 },
+  });
+  await withoutUrls.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(emptyPreviewResearchCalls, 0);
+});
+
+test('catalog.intake.confirm accepts one changed research result then preserves it when the spent retry returns unknown', async () => {
+  let researchCalls = 0;
+  const published = [];
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        researchCalls += 1;
+        if (input.phase === 'initial') {
+          return {
+            kind: 'observed',
+            value: {
+              tabelog: agentTabelog(4.2, tabelogUrl),
+              reservation: { status: 'unknown' },
+            },
+          };
+        }
+        return researchCalls === 2
+          ? {
+              kind: 'observed',
+              value: {
+                tabelog: agentTabelog(4.3, tabelogUrl),
+                reservation: { status: 'unknown' },
+              },
+            }
+          : {
+              kind: 'observed',
+              value: {
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              },
+            };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish(preview) {
+        published.push(preview);
+        return {
+          status: 'committed_verified',
+          itemId: 'item-researched',
+          receiptRef: 'receipt-researched',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'one-shot-research' },
+  });
+  const selected = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      requestResearch: true,
+    },
+  });
+  assert.equal(selected.value.preview.previewVersion, 1);
+  assert.equal(selected.value.preview.tabelog.score, 4.2);
+
+  const refreshed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(refreshed.ok, true);
+  assert.equal(refreshed.value.status, 'conflict');
+  assert.equal(refreshed.value.newPreview.previewVersion, 2);
+  assert.equal(refreshed.value.newPreview.tabelog.score, 4.3);
+
+  const committed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(committed.ok, true);
+  assert.equal(committed.value.status, 'committed_verified');
+  assert.equal(researchCalls, 2);
+  assert.equal(published.length, 1);
+  assert.equal(published[0].previewVersion, 2);
+  assert.equal(published[0].tabelog.score, 4.3);
+  assert.equal(published[0].tabelog.freshness, 'fresh');
+});
+
+test('catalog.intake.confirm records same-facts research internally before publication without changing the public preview', async () => {
+  const clock = fixedClock();
+  const state = createInMemoryCatalogIntakeStatePort(clock);
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  let researchCalls = 0;
+  let publishCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+    clock,
+    durableGeocoderPort: {
+      async propose() {
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress: '東京都港区六本木1-4-5',
+            latitude: 35.6654,
+            longitude: 139.7298,
+            provider: 'google-geocoding',
+            sourceUrl: 'https://maps.google.com/',
+            license: 'Google Maps terms',
+            checkedAt: '2026-09-22T10:00:00.000Z',
+          },
+        };
+      },
+    },
+    webResearchPort: {
+      async research() {
+        researchCalls += 1;
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: agentTabelog(4.2, tabelogUrl),
+            reservation: { status: 'unknown' },
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish(preview, _mutationKey, expectedSessionVersion) {
+        publishCalls += 1;
+        const stored = await state.get(
+          ownerConversation.invocation,
+          preview.sessionId,
+        );
+        assert.equal(expectedSessionVersion, publishCalls === 1 ? 4 : 6);
+        assert.equal(stored.sessionVersion, expectedSessionVersion);
+        assert.equal(stored.preview.previewVersion, publishCalls);
+        assert.equal(
+          stored.researchPhaseApplications.confirm.appliedPreviewVersion,
+          publishCalls,
+        );
+        assert.equal('researchPhaseApplications' in stored.preview, false);
+        assert.equal(stored.preview.tabelog.freshness, 'fresh');
+        if (publishCalls === 1) {
+          const { evidenceDigest: _digest, ...priorWithoutDigest } = preview;
+          const withoutDigest = {
+            ...priorWithoutDigest,
+            previewVersion: 2,
+            catalogRevision: 'catalog-r2',
+          };
+          const newPreview = {
+            ...withoutDigest,
+            evidenceDigest: await testEvidenceDigest(withoutDigest),
+          };
+          const { confirmMutationKey: _claim, ...withoutClaim } = stored;
+          const raced = await state.compareAndSwap({
+            scope: ownerConversation.invocation,
+            sessionId: stored.sessionId,
+            expectedVersion: stored.sessionVersion,
+            next: {
+              ...withoutClaim,
+              sessionVersion: stored.sessionVersion + 1,
+              catalogRevision: 'catalog-r2',
+              preview: newPreview,
+              researchPhaseApplications: {
+                confirm: {
+                  ...stored.researchPhaseApplications.confirm,
+                  appliedPreviewVersion: 2,
+                },
+              },
+            },
+          });
+          assert.equal(raced.kind, 'applied');
+          return { status: 'conflict', newPreview };
+        }
+        return {
+          status: 'committed_verified',
+          itemId: 'item-same-facts',
+          receiptRef: 'receipt-same-facts',
+          replayed: false,
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'same-facts-marker' },
+  });
+  const selected = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      requestResearch: true,
+    },
+  });
+  assert.equal(selected.value.preview.previewVersion, 1);
+
+  const confirmed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.value.status, 'conflict');
+  assert.equal(confirmed.value.newPreview.previewVersion, 2);
+  assert.equal(confirmed.value.newPreview.tabelog.freshness, 'fresh');
+  const retried = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  });
+  assert.equal(retried.ok, true);
+  assert.equal(retried.value.status, 'committed_verified');
+  assert.equal(researchCalls, 2);
+  assert.equal(publishCalls, 2);
+});
+
+test('catalog.intake.confirm treats a spent but unapplied research result as manual stale evidence', async () => {
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  let researchCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        researchCalls += 1;
+        return input.phase === 'initial'
+          ? {
+              kind: 'observed',
+              value: {
+                tabelog: agentTabelog(4.2, tabelogUrl),
+                reservation: { status: 'unknown' },
+              },
+            }
+          : {
+              kind: 'observed',
+              value: {
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              },
+            };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'unapplied-research' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      requestResearch: true,
+    },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'conflict');
+  assert.equal(result.value.newPreview.previewVersion, 2);
+  assert.equal(result.value.newPreview.tabelog.status, 'known');
+  assert.equal(result.value.newPreview.tabelog.score, 4.2);
+  assert.equal(result.value.newPreview.tabelog.freshness, 'stale');
+  assert.equal(
+    result.value.newPreview.tabelog.observedAt,
+    '2026-09-22T10:00:00.000Z',
+  );
+  assert.deepEqual(
+    result.value.newPreview.warnings.map(({ code }) => code),
+    ['needs_review'],
+  );
+  assert.equal(researchCalls, 2);
+});
+
+test('catalog.intake.confirm returns closed expired or conflict without preview CAS or publication', async () => {
+  for (const kind of ['expired', 'conflict']) {
+    const state = recordingStatePort();
+    let publishCalls = 0;
+    const application = createFixtureApplication({
+      discoveryPort: discoveryFixture(),
+      statePort: state.port,
+      webResearchPort: {
+        async research() {
+          return { kind };
+        },
+      },
+      atlasCatalogIntakePort: {
+        async publish() {
+          publishCalls += 1;
+          throw new Error('must not publish');
+        },
+      },
+    });
+    await discoverAndSelect(
+      application,
+      { coordinates: { latitude: 35.6654, longitude: 139.7298 } },
+      { tabelog: researchTabelogAssertion() },
+    );
+    const writesBeforeConfirm = state.replaceCalls;
+    const operation = {
+      key: 'catalog.intake.confirm',
+      input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+    };
+
+    const first = await application.execute(operation);
+    const second = await application.execute(operation);
+    assertClosedAddFailure(first, kind);
+    assertClosedAddFailure(second, kind);
+    assert.equal(state.replaceCalls, writesBeforeConfirm);
+    assert.equal(publishCalls, 0);
+  }
+});
+
+test('catalog.intake.confirm invalidates an applied marker after preview edit and conservatively stales spent evidence', async () => {
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  let researchCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research(input) {
+        researchCalls += 1;
+        if (input.phase === 'initial') {
+          return {
+            kind: 'observed',
+            value: {
+              tabelog: agentTabelog(4.2, tabelogUrl),
+              reservation: { status: 'unknown' },
+            },
+          };
+        }
+        return researchCalls === 2
+          ? {
+              kind: 'observed',
+              value: {
+                tabelog: agentTabelog(4.3, tabelogUrl),
+                reservation: { status: 'unknown' },
+              },
+            }
+          : {
+              kind: 'observed',
+              value: {
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              },
+            };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'edited-marker' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      requestResearch: true,
+    },
+  });
+  const researched = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  assert.equal(researched.value.status, 'conflict');
+
+  const edited = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 3,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-6',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      requestResearch: false,
+    },
+  });
+  assert.equal(edited.value.preview.previewVersion, 3);
+  assert.equal(edited.value.preview.tabelog.freshness, 'fresh');
+
+  const retried = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 3 },
+  });
+  assert.equal(retried.value.status, 'conflict');
+  assert.equal(retried.value.newPreview.previewVersion, 4);
+  assert.equal(retried.value.newPreview.tabelog.score, 4.3);
+  assert.equal(retried.value.newPreview.tabelog.freshness, 'stale');
+  assert.equal(researchCalls, 3);
+});
+
+test('catalog.intake.confirm never downgrades owner-asserted evidence when research returns unknown', async () => {
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    webResearchPort: {
+      async research() {
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: { status: 'unknown' },
+            reservation: { status: 'unknown' },
+          },
+        };
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'owner-evidence' },
+  });
+  await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {
+        address: '東京都港区六本木1-4-5',
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      tabelog: { score: 4.2, url: tabelogUrl },
+      requestResearch: false,
+    },
+  });
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+  const preview =
+    result.value.status === 'conflict' ? result.value.newPreview : undefined;
+  assert.ok(preview);
+  assert.equal(preview.tabelog.status, 'known');
+  assert.equal(preview.tabelog.provenance, 'owner_asserted');
+  assert.equal(preview.tabelog.freshness, 'fresh');
+  assert.equal(preview.tabelog.score, 4.2);
 });
 
 test('catalog.intake.select returns a closed no-provider preview without persisting transient presentation', async () => {
@@ -536,9 +1243,20 @@ test('catalog.intake.confirm returns a new preview when fixture Web research cha
     discoveryPort: discoveryFixture(),
     webResearchPort: {
       async research(input) {
-        assert.equal(input.phase, 'confirm');
+        if (input.phase === 'initial') {
+          return {
+            kind: 'observed',
+            value: {
+              tabelog: agentTabelog(
+                4.2,
+                'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+              ),
+              reservation: { status: 'unknown' },
+            },
+          };
+        }
         return {
-          ok: true,
+          kind: 'observed',
           value: {
             tabelog: {
               status: 'known',
@@ -566,9 +1284,11 @@ test('catalog.intake.confirm returns a new preview when fixture Web research cha
       },
     },
   });
-  await discoverAndSelect(application, {
-    coordinates: { latitude: 35.6654, longitude: 139.7298 },
-  });
+  await discoverAndSelect(
+    application,
+    { coordinates: { latitude: 35.6654, longitude: 139.7298 } },
+    { requestResearch: true },
+  );
 
   const result = await application.execute({
     key: 'catalog.intake.confirm',
@@ -600,7 +1320,7 @@ test('catalog.intake.confirm rejects expanded Web research output without persis
     webResearchPort: {
       async research(input) {
         return {
-          ok: true,
+          kind: 'observed',
           value: {
             tabelog: {
               ...input.preview.tabelog,
@@ -623,9 +1343,13 @@ test('catalog.intake.confirm rejects expanded Web research output without persis
       },
     },
   });
-  await discoverAndSelect(application, {
-    coordinates: { latitude: 35.6654, longitude: 139.7298 },
-  });
+  await discoverAndSelect(
+    application,
+    {
+      coordinates: { latitude: 35.6654, longitude: 139.7298 },
+    },
+    { tabelog: researchTabelogAssertion() },
+  );
   const before = structuredClone(state.sessions.get('session-1'));
 
   const result = await application.execute({
@@ -673,7 +1397,7 @@ test('catalog.intake.confirm rejects illegal Web research URL, time, range, prov
       webResearchPort: {
         async research(input) {
           return {
-            ok: true,
+            kind: 'observed',
             value: { tabelog, reservation: input.preview.reservation },
           };
         },
@@ -690,9 +1414,13 @@ test('catalog.intake.confirm rejects illegal Web research URL, time, range, prov
         },
       },
     });
-    await discoverAndSelect(application, {
-      coordinates: { latitude: 35.6654, longitude: 139.7298 },
-    });
+    await discoverAndSelect(
+      application,
+      {
+        coordinates: { latitude: 35.6654, longitude: 139.7298 },
+      },
+      { tabelog: researchTabelogAssertion() },
+    );
     const before = structuredClone(state.sessions.get('session-1'));
 
     assert.deepEqual(
@@ -836,6 +1564,7 @@ test('catalog.intake.confirm retries enabled geocoding for unknown evidence and 
       expectedSessionVersion: 1,
       ordinal: 1,
       ownerFields: { title: '鮨青空' },
+      tabelog: researchTabelogAssertion(),
       requestResearch: false,
     },
   });
@@ -899,7 +1628,7 @@ test('catalog.intake.confirm terminates when geocoding fails while Web research 
       async research({ preview }) {
         researchCalls += 1;
         return {
-          ok: true,
+          kind: 'observed',
           value: {
             tabelog: preview.tabelog,
             reservation: preview.reservation,
@@ -930,6 +1659,7 @@ test('catalog.intake.confirm terminates when geocoding fails while Web research 
       expectedSessionVersion: 1,
       ordinal: 1,
       ownerFields: { title: '鮨青空' },
+      tabelog: researchTabelogAssertion(),
       requestResearch: false,
     },
   });
@@ -949,7 +1679,7 @@ test('catalog.intake.confirm terminates when geocoding fails while Web research 
     'committed_needs_review',
   );
   assert.equal(geocoderCalls, 3);
-  assert.equal(researchCalls, 2);
+  assert.equal(researchCalls, 1);
   assert.equal(publishCalls, 1);
 });
 
@@ -979,11 +1709,11 @@ test('catalog.intake.confirm terminates when geocoding succeeds while Web resear
       },
     },
     webResearchPort: {
-      async research({ preview }) {
+      async research(input) {
         researchCalls += 1;
-        return researchCalls === 1
+        return input.phase === 'initial'
           ? {
-              ok: true,
+              kind: 'observed',
               value: {
                 tabelog: {
                   status: 'known',
@@ -993,12 +1723,11 @@ test('catalog.intake.confirm terminates when geocoding succeeds while Web resear
                   observedAt,
                   freshness: 'fresh',
                 },
-                reservation: preview.reservation,
+                reservation: { status: 'unknown' },
               },
             }
           : {
-              ok: false,
-              error: { kind: 'dependency_failure', message: 'private outage' },
+              kind: 'unavailable',
             };
       },
     },
@@ -1024,29 +1753,28 @@ test('catalog.intake.confirm terminates when geocoding succeeds while Web resear
       sessionId: 'session-1',
       expectedSessionVersion: 1,
       ordinal: 1,
-      requestResearch: false,
+      requestResearch: true,
     },
   });
-  const researched = await application.execute({
-    key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
-  });
-  assert.equal(researched.ok && researched.value.status, 'conflict');
   const failedRefresh = await application.execute({
     key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
   });
   assert.equal(failedRefresh.ok && failedRefresh.value.status, 'conflict');
   assert.equal(failedRefresh.value.newPreview.tabelog.freshness, 'stale');
   assert.equal(failedRefresh.value.newPreview.tabelog.observedAt, observedAt);
+  assert.deepEqual(
+    failedRefresh.value.newPreview.warnings.map(({ code }) => code),
+    ['stale_evidence', 'provider_unavailable', 'needs_review'],
+  );
 
   const committed = await application.execute({
     key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 3 },
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
   });
 
   assert.equal(committed.ok && committed.value.status, 'committed_verified');
-  assert.equal(geocoderCalls, 4);
+  assert.equal(geocoderCalls, 3);
   assert.equal(researchCalls, 3);
   assert.equal(publishCalls, 1);
 });
@@ -1060,9 +1788,9 @@ test('catalog.intake.confirm makes failed Web research evidence stale once witho
     webResearchPort: {
       async research(input) {
         researchCalls += 1;
-        if (researchCalls === 1) {
+        if (input.phase === 'initial') {
           return {
-            ok: true,
+            kind: 'observed',
             value: {
               tabelog: {
                 status: 'known',
@@ -1072,17 +1800,11 @@ test('catalog.intake.confirm makes failed Web research evidence stale once witho
                 observedAt,
                 freshness: 'fresh',
               },
-              reservation: input.preview.reservation,
+              reservation: { status: 'unknown' },
             },
           };
         }
-        return {
-          ok: false,
-          error: {
-            kind: 'dependency_failure',
-            message: 'private research outage',
-          },
-        };
+        return { kind: 'response_lost' };
       },
     },
     atlasCatalogIntakePort: {
@@ -1097,29 +1819,31 @@ test('catalog.intake.confirm makes failed Web research evidence stale once witho
       },
     },
   });
-  await discoverAndSelect(application, {
-    coordinates: { latitude: 35.6654, longitude: 139.7298 },
-  });
-  const researched = await application.execute({
+  await discoverAndSelect(
+    application,
+    {
+      coordinates: { latitude: 35.6654, longitude: 139.7298 },
+    },
+    { requestResearch: true },
+  );
+  const failedRefresh = await application.execute({
     key: 'catalog.intake.confirm',
     input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
   });
-  assert.equal(researched.value.status, 'conflict');
-
-  const failedRefresh = await application.execute({
-    key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
-  });
   assert.equal(failedRefresh.ok, true);
   assert.equal(failedRefresh.value.status, 'conflict');
-  assert.equal(failedRefresh.value.newPreview.previewVersion, 3);
+  assert.equal(failedRefresh.value.newPreview.previewVersion, 2);
   assert.equal(failedRefresh.value.newPreview.tabelog.freshness, 'stale');
   assert.equal(failedRefresh.value.newPreview.tabelog.observedAt, observedAt);
+  assert.deepEqual(
+    failedRefresh.value.newPreview.warnings.map(({ code }) => code),
+    ['stale_evidence', 'provider_unavailable', 'needs_review'],
+  );
   assert.equal(publishCalls, 0);
 
   const stableRetry = await application.execute({
     key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 3 },
+    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
   });
   assert.equal(stableRetry.ok, true);
   assert.equal(stableRetry.value.status, 'committed_verified');
@@ -1178,6 +1902,66 @@ test('catalog.intake session expires at the exact 30 minute inactivity boundary'
   assertClosedAddFailure(result, 'expired');
 });
 
+test('confirm research crossing the inactivity boundary expires atomically without preview CAS or publish', async () => {
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  const clock = { now: () => now };
+  const state = createInMemoryCatalogIntakeStatePort(clock);
+  let publishCalls = 0;
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    statePort: state,
+    clock,
+    webResearchPort: {
+      async research({ phase }) {
+        if (phase === 'confirm') {
+          now = new Date('2026-09-22T10:30:00.000Z');
+        }
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: agentTabelog(phase === 'initial' ? 4.1 : 4.2, tabelogUrl),
+            reservation: { status: 'unknown' },
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publishCalls += 1;
+        throw new Error('publish must not run after session expiry');
+      },
+    },
+  });
+  await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: '鮨 さいとう', requestToken: 'request-research-ttl' },
+  });
+  const selected = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: { title: '鮨 さいとう' },
+      requestResearch: true,
+    },
+  });
+  assert.equal(selected.ok, true);
+  assert.equal(selected.value.preview.previewVersion, 1);
+
+  const result = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+  });
+
+  assertClosedAddFailure(result, 'expired');
+  assert.equal(publishCalls, 0);
+  const stored = await state.get(ownerConversation.invocation, 'session-1');
+  assert.equal(stored.state, 'expired');
+  assert.equal(stored.expiredFromVersion, 2);
+});
+
 test('discover retry also expires at the exact 30 minute inactivity boundary', async () => {
   let now = new Date('2026-09-22T10:00:00.000Z');
   let refetchCalls = 0;
@@ -1206,7 +1990,7 @@ test('discover retry also expires at the exact 30 minute inactivity boundary', a
 test('expiration CAS resolves renewed, expired, and cancelled concurrent state without false expiry', async () => {
   for (const race of ['renewed', 'expired', 'cancelled']) {
     let now = new Date('2026-09-22T10:00:00.000Z');
-    const base = createInMemoryCatalogIntakeStatePort();
+    const base = createInMemoryCatalogIntakeStatePort({ now: () => now });
     const application = createFixtureApplication({
       discoveryPort: discoveryFixture(),
       statePort: expirationRacePort(base, race),
@@ -1370,7 +2154,7 @@ test('catalog intake sessions are isolated by owner, channel, and conversation',
 });
 
 test('state cleanup expires active sessions and keeps only a minimal terminal reference', async () => {
-  const state = createInMemoryCatalogIntakeStatePort();
+  const state = createInMemoryCatalogIntakeStatePort(fixedClock());
   const application = createFixtureApplication({
     discoveryPort: discoveryFixture(),
     statePort: state,
@@ -1613,7 +2397,11 @@ test('closed input validation accepts two-decimal Tabelog values and rejects for
   }
 });
 
-async function discoverAndSelect(application, ownerFields = {}) {
+async function discoverAndSelect(
+  application,
+  ownerFields = {},
+  selectFields = {},
+) {
   await application.execute({
     key: 'catalog.intake.discover',
     input: { query: '鮨 さいとう', requestToken: 'request-1' },
@@ -1630,20 +2418,28 @@ async function discoverAndSelect(application, ownerFields = {}) {
         ...ownerFields,
       },
       requestResearch: false,
+      ...selectFields,
     },
   });
+}
+
+function researchTabelogAssertion() {
+  return {
+    score: 4.2,
+    url: 'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+  };
 }
 
 function createFixtureApplication(options) {
   const normalized = options.discoveryPort
     ? options
     : { discoveryPort: options };
+  const clock = normalized.clock ?? fixedClock();
   const intakeModule = createCatalogIntakeModule({
     discoveryPort: normalized.discoveryPort,
-    statePort: normalized.statePort ?? createInMemoryCatalogIntakeStatePort(),
-    clock: normalized.clock ?? {
-      now: () => new Date('2026-09-22T10:00:00.000Z'),
-    },
+    statePort:
+      normalized.statePort ?? createInMemoryCatalogIntakeStatePort(clock),
+    clock,
     idSource: { nextId: () => 'session-1' },
     ...(normalized.idSource ? { idSource: normalized.idSource } : {}),
     catalogRevision: normalized.catalogRevision ?? {
@@ -1670,6 +2466,31 @@ function createFixtureApplication(options) {
   };
 }
 
+function fixedClock() {
+  return { now: () => new Date('2026-09-22T10:00:00.000Z') };
+}
+
+async function testEvidenceDigest(value) {
+  const bytes = new TextEncoder().encode(testCanonicalJson(value));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
+function testCanonicalJson(value) {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(testCanonicalJson).join(',')}]`;
+  }
+  return `{${Object.entries(value)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([key, entry]) => `${JSON.stringify(key)}:${testCanonicalJson(entry)}`)
+    .join(',')}}`;
+}
+
 function discoveryFixture(options = {}) {
   const candidate = discoveryCandidate(options);
   return {
@@ -1690,6 +2511,17 @@ function discoveryFixture(options = {}) {
       assert.equal(placeId, candidate.durableIdentity.placeId);
       return { ok: true, value: candidate };
     },
+  };
+}
+
+function agentTabelog(score, url) {
+  return {
+    status: 'known',
+    score,
+    url,
+    provenance: 'agent_observed',
+    observedAt: '2026-09-22T10:00:00.000Z',
+    freshness: 'fresh',
   };
 }
 

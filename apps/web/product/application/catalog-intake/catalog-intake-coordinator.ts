@@ -91,16 +91,73 @@ export interface DurableGeocoderPort {
 }
 
 export interface WebResearchPort {
-  research(input: {
-    readonly phase: 'confirm';
-    readonly preview: CatalogIntakePreview;
-  }): Promise<
-    Result<{
-      readonly tabelog: CatalogIntakeTabelogSnapshot;
-      readonly reservation: CatalogIntakeReservationSnapshot;
-    }>
-  >;
+  research(input: WebResearchInput): Promise<WebResearchOutcome>;
 }
+
+export type WebResearchOutcome =
+  | {
+      readonly kind: 'observed';
+      readonly value: {
+        readonly tabelog: CatalogIntakeTabelogSnapshot;
+        readonly reservation: CatalogIntakeReservationSnapshot;
+      };
+    }
+  | {
+      readonly kind:
+        | 'unavailable'
+        | 'response_lost'
+        | 'already_spent'
+        | 'expired'
+        | 'conflict';
+    };
+
+type WebResearchInputBase = {
+  readonly scope: CatalogIntakeScope;
+  readonly sessionId: string;
+  readonly expectedSessionVersion: number;
+  readonly queryOrUrlsDigest: string;
+};
+
+export type WebResearchInput =
+  | (WebResearchInputBase & {
+      readonly phase: 'initial';
+      readonly normalizedOwnerQuery: string;
+    })
+  | (WebResearchInputBase & {
+      readonly phase: 'confirm';
+      readonly canonicalUrls: readonly string[];
+      readonly preview: CatalogIntakePreview;
+    });
+
+export type CatalogIntakeResearchPhase = 'initial' | 'confirm';
+
+export interface CatalogIntakeResearchAllowance {
+  readonly sessionId: string;
+  readonly phase: CatalogIntakeResearchPhase;
+  readonly queryOrUrlsDigest: string;
+  readonly maxCounts: {
+    readonly searchQueries: number;
+    readonly pageRequests: number;
+  };
+  readonly maxDurationMs: number;
+  readonly requestTimeoutMs: 15_000;
+  readonly maxRedirects: 3;
+  readonly deadline: string;
+  readonly requestId: string;
+}
+
+export const catalogIntakeResearchBudgets = {
+  initial: {
+    searchQueries: 1,
+    pageRequests: 3,
+    maxDurationMs: 35_000,
+  },
+  confirm: {
+    searchQueries: 0,
+    pageRequests: 2,
+    maxDurationMs: 25_000,
+  },
+} as const;
 
 export interface CatalogIntakeScope {
   readonly ownerId: string;
@@ -393,6 +450,16 @@ interface CatalogIntakeActiveSessionBase extends CatalogIntakeScope {
   readonly discoverExpiresAt: string;
   readonly lastAcceptedActivityAt: string;
   readonly expiresAt: string;
+  readonly researchPhaseDigests: {
+    readonly initial: string;
+    readonly confirm?: string;
+  };
+  readonly researchPhaseApplications?: {
+    readonly confirm?: {
+      readonly queryOrUrlsDigest: string;
+      readonly appliedPreviewVersion: number;
+    };
+  };
   readonly lastTransition?: {
     readonly operation: 'select';
     readonly fromVersion: number;
@@ -490,6 +557,22 @@ export interface CatalogIntakeStatePort {
         readonly kind: 'conflict';
         readonly current?: CatalogIntakeStoredSession;
       }
+  >;
+  consumeResearchPhase(input: {
+    readonly scope: CatalogIntakeScope;
+    readonly sessionId: string;
+    readonly expectedSessionVersion: number;
+    readonly phase: CatalogIntakeResearchPhase;
+    readonly queryOrUrlsDigest: string;
+    readonly requestId: string;
+  }): Promise<
+    | {
+        readonly kind: 'consumed';
+        readonly allowance: CatalogIntakeResearchAllowance;
+      }
+    | { readonly kind: 'already_spent' }
+    | { readonly kind: 'expired' }
+    | { readonly kind: 'conflict' }
   >;
   cleanup(now: Date): Promise<{
     readonly expired: number;
@@ -610,6 +693,12 @@ export function createCatalogIntakeModule(options: {
           ...scope,
           ownerQuery: input.query,
           normalizedOwnerQuery: input.query,
+          researchPhaseDigests: {
+            initial: await deriveCatalogIntakeResearchInputDigest({
+              phase: 'initial',
+              normalizedOwnerQuery: input.query,
+            }),
+          },
           requestToken: input.requestToken,
           hasMore: discovery.hasMore,
           candidates: discovery.candidates.map(({ durableIdentity }) => ({
@@ -860,6 +949,19 @@ export function createCatalogIntakeModule(options: {
             next,
           });
           if (transitioned.kind === 'conflict') {
+            if (
+              await rejectedActiveCasExpired(
+                transitioned.current,
+                scope,
+                options,
+              )
+            ) {
+              return addFailure(
+                'expired',
+                'Catalog intake session has expired.',
+                false,
+              );
+            }
             return replayOrConflictSelect(
               transitioned.current,
               input,
@@ -913,7 +1015,7 @@ export function createCatalogIntakeModule(options: {
                   checkedAt: geocoderProposal.checkedAt,
                 }
               : { status: 'unknown' as const };
-        const tabelog =
+        const ownerTabelog =
           input.tabelog && input.tabelog !== 'unknown'
             ? {
                 status: 'known' as const,
@@ -922,8 +1024,10 @@ export function createCatalogIntakeModule(options: {
                 assertedAt,
                 freshness: 'fresh' as const,
               }
-            : { status: 'unknown' as const };
-        const reservation =
+            : input.tabelog === undefined && session.state === 'preview_ready'
+              ? session.preview.tabelog
+              : { status: 'unknown' as const };
+        const ownerReservation =
           input.reservation && input.reservation !== 'unknown'
             ? {
                 status: 'known' as const,
@@ -932,7 +1036,74 @@ export function createCatalogIntakeModule(options: {
                 assertedAt,
                 freshness: 'fresh' as const,
               }
-            : { status: 'unknown' as const };
+            : input.reservation === undefined &&
+                session.state === 'preview_ready'
+              ? session.preview.reservation
+              : { status: 'unknown' as const };
+        let researched: {
+          readonly tabelog: CatalogIntakeTabelogSnapshot;
+          readonly reservation: CatalogIntakeReservationSnapshot;
+        } = {
+          tabelog: { status: 'unknown' as const },
+          reservation: { status: 'unknown' as const },
+        };
+        let researchUnavailable = false;
+        if (
+          input.requestResearch &&
+          session.state === 'candidates_ready' &&
+          options.webResearchPort
+        ) {
+          const research = await options.webResearchPort.research({
+            phase: 'initial',
+            scope,
+            sessionId: session.sessionId,
+            expectedSessionVersion: session.sessionVersion,
+            queryOrUrlsDigest: session.researchPhaseDigests.initial,
+            normalizedOwnerQuery: session.normalizedOwnerQuery,
+          });
+          if (research.kind === 'expired') {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
+          if (research.kind === 'conflict') {
+            return addFailure(
+              'conflict',
+              'Catalog intake session has changed.',
+              false,
+            );
+          }
+          if (research.kind !== 'observed') {
+            researchUnavailable = true;
+          } else {
+            const normalizedResearch = validateWebResearchOutput(
+              research.value,
+              { tabelog: ownerTabelog, reservation: ownerReservation },
+            );
+            if (!normalizedResearch) {
+              return addFailure(
+                'dependency_failure',
+                'Web research returned an invalid response.',
+                false,
+              );
+            }
+            researched = normalizedResearch;
+          }
+        }
+        const tabelog =
+          ownerTabelog.status === 'known'
+            ? ownerTabelog
+            : researched.tabelog.status === 'known'
+              ? researched.tabelog
+              : ownerTabelog;
+        const reservation =
+          ownerReservation.status === 'known'
+            ? ownerReservation
+            : researched.reservation.status === 'known'
+              ? researched.reservation
+              : ownerReservation;
         const previewWithoutDigest = {
           sessionId: session.sessionId,
           previewVersion:
@@ -964,12 +1135,13 @@ export function createCatalogIntakeModule(options: {
               : []),
           ],
           warnings: canonicalizeCatalogIntakeWarnings([
-            ...(geocoderUnavailable
+            ...(geocoderUnavailable || researchUnavailable
               ? ([
                   {
                     code: 'provider_unavailable' as const,
-                    message:
-                      'Durable location lookup is unavailable; review the owner-provided details.',
+                    message: geocoderUnavailable
+                      ? 'Durable location lookup is unavailable; review the owner-provided details.'
+                      : 'Web research is unavailable; review the owner-provided details.',
                   },
                 ] as const)
               : []),
@@ -998,6 +1170,10 @@ export function createCatalogIntakeModule(options: {
             inputJson,
           },
           preview,
+          researchPhaseDigests: await researchPhaseDigestsForPreview(
+            session,
+            preview,
+          ),
         };
         const transitioned = await options.statePort.compareAndSwap({
           scope,
@@ -1006,6 +1182,15 @@ export function createCatalogIntakeModule(options: {
           next,
         });
         if (transitioned.kind === 'conflict') {
+          if (
+            await rejectedActiveCasExpired(transitioned.current, scope, options)
+          ) {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
           return replayOrConflictSelect(transitioned.current, input, inputJson);
         }
         return success({
@@ -1144,6 +1329,10 @@ export function createCatalogIntakeModule(options: {
             lastAcceptedActivityAt: acceptedAt.toISOString(),
             expiresAt: newPreview.expiresAt,
             preview: newPreview,
+            researchPhaseDigests: await researchPhaseDigestsForPreview(
+              session,
+              newPreview,
+            ),
           };
           const transitioned = await options.statePort.compareAndSwap({
             scope,
@@ -1151,6 +1340,20 @@ export function createCatalogIntakeModule(options: {
             expectedVersion: session.sessionVersion,
             next,
           });
+          if (
+            transitioned.kind === 'conflict' &&
+            (await rejectedActiveCasExpired(
+              transitioned.current,
+              scope,
+              options,
+            ))
+          ) {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
           return transitioned.kind === 'applied'
             ? success({ status: 'conflict', newPreview })
             : addFailure(
@@ -1220,12 +1423,50 @@ export function createCatalogIntakeModule(options: {
               : priorLocation;
           providerRefreshFailed ||= !resolved;
         }
-        if (options.webResearchPort) {
+        const canonicalResearchUrls = catalogIntakeCanonicalResearchUrls(
+          session.preview,
+        );
+        const confirmResearchDigest = session.researchPhaseDigests.confirm;
+        const appliedConfirm = session.researchPhaseApplications?.confirm;
+        const confirmResearchAlreadyApplied = Boolean(
+          confirmResearchDigest &&
+          appliedConfirm?.queryOrUrlsDigest === confirmResearchDigest &&
+          appliedConfirm.appliedPreviewVersion ===
+            session.preview.previewVersion,
+        );
+        let confirmResearchAttempted = false;
+        let confirmResearchApplied = false;
+        if (
+          options.webResearchPort &&
+          confirmResearchDigest &&
+          canonicalResearchUrls.length > 0 &&
+          !confirmResearchAlreadyApplied
+        ) {
+          confirmResearchAttempted = true;
           const research = await options.webResearchPort.research({
             phase: 'confirm',
+            scope,
+            sessionId: session.sessionId,
+            expectedSessionVersion: session.sessionVersion,
+            queryOrUrlsDigest: confirmResearchDigest,
+            canonicalUrls: canonicalResearchUrls,
             preview: session.preview,
           });
-          if (!research.ok) {
+          if (research.kind === 'expired') {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
+          if (research.kind === 'conflict') {
+            return addFailure(
+              'conflict',
+              'Catalog intake session has changed.',
+              false,
+            );
+          }
+          if (research.kind !== 'observed') {
             providerRefreshFailed = true;
             refreshedTabelog = markAgentTabelogStale(session.preview.tabelog);
             refreshedReservation = markAgentReservationStale(
@@ -1242,6 +1483,7 @@ export function createCatalogIntakeModule(options: {
                 reason: 'dependency',
               });
             }
+            confirmResearchApplied = true;
             const stableResearch = stabilizeResearchEvidence(
               normalizedResearch,
               session.preview,
@@ -1251,12 +1493,15 @@ export function createCatalogIntakeModule(options: {
           }
         }
         const providerRefreshEnabled = Boolean(
-          options.durableGeocoderPort || options.webResearchPort,
+          options.durableGeocoderPort || confirmResearchAttempted,
         );
         const refreshedWarnings = !providerRefreshEnabled
           ? session.preview.warnings
           : providerRefreshFailed
-            ? withConfirmProviderUnavailableWarning(session.preview.warnings)
+            ? withConfirmProviderUnavailableWarning(
+                session.preview.warnings,
+                hasStaleAgentEvidence(refreshedTabelog, refreshedReservation),
+              )
             : withoutRefreshFailureWarnings(session.preview.warnings);
         if (
           canonicalJson(refreshedAddress) !==
@@ -1287,12 +1532,28 @@ export function createCatalogIntakeModule(options: {
             ...previewWithoutDigest,
             evidenceDigest: await digestCanonical(previewWithoutDigest),
           };
+          const nextResearchPhaseDigests = await researchPhaseDigestsForPreview(
+            session,
+            newPreview,
+          );
           const next: CatalogIntakePreviewSession = {
             ...session,
             sessionVersion: session.sessionVersion + 1,
             lastAcceptedActivityAt: acceptedAt.toISOString(),
             expiresAt: newPreview.expiresAt,
             preview: newPreview,
+            researchPhaseDigests: nextResearchPhaseDigests,
+            ...(confirmResearchApplied && nextResearchPhaseDigests.confirm
+              ? {
+                  researchPhaseApplications: {
+                    ...session.researchPhaseApplications,
+                    confirm: {
+                      queryOrUrlsDigest: nextResearchPhaseDigests.confirm,
+                      appliedPreviewVersion: newPreview.previewVersion,
+                    },
+                  },
+                }
+              : {}),
           };
           const transitioned = await options.statePort.compareAndSwap({
             scope,
@@ -1300,6 +1561,20 @@ export function createCatalogIntakeModule(options: {
             expectedVersion: session.sessionVersion,
             next,
           });
+          if (
+            transitioned.kind === 'conflict' &&
+            (await rejectedActiveCasExpired(
+              transitioned.current,
+              scope,
+              options,
+            ))
+          ) {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
           return transitioned.kind === 'applied'
             ? success({ status: 'conflict', newPreview })
             : addFailure(
@@ -1307,6 +1582,46 @@ export function createCatalogIntakeModule(options: {
                 'Catalog intake preview has changed.',
                 false,
               );
+        }
+        if (
+          confirmResearchApplied &&
+          confirmResearchDigest &&
+          !confirmResearchAlreadyApplied
+        ) {
+          const markedSession: CatalogIntakePreviewSession = {
+            ...session,
+            sessionVersion: session.sessionVersion + 1,
+            researchPhaseApplications: {
+              ...session.researchPhaseApplications,
+              confirm: {
+                queryOrUrlsDigest: confirmResearchDigest,
+                appliedPreviewVersion: session.preview.previewVersion,
+              },
+            },
+          };
+          const marked = await options.statePort.compareAndSwap({
+            scope,
+            sessionId: session.sessionId,
+            expectedVersion: session.sessionVersion,
+            next: markedSession,
+          });
+          if (marked.kind !== 'applied') {
+            if (
+              await rejectedActiveCasExpired(marked.current, scope, options)
+            ) {
+              return addFailure(
+                'expired',
+                'Catalog intake session has expired.',
+                false,
+              );
+            }
+            return addFailure(
+              'conflict',
+              'Catalog intake preview has changed.',
+              false,
+            );
+          }
+          session = markedSession;
         }
         if (options.atlasCatalogIntakePort) {
           const mutationKey = await deriveAddConfirmMutationKey(
@@ -1326,6 +1641,15 @@ export function createCatalogIntakeModule(options: {
               next: claimedSession,
             });
             if (claimed.kind !== 'applied') {
+              if (
+                await rejectedActiveCasExpired(claimed.current, scope, options)
+              ) {
+                return addFailure(
+                  'expired',
+                  'Catalog intake session has expired.',
+                  false,
+                );
+              }
               return addFailure(
                 'conflict',
                 'Catalog intake preview has changed.',
@@ -1449,6 +1773,13 @@ export function createCatalogIntakeModule(options: {
         });
         if (transitioned.kind === 'conflict') {
           const current = transitioned.current;
+          if (await rejectedActiveCasExpired(current, scope, options)) {
+            return addFailure(
+              'expired',
+              'Catalog intake session has expired.',
+              false,
+            );
+          }
           if (
             current?.state === 'cancelled' &&
             current.cancelledFromVersion === input.expectedSessionVersion
@@ -1571,8 +1902,11 @@ export function createCatalogIntakeOperationGroup(module: CatalogIntakeModule) {
   });
 }
 
-export function createInMemoryCatalogIntakeStatePort(): CatalogIntakeStatePort {
+export function createInMemoryCatalogIntakeStatePort(
+  clock: { now(): Date } = { now: () => new Date() },
+): CatalogIntakeStatePort {
   const sessions = new Map<string, CatalogIntakeStoredSession>();
+  const researchSpends = new Set<string>();
   return {
     async findByRequest(scope, requestToken) {
       const session = [...sessions.values()].find(
@@ -1639,8 +1973,71 @@ export function createInMemoryCatalogIntakeStatePort(): CatalogIntakeStatePort {
             : {}),
         };
       }
+      if (
+        current.state === 'candidates_ready' ||
+        current.state === 'preview_ready'
+      ) {
+        const expired = clock.now().getTime() >= Date.parse(current.expiresAt);
+        if ((next.state === 'expired') !== expired) {
+          return {
+            kind: 'conflict' as const,
+            current: structuredClone(current),
+          };
+        }
+      }
       sessions.set(sessionId, structuredClone(next));
       return { kind: 'applied' as const, session: structuredClone(next) };
+    },
+    async consumeResearchPhase(input) {
+      const session = sessions.get(input.sessionId);
+      if (
+        !session ||
+        !sameScope(session, input.scope) ||
+        session.sessionVersion !== input.expectedSessionVersion ||
+        (session.state !== 'candidates_ready' &&
+          session.state !== 'preview_ready') ||
+        (input.phase === 'initial' && session.state !== 'candidates_ready') ||
+        (input.phase === 'confirm' && session.state !== 'preview_ready')
+      ) {
+        return { kind: 'conflict' as const };
+      }
+      if (
+        session.researchPhaseDigests[input.phase] !== input.queryOrUrlsDigest
+      ) {
+        return { kind: 'conflict' as const };
+      }
+      const now = clock.now();
+      if (now.getTime() >= Date.parse(session.expiresAt)) {
+        return { kind: 'expired' as const };
+      }
+      const spendKey = `${input.sessionId}:${input.phase}`;
+      if (researchSpends.has(spendKey)) {
+        return { kind: 'already_spent' as const };
+      }
+      researchSpends.add(spendKey);
+      const budget = catalogIntakeResearchBudgets[input.phase];
+      return {
+        kind: 'consumed' as const,
+        allowance: {
+          sessionId: input.sessionId,
+          phase: input.phase,
+          queryOrUrlsDigest: input.queryOrUrlsDigest,
+          maxCounts: {
+            searchQueries: budget.searchQueries,
+            pageRequests: budget.pageRequests,
+          },
+          maxDurationMs: budget.maxDurationMs,
+          requestTimeoutMs: 15_000,
+          maxRedirects: 3,
+          deadline: new Date(
+            Math.min(
+              now.getTime() + budget.maxDurationMs,
+              Date.parse(session.expiresAt),
+            ),
+          ).toISOString(),
+          requestId: input.requestId,
+        },
+      };
     },
     async cleanup(now) {
       let expired = 0;
@@ -1839,6 +2236,28 @@ async function expireIfNeeded(
     return { kind: 'active', session: current };
   }
   return { kind: 'conflict' };
+}
+
+async function rejectedActiveCasExpired(
+  current: CatalogIntakeStoredSession | undefined,
+  scope: CatalogIntakeScope,
+  options: {
+    readonly statePort: CatalogIntakeStatePort;
+    readonly clock: { now(): Date };
+  },
+): Promise<boolean> {
+  if (current?.state === 'expired') return true;
+  if (
+    current?.state !== 'candidates_ready' &&
+    current?.state !== 'preview_ready'
+  ) {
+    return false;
+  }
+  if (options.clock.now().getTime() < Date.parse(current.expiresAt)) {
+    return false;
+  }
+  const expiration = await expireIfNeeded(current, scope, options);
+  return expiration.kind === 'expired';
 }
 
 function expiredSession(
@@ -2226,7 +2645,7 @@ function validateOwnerFields(
   };
 }
 
-function validateOwnerTabelog(
+export function validateOwnerTabelog(
   value: unknown,
 ): OwnerTabelogAssertion | 'unknown' | undefined {
   if (value === undefined || value === 'unknown') return value;
@@ -2262,7 +2681,7 @@ function validateOwnerTabelog(
   };
 }
 
-function validateOwnerReservation(
+export function validateOwnerReservation(
   value: unknown,
 ): OwnerReservationAssertion | 'unknown' | undefined {
   if (value === undefined || value === 'unknown') return value;
@@ -2325,9 +2744,9 @@ function validateOwnerReservation(
   };
 }
 
-function validateWebResearchOutput(
+export function validateWebResearchOutput(
   value: unknown,
-  preview: CatalogIntakePreview,
+  preview: Pick<CatalogIntakePreview, 'tabelog' | 'reservation'>,
 ):
   | {
       readonly tabelog: CatalogIntakeTabelogSnapshot;
@@ -2612,13 +3031,38 @@ const confirmProviderUnavailableWarning: CatalogIntakeWarning = {
     'One or more enabled evidence providers could not be refreshed; retained evidence is stale or unknown.',
 };
 
+const staleEvidenceWarning: CatalogIntakeWarning = {
+  code: 'stale_evidence',
+  message:
+    'Previously observed evidence could not be refreshed and must be reviewed.',
+};
+
 function withConfirmProviderUnavailableWarning(
   warnings: readonly CatalogIntakeWarning[],
+  includeStaleEvidence: boolean,
 ): readonly CatalogIntakeWarning[] {
   return canonicalizeCatalogIntakeWarnings(
     warnings
-      .filter(({ code }) => code !== 'provider_unavailable')
-      .concat(confirmProviderUnavailableWarning),
+      .filter(
+        ({ code }) =>
+          code !== 'stale_evidence' && code !== 'provider_unavailable',
+      )
+      .concat(
+        includeStaleEvidence ? [staleEvidenceWarning] : [],
+        confirmProviderUnavailableWarning,
+      ),
+  );
+}
+
+function hasStaleAgentEvidence(
+  tabelog: CatalogIntakeTabelogSnapshot,
+  reservation: CatalogIntakeReservationSnapshot,
+): boolean {
+  return [tabelog, reservation].some(
+    (snapshot) =>
+      snapshot.status === 'known' &&
+      snapshot.provenance === 'agent_observed' &&
+      snapshot.freshness === 'stale',
   );
 }
 
@@ -2661,16 +3105,28 @@ function stabilizeResearchEvidence(
   prior: CatalogIntakePreview,
 ) {
   return {
-    tabelog: sameAgentObservedFacts(refreshed.tabelog, prior.tabelog)
-      ? prior.tabelog
-      : refreshed.tabelog,
-    reservation: sameAgentObservedFacts(
+    tabelog: stabilizeResearchSnapshot(
+      refreshed.tabelog,
+      prior.tabelog,
+      markAgentTabelogStale,
+    ),
+    reservation: stabilizeResearchSnapshot(
       refreshed.reservation,
       prior.reservation,
-    )
-      ? prior.reservation
-      : refreshed.reservation,
+      markAgentReservationStale,
+    ),
   };
+}
+
+function stabilizeResearchSnapshot<Snapshot>(
+  refreshed: Snapshot & { readonly status: 'known' | 'unknown' },
+  prior: Snapshot & { readonly status: 'known' | 'unknown' },
+  markStale: (snapshot: Snapshot) => Snapshot,
+): Snapshot {
+  if (refreshed.status === 'unknown' && prior.status === 'known') {
+    return markStale(prior);
+  }
+  return sameAgentObservedFacts(refreshed, prior) ? prior : refreshed;
 }
 
 function sameAgentObservedFacts(left: unknown, right: unknown): boolean {
@@ -2695,6 +3151,62 @@ async function digestCanonical(value: unknown): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+export function deriveCatalogIntakeResearchInputDigest(input: {
+  readonly phase: 'initial';
+  readonly normalizedOwnerQuery: string;
+}): Promise<string>;
+export function deriveCatalogIntakeResearchInputDigest(input: {
+  readonly phase: 'confirm';
+  readonly canonicalUrls: readonly string[];
+}): Promise<string | undefined>;
+export async function deriveCatalogIntakeResearchInputDigest(
+  input:
+    | {
+        readonly phase: 'initial';
+        readonly normalizedOwnerQuery: string;
+      }
+    | { readonly phase: 'confirm'; readonly canonicalUrls: readonly string[] },
+): Promise<string | undefined> {
+  if (input.phase === 'initial') {
+    return digestCanonical({
+      phase: 'initial',
+      query: input.normalizedOwnerQuery,
+    });
+  }
+  const canonicalUrls = [...new Set(input.canonicalUrls)].sort(codeUnitOrder);
+  return canonicalUrls.length === 0
+    ? undefined
+    : digestCanonical({ phase: 'confirm', canonicalUrls });
+}
+
+async function researchPhaseDigestsForPreview(
+  session: CatalogIntakeCandidatesSession | CatalogIntakePreviewSession,
+  preview: CatalogIntakePreview,
+): Promise<CatalogIntakeActiveSessionBase['researchPhaseDigests']> {
+  const canonicalUrls = catalogIntakeCanonicalResearchUrls(preview);
+  const confirm = await deriveCatalogIntakeResearchInputDigest({
+    phase: 'confirm',
+    canonicalUrls,
+  });
+  return {
+    initial: session.researchPhaseDigests.initial,
+    ...(confirm ? { confirm } : {}),
+  };
+}
+
+function catalogIntakeCanonicalResearchUrls(
+  preview: Pick<CatalogIntakePreview, 'tabelog' | 'reservation'>,
+): readonly string[] {
+  return [
+    ...new Set([
+      ...(preview.tabelog.status === 'known' ? [preview.tabelog.url] : []),
+      ...(preview.reservation.status === 'known'
+        ? [preview.reservation.url]
+        : []),
+    ]),
+  ].sort(codeUnitOrder);
 }
 
 function deriveAddConfirmMutationKey(
@@ -2731,7 +3243,11 @@ function canonicalJson(value: unknown): string {
     return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
   }
   return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => codeUnitOrder(left, right))
     .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
     .join(',')}}`;
+}
+
+function codeUnitOrder(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }

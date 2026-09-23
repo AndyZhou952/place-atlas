@@ -364,6 +364,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
         catalogRevision,
         now.toISOString(),
         expiresAt,
+        newPreview.previewVersion,
         now.getTime(),
         Date.parse(expiresAt),
         now.getTime(),
@@ -541,7 +542,11 @@ const refreshRevisionConflictSql =
   'UPDATE catalog_intake_sessions SET session_version = ?, ' +
   "session_json = json_remove(json_set(session_json, '$.sessionVersion', ?, " +
   "'$.preview', json(?), '$.catalogRevision', ?, " +
-  "'$.lastAcceptedActivityAt', ?, '$.expiresAt', ?), '$.confirmMutationKey'), " +
+  "'$.lastAcceptedActivityAt', ?, '$.expiresAt', ?, " +
+  "'$.researchPhaseApplications.confirm.appliedPreviewVersion', ?), " +
+  "'$.confirmMutationKey', CASE WHEN json_type(session_json, " +
+  "'$.researchPhaseApplications.confirm') = 'object' " +
+  "THEN '$.__preserveResearchMarker' ELSE '$.researchPhaseApplications' END), " +
   'last_accepted_activity_at_ms = ?, expires_at_ms = ?, updated_at_ms = ? ' +
   "WHERE session_id = ? AND state = 'preview_ready' " +
   'AND session_version = ? ' +

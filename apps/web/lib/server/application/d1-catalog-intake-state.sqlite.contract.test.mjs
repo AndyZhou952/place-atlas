@@ -13,6 +13,10 @@ const publicationMigration = new URL(
   '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0008_catalog_intake_publication.sql',
   import.meta.url,
 );
+const researchAllowanceMigration = new URL(
+  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0009_catalog_intake_research_allowances.sql',
+  import.meta.url,
+);
 const scope = {
   ownerId: 'owner-1',
   channel: 'wechat',
@@ -27,8 +31,13 @@ test('D1 intake state persists scoped minimal candidates, replaces active sessio
   const publicationSql = await readFile(publicationMigration, 'utf8');
   sqlite.exec(publicationSql);
   sqlite.exec(publicationSql);
+  const researchSql = await readFile(researchAllowanceMigration, 'utf8');
+  sqlite.exec(researchSql);
+  sqlite.exec(researchSql);
   const database = toD1(sqlite);
-  const state = new D1CatalogIntakeState(database);
+  const state = new D1CatalogIntakeState(database, {
+    now: () => new Date('2026-09-22T10:10:00.000Z'),
+  });
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
 
   assert.equal((await state.createReplacingActive(first)).kind, 'created');
@@ -114,9 +123,335 @@ test('D1 intake state persists scoped minimal candidates, replaces active sessio
   );
 });
 
+test('D1 intake state atomically consumes the initial research phase once with its reserved budget', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  const now = new Date('2026-09-22T10:00:00.000Z');
+  const state = new D1CatalogIntakeState(toD1(sqlite), { now: () => now });
+  const session = candidateSession(
+    'session-research',
+    'request-research',
+    '鮨',
+  );
+  await state.createReplacingActive(session);
+
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: session.sessionId,
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'f'.repeat(64),
+      requestId: 'research-substitution',
+    }),
+    { kind: 'conflict' },
+  );
+
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: session.sessionId,
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'a'.repeat(64),
+      requestId: 'research-request-1',
+    }),
+    {
+      kind: 'consumed',
+      allowance: {
+        sessionId: session.sessionId,
+        phase: 'initial',
+        queryOrUrlsDigest: 'a'.repeat(64),
+        maxCounts: { searchQueries: 1, pageRequests: 3 },
+        maxDurationMs: 35_000,
+        requestTimeoutMs: 15_000,
+        maxRedirects: 3,
+        deadline: '2026-09-22T10:00:35.000Z',
+        requestId: 'research-request-1',
+      },
+    },
+  );
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: session.sessionId,
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'a'.repeat(64),
+      requestId: 'research-request-2',
+    }),
+    { kind: 'already_spent' },
+  );
+  assert.equal(
+    sqlite
+      .prepare(
+        'SELECT COUNT(*) AS count FROM catalog_intake_research_phase_spends',
+      )
+      .get().count,
+    1,
+  );
+});
+
+test('D1 intake state keeps the confirm reserve separate from the spent initial phase', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  const now = new Date('2026-09-22T10:00:00.000Z');
+  const state = new D1CatalogIntakeState(toD1(sqlite), { now: () => now });
+  const session = candidateSession(
+    'session-confirm-research',
+    'request-confirm-research',
+    '鮨',
+  );
+  await state.createReplacingActive(session);
+  assert.equal(
+    (
+      await state.consumeResearchPhase({
+        scope,
+        sessionId: session.sessionId,
+        expectedSessionVersion: 1,
+        phase: 'initial',
+        queryOrUrlsDigest: 'a'.repeat(64),
+        requestId: 'research-initial',
+      })
+    ).kind,
+    'consumed',
+  );
+  sqlite
+    .prepare(
+      "UPDATE catalog_intake_sessions SET state = 'preview_ready', session_version = 2, session_json = ? WHERE session_id = ?",
+    )
+    .run(
+      JSON.stringify({
+        ...session,
+        state: 'preview_ready',
+        sessionVersion: 2,
+        researchPhaseDigests: {
+          ...session.researchPhaseDigests,
+          confirm: 'b'.repeat(64),
+        },
+      }),
+      session.sessionId,
+    );
+
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: session.sessionId,
+      expectedSessionVersion: 2,
+      phase: 'confirm',
+      queryOrUrlsDigest: 'b'.repeat(64),
+      requestId: 'research-confirm',
+    }),
+    {
+      kind: 'consumed',
+      allowance: {
+        sessionId: session.sessionId,
+        phase: 'confirm',
+        queryOrUrlsDigest: 'b'.repeat(64),
+        maxCounts: { searchQueries: 0, pageRequests: 2 },
+        maxDurationMs: 25_000,
+        requestTimeoutMs: 15_000,
+        maxRedirects: 3,
+        deadline: '2026-09-22T10:00:25.000Z',
+        requestId: 'research-confirm',
+      },
+    },
+  );
+  assert.equal(
+    sqlite
+      .prepare(
+        'SELECT COUNT(*) AS count FROM catalog_intake_research_phase_spends WHERE session_id = ?',
+      )
+      .get(session.sessionId).count,
+    2,
+  );
+});
+
+test('D1 research allowance binds the exact authoritative preview digest and rejects edit races', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  const state = new D1CatalogIntakeState(toD1(sqlite), {
+    now: () => new Date('2026-09-22T10:00:00.000Z'),
+  });
+  const session = candidateSession(
+    'session-digest-race',
+    'request-digest-race',
+    '鮨',
+  );
+  await state.createReplacingActive(session);
+
+  const previewSession = {
+    ...session,
+    state: 'preview_ready',
+    sessionVersion: 2,
+    researchPhaseDigests: {
+      ...session.researchPhaseDigests,
+      confirm: 'b'.repeat(64),
+    },
+  };
+  sqlite
+    .prepare(
+      "UPDATE catalog_intake_sessions SET state = 'preview_ready', session_version = 2, session_json = ? WHERE session_id = ?",
+    )
+    .run(JSON.stringify(previewSession), session.sessionId);
+
+  for (const digest of ['a'.repeat(64), 'c'.repeat(64)]) {
+    assert.deepEqual(
+      await state.consumeResearchPhase({
+        scope,
+        sessionId: session.sessionId,
+        expectedSessionVersion: 2,
+        phase: 'confirm',
+        queryOrUrlsDigest: digest,
+        requestId: `substitution-${digest[0]}`,
+      }),
+      { kind: 'conflict' },
+    );
+  }
+  assert.equal(
+    sqlite
+      .prepare(
+        'SELECT COUNT(*) AS count FROM catalog_intake_research_phase_spends WHERE session_id = ?',
+      )
+      .get(session.sessionId).count,
+    0,
+  );
+
+  sqlite
+    .prepare(
+      'UPDATE catalog_intake_sessions SET session_json = ? WHERE session_id = ?',
+    )
+    .run(
+      JSON.stringify({
+        ...previewSession,
+        researchPhaseDigests: {
+          ...previewSession.researchPhaseDigests,
+          confirm: 'c'.repeat(64),
+        },
+      }),
+      session.sessionId,
+    );
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: session.sessionId,
+      expectedSessionVersion: 2,
+      phase: 'confirm',
+      queryOrUrlsDigest: 'b'.repeat(64),
+      requestId: 'stale-preview-edit-race',
+    }),
+    { kind: 'conflict' },
+  );
+  assert.equal(
+    (
+      await state.consumeResearchPhase({
+        scope,
+        sessionId: session.sessionId,
+        expectedSessionVersion: 2,
+        phase: 'confirm',
+        queryOrUrlsDigest: 'c'.repeat(64),
+        requestId: 'current-preview',
+      })
+    ).kind,
+    'consumed',
+  );
+});
+
+test('D1 research phase consumption fails closed outside the exact active scope and TTL', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  const state = new D1CatalogIntakeState(toD1(sqlite), { now: () => now });
+  const session = candidateSession(
+    'session-scoped-research',
+    'request-scoped-research',
+    '鮨',
+  );
+  await state.createReplacingActive(session);
+  assert.equal(
+    (
+      await state.consumeResearchPhase({
+        scope,
+        sessionId: session.sessionId,
+        expectedSessionVersion: 1,
+        phase: 'initial',
+        queryOrUrlsDigest: 'a'.repeat(64),
+        requestId: 'research-owner',
+      })
+    ).kind,
+    'consumed',
+  );
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope: { ...scope, ownerId: 'another-owner' },
+      sessionId: session.sessionId,
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'a'.repeat(64),
+      requestId: 'research-attacker',
+    }),
+    { kind: 'conflict' },
+  );
+
+  const expired = candidateSession(
+    'session-expired-research',
+    'request-expired-research',
+    '蕎麦',
+  );
+  await state.createReplacingActive(expired);
+  now = new Date(expired.expiresAt);
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: expired.sessionId,
+      expectedSessionVersion: 1,
+      phase: 'initial',
+      queryOrUrlsDigest: 'b'.repeat(64),
+      requestId: 'research-expired',
+    }),
+    { kind: 'expired' },
+  );
+  now = new Date('2026-09-22T10:00:00.000Z');
+  const wrongPhase = candidateSession(
+    'session-wrong-phase',
+    'request-wrong-phase',
+    '天ぷら',
+  );
+  await state.createReplacingActive(wrongPhase);
+  sqlite
+    .prepare(
+      "UPDATE catalog_intake_sessions SET state = 'preview_ready', session_version = 2 WHERE session_id = ?",
+    )
+    .run(wrongPhase.sessionId);
+  assert.deepEqual(
+    await state.consumeResearchPhase({
+      scope,
+      sessionId: wrongPhase.sessionId,
+      expectedSessionVersion: 2,
+      phase: 'initial',
+      queryOrUrlsDigest: 'c'.repeat(64),
+      requestId: 'research-wrong-phase',
+    }),
+    { kind: 'conflict' },
+  );
+  assert.equal(
+    sqlite
+      .prepare(
+        'SELECT COUNT(*) AS count FROM catalog_intake_research_phase_spends',
+      )
+      .get().count,
+    1,
+  );
+});
+
 test('D1 intake state rejects a persisted preview with duplicate or noncanonical warnings', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
   const database = toD1(sqlite);
   const state = new D1CatalogIntakeState(database);
   const session = candidateSession(
@@ -154,6 +489,7 @@ test('D1 cleanup converts expired payloads to minimal terminal references and re
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
   sqlite.exec(await readFile(publicationMigration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
   const state = new D1CatalogIntakeState(toD1(sqlite));
   await state.createReplacingActive(
     candidateSession('session-1', 'request-1', '银座 寿司'),
@@ -204,7 +540,10 @@ test('D1 terminal collisions roll back replacement and terminal CAS without dele
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
   sqlite.exec(await readFile(publicationMigration, 'utf8'));
-  const state = new D1CatalogIntakeState(toD1(sqlite));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  const state = new D1CatalogIntakeState(toD1(sqlite), {
+    now: () => new Date('2026-09-22T10:05:00.000Z'),
+  });
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
   await state.createReplacingActive(first);
   insertConflictingTerminal(sqlite, first);
@@ -244,7 +583,10 @@ test('D1 cleanup does not remove a session renewed before the scheduled sweep', 
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));
   sqlite.exec(await readFile(publicationMigration, 'utf8'));
-  const state = new D1CatalogIntakeState(toD1(sqlite));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  const state = new D1CatalogIntakeState(toD1(sqlite), {
+    now: () => new Date('2026-09-22T10:29:59.000Z'),
+  });
   const first = candidateSession('session-1', 'request-1', '銀座 鮨');
   await state.createReplacingActive(first);
   const renewed = {
@@ -272,6 +614,40 @@ test('D1 cleanup does not remove a session renewed before the scheduled sweep', 
   assert.equal((await state.get(scope, 'session-1')).sessionVersion, 2);
 });
 
+test('D1 active CAS cannot renew a session at the exact expiry boundary', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  sqlite.exec(await readFile(publicationMigration, 'utf8'));
+  sqlite.exec(await readFile(researchAllowanceMigration, 'utf8'));
+  let now = new Date('2026-09-22T10:00:00.000Z');
+  const state = new D1CatalogIntakeState(toD1(sqlite), { now: () => now });
+  const first = candidateSession(
+    'session-ttl-cas',
+    'request-ttl-cas',
+    '銀座 鮨',
+  );
+  await state.createReplacingActive(first);
+
+  now = new Date(first.expiresAt);
+  const renewed = {
+    ...first,
+    sessionVersion: 2,
+    lastAcceptedActivityAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+  };
+  const result = await state.compareAndSwap({
+    scope,
+    sessionId: first.sessionId,
+    expectedVersion: first.sessionVersion,
+    next: renewed,
+  });
+
+  assert.equal(result.kind, 'conflict');
+  const stored = await state.get(scope, first.sessionId);
+  assert.equal(stored.sessionVersion, 1);
+  assert.equal(stored.expiresAt, first.expiresAt);
+});
+
 function candidateSession(sessionId, requestToken, ownerQuery) {
   return {
     ...scope,
@@ -280,6 +656,7 @@ function candidateSession(sessionId, requestToken, ownerQuery) {
     state: 'candidates_ready',
     ownerQuery,
     normalizedOwnerQuery: ownerQuery,
+    researchPhaseDigests: { initial: 'a'.repeat(64) },
     requestToken,
     hasMore: false,
     candidates: [

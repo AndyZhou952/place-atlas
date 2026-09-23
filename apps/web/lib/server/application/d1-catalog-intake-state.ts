@@ -1,9 +1,11 @@
 import type {
   CatalogIntakeCandidatesSession,
+  CatalogIntakeResearchAllowance,
   CatalogIntakeScope,
   CatalogIntakeStatePort,
   CatalogIntakeStoredSession,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
+import { catalogIntakeResearchBudgets } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { hasCanonicalCatalogIntakeWarningOrder } from '../../../product/application/catalog-intake/catalog-intake-warning-policy.ts';
 
 interface JsonRow {
@@ -13,6 +15,17 @@ interface JsonRow {
 interface RequestRow {
   readonly normalized_owner_query: string;
   readonly session_id: string;
+}
+
+interface ResearchSpendRow {
+  readonly deadline_ms: number;
+}
+
+interface ResearchEligibilityRow {
+  readonly state: string;
+  readonly session_version: number;
+  readonly expires_at_ms: number;
+  readonly research_digest: string | null;
 }
 
 export class D1CatalogIntakeState implements CatalogIntakeStatePort {
@@ -104,6 +117,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
   }) {
     const { scope, sessionId, expectedVersion, next } = input;
     if (next.state === 'candidates_ready' || next.state === 'preview_ready') {
+      const nowMs = this.#clock.now().getTime();
       const result = await this.#database
         .prepare(updateActiveSql)
         .bind(
@@ -118,6 +132,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
           scope.channel,
           scope.conversationId,
           expectedVersion,
+          nowMs,
         )
         .run();
       if (changes(result) === 1) {
@@ -141,9 +156,14 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
         : next.expiredFromVersion;
     const terminalAt =
       next.state === 'cancelled' ? next.terminalAt : next.expiredAt;
+    const nowMs = this.#clock.now().getTime();
     const results = await this.#database.batch([
       this.#database
-        .prepare(insertTerminalCasSql)
+        .prepare(
+          next.state === 'expired'
+            ? insertExpiredTerminalCasSql
+            : insertCancelledTerminalCasSql,
+        )
         .bind(
           next.sessionId,
           next.ownerId,
@@ -162,6 +182,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
           scope.channel,
           scope.conversationId,
           expectedVersion,
+          nowMs,
         ),
       this.#database
         .prepare(deleteActiveCasSql)
@@ -185,6 +206,103 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
     };
   }
 
+  async consumeResearchPhase(input: {
+    readonly scope: CatalogIntakeScope;
+    readonly sessionId: string;
+    readonly expectedSessionVersion: number;
+    readonly phase: 'initial' | 'confirm';
+    readonly queryOrUrlsDigest: string;
+    readonly requestId: string;
+  }) {
+    if (
+      !/^[0-9a-f]{64}$/u.test(input.queryOrUrlsDigest) ||
+      input.requestId.length < 1 ||
+      input.requestId.length > 200
+    ) {
+      return { kind: 'conflict' as const };
+    }
+    const nowMs = this.#clock.now().getTime();
+    const budget = catalogIntakeResearchBudgets[input.phase];
+    const phaseState =
+      input.phase === 'confirm' ? 'preview_ready' : 'candidates_ready';
+    const digestPath = `$.researchPhaseDigests.${input.phase}`;
+    const result = await this.#database
+      .prepare(consumeResearchPhaseSql)
+      .bind(
+        input.sessionId,
+        input.phase,
+        input.queryOrUrlsDigest,
+        input.requestId,
+        budget.searchQueries,
+        budget.pageRequests,
+        budget.maxDurationMs,
+        nowMs,
+        nowMs + budget.maxDurationMs,
+        researchSpendRetentionMs,
+        input.sessionId,
+        input.scope.ownerId,
+        input.scope.channel,
+        input.scope.conversationId,
+        input.expectedSessionVersion,
+        nowMs,
+        phaseState,
+        digestPath,
+        input.queryOrUrlsDigest,
+      )
+      .run();
+    if (changes(result) === 1) {
+      const row = await this.#database
+        .prepare(findResearchSpendSql)
+        .bind(input.sessionId, input.phase)
+        .first<ResearchSpendRow>();
+      if (!row) throw new Error('Research allowance write was not visible.');
+      const allowance: CatalogIntakeResearchAllowance = {
+        sessionId: input.sessionId,
+        phase: input.phase,
+        queryOrUrlsDigest: input.queryOrUrlsDigest,
+        maxCounts: {
+          searchQueries: budget.searchQueries,
+          pageRequests: budget.pageRequests,
+        },
+        maxDurationMs: budget.maxDurationMs,
+        requestTimeoutMs: 15_000,
+        maxRedirects: 3,
+        deadline: new Date(row.deadline_ms).toISOString(),
+        requestId: input.requestId,
+      };
+      return { kind: 'consumed' as const, allowance };
+    }
+    const eligible = await this.#database
+      .prepare(findResearchEligibilitySql)
+      .bind(
+        digestPath,
+        input.sessionId,
+        input.scope.ownerId,
+        input.scope.channel,
+        input.scope.conversationId,
+      )
+      .first<ResearchEligibilityRow>();
+    if (
+      !eligible ||
+      eligible.session_version !== input.expectedSessionVersion
+    ) {
+      return { kind: 'conflict' as const };
+    }
+    if (nowMs >= eligible.expires_at_ms) {
+      return { kind: 'expired' as const };
+    }
+    if (eligible.state !== phaseState) return { kind: 'conflict' as const };
+    if (eligible.research_digest !== input.queryOrUrlsDigest) {
+      return { kind: 'conflict' as const };
+    }
+    const spent = await this.#database
+      .prepare(findResearchSpendSql)
+      .bind(input.sessionId, input.phase)
+      .first<ResearchSpendRow>();
+    if (spent) return { kind: 'already_spent' as const };
+    return { kind: 'conflict' as const };
+  }
+
   async cleanup(now: Date) {
     const nowMs = now.getTime();
     const retainUntilMs = nowMs + retentionMs;
@@ -203,6 +321,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
       this.#database.prepare(deleteTerminalSql).bind(nowMs),
       this.#database.prepare(deleteTokensSql).bind(nowMs),
       this.#database.prepare(deletePublishReceiptsSql).bind(nowMs),
+      this.#database.prepare(deleteResearchSpendsSql).bind(nowMs),
     ]);
     return {
       expired: changes(results[1]),
@@ -212,6 +331,7 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
 }
 
 const retentionMs = 180 * 24 * 60 * 60 * 1000;
+const researchSpendRetentionMs = 24 * 60 * 60 * 1000;
 const scopeWhere = 'owner_id = ? AND channel = ? AND conversation_id = ?';
 const findRequestSql =
   'SELECT normalized_owner_query, session_id ' +
@@ -259,7 +379,7 @@ const updateActiveSql =
   'session_json = ?, last_accepted_activity_at_ms = ?, expires_at_ms = ?, ' +
   'updated_at_ms = ? WHERE session_id = ? AND ' +
   scopeWhere +
-  ' AND session_version = ?';
+  ' AND session_version = ? AND expires_at_ms > ?';
 const insertTerminalCasSql =
   'INSERT INTO catalog_intake_terminal_refs ' +
   '(session_id, owner_id, channel, conversation_id, state, session_version, ' +
@@ -268,6 +388,10 @@ const insertTerminalCasSql =
   'FROM catalog_intake_sessions WHERE session_id = ? AND ' +
   scopeWhere +
   ' AND session_version = ?';
+const insertExpiredTerminalCasSql =
+  insertTerminalCasSql + ' AND expires_at_ms <= ?';
+const insertCancelledTerminalCasSql =
+  insertTerminalCasSql + ' AND expires_at_ms > ?';
 const deleteActiveCasSql =
   'DELETE FROM catalog_intake_sessions WHERE session_id = ? AND ' +
   scopeWhere +
@@ -300,6 +424,28 @@ const deleteTokensSql =
   'DELETE FROM catalog_intake_request_tokens WHERE retain_until_ms <= ?';
 const deletePublishReceiptsSql =
   'DELETE FROM catalog_intake_publish_receipts WHERE retain_until_ms <= ?';
+const consumeResearchPhaseSql =
+  'INSERT OR IGNORE INTO catalog_intake_research_phase_spends ' +
+  '(session_id, phase, query_or_urls_digest, request_id, ' +
+  'max_search_queries, max_page_requests, max_duration_ms, ' +
+  'request_timeout_ms, max_redirects, spent_at_ms, deadline_ms, ' +
+  'retain_until_ms) SELECT ?, ?, ?, ?, ?, ?, ?, 15000, 3, ?, ' +
+  'MIN(?, expires_at_ms), expires_at_ms + ? FROM catalog_intake_sessions ' +
+  'WHERE session_id = ? AND ' +
+  scopeWhere +
+  ' AND session_version = ? AND expires_at_ms > ? ' +
+  'AND state = ? AND json_extract(session_json, ?) = ?';
+const findResearchSpendSql =
+  'SELECT deadline_ms FROM catalog_intake_research_phase_spends ' +
+  'WHERE session_id = ? AND phase = ?';
+const findResearchEligibilitySql =
+  'SELECT state, session_version, expires_at_ms, ' +
+  'json_extract(session_json, ?) AS research_digest ' +
+  'FROM catalog_intake_sessions ' +
+  'WHERE session_id = ? AND ' +
+  scopeWhere;
+const deleteResearchSpendsSql =
+  'DELETE FROM catalog_intake_research_phase_spends WHERE retain_until_ms <= ?';
 
 function insertSession(
   database: D1Database,

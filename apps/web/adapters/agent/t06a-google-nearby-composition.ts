@@ -10,7 +10,7 @@ import { createGoogleTransitRouteProvider } from '../../adapters/providers/googl
 import { createGoogleWalkingRouteMatrixProvider } from '../../adapters/providers/google-walking-route-matrix-provider.ts';
 import { publicUnicastAddressClassifier } from '../../adapters/providers/public-unicast-address-classifier.ts';
 import { createT06aNearbyRecommendation } from '../../product/application/decision/t06a-nearby-recommendation.ts';
-import type { AgentNearbyOperationDependencies } from '../../product/application/decision/agent-nearby-operation.ts';
+import type { NearbyRecommendOperationDependencies } from '../../product/application/decision/agent-nearby-operation.ts';
 import {
   createProviderPolicyGateway,
   type ProviderPolicy,
@@ -43,7 +43,7 @@ export function createT06aGoogleNearbyComposition({
   usage,
 }: T06aGoogleNearbyCompositionOptions): {
   readonly catalogRead: ReturnType<typeof createD1PocCatalogRead>;
-  readonly agentNearby: Omit<AgentNearbyOperationDependencies, 'catalog'>;
+  readonly agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'>;
 } {
   const fixedTransport = createGoogleFixedEndpointTransport({
     apiKey: googleMapsApiKey,

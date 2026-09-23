@@ -247,10 +247,20 @@ function parseCoordinate(
     : undefined;
 }
 
-function normalizeOsmType(value: unknown): 'node' | 'way' | 'relation' | undefined {
+function normalizeOsmType(
+  value: unknown,
+): 'node' | 'way' | 'relation' | undefined {
   const normalized =
-    value === 'N' ? 'node' : value === 'W' ? 'way' : value === 'R' ? 'relation' : value;
-  return normalized === 'node' || normalized === 'way' || normalized === 'relation'
+    value === 'N'
+      ? 'node'
+      : value === 'W'
+        ? 'way'
+        : value === 'R'
+          ? 'relation'
+          : value;
+  return normalized === 'node' ||
+    normalized === 'way' ||
+    normalized === 'relation'
     ? normalized
     : undefined;
 }
@@ -261,7 +271,10 @@ function normalizeOsmId(value: unknown): string | undefined {
     : undefined;
 }
 
-function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+function hasExactKeys(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
@@ -271,7 +284,10 @@ function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<
   );
 }
 
-function hasAllowedKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+function hasAllowedKeys(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }

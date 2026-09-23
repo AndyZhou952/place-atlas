@@ -27,6 +27,10 @@ const publicationMigration = new URL(
   '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0008_catalog_intake_publication.sql',
   import.meta.url,
 );
+const researchAllowanceMigration = new URL(
+  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0009_catalog_intake_research_allowances.sql',
+  import.meta.url,
+);
 
 test('D1 Atlas Catalog publish atomically commits a verified item, identity, snapshots, receipt, and terminal session', async () => {
   const sqlite = await migratedDatabase();
@@ -85,6 +89,29 @@ test('D1 Atlas Catalog publish refreshes a stale catalog revision as a new previ
   const sqlite = await migratedDatabase();
   const preview = verifiedPreview();
   insertPreviewSession(sqlite, preview, 'c'.repeat(64));
+  const confirmDigest = 'd'.repeat(64);
+  const beforeRace = JSON.parse(
+    sqlite
+      .prepare(
+        'SELECT session_json FROM catalog_intake_sessions WHERE session_id = ?',
+      )
+      .get(preview.sessionId).session_json,
+  );
+  beforeRace.researchPhaseDigests = {
+    initial: 'a'.repeat(64),
+    confirm: confirmDigest,
+  };
+  beforeRace.researchPhaseApplications = {
+    confirm: {
+      queryOrUrlsDigest: confirmDigest,
+      appliedPreviewVersion: preview.previewVersion,
+    },
+  };
+  sqlite
+    .prepare(
+      'UPDATE catalog_intake_sessions SET session_json = ? WHERE session_id = ?',
+    )
+    .run(JSON.stringify(beforeRace), preview.sessionId);
   sqlite
     .prepare(
       'UPDATE atlas_catalog_revision SET revision_number = 2 WHERE singleton = 1',
@@ -118,6 +145,13 @@ test('D1 Atlas Catalog publish refreshes a stale catalog revision as a new previ
   );
   assert.equal(stored.sessionVersion, 3);
   assert.deepEqual(stored.preview, result.newPreview);
+  assert.deepEqual(stored.researchPhaseApplications, {
+    confirm: {
+      queryOrUrlsDigest: confirmDigest,
+      appliedPreviewVersion: result.newPreview.previewVersion,
+    },
+  });
+  assert.equal('researchPhaseApplications' in result.newPreview, false);
 });
 
 test('D1 Atlas Catalog commits incomplete durable evidence as owner-only needs review', async () => {
@@ -1016,6 +1050,7 @@ async function migratedDatabase() {
     baseMigration,
     sessionMigration,
     publicationMigration,
+    researchAllowanceMigration,
   ]) {
     sqlite.exec(await readFile(migration, 'utf8'));
   }

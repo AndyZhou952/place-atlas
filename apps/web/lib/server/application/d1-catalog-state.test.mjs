@@ -42,6 +42,9 @@ test('the D1 catalog adapter maps record state into the application contract', a
               ],
             };
           }
+          if (/FROM atlas_review_candidates/u.test(sql)) {
+            return { results: [] };
+          }
           if (/FROM atlas_item_overrides/u.test(sql)) {
             return {
               results: [
@@ -107,16 +110,22 @@ test('the D1 catalog adapter maps record state into the application contract', a
 });
 
 test('the D1 catalog adapter persists a needs-review item with the application timestamp', async () => {
-  const bindings = [];
+  const statements = [];
   const database = {
     prepare(sql) {
-      assert.match(sql, /INSERT INTO atlas_items/u);
-      return {
+      const statement = {
+        sql,
+        values: [],
         bind(...values) {
-          bindings.push(values);
-          return { async run() {} };
+          statement.values = values;
+          return statement;
         },
       };
+      return statement;
+    },
+    async batch(next) {
+      statements.push(...next);
+      return next.map(() => ({ meta: { changes: 1 } }));
     },
   };
   const state = new D1CatalogState(database);
@@ -133,13 +142,15 @@ test('the D1 catalog adapter persists a needs-review item with the application t
   });
 
   assert.equal(result.ok, true);
-  assert.equal(bindings.length, 1);
-  assert.equal(bindings[0][0], storedItem.id);
-  assert.deepEqual(JSON.parse(bindings[0][1]), {
+  assert.equal(statements.length, 2);
+  assert.match(statements[0].sql, /INSERT INTO atlas_items/u);
+  assert.match(statements[1].sql, /UPDATE atlas_catalog_revision/u);
+  assert.equal(statements[0].values[0], storedItem.id);
+  assert.deepEqual(JSON.parse(statements[0].values[1]), {
     ...storedItem,
     updatedAt: '2026-09-12T13:00:00.000Z',
   });
-  assert.deepEqual(bindings[0].slice(2), [
+  assert.deepEqual(statements[0].values.slice(2), [
     'needs_review',
     '2026-09-12T13:00:00.000Z',
     '2026-09-12T13:00:00.000Z',
@@ -147,16 +158,22 @@ test('the D1 catalog adapter persists a needs-review item with the application t
 });
 
 test('the D1 catalog adapter upserts the complete item override record', async () => {
-  const bindings = [];
+  const statements = [];
   const database = {
     prepare(sql) {
-      assert.match(sql, /INSERT INTO atlas_item_overrides/u);
-      return {
+      const statement = {
+        sql,
+        values: [],
         bind(...values) {
-          bindings.push(values);
-          return { async run() {} };
+          statement.values = values;
+          return statement;
         },
       };
+      return statement;
+    },
+    async batch(next) {
+      statements.push(...next);
+      return next.map(() => ({ meta: { changes: 1 } }));
     },
   };
   const state = new D1CatalogState(database);
@@ -169,13 +186,19 @@ test('the D1 catalog adapter upserts the complete item override record', async (
     updatedAt: '2026-09-12T14:00:00.000Z',
   });
 
-  assert.deepEqual(bindings, [
+  assert.match(statements[0].sql, /INSERT INTO atlas_item_overrides/u);
+  assert.match(statements[1].sql, /UPDATE atlas_catalog_revision/u);
+  assert.deepEqual(
+    statements.map(({ values }) => values),
     [
-      'stored',
-      'Edited title',
-      'Edited description',
-      'planned',
-      '2026-09-12T14:00:00.000Z',
+      [
+        'stored',
+        'Edited title',
+        'Edited description',
+        'planned',
+        '2026-09-12T14:00:00.000Z',
+      ],
+      [],
     ],
-  ]);
+  );
 });

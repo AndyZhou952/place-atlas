@@ -31,13 +31,33 @@ export interface ReservationSnapshot {
   readonly advanceDays?: number;
   readonly bookingWindowLabel?: string;
   readonly releaseNote?: string;
-  readonly checkedAt: string;
+  readonly checkedAt?: string;
 }
 
 export interface EventSchedule {
   readonly startDate: string;
   readonly endDate: string;
   readonly displayDate: string;
+}
+
+export interface AtlasIntakeEvidence {
+  readonly candidateIdentity: {
+    readonly providerNamespace: string;
+    readonly placeId: string;
+  };
+  readonly ownerFields: CatalogIntakeOwnerFields;
+  readonly titleProposal?: CatalogIntakeTitleProposal;
+  readonly addressProposal?: CatalogIntakeAddressProposal;
+  readonly locationEvidence: CatalogIntakeLocationEvidence;
+  readonly tabelog: CatalogIntakeTabelogSnapshot;
+  readonly reservation: CatalogIntakeReservationSnapshot;
+  readonly unknownFields: readonly (
+    | 'address'
+    | 'coordinates'
+    | 'tabelog'
+    | 'reservation'
+  )[];
+  readonly warnings: readonly CatalogIntakeWarning[];
 }
 
 export interface AtlasItem {
@@ -62,8 +82,28 @@ export interface AtlasItem {
   readonly hasVisited?: boolean;
   readonly tags: readonly string[];
   readonly sources: readonly SourceLink[];
+  readonly intakeEvidence?: AtlasIntakeEvidence;
   readonly updatedAt?: string;
 }
+
+export interface AtlasReviewCandidate {
+  readonly recordType: 'review_candidate';
+  readonly id: string;
+  readonly kind: 'food';
+  readonly title: string;
+  readonly area?: string;
+  readonly description: string;
+  readonly verificationStatus: 'needs_review';
+  readonly personalState: PersonalState;
+  readonly personalRating?: number;
+  readonly isFavorite?: boolean;
+  readonly hasVisited?: boolean;
+  readonly tags: readonly string[];
+  readonly reviewEvidence: AtlasIntakeEvidence;
+  readonly updatedAt: string;
+}
+
+export type AtlasCatalogEntry = AtlasItem | AtlasReviewCandidate;
 
 export interface AtlasItemEdit {
   readonly title: string;
@@ -82,3 +122,12 @@ export interface NearbyAtlasItem {
   readonly tabelogScore?: number;
   readonly reservation: ReservationSnapshot;
 }
+import type {
+  CatalogIntakeAddressProposal,
+  CatalogIntakeLocationEvidence,
+  CatalogIntakeOwnerFields,
+  CatalogIntakeReservationSnapshot,
+  CatalogIntakeTabelogSnapshot,
+  CatalogIntakeTitleProposal,
+  CatalogIntakeWarning,
+} from '../catalog-intake/catalog-intake-coordinator.ts';

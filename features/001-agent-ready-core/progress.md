@@ -15,4 +15,4 @@
 - 已完成: W7 的 T-13 最终收缩与架构适应度门；第 11 轮专项评审与第 3 轮整体代码评审通过（230/230 测试、format、lint、typecheck、build 全部通过）
 - 已冻结接口: AtlasApplication 调用形态、Result/错误集合、operation descriptor 与 `defineOperationGroup` 静态组合约定
 - 已完成: Draft PR #7 首轮 GitHub CI 通过
-- 下一步: T-14 生产维护切换；必须由用户批准具体维护窗口，之后才能部署含 `0003` 的产物并执行生产 reset
+- 下一步: T-14 生产维护切换；新增依赖 `003/T-26`，只有 snapshot-only 安全能力和 before-evidence handoff 就绪且用户批准具体维护窗口后，才能部署 active 0004 并执行生产 reset

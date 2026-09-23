@@ -3,6 +3,7 @@ import {
   type OperationDefinition,
 } from '../atlas-application.ts';
 import type { CatalogRead } from '../catalog/catalog-read.ts';
+import { isAtlasItem } from '../catalog/catalog-projection.ts';
 import { failure, success, type Result } from '../result.ts';
 import { normalizeAssessmentRating } from './assessment-rating.ts';
 import { isEffectivelyVisited } from './effective-visited.ts';
@@ -39,10 +40,12 @@ export function createPlaceAssessmentOperationGroup(
       effect: 'write',
       validate: validateMutation,
     },
-    async handle({ itemId, patch }) {
+    async handle({ itemId, patch }, execution) {
       try {
         const item = await catalog.get(itemId);
-        if (!item) return failure('not_found', 'Atlas item not found.');
+        if (!item || !isAtlasItem(item)) {
+          return failure('not_found', 'Atlas item not found.');
+        }
 
         const context = await state.read(itemId);
         const assessment = applyPatch(
@@ -51,9 +54,7 @@ export function createPlaceAssessmentOperationGroup(
           patch,
           dependencies.clock.now(),
         );
-        await state.save(assessment);
-
-        return success({
+        const output = {
           assessment,
           item: {
             ...item,
@@ -63,8 +64,15 @@ export function createPlaceAssessmentOperationGroup(
               assessment.manualVisited,
               context.visitCount,
             ),
+            overallComment: assessment.summary,
           },
-        });
+        };
+        await state.save(
+          assessment,
+          execution?.atomicMutation?.receiptFor(output),
+        );
+
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

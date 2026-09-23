@@ -5,6 +5,7 @@ import { D1VisitMediaState } from './d1-visit-media-state.ts';
 
 const row = {
   id: 'media-1',
+  display_id: 'pm_opaque_1',
   visit_id: 'visit-1',
   item_id: 'item-1',
   object_key: 'visits/visit-1/media-1',
@@ -46,6 +47,7 @@ test('the D1 VisitMedia adapter filters by Visit and item with legacy ordering',
   assert.deepEqual(records, [
     {
       id: 'media-1',
+      displayId: 'pm_opaque_1',
       visitId: 'visit-1',
       itemId: 'item-1',
       objectKey: 'visits/visit-1/media-1',
@@ -114,6 +116,7 @@ test('the D1 adapter reads Visit ordering context and atomically inserts metadat
   await state.insert([
     {
       id: 'media-1',
+      displayId: 'pm_opaque_1',
       visitId: 'visit-1',
       itemId: 'item-1',
       objectKey: 'visits/visit-1/media-1',
@@ -133,6 +136,7 @@ test('the D1 adapter reads Visit ordering context and atomically inserts metadat
   assert.match(calls[1].sql, /INSERT INTO visit_media/u);
   assert.deepEqual(calls[1].values, [
     'media-1',
+    'pm_opaque_1',
     'visit-1',
     'item-1',
     'visits/visit-1/media-1',

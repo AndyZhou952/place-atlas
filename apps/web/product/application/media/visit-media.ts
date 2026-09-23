@@ -15,6 +15,8 @@ export interface VisitMedia {
 
 export interface VisitMediaMetadata extends Omit<VisitMedia, 'contentUrl'> {
   readonly objectKey: string;
+  /** Opaque public lookup token; never derived from the internal ID or key. */
+  readonly displayId: string;
 }
 
 export interface VisitMediaFilters {

@@ -56,9 +56,12 @@ test('the D1 adapter persists the full assessment while retaining the old column
       return {
         bind(...values) {
           calls.push(values);
-          return { async run() {} };
+          return { values };
         },
       };
+    },
+    async batch(statements) {
+      return statements.map(() => ({ meta: { changes: 1 } }));
     },
   };
   const state = new D1PlaceAssessmentState(database);

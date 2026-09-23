@@ -1,0 +1,17 @@
+{
+  "id": "japan-atlas-jpmap",
+  "name": "Japan Atlas jpmap",
+  "description": "Model-bypassing native command client for Japan Atlas",
+  "version": "0.2.0",
+  "commandAliases": [
+    { "name": "jpmap", "kind": "runtime-slash" }
+  ],
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

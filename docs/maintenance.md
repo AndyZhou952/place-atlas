@@ -4,9 +4,11 @@
 
 本手册定义 PlaceAssessment 测试状态 reset 的 dry-run、验证、本地副本演练和回退流程。当前 T-12 **只生成并测试工具，不执行生产变更**；生产维护必须等 T-14 独立代码门通过、写入冻结窗口确定并再次取得用户批准。
 
-包含 `0003_reset_test_place_assessments` 的构建产物在 T-14 之前不得部署到生产；本地 build／CI 不会执行 migration，但任何会自动应用 D1 migration 的发布流程都属于生产维护。
+包含原 `0003_reset_test_place_assessments` 的既有构建产物（包括 Site version 16）永不部署到生产；本地 build／CI 不会执行 migration，但任何会自动应用 D1 migration 的发布流程都属于生产维护。
 
-当前代码收缩状态：所有生产 HTTP 读写已切换到唯一 `AtlasApplication` composition，旧 `atlas-store`、`media-store` 及其重复 SQL／媒体规则 helper 已删除；架构适应度测试会阻止 route 重新直连存储或恢复第二 writer。这个状态只表示代码切换已准备好，不表示 `0003` 已执行、生产数据已 reset 或 T-14 已获批准。
+**已批准但尚待特性 003 实现的顺序：** 原 reset SQL 保持字节与 SHA-256 不变并转为 non-runnable pending artifact；新的 active 0003 只建立 maintenance fence/snapshot 控制结构。snapshot-only 发布、完整 before evidence 和全 D1 恢复演练通过后，该 pending SQL 才能以 active 0004 发布。实现落地前不得部署现有 active 0003；落地后以 active 0004 为下文 reset migration，详见 D-020 与 `features/003-production-snapshot/spec.md`。
+
+当前代码收缩状态：所有生产 HTTP 读写已切换到唯一 `AtlasApplication` composition，旧 `atlas-store`、`media-store` 及其重复 SQL／媒体规则 helper 已删除；架构适应度测试会阻止 route 重新直连存储或恢复第二 writer。这个状态只表示代码切换已准备好，不表示 reset 已执行、生产数据已 reset 或 T-14 已获批准。
 
 ## 1. Reset 边界
 
@@ -21,7 +23,7 @@
 
 以下内容必须逐项保持：所有表与记录集合、`created_at`／`updated_at`、AtlasItem 与 override、Visit、VisitMedia metadata、ImportJob、tombstone、旧 `journal_entries`，以及完整 R2 object-key manifest。已有 Visit 的地点在 reset 后仍由 `存在 Visit OR manualVisited` 推导为 `行った`。
 
-Migration [`0003_reset_test_place_assessments.sql`](../apps/web/drizzle/0003_reset_test_place_assessments.sql) 不可修改；未来变化必须新增 migration。
+原 reset SQL 当前仍位于 [`0003_reset_test_place_assessments.sql`](../apps/web/drizzle/0003_reset_test_place_assessments.sql)，但从未部署。按 D-020 实现时只能原样移动为 pending artifact，并在门禁通过后原样成为 active 0004；SQL 字节与 checksum 不可修改。已部署 migration 仍一律不可移动或修改，未来变化必须新增 migration。
 
 ## 2. 工具安全约束
 
@@ -131,11 +133,11 @@ npm run maintenance:assessment-reset -- verify \
 1. 冻结所有个人状态、Visit、媒体、地点、Inbox 与 WebMCP 写入并排空旧请求。
 2. 导出完整 D1 snapshot，校验备份可读；导出完整 R2 object-key manifest。
 3. 以同一 maintenance ID/source scope、不同 capture ID 与不同 D1/R2 来源生成前后证据；在新建的本地 `.snapshot.sqlite` 副本上重新运行 dry-run、rehearse 和 verify。
-4. 保留旧部署版本，才可对生产 D1 应用已审核的不可变 migration；migration 本身不访问 R2。
+4. 保留旧部署版本，确认 active 0004 与 pending reset checksum/字节完全一致，才可对生产 D1 应用该 migration；migration 本身不访问 R2。
 5. 再次导出 D1 与 R2 manifest并验证，只读 smoke 通过后才切换新 writer。
 6. 完成用户批准的写入 smoke 后恢复写入。
 
-维护窗口前必须先确认默认 CI 中的架构适应度、operation catalog 类型负例、全量测试与 build 均通过。不要为了“验证 migration”运行部署命令；日常本地 build 只验证产物，`0003` 只能在本节批准的副本演练或生产维护窗口中应用。
+维护窗口前必须先确认默认 CI 中的架构适应度、operation catalog 类型负例、全量测试与 build 均通过。不要为了“验证 migration”运行部署命令；日常本地 build 只验证产物。旧 active 0003 禁止部署；完成 D-020 后，reset 只以经 checksum 门确认的 active 0004 在本节批准的副本演练或生产维护窗口中应用。
 
 ## 8. 回退
 

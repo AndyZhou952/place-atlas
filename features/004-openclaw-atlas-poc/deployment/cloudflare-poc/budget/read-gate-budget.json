@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "phase": "read-gate-predeploy",
+  "policy": {
+    "hardLimitUsd": 60,
+    "reserveUsd": 10,
+    "warnAtUsd": 45
+  },
+  "input": {
+    "asOf": "2026-09-13T00:00:00.000Z",
+    "daysObserved": 1,
+    "daysInMonth": 30,
+    "fixedCosts": [
+      {
+        "service": "aws-lightsail-4gb",
+        "monthlyUsd": 24,
+        "calibration": "estimate",
+        "evidenceRef": "owner-plan-selection-2026-09-13"
+      },
+      {
+        "service": "cloudflare-workers",
+        "monthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/workers/platform/pricing/"
+      },
+      {
+        "service": "cloudflare-d1",
+        "monthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/d1/platform/pricing/"
+      },
+      {
+        "service": "cloudflare-r2",
+        "monthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/r2/pricing/"
+      }
+    ],
+    "variableCosts": [
+      {
+        "provider": "deepseek",
+        "usedUnits": 0,
+        "unitCostUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "direct-dispatch-model-call-counter",
+        "warnUnits": 0,
+        "hardUnits": 0
+      },
+      {
+        "provider": "google-maps-platform",
+        "usedUnits": 0,
+        "unitCostUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "fixture-read-gate-provider-counter",
+        "warnUnits": 8000,
+        "hardUnits": 10000
+      },
+      {
+        "provider": "foursquare-places-api-new",
+        "usedUnits": 0,
+        "unitCostUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "fixture-read-gate-provider-counter",
+        "warnUnits": 400,
+        "hardUnits": 500
+      }
+    ]
+  },
+  "projection": {
+    "asOf": "2026-09-13T00:00:00.000Z",
+    "currency": "USD",
+    "hardLimitUsd": 60,
+    "reserveUsd": 10,
+    "projectedSpendUsd": 24,
+    "projectedWithReserveUsd": 34,
+    "gate": "open",
+    "reasons": [],
+    "calibration": "provisional",
+    "components": [
+      {
+        "service": "aws-lightsail-4gb",
+        "kind": "fixed",
+        "projectedMonthlyUsd": 24,
+        "calibration": "estimate",
+        "evidenceRef": "owner-plan-selection-2026-09-13"
+      },
+      {
+        "service": "cloudflare-workers",
+        "kind": "fixed",
+        "projectedMonthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/workers/platform/pricing/"
+      },
+      {
+        "service": "cloudflare-d1",
+        "kind": "fixed",
+        "projectedMonthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/d1/platform/pricing/"
+      },
+      {
+        "service": "cloudflare-r2",
+        "kind": "fixed",
+        "projectedMonthlyUsd": 0,
+        "calibration": "estimate",
+        "evidenceRef": "https://developers.cloudflare.com/r2/pricing/"
+      },
+      {
+        "service": "deepseek",
+        "kind": "variable",
+        "projectedMonthlyUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "direct-dispatch-model-call-counter"
+      },
+      {
+        "service": "google-maps-platform",
+        "kind": "variable",
+        "projectedMonthlyUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "fixture-read-gate-provider-counter"
+      },
+      {
+        "service": "foursquare-places-api-new",
+        "kind": "variable",
+        "projectedMonthlyUsd": 0,
+        "calibration": "usage_counter",
+        "evidenceRef": "fixture-read-gate-provider-counter"
+      }
+    ],
+    "providerGates": [
+      {
+        "provider": "deepseek",
+        "projectedUnits": 0,
+        "warnUnits": 0,
+        "hardUnits": 0,
+        "gate": "open"
+      },
+      {
+        "provider": "google-maps-platform",
+        "projectedUnits": 0,
+        "warnUnits": 8000,
+        "hardUnits": 10000,
+        "gate": "open"
+      },
+      {
+        "provider": "foursquare-places-api-new",
+        "projectedUnits": 0,
+        "warnUnits": 400,
+        "hardUnits": 500,
+        "gate": "open"
+      }
+    ]
+  },
+  "blockers": [
+    "cloudflare_account_authorization",
+    "isolated_d1_database_id",
+    "isolated_r2_bucket_creation",
+    "cloudflare_bill_and_usage_calibration"
+  ]
+}

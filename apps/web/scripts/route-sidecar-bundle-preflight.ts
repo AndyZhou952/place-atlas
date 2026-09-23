@@ -1,0 +1,61 @@
+import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+
+const allowedUrls = [
+  'https://maps.googleapis.com/maps/api/geocode/json',
+  'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
+  'https://www.google.com/maps',
+] as const;
+
+export function inspectRouteSidecarBundle(source: string): {
+  readonly ready: boolean;
+  readonly blockers: readonly string[];
+} {
+  const blockers: string[] = [];
+  if (
+    /foursquare|transit|computeRoutes|directions\/v2|google-fixed-endpoint-transport/iu.test(
+      source,
+    )
+  ) {
+    blockers.push('forbidden_provider_capability');
+  }
+  if (!source.includes(allowedUrls[0]) || !source.includes(allowedUrls[1])) {
+    blockers.push('required_fixed_endpoint_missing');
+  }
+  const withoutAllowedUrls = allowedUrls.reduce(
+    (value, url) => value.replaceAll(url, ''),
+    source,
+  );
+  if (/https:\/\//u.test(withoutAllowedUrls)) {
+    blockers.push('unexpected_network_endpoint');
+  }
+  return { ready: blockers.length === 0, blockers };
+}
+
+async function main(): Promise<void> {
+  const parsed = parseArgs({
+    options: { bundle: { type: 'string', multiple: true } },
+    strict: true,
+  });
+  const paths = parsed.values.bundle;
+  if (!paths || paths.length < 1) {
+    throw new Error('Route Sidecar bundle preflight requires bundle paths.');
+  }
+  const result = inspectRouteSidecarBundle(
+    (await Promise.all(paths.map((path) => readFile(path, 'utf8')))).join('\n'),
+  );
+  if (!result.ready) {
+    throw new Error(
+      `Route Sidecar bundle preflight failed: ${result.blockers.join(', ')}`,
+    );
+  }
+  process.stdout.write('Route Sidecar bundle preflight passed.\n');
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  await main();
+}

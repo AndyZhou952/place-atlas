@@ -29,19 +29,31 @@ const item = {
   hasVisited: false,
 };
 
-test('Journal DELETE preserves its existing JSON shape and status mapping', async () => {
-  const success = applicationResult({ ok: true, value: { item } });
-  const missing = applicationResult({
+test('Journal DELETE returns a mutation receipt and preserves status mapping', async () => {
+  const request = new Request('https://atlas.example/api/journal/visit-one', {
+    method: 'DELETE',
+    headers: { 'x-atlas-mutation-id': 'delete-visit-one' },
+  });
+  const success = mutationResult({
+    ok: true,
+    value: {
+      mutationId: 'delete-visit-one',
+      payloadDigest: 'a'.repeat(64),
+      result: { item },
+      replayed: false,
+    },
+  });
+  const missing = mutationResult({
     ok: false,
     error: { kind: 'not_found', message: 'Journal entry not found.' },
   });
 
-  const deleted = await deleteVisitResponse(success, 'visit-one');
-  const invalid = await deleteVisitResponse(success, '');
-  const notFound = await deleteVisitResponse(missing, 'missing');
+  const deleted = await deleteVisitResponse(success, request, 'visit-one');
+  const invalid = await deleteVisitResponse(success, request, '');
+  const notFound = await deleteVisitResponse(missing, request, 'missing');
 
   assert.equal(deleted.status, 200);
-  assert.deepEqual(await deleted.json(), { item });
+  assert.deepEqual((await deleted.json()).result, { item });
   assert.equal(invalid.status, 400);
   assert.equal(await invalid.text(), 'Journal entry ID is required');
   assert.equal(notFound.status, 404);
@@ -77,6 +89,14 @@ test('Item DELETE preserves its existing JSON shape and closes dependency errors
 function applicationResult(result) {
   return {
     async execute() {
+      return result;
+    },
+  };
+}
+
+function mutationResult(result) {
+  return {
+    async mutate() {
       return result;
     },
   };

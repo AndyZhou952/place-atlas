@@ -1,0 +1,59 @@
+# 进度
+
+- 特性: 005-owner-poc-unified-api
+- 当前阶段: T-16 done（第 7 轮独立 code/UI review PASS，并于 2026-09-23 获用户确认；下一张中央汇合票为 T-15）
+- 执行模式: interactive
+- 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
+- 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
+- 已完成: 用户确认统一应用操作、简单 Owner Login、Web/Agent 不同鉴权、Google 路线与 DeepSeek 职责
+- 已完成: 起草 feature、spec、architecture 与内部 ticket graph
+- 已完成: 第 1 轮独立 spec/architecture review 结论为需修改；已按发现项补齐公开读取投影、Route Sidecar、raw Secret、hard caps、统一 mutation、seed 与双入口切换
+- 已完成: 第 2 轮独立 review 指出公开 DTO、digest 所有权、session 轮换与 Sidecar 公网负测缺口；已按用户最新公开确认完成最小修订
+- 已完成: 第 3 轮独立 spec/architecture review 均通过；用户于 2026-09-21 确认规格与架构
+- 已完成: 用户确认公开边界：持 URL 者可查看 Catalog、总体评论、Visit 展示与照片原图；internal ID、存储 key、hash、audit 保持私有；只有 Owner 可以写入
+- 已完成: 本地实现并验证 Public Read、Owner Auth、T-03 统一 coordinator、T-04 Visit/媒体统一 mutation 与公开投影、T-10 Owner Login 与总体评论 UI
+- 已完成: 第 2 轮独立代码评审通过；遗留 `POST /api/items` 在 owner-poc 中持续 fail closed，Add 只允许在 T-17/T-18 门后经共享 `catalog.intake.*` adapters 开放
+- 已完成: 新的隔离 owner-poc D1、R2 与 Worker 已 provision，旧资源保持不变；0001–0005 migrations、0005 D1 hotfix 独立评审、preflight 与最终 strict deploy 均通过
+- 已完成: 远端公开 Catalog 返回 5 条记录且 Journal 可读；匿名同源写入与错误登录 fail closed，用户已实测 Owner 登录、总体评论、喜欢与去过状态可写入并读回
+- 已完成: AWS signed Agent smoke 到达 route-service-pending 并产生预期 nonce/receipt/audit；非 Owner sender 被拒绝且计数不变
+- 已记录: Owner 写入体感延迟不影响正确性验收，后续性能诊断移交 GitHub #10
+- 已完成: T-05 渠道无关的结构化 `nearby.recommend` 已实现；Web 与微信 presenter 适配同一闭合 result，独立第 2 轮代码评审通过
+- 已完成: T-06 本地实现与安全代码门通过；17/17 Sidecar tests、私有 dry-run `No bindings found`、bundle least-privilege、双 8,000 hard cap 与 fail-closed preflight 均获独立第 2 轮评审确认
+- 已完成: 最新完整本地 test suite、无缓存 TypeScript、lint、format check 与 owner-poc production build 全部通过
+- 已完成: T-06 远端 Sidecar 加密 Secret 名称／类型、strict deploy 与部署前后公网不可达 preflight 通过；脱敏记录见 `evidence/route-sidecar-deployment-smoke-2026-09-21.md`
+- 已完成: 用户已确认 Google Cloud key restriction、Geocoding/Route Matrix 日配额与 billing guard；Owner Worker 已通过精确 service binding preflight 并 strict deploy
+- 已完成: T-07 的 Browser/Agent 等价、request-only 负面边界、公开 Terms/Privacy、Nearby UI 与 `no-store`/查询状态一致性均已实现；独立最终代码/UI 评审通过
+- 已发现: 首次 Owner 真实 smoke 返回 false `not_found`；聚合 ledger 显示 Geocoding 已预留 3 次、walking 为 0，证明失败位于 Google v3 地址解析阶段
+- 已完成: TDD 修复 Geocoding v3 key query 鉴权与 HTTP-200 provider status 误分类；严格 status/result 状态机、Sidecar 23/23、bundle gate 与独立安全复审通过
+- 已完成: 修复后的私有 Sidecar 已 strict deploy，部署前后 secret-name-only 与公网不可达 preflight 通过；未轮换 secret、未改 Owner Worker
+- 已完成: T-06 修复后 live Owner smoke 使用已保存的精确地址 `東京都江東区平野2-16-14`，成功返回 `コーヒー マメヤ カケル`；真实 Geocoding → 私有 Sidecar → walking Routes → Atlas 推荐链路已闭合
+- 已记录: Catalog 扩容后的本地坐标粗筛／Top-N 优化由 GitHub #11 跟踪，并交叉引用既有 feature004/T-06A；该性能项不阻塞当前 PoC
+- 已完成: 用户于 2026-09-22 确认 Web/Agent 共用 intake、Agent-first 单次 Tabelog best-effort research、Owner preview/confirm、手填/unknown 兜底等产品方向
+- 已确认: 用户于 2026-09-22 确认最终 Add 增量架构；Google/OSM durable location（A-47）、session/idempotency（A-49）与 phase research budget（A-50）转为已确认架构约束
+- 已完成: Add 增量规格已落盘；Google external rating 的跨地区扩展延后 GitHub #12，Record 的稳定 channel event ID 门保持不变
+- 已完成: Add 第 1 轮独立规格评审结论为需修改；已修复 Google/Leaflet 持久化冲突、durable geocoder、候选最小化、Tabelog 研究边界、confirm refresh、四种结果、session/幂等、DTO/provenance/freshness 与 UI 可访问性发现项
+- 已完成: 用户将 Tabelog 定为 Agent-first、Owner-directed single-intake best-effort 主路径，并接受个人非商用 PoC 的当期来源风险；手填/unknown 为兜底
+- 已完成: Add 第 2 轮复审提出 3 个 contract 缺口；已补齐 only-name title/location proposal 与追问、initial/confirm 独立 research 预算、LatLng/location/source unions、closed outputs/errors；A-47/A-49 当时记为待架构确认，现已随最终架构确认
+- 已完成: Add 增量规格第 5 轮独立机械复审通过（PASS），规格门关闭
+- 已完成: Add 增量架构已落盘：CatalogIntakeModule 深模块、三 provider ports、D1 CAS/transaction/receipt seams、Research Relay 信任区、三条端到端流程及蓝绿/manifest 门
+- 已完成: Add 架构第 1 轮独立评审指出模块归属、Google 双分区、遗留替换与 Relay 单次 egress 缺口；已修订为 Application Operations 编排、Atlas Catalog 独占发布政策、原地深化 coordinator，并新增 Proposed D-P06 allowance/threat model
+- 已完成: Add 架构第 2 轮独立评审指出 Catalog decision/commit TOCTOU 与 Relay SSRF transport 缺口；已收口为 `AtlasCatalogIntakePort.publish` 单事务深接口，并补齐 HTTPS:443、A+AAAA、禁止地址、TLS SNI/Host IP pin、逐跳 redirect 与 DNS rebinding 门
+- 已完成: Add 增量架构第 3 轮独立评审通过（PASS）；用户于 2026-09-22 明确确认架构
+- 已完成: Add 任务票第 1 轮独立评审发现 T-17 隐含语义依赖、过度并行、生产 provider 门与虚假 Record blockers；已收窄 T-17 为确定性 E2E，串行中央汇合 T-14→T-16→T-15 integration，补齐 T-18 provider preflight，并移除 Record 排期型阻塞边
+- 已实现待独立代码评审: T-12 已原地深化为 `CatalogIntakeModule`，四个闭合 `catalog.intake.*` operations 已进入真实服务端 `AtlasApplication` 且 production default fail closed；遗留 full-evidence tests 已迁移为公开 Application seam contracts，旧 session/map evidence 实现已移除，Agent manifest 与 owner-poc direct POST 仍保持关闭
+- 已修复待独立复审: T-12 首轮代码评审发现的 async rejection 泄露、provider/state 负测、最终 DTO/AddError、Tabelog URL/两位小数与 Unicode control 缺口均已修复；T-12 仍不勾选，复审 PASS 前不进入 T-13
+- 已修复待最终复审: T-12 第二轮仅余的 Tabelog URL finding 已以明确、有限的餐厅详情路径 allowlist 修复；无网络调用或 T-13+ 行为
+- 已完成: T-12 第 3 轮独立代码评审 PASS；完整测试 479/479、聚焦 CatalogIntake contract 10/10，TypeScript、lint、format-check 与 diff-check 均通过；用户于 2026-09-22 明确确认，T-12 已勾选并进入 T-13
+- 已完成: T-13 append-only D1 session/CAS、30 分钟 inactivity TTL、180 天 terminal/request retention、transient Google Top-3 与 owner-poc daily cleanup 已实现；第 2 轮独立代码评审 PASS，聚焦 contracts 27/27、完整测试 496/496、TypeScript、lint、format-check、diff-check 与 owner-poc production build 全部通过；用户于 2026-09-22 明确确认，T-13 已勾选并进入 T-14
+- 已实现待独立 code/UI review: T-14 only-name durable proposal、歧义追问与 provider-unavailable needs_review preview 已进入 `CatalogIntakeModule`；可替换 `DurableGeocoderPort` 与 public Nominatim offline adapter contracts 覆盖 Owner 直接触发、official endpoint、全应用 D1 原子 1 req/s、共享 cache、有效 UA/Referer、OSM provenance/license/attribution、禁止 expanded/private input、damaged cache fail closed 与 provider replacement seam；0007 migration 尚未部署
+- 已实现待独立 code/UI review: Web 增加四个 Owner-cookie `catalog.intake.*` POST adapters、服务端派生 128-bit conversation、sessionStorage 往返、闭合 typed error 与 existing Owner-login trigger；Add panel 位于 collection heading 后、普通 Catalog search 前，覆盖 loading/empty/candidates/clarification/error/preview/expired/conflict/success shell、原生 radio、inline errors、focus/live region、disabled confirm reason 与 >=44px controls；未向 Agent capabilities/WebMCP 暴露 intake，遗留 `POST /api/items` 继续 fail closed
+- 已完成独立代码/UI 门: T-14 第 1 轮的两项一般发现均已 TDD 收口：collection 关闭时由 `inert` 统一隔离全部隐藏交互控件；Web conversation 改为从已验证的签名 HttpOnly Owner session 在服务端域分隔派生 128-bit opaque ID，discover 替换伪造的合法 header，select/confirm/cancel 拒绝不匹配 ID。第 2 轮独立评审 PASS，严重 0 / 一般 0 / 建议 0
+- 本地验证: 评审者独立复跑 focused 14/14、完整测试 515/515、TypeScript、lint、format-check、diff-check、owner-poc production build 与 migration-check，全部通过。主任务用 `/dev/shm` 临时 Chromium 完成 1440×1107 desktop、390×1038 mobile initial render 与标准 401 Owner-login state，并目视确认 warm editorial 方向、排版、overflow、44px 控件以及 401 后输入 `鮨青空` 保留且 Owner password panel 可见；截图保存在 workspace 外 `t14-add-desktop.png` / `t14-add-mobile.png` / `t14-add-401.png`。owner-poc production composition 仍故意使用 unavailable intake module，真实 provider wiring/deploy 属 T-18，因此当前线上 Add preview 继续 fail closed
+- 已完成: 用户于 2026-09-23 接受 T-14 演示并授权继续；验收记录见 `reviews/t14-demo-acceptance-2026-09-23.md`。T-14 已勾选，线上不可用与 T-18 边界保持不变
+- 已完成: T-16 原子 confirm/publish 五路结果、server-only mutation key、full preview/digest/scope/exact-TTL CAS、Catalog revision/identity race、同 key 并发与 response-loss replay、180 天 receipt cleanup、精确 provenance/time/license 以及双 provider 可终止 refresh 均已实现；verified item 与 Owner-only Review Candidate 分离，Candidate 的 Visit 生命周期可用但不会进入匿名 Public Read、地图或 Nearby
+- 已完成: T-16 第 7 轮独立 code/UI review PASS；changed/new focused 144/144、架构与边界 64/64、完整测试 564/564、TypeScript、lint、format、migration、diff 与 owner-poc build 全部通过。用户于 2026-09-23 指示 `continue` 并确认收口；验收记录见 `reviews/t16-demo-acceptance-2026-09-23.md`
+- 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
+- 未完成: T-08、T-09、T-15，以及 T-17–T-20 的 Add/Record 工作
+- 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
+- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14/T-16 的代码门与用户确认均已关闭；D-P06 在 T-15 preflight/威胁评审前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
+- 下一步: 提交并推送已确认的 T-16，然后按红→绿→重构实现 T-15 的签名 Research Relay 与 Tabelog／预约 preview；不提前开放 T-17 Agent manifest 或执行 T-18 production provider/deploy

@@ -4,6 +4,7 @@ import {
 } from '../atlas-application.ts';
 import { failure, success, type Result } from '../result.ts';
 import type {
+  AtlasCatalogEntry,
   AtlasItem,
   AtlasItemEdit,
   CatalogProfile,
@@ -38,7 +39,7 @@ export function createCatalogReadOperationGroup(catalog: CatalogRead) {
   const listCatalog: OperationDefinition<
     'catalog.list',
     ListCatalogInput,
-    readonly AtlasItem[],
+    readonly AtlasCatalogEntry[],
     'json'
   > = {
     descriptor: {
@@ -62,7 +63,7 @@ export function createCatalogReadOperationGroup(catalog: CatalogRead) {
   const getCatalogItem: OperationDefinition<
     'catalog.get',
     GetCatalogItemInput,
-    AtlasItem,
+    AtlasCatalogEntry,
     'json'
   > = {
     descriptor: {
@@ -126,7 +127,7 @@ export function createCatalogOperationGroup(
   const updateCatalogItem: OperationDefinition<
     'catalog.update_item',
     UpdateCatalogItemInput,
-    AtlasItem,
+    AtlasCatalogEntry,
     'json'
   > = {
     descriptor: {

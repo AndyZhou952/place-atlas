@@ -319,7 +319,7 @@ export function createAtlasWebMcpTools({
       name: 'list_visit_media',
       title: 'List Visit photos',
       description:
-        'Read private photo metadata and captions for one Visit. Binary upload uses the scoped media HTTP operation.',
+        'Read public photo display metadata and captions for one Visit. Binary upload uses the scoped media HTTP operation.',
       inputSchema: objectInputSchema({ visitId: { type: 'string' } }, [
         'visitId',
       ]),
@@ -329,7 +329,15 @@ export function createAtlasWebMcpTools({
           key: browserOperationHttpCatalog['media.list'].key,
           input: { visitId: readString(input, 'visitId') },
         });
-        return currentMedia.map(({ contentSha256: _hash, ...entry }) => entry);
+        return currentMedia.map((entry) => ({
+          id: entry.id,
+          visitId: entry.visitId,
+          itemId: entry.itemId,
+          originalFilename: entry.originalFilename,
+          ...(entry.caption === undefined ? {} : { caption: entry.caption }),
+          displayOrder: entry.displayOrder,
+          contentUrl: entry.contentUrl,
+        }));
       },
     },
     {

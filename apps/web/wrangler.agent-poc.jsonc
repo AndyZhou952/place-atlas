@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "japan-atlas-agent-poc",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-09-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS",
+  },
+  "vars": {
+    "ATLAS_DATASET": "fixture",
+    "ATLAS_DEPLOYMENT_ENV": "agent-poc-readonly",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "japan-atlas-agent-poc-fixture",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "japan-atlas-agent-poc-media-fixture",
+    },
+  ],
+}

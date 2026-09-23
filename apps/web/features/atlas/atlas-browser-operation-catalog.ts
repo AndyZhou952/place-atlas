@@ -31,6 +31,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     bodyKind: 'none',
     capability: { name: 'list_atlas_items' },
   },
+  'catalog.review_candidates.list': {
+    key: 'catalog.review_candidates.list',
+    method: 'GET',
+    path: '/api/owner/catalog/review-candidates',
+    bodyKind: 'none',
+  },
   'decision.nearby': {
     key: 'decision.nearby',
     method: 'GET',
@@ -40,6 +46,36 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
       name: 'find_nearby',
       pathSuffix: '?lat={lat}&lon={lon}',
     },
+  },
+  'nearby.recommend': {
+    key: 'nearby.recommend',
+    method: 'GET',
+    path: '/api/nearby',
+    bodyKind: 'none',
+  },
+  'catalog.intake.discover': {
+    key: 'catalog.intake.discover',
+    method: 'POST',
+    path: '/api/catalog-intake/discover',
+    bodyKind: 'json',
+  },
+  'catalog.intake.select': {
+    key: 'catalog.intake.select',
+    method: 'POST',
+    path: '/api/catalog-intake/select',
+    bodyKind: 'json',
+  },
+  'catalog.intake.confirm': {
+    key: 'catalog.intake.confirm',
+    method: 'POST',
+    path: '/api/catalog-intake/confirm',
+    bodyKind: 'json',
+  },
+  'catalog.intake.cancel': {
+    key: 'catalog.intake.cancel',
+    method: 'POST',
+    path: '/api/catalog-intake/cancel',
+    bodyKind: 'json',
   },
   'catalog.update_item': {
     key: 'catalog.update_item',
@@ -81,10 +117,6 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     method: 'GET',
     path: '/api/media',
     bodyKind: 'none',
-    capability: {
-      name: 'list_visit_media',
-      pathSuffix: '?visitId={visitId}',
-    },
   },
   'media.attach': {
     key: 'media.attach',

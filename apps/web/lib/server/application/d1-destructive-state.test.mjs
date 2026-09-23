@@ -40,6 +40,7 @@ test('the D1 destructive adapter collects Visit object keys and commits its casc
       overallRating: 4.2,
       isFavorite: true,
       manualVisited: true,
+      updatedAt: 'assessment-time',
     },
     tombstoned: false,
     visitCount: 2,
@@ -62,6 +63,28 @@ test('the D1 destructive adapter collects Visit object keys and commits its casc
   );
 });
 
+test('the D1 destructive adapter resolves a Review Candidate as the Visit deletion target', async () => {
+  const candidatePayload =
+    '{"recordType":"review_candidate","id":"review-one"}';
+  const database = fakeDatabase({
+    firstRows: [
+      {
+        ...row,
+        item_id: 'review-one',
+        payload_json: null,
+        review_candidate_payload_json: candidatePayload,
+        visit_count: 1,
+      },
+    ],
+  });
+  const state = new D1DestructiveState(database.value);
+
+  const context = await state.readVisitDeletion('candidate-visit');
+
+  assert.equal(context.dynamicPayload, candidatePayload);
+  assert.match(database.statements[0].sql, /atlas_review_candidates/u);
+});
+
 test('the D1 destructive adapter atomically removes all item records and writes a tombstone', async () => {
   const database = fakeDatabase({ firstRows: [row] });
   const state = new D1DestructiveState(database.value);
@@ -82,15 +105,18 @@ test('the D1 destructive adapter atomically removes all item records and writes 
     'journal_entries',
     'place_assessments',
     'atlas_item_overrides',
+    'atlas_review_candidates',
     'atlas_items',
   ]) {
     assert.match(sql, new RegExp(`DELETE FROM ${table}`, 'u'), table);
   }
   assert.match(sql, /INSERT INTO atlas_item_tombstones/u);
-  assert.deepEqual(database.batches[0].at(-1).values, [
-    'place-one',
-    '2026-09-12T12:00:00.000Z',
-  ]);
+  assert.deepEqual(
+    database.batches[0].find((statement) =>
+      statement.sql.includes('INSERT INTO atlas_item_tombstones'),
+    ).values,
+    ['place-one', '2026-09-12T12:00:00.000Z'],
+  );
 });
 
 test('a rejected destructive D1 batch performs no standalone structured writes', async () => {
@@ -115,6 +141,7 @@ function fakeDatabase({ firstRows = [], batchError, onRun = () => {} } = {}) {
   let roundTrips = 0;
   let firstIndex = 0;
   const batches = [];
+  const statements = [];
   const value = {
     prepare(sql) {
       const statement = {
@@ -132,6 +159,7 @@ function fakeDatabase({ firstRows = [], batchError, onRun = () => {} } = {}) {
           onRun();
         },
       };
+      statements.push(statement);
       return statement;
     },
     async batch(statements) {
@@ -141,5 +169,10 @@ function fakeDatabase({ firstRows = [], batchError, onRun = () => {} } = {}) {
       return statements.map(() => ({ meta: { changes: 1 } }));
     },
   };
-  return { value, batches, roundTrips: () => roundTrips };
+  return {
+    value,
+    batches,
+    statements,
+    roundTrips: () => roundTrips,
+  };
 }

@@ -28,7 +28,10 @@ interface OperationDefinitionShape<
   Kind extends OperationResultKind,
 > {
   readonly descriptor: OperationDescriptor<Key, Input, Kind>;
-  readonly handle: (input: Input) => Promise<Result<Output>>;
+  readonly handle: (
+    input: Input,
+    context?: ApplicationExecutionContext,
+  ) => Promise<Result<Output>>;
 }
 
 export type OperationDefinition<
@@ -96,10 +99,38 @@ export interface TypedOperation<
 export interface AtlasApplication<Definitions> {
   execute<Key extends JsonOperationKey<Definitions>>(
     operation: TypedOperation<Definitions, Key>,
+    context?: ApplicationExecutionContext,
   ): Promise<Result<OutputOf<Definitions, Key>>>;
   openMedia<Key extends MediaOperationKey<Definitions>>(
     operation: TypedOperation<Definitions, Key>,
   ): Promise<Result<OutputOf<Definitions, Key>>>;
+  normalize<Key extends JsonOperationKey<Definitions>>(
+    operation: TypedOperation<Definitions, Key>,
+  ): Result<TypedOperation<Definitions, Key>>;
+  executePrepared<Key extends JsonOperationKey<Definitions>>(
+    operation: TypedOperation<Definitions, Key>,
+    context?: ApplicationExecutionContext,
+  ): Promise<Result<OutputOf<Definitions, Key>>>;
+}
+
+export interface AtomicMutationCommit {
+  readonly principal: string;
+  readonly mutationId: string;
+  readonly payloadDigest: string;
+  readonly attemptToken: string;
+  readonly result: unknown;
+  readonly committedAtMs: number;
+}
+
+export interface ApplicationExecutionContext {
+  readonly invocation?: {
+    readonly ownerId: string;
+    readonly channel: string;
+    readonly conversationId: string;
+  };
+  readonly atomicMutation?: {
+    readonly receiptFor: (result: unknown) => AtomicMutationCommit;
+  };
 }
 
 type CheckedDefinitions<Definitions> = {
@@ -123,8 +154,12 @@ export function createAtlasApplication<const Definitions extends object>(
   definitions: Definitions & CheckedDefinitions<Definitions>,
 ): AtlasApplication<Definitions> {
   return {
-    execute: (operation) => dispatch(definitions, operation, 'json'),
+    execute: (operation, context) =>
+      dispatch(definitions, operation, 'json', context),
     openMedia: (operation) => dispatch(definitions, operation, 'media_stream'),
+    normalize: (operation) => normalize(definitions, operation, 'json'),
+    executePrepared: (operation, context) =>
+      dispatchPrepared(definitions, operation, 'json', context),
   };
 }
 
@@ -134,7 +169,10 @@ interface RuntimeDefinition {
     readonly resultKind: OperationResultKind;
     readonly validate: (input: unknown) => Result<unknown>;
   };
-  readonly handle: (input: unknown) => Promise<Result<unknown>>;
+  readonly handle: (
+    input: unknown,
+    context?: ApplicationExecutionContext,
+  ) => Promise<Result<unknown>>;
 }
 
 async function dispatch<
@@ -144,28 +182,76 @@ async function dispatch<
   definitions: Definitions,
   operation: TypedOperation<Definitions, Key>,
   resultKind: OperationResultKind,
+  context?: ApplicationExecutionContext,
 ): Promise<Result<OutputOf<Definitions, Key>>> {
   try {
-    const candidate = (definitions as Record<string, unknown>)[operation.key];
-    if (!isRuntimeDefinition(candidate, operation.key, resultKind)) {
-      return failure(
-        'unexpected_failure',
-        'The requested application operation is unavailable.',
-      );
-    }
-
-    const validated = candidate.descriptor.validate(operation.input);
-    if (!validated.ok) return validated;
-
-    return (await candidate.handle(validated.value)) as Result<
-      OutputOf<Definitions, Key>
-    >;
+    const prepared = normalize(definitions, operation, resultKind);
+    if (!prepared.ok) return prepared;
+    return await dispatchPrepared(
+      definitions,
+      prepared.value,
+      resultKind,
+      context,
+    );
   } catch {
     return failure(
       'unexpected_failure',
       'The application operation could not be completed.',
     );
   }
+}
+
+async function dispatchPrepared<
+  Definitions extends object,
+  Key extends OperationKey<Definitions>,
+>(
+  definitions: Definitions,
+  operation: TypedOperation<Definitions, Key>,
+  resultKind: OperationResultKind,
+  context?: ApplicationExecutionContext,
+): Promise<Result<OutputOf<Definitions, Key>>> {
+  const candidate = (definitions as Record<string, unknown>)[operation.key];
+  if (!isRuntimeDefinition(candidate, operation.key, resultKind)) {
+    return unavailableOperation();
+  }
+  return (await candidate.handle(operation.input, context)) as Result<
+    OutputOf<Definitions, Key>
+  >;
+}
+
+function normalize<
+  Definitions extends object,
+  Key extends OperationKey<Definitions>,
+>(
+  definitions: Definitions,
+  operation: TypedOperation<Definitions, Key>,
+  resultKind: OperationResultKind,
+): Result<TypedOperation<Definitions, Key>> {
+  try {
+    const candidate = (definitions as Record<string, unknown>)[operation.key];
+    if (!isRuntimeDefinition(candidate, operation.key, resultKind)) {
+      return unavailableOperation();
+    }
+    const validated = candidate.descriptor.validate(operation.input);
+    return validated.ok
+      ? ({
+          ok: true,
+          value: { key: operation.key, input: validated.value },
+        } as Result<TypedOperation<Definitions, Key>>)
+      : validated;
+  } catch {
+    return failure(
+      'unexpected_failure',
+      'The application operation could not be completed.',
+    );
+  }
+}
+
+function unavailableOperation(): Result<never> {
+  return failure(
+    'unexpected_failure',
+    'The requested application operation is unavailable.',
+  );
 }
 
 function isRuntimeDefinition(

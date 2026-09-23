@@ -3,7 +3,7 @@ import type {
   AtlasItemOverrideRecord,
   PlaceAssessmentRecord,
 } from './catalog-state.ts';
-import { projectCatalog } from './catalog-projection.ts';
+import { isAtlasItem, projectCatalog } from './catalog-projection.ts';
 
 export interface CatalogItemProjectionContext {
   readonly itemId: string;
@@ -39,7 +39,10 @@ export function createCatalogItemProjection(
           visitCounts: [{ itemId: context.itemId, count: context.visitCount }],
         },
         seedItems,
-      ).find((item) => item.id === context.itemId);
+      ).find(
+        (item): item is AtlasItem =>
+          item.id === context.itemId && isAtlasItem(item),
+      );
     },
   };
 }

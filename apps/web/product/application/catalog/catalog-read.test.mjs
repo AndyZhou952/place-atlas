@@ -31,6 +31,32 @@ function item(id, overrides = {}) {
   };
 }
 
+function reviewCandidate(id, warnings) {
+  return {
+    recordType: 'review_candidate',
+    id,
+    kind: 'food',
+    title: `Review ${id}`,
+    description: 'Awaiting owner review',
+    verificationStatus: 'needs_review',
+    personalState: 'saved',
+    tags: [],
+    reviewEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google-places',
+        placeId: `place-${id}`,
+      },
+      ownerFields: { title: `Review ${id}` },
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: ['address', 'coordinates', 'tabelog', 'reservation'],
+      warnings,
+    },
+    updatedAt: '2026-09-23T00:00:00.000Z',
+  };
+}
+
 test('the full catalog merges records and excludes malformed or tombstoned items', async () => {
   const dynamicItem = item('dynamic', {
     verificationStatus: 'needs_review',
@@ -122,6 +148,44 @@ test('the verified profile excludes needs-review records after merging', async (
     result.ok ? result.value.map((candidate) => candidate.id) : result,
     ['verified'],
   );
+});
+
+test('the full catalog rejects persisted Review Candidates with duplicate or noncanonical warning order', async () => {
+  const warnings = [
+    { code: 'provider_unavailable', message: 'Provider unavailable.' },
+    { code: 'needs_review', message: 'Owner review required.' },
+  ];
+  const application = createAtlasApplication(
+    createCatalogReadOperationGroup(
+      createCatalogRead(
+        new InMemoryCatalogState({
+          dynamicPayloads: [
+            JSON.stringify(reviewCandidate('valid-warning-order', warnings)),
+            JSON.stringify(
+              reviewCandidate('reordered-warnings', [...warnings].reverse()),
+            ),
+            JSON.stringify(
+              reviewCandidate('duplicate-warnings', [warnings[0], warnings[0]]),
+            ),
+          ],
+          overrides: [],
+          assessments: [],
+          tombstoneIds: [],
+          visitCounts: [],
+        }),
+        [],
+      ),
+    ),
+  );
+
+  const result = await application.execute({
+    key: 'catalog.list',
+    input: { profile: 'full_merged_catalog' },
+  });
+
+  assert.deepEqual(result.ok ? result.value.map(({ id }) => id) : result, [
+    'valid-warning-order',
+  ]);
 });
 
 test('catalog state failures become a sanitized dependency error', async () => {

@@ -13,7 +13,18 @@ void application.execute({
 
 void application.execute({
   key: 'media.attach',
-  input: { visitId: 'visit-1', files: [] },
+  input: { visitId: 'visit-1', files: [], uploadIds: [] },
+});
+
+void application.execute({
+  key: 'nearby.recommend',
+  input: { locationHint: '銀座' },
+});
+
+void application.execute({
+  key: 'nearby.recommend',
+  // @ts-expect-error Structured Nearby requires a location hint.
+  input: {},
 });
 
 void application.execute({

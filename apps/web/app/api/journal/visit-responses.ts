@@ -1,9 +1,12 @@
 import type { AtlasApplication } from '@/product/application/atlas-application';
 import type { createVisitOperationGroup } from '@/product/application/visits/visit-operations';
+import { ownerMutationResponse } from '../owner-mutation-response.ts';
+import type { createInvocationCoordinator } from '../../../product/application/invocation/invocation-coordinator.ts';
 
 type VisitApplication = AtlasApplication<
   ReturnType<typeof createVisitOperationGroup>
 >;
+type InvocationCoordinator = ReturnType<typeof createInvocationCoordinator>;
 
 interface HttpNewVisit {
   readonly id?: string;
@@ -31,60 +34,57 @@ export async function listVisitsResponse(
 }
 
 export async function createVisitResponse(
-  application: VisitApplication,
+  coordinator: InvocationCoordinator,
+  request: Request,
   input: unknown,
 ): Promise<Response> {
   if (!isHttpNewVisit(input)) {
     return new Response(invalidCreateMessage, { status: 400 });
   }
-  const result = await application.execute({
-    key: 'visit.create',
-    input: {
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'visit.create',
+    operationInput: {
       ...(input.id === undefined ? {} : { id: input.id.trim() }),
       itemId: input.itemId,
       visitedAt: input.visitedAt,
       ...(input.rating === undefined ? {} : { rating: input.rating }),
       ...(input.note === undefined ? {} : { note: input.note }),
     },
-  });
-  if (result.ok) return Response.json(result.value, { status: 201 });
-  if (result.error.kind === 'invalid_input') {
-    return new Response(invalidCreateMessage, { status: 400 });
-  }
-  if (result.error.kind === 'not_found') {
-    return new Response('Atlas item not found', { status: 404 });
-  }
-  return new Response('The Journal entry could not be saved.', {
-    status: 500,
+    successStatus: 201,
+    errors: {
+      invalidInput: invalidCreateMessage,
+      notFound: 'Atlas item not found',
+      dependencyFailure: 'The Journal entry could not be saved.',
+    },
   });
 }
 
 export async function updateVisitResponse(
-  application: VisitApplication,
+  coordinator: InvocationCoordinator,
+  request: Request,
   id: string,
   input: unknown,
 ): Promise<Response> {
   if (!id || !isHttpVisitUpdate(input)) {
     return new Response('Invalid visit update', { status: 400 });
   }
-  const result = await application.execute({
-    key: 'visit.update',
-    input: {
+  return ownerMutationResponse({
+    coordinator,
+    request,
+    operation: 'visit.update',
+    operationInput: {
       id,
       visitedAt: input.visitedAt,
       ...(input.note === undefined ? {} : { note: input.note }),
       ...(input.rating === undefined ? {} : { rating: input.rating }),
     },
-  });
-  if (result.ok) return Response.json(result.value);
-  if (result.error.kind === 'invalid_input') {
-    return new Response('Invalid visit update', { status: 400 });
-  }
-  if (result.error.kind === 'not_found') {
-    return new Response('Journal entry not found', { status: 404 });
-  }
-  return new Response('The Journal entry could not be updated.', {
-    status: 500,
+    errors: {
+      invalidInput: 'Invalid visit update',
+      notFound: 'Journal entry not found',
+      dependencyFailure: 'The Journal entry could not be updated.',
+    },
   });
 }
 

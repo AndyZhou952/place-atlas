@@ -9,3 +9,42 @@
 - A-5 2026-09-11 [生效] 当前不开放无评分、无笔记的纯照片 Visit；等 VisitCaptureSession 能提供明确归属和生命周期后再评估 — 默认理由：与现有 API 一致并避免孤立媒体。
 - A-6 2026-09-12 [已确认] 普通删除进入 30 天可恢复窗口；显式永久删除立即清理主存储，R2 在窗口结束后清理 — 用户确认。
 - A-7 2026-09-12 [已确认] 001 迁移只允许重置 PlaceAssessment 的喜欢、旧到访位、个人评分与摘要四类测试字段为空／false；除这份封闭白名单外，所有表、记录、字段与 R2 对象必须保持不变 — 用户确认旧个人状态仅为前端测试数据，地点正常保留。
+- A-12 2026-09-12 [已确认] 在原 0003 首次生产应用前把其已审核 SQL 按字节与 checksum 原样转为 pending artifact；新的 active 0003 只建立 maintenance fence/snapshot 所需控制结构。取得完整 D1/R2 before evidence 后，再把原 reset SQL 以 active 0004 发布并进入 T-14 — 用户确认调整 migration 顺序，并要求保留完整恢复能力。
+- A-13 2026-09-12 [已确认] 当前生产中的喜欢、到访和评分均为可丢弃的前端测试状态，地点记录保留；后续真实内容统一批量导入。该事实不得降低 T-14 的完整快照、恢复演练和证据标准 — 用户确认。
+- A-14 2026-09-12 [已确认] 特性 003 切换为 auto：云端 Agent 可自行完成 T-01–T-26、独立评审、修正、CLI commit/push，并可创建不绑定生产数据且始终 owner-only 的临时隔离 Site；T-25 仅在全部门禁通过时自动部署不含 reset 的 snapshot-only build。生产 freeze/capture、active 0004 部署与 reset 仍归 001/T-14，不在本授权内 — 用户要求关机后无需中途介入。
+- A-15 2026-09-13 [已确认] OpenClaw × Atlas PoC 分两阶段发布：先用只读 Nearby 验证微信、OpenClaw、服务鉴权与 Atlas API 链路，再开放 Visit 与图片 mutation — 用户同意只读优先。
+- A-16 2026-09-13 [已确认] 多消息评价先进入 VisitCaptureSession 草稿；“完成记录”只生成预览，只有“确认保存”才写入 Visit／VisitMedia，自然语言不得跳过确认自动提交 — 用户同意显式预览与确认。
+- A-17 2026-09-13 [已确认] PoC 不建设定位链接，也不修改或等待微信位置卡片支持；位置线索只接受用户手动输入的街区／地址文字，或从 Google Maps 等应用复制的地址文字 — 用户确认以手动文字输入为准。
+- A-18 2026-09-13 [已确认] VisitCaptureSession 连续 30 分钟无活动时转为暂停并在下一条相关消息到来时询问是否继续，24 小时后过期；提交后的迟到图片只在用户明确引用保存回执并要求追加时关联 — 用户确认。
+- A-19 2026-09-13 [已确认] Nearby 默认先筛选真实步行 10～15 分钟内可达的已验证地点并优先未到访；首层无结果时才展示扩大到 2 公里的候选或无需换乘的电车候选。个人评分只在有效到访状态为真时展示，并与外部评分分开 — 用户确认产品范围，精确 PoC 阈值见 A-21。
+- A-20 2026-09-13 [生效] 步行时间与无需换乘电车可达性只接受可验证路线 adapter 的证据；未配置或失败时返回明确标注的距离估算，不允许模型生成路线事实 — 默认理由：保持推荐可信并把供应商选择留在特性架构阶段。
+- A-21 2026-09-13 [已确认] PoC 将步行范围硬上限设为 15 分钟，将无需换乘电车候选的门到门总行程上限设为 20 分钟 — 用户要求电车也尽量控制在 20 分钟内，避免马上迟到。
+- A-22 2026-09-13 [已取代] 原“按 Atlas workspace 隔离”改由 A-25 的单一微信前门＋确定性项目命令路由落实；Atlas 凭证与工具仍按项目隔离，其他项目不能访问。
+- A-23 2026-09-13 [已确认] 单个 VisitCaptureSession 上限为 100 段文字／20,000 个 Unicode 字符、24 张图片／每张 8 MB／合计 128 MB；七天演练脚本成功率至少 95%，重复、丢失、半可见和未授权成功均为零，PoC 月度总运行成本不超过 60 美元 — 用户确认其他规格无异议。
+- A-24 2026-09-13 [已确认] Agent 必须支持仅凭餐厅名发起建档：先查已有地点与受控来源，同名／多分店时让用户消歧，展示地址、外部评分与来源预览，只有用户确认后才写入；外部评分不得成为个人评分 — 用户明确要求纳入计划。
+- A-25 2026-09-13 [已确认] Agent 采用单一微信前门和确定性项目命令路由：`/jpmap` 在模型参与前按严格语法直接分发到 Japan Atlas 工具；未来 `/gym`、`/bobo` 等沿用同一 registry，每个项目拥有独立凭证、工具 allowlist 与状态命名空间 — 用户同意按该方案进行。
+- A-26 2026-09-13 [已确认] Nearby 最终候选必须重新核验能否直接 walk in 和可得的排队信息；动态信息带来源与核验时间，拿不到时明确显示未知，不能由 Agent 推断 — 用户确认。
+- A-27 2026-09-13 [生效] 无斜杠 `jpmap ...` 与连续 capture 是 capability-gated 便利能力：只有代码自有的微信入站路由在 OpenClaw agent loop 前通过真实链路探针后才启用；否则只保证规范 `/jpmap ...`，bare 输入可进入无项目能力的普通助手 — 独立评审发现当前版本存在 ordinary user turn 跳过 `before_agent_reply` 的已知风险。
+- A-28 2026-09-13 [已确认] Record 最终包含总体评分、总体评语、照片和每张照片的细分评分，并需处理输入店名与已录入规范名称不同；逐图评分的业务含义／量表／归属／展示、店名候选匹配与歧义阈值、以及多段内容推断规则在 record 实现前另过规格与架构增量评审，不阻塞 Nearby 和 Catalog 切片 — 用户明确选择先进入 ticketing、稍后细化 record。
+- A-29 2026-09-13 [已确认] Nearby 只查询 Japan Atlas 已录入且已验证的餐厅，Foursquare／Places discovery 与模型均不得扩大候选全集；位置与已存餐厅的步行／电车时间由确定性路线 adapter 计算。Foursquare 不进入 Nearby 主链，是否用于 Catalog intake 留待供应商许可与数据质量比较。— 用户纠正此前把餐厅发现与已收藏 Nearby 混为一谈。
+- A-30 2026-09-17 [已确认] 隔离只读 Nearby PoC 的 Google egress 采用 D-P04：Cloudflare 仅可调用三条构建时闭合的 Google 官方 endpoint tuple，拒绝全部 redirect，不提供逐 DNS／IP pin；该例外不得扩展到其他 provider 或任意 URL。— 用户在独立架构评审通过后确认继续采用推荐方案。
+- A-31 2026-09-21 [已确认] Owner PoC 的 Web 与 Agent 以同一个 `AtlasApplication` 和同一个 owner-poc D1 作为业务事实源；Web Cookie 与 Agent HMAC 只是不同入口鉴权，不能各自实现或保存一套业务规则／地点／个人事实。— 用户明确要求网页按钮与微信交互调用同一业务能力。
+- A-32 2026-09-21 [已确认] 第一阶段网页保持公开读取，浏览器的业务 `POST/PUT/PATCH/DELETE` 只允许已登录 Owner；不引入多用户、OAuth、角色或编辑模式切换，登录后沿用现有控件。— 用户只要求防止未登录写入并优先快速完成个人 PoC。
+- A-33 2026-09-21 [已取代] 原不可逆 verifier 方案由 A-38 的 Cloudflare encrypted raw Secret 契约取代；仍保留凭证不进入源码、数据库、日志、fixture 或文档的要求。
+- A-34 2026-09-21 [已确认] 正式个人 PoC 使用蓝绿 owner-poc D1/config 与完整应用 schema；旧 read-only fixture D1/Worker 保留且不原地升级，只有新环境冒烟通过后才切换入口，失败时回退旧 URL。— 用于修复当前页面与 fixture schema 不匹配且保留已跑通的只读链路。
+- A-35 2026-09-21 [已确认] owner-poc 的规范地点只存于 `atlas_items`，个人事实只存于 `place_assessments`、`visits`、`visit_media`；Agent fixture rows、`agent_catalog_items` 和 presenter 文本不构成第二事实源。— 用户确认 Web 与微信应看到同一数据和处理结果。
+- A-36 2026-09-21 [已取代] 原把 Google adapter 组合进 owner-poc 的方向由 A-40 的独立只读 Route Sidecar 取代；Foursquare 保持未配置、未调用。
+- A-37 2026-09-21 [部分取代] 精确 `/jpmap` 命令优先走确定性 parser 且不调用 DeepSeek；模型只可在项目、身份、scope 和允许 operation 已确定后把模糊语义转换为 schema 受限 proposal。Add 的稳定事件 ID 门由 A-45 的 Add-only product mutation key 取代；Record 仍等待稳定 channel event ID、逐图评分语义与 capture/publish 门。
+- A-38 2026-09-21 [已确认] 单密码登录使用 Cloudflare encrypted raw Secrets：`ATLAS_OWNER_PASSWORD` 与至少 256-bit 随机 `ATLAS_OWNER_SESSION_SECRET`；口令常量时间比较，session version/secret 轮换使旧 Cookie 失效，缺 Secret 失败关闭。
+- A-39 2026-09-21 [已确认] 用户确认所有非敏感 PoC 展示内容可公开：闭合 Catalog、个人总体状态/评论、Visit 展示、媒体展示元数据与照片二进制；严禁 object key、原文件名、hash、内部存储 ID 与审计数据。未知读取默认私有，真实敏感内容前收窄并重审。
+- A-40 2026-09-21 [已确认] Google egress 位于独立只读 Route Sidecar，只持 Google key，配置 `workers_dev=false` 且无 routes/owner bindings；preflight 证明公网不可达和未绑定 Worker 不可调用。Geocoding 与 walking Matrix hard cap 各为每月 8,000 单位，按 provider+SKU+period 预留且失败不退款。
+- A-41 2026-09-21 [已确认] Web 与 Agent 都生成统一 InvocationContext；协调器在 schema normalization 后用唯一版本 canonicalizer 对 `{operation,input}` 计算权威 digest。Web 不提交 digest，Agent transport digest 只校验/比对；所有非幂等 mutation 使用稳定 ID 与可重放 receipt。
+- A-42 2026-09-21 [已确认] owner-poc 初始 seed manifest 固定为 v1、5 条及已记录源 SHA-256；Web URL 与 OpenClaw endpoint/HMAC 分别切换和回退，回退是只读降级且不把 owner-poc 新写入反向迁移至 fixture。
+- A-43 2026-09-22 [部分取代] Web 与 Agent 共用 `catalog.intake.discover/select/confirm/cancel`、确定性命令与单 active session 的方向保留；Google Geocoding durable location 与建议性 TTL 被 A-47/A-49 取代。
+- A-44 2026-09-22 [部分取代] single-intake 受控研究与最小 scalar snapshot 方向保留；“Web 手填为主”和 checkedAt 混用被 A-48 的 Agent-first 及诚实 provenance/time 取代。
+- A-45 2026-09-22 [部分取代] Add-only product mutation key 与 Record 不继承例外的方向保留；精确 domain/version、输入、顺序、TTL 与回放规则由 A-49 取代。
+- A-46 2026-09-22 [部分取代] Tabelog 与个人评分分离、预约 advanceDays／walk-in／queue 和 GitHub #12 方向保留；统一 checkedAt 被 A-48 的 `agent_observed/observedAt` 与 `owner_asserted/assertedAt` 取代。
+- A-47 2026-09-22 [已确认] Google Places 只瞬时发现并 durable 保存 Place ID tuple；Google Places/Geocoding content 不进 Leaflet，Google Geocoding 继续只用于 Nearby request-only。Add durable location 使用 Owner-confirmed name/address 与可切换 OSM-compatible `DurableGeocoderPort`；PoC Nominatim 必须遵守用户触发、全应用 ≤1 req/s、UA/Referer、cache、attribution、no autocomplete/systematic scraping。无合法坐标保存 needs_review 且不进地图/Nearby。— 用户于 2026-09-22 确认最终增量架构。
+- A-48 2026-09-22 [已确认] Tabelog 采用 Owner-directed、single-intake、Agent-first best-effort research 主路径，Owner 接受个人非商用 PoC 的当期来源风险；禁止批量、Google SERP HTML/internal API、绕过页面限制与保存正文/HTML/图片；`agent_observed/observedAt`，Owner 手填或修改为 `owner_asserted/assertedAt`，手填/unknown 是兜底。精确技术预算由 A-50 定义，不声称为用户逐项确认。
+- A-49 2026-09-22 [已确认] Add session 状态固定为 discovering/candidates_ready/preview_ready/committed/cancelled/expired，accepted activity 后 30 分钟、恰好 30:00 即过期；服务端以 `add-confirm:v1 + ownerId + operation + serverSessionId + currentPreviewVersion + authoritativePreviewDigest` 派生 key，confirm-time refresh 后原子写 receipt。committed 可回放 180 天；Record 不继承此例外。— 用户于 2026-09-22 确认最终增量架构。
+- A-50 2026-09-22 [已确认] Add 单次 research 技术预算总计 1 search/5 pages/60 秒，phase reserve 不可借用：initial 最多 1 search+3 pages+35 秒，confirm refresh 不新 search、只用 preview canonical URLs且最多 2 pages+25 秒；每 request 最多 15 秒/3 redirects。— 用户于 2026-09-22 确认最终增量架构。

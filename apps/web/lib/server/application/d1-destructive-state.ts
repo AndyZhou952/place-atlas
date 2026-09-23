@@ -3,10 +3,14 @@ import type {
   DestructiveItemContext,
   DestructiveRecordState,
 } from '@/product/application/destructive/destructive-state';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface DestructiveContextRow {
   readonly item_id: string;
   readonly payload_json?: string | null;
+  readonly review_candidate_payload_json?: string | null;
   readonly override_title?: string | null;
   readonly override_description?: string | null;
   readonly override_personal_state?: PersonalState | null;
@@ -41,16 +45,23 @@ export class D1DestructiveState implements DestructiveRecordState {
     return row ? toContext(row) : undefined;
   }
 
-  async commitVisitDeletion(id: string): Promise<void> {
-    await this.#database.batch([
-      this.#database
-        .prepare('DELETE FROM visit_media WHERE visit_id = ?')
-        .bind(id),
-      this.#database.prepare('DELETE FROM visits WHERE id = ?').bind(id),
-      this.#database
-        .prepare('DELETE FROM journal_entries WHERE id = ?')
-        .bind(id),
-    ]);
+  async commitVisitDeletion(
+    id: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    await commitD1MutationAtomically(
+      this.#database,
+      [
+        this.#database
+          .prepare('DELETE FROM visit_media WHERE visit_id = ?')
+          .bind(id),
+        this.#database.prepare('DELETE FROM visits WHERE id = ?').bind(id),
+        this.#database
+          .prepare('DELETE FROM journal_entries WHERE id = ?')
+          .bind(id),
+      ],
+      atomicCommit,
+    );
   }
 
   async readItemDeletion(id: string): Promise<DestructiveItemContext> {
@@ -76,6 +87,23 @@ export class D1DestructiveState implements DestructiveRecordState {
       this.#database
         .prepare('DELETE FROM atlas_item_overrides WHERE item_id = ?')
         .bind(id),
+      this.#database
+        .prepare('DELETE FROM atlas_item_location_snapshots WHERE item_id = ?')
+        .bind(id),
+      this.#database
+        .prepare('DELETE FROM atlas_item_tabelog_snapshots WHERE item_id = ?')
+        .bind(id),
+      this.#database
+        .prepare(
+          'DELETE FROM atlas_item_reservation_snapshots WHERE item_id = ?',
+        )
+        .bind(id),
+      this.#database
+        .prepare('DELETE FROM atlas_place_identities WHERE item_id = ?')
+        .bind(id),
+      this.#database
+        .prepare('DELETE FROM atlas_review_candidates WHERE id = ?')
+        .bind(id),
       this.#database.prepare('DELETE FROM atlas_items WHERE id = ?').bind(id),
       this.#database
         .prepare(
@@ -84,6 +112,10 @@ export class D1DestructiveState implements DestructiveRecordState {
            ON CONFLICT(item_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
         )
         .bind(id, deletedAt),
+      this.#database.prepare(
+        'UPDATE atlas_catalog_revision ' +
+          'SET revision_number = revision_number + 1 WHERE singleton = 1',
+      ),
     ]);
   }
 }
@@ -93,7 +125,8 @@ function toContext(row: DestructiveContextRow): DestructiveItemContext {
   const hasAssessment = row.assessment_updated_at != null;
   return {
     itemId: row.item_id,
-    dynamicPayload: row.payload_json ?? undefined,
+    dynamicPayload:
+      row.payload_json ?? row.review_candidate_payload_json ?? undefined,
     override: hasOverride
       ? {
           itemId: row.item_id,
@@ -109,6 +142,7 @@ function toContext(row: DestructiveContextRow): DestructiveItemContext {
           overallRating: row.overall_rating ?? undefined,
           isFavorite: Boolean(row.is_favorite),
           manualVisited: Boolean(row.has_visited),
+          updatedAt: row.assessment_updated_at ?? '',
         }
       : undefined,
     tombstoned: row.tombstone_id != null,
@@ -123,6 +157,7 @@ const visitDeletionContextSql = `WITH requested_visit AS (
   SELECT requested_visit.id AS visit_id,
          requested_visit.item_id,
          items.payload_json,
+         review_candidates.payload_json AS review_candidate_payload_json,
          overrides.title AS override_title,
          overrides.description AS override_description,
          overrides.personal_state AS override_personal_state,
@@ -139,6 +174,7 @@ const visitDeletionContextSql = `WITH requested_visit AS (
          ), '[]') AS media_object_keys_json
   FROM requested_visit
   LEFT JOIN atlas_items AS items ON items.id = requested_visit.item_id
+  LEFT JOIN atlas_review_candidates AS review_candidates ON review_candidates.id = requested_visit.item_id
   LEFT JOIN atlas_item_overrides AS overrides ON overrides.item_id = requested_visit.item_id
   LEFT JOIN place_assessments AS assessments ON assessments.item_id = requested_visit.item_id
   LEFT JOIN atlas_item_tombstones AS tombstones ON tombstones.item_id = requested_visit.item_id`;

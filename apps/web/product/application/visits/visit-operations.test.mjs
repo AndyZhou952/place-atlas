@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createAtlasApplication } from '../atlas-application.ts';
 import { createCatalogItemProjection } from '../catalog/catalog-item-projection.ts';
 import { InMemoryVisitState } from './in-memory-visit-state.ts';
+import { createVisitTargetProjection } from './visit-item-projection.ts';
 import { createVisitOperationGroup } from './visit-operations.ts';
 
 const places = [
@@ -110,6 +111,43 @@ test('create never writes manualVisited and derives effectiveVisited from the Vi
   assert.equal(
     (await state.readItemContext('place-one')).assessment.manualVisited,
     false,
+  );
+});
+
+test('create records a Visit against an explicit owner-only Review Candidate target', async () => {
+  const candidate = reviewCandidate('review-one', 'Review place');
+  const state = new InMemoryVisitState({
+    dynamicPayloads: [JSON.stringify(candidate)],
+  });
+  const application = createAtlasApplication(
+    createVisitOperationGroup(
+      state,
+      createVisitTargetProjection([]),
+      dependencies,
+    ),
+  );
+
+  const result = await application.execute({
+    key: 'visit.create',
+    input: {
+      id: 'candidate-visit',
+      itemId: candidate.id,
+      visitedAt: '2026-09-12',
+      note: 'Needs later catalog review',
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.value.visit.itemId, candidate.id);
+  assert.equal(result.ok && result.value.item.recordType, 'review_candidate');
+  assert.equal(
+    result.ok && result.value.item.verificationStatus,
+    'needs_review',
+  );
+  assert.equal(result.ok && result.value.item.hasVisited, true);
+  assert.deepEqual(
+    (await state.list()).map(({ id, itemId }) => ({ id, itemId })),
+    [{ id: 'candidate-visit', itemId: candidate.id }],
   );
 });
 
@@ -300,6 +338,34 @@ function place(id, title) {
     personalState: 'candidate',
     tags: [],
     sources: [],
+  };
+}
+
+function reviewCandidate(id, title) {
+  return {
+    recordType: 'review_candidate',
+    id,
+    kind: 'food',
+    title,
+    description: 'Awaiting owner review',
+    verificationStatus: 'needs_review',
+    personalState: 'saved',
+    tags: [],
+    reviewEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google_places',
+        placeId: `place-${id}`,
+      },
+      ownerFields: { title },
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: ['address', 'coordinates', 'tabelog', 'reservation'],
+      warnings: [
+        { code: 'needs_review', message: 'Owner review is required.' },
+      ],
+    },
+    updatedAt: '2026-09-12T12:00:00.000Z',
   };
 }
 

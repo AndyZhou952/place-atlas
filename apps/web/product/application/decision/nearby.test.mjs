@@ -30,7 +30,7 @@ function item(id, latitude, longitude, overrides = {}) {
   };
 }
 
-test('nearby profiles use the requested catalog and preserve catalog order for equal distances', async () => {
+test('nearby profiles expose only verified items and preserve catalog order for equal distances', async () => {
   const first = item('first', 35.69, 139.76);
   const second = item('second', 35.69, 139.76);
   const candidate = item('candidate', 35.68, 139.76, {
@@ -69,7 +69,7 @@ test('nearby profiles use the requested catalog and preserve catalog order for e
     ),
     [
       ['first', 'second'],
-      ['candidate', 'first', 'second'],
+      ['first', 'second'],
     ],
   );
 });
@@ -111,7 +111,7 @@ test('nearby validates coordinate boundaries and limits through AtlasApplication
   );
 });
 
-test('the full nearby profile is independent of personal and UI filtering state', async () => {
+test('the full nearby profile still excludes review candidates regardless of personal UI state', async () => {
   const application = createAtlasApplication(
     createDecisionOperationGroup(
       createCatalogRead(new InMemoryCatalogState(), [
@@ -138,6 +138,6 @@ test('the full nearby profile is independent of personal and UI filtering state'
 
   assert.deepEqual(
     result.ok ? result.value.map((candidate) => candidate.id) : result,
-    ['unvisited-candidate'],
+    [],
   );
 });

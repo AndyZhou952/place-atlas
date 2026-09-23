@@ -12,6 +12,7 @@ const jpegBytes = Uint8Array.of(0xff, 0xd8, 0xff, 0x00);
 const dependencies = {
   clock: { now: () => '2026-09-12T08:00:00.000Z' },
   idSource: { nextId: () => 'generated-media' },
+  displayIdSource: { nextId: () => 'public-media-token' },
   digest: async () =>
     '374ffede23adbc8bc625205f4bf86750807ffb6ce71fc7d10cac8bded0872bf5',
 };
@@ -70,6 +71,7 @@ test('attach stores a validated image before committing ordered VisitMedia metad
     originalFilename: 'image',
     contentType: 'image/jpeg',
     byteSize: 4,
+    displayId: 'pm_public-media-token',
     contentSha256:
       '374ffede23adbc8bc625205f4bf86750807ffb6ce71fc7d10cac8bded0872bf5',
     caption: 'Chef selection',
@@ -99,7 +101,9 @@ test('attach stores a validated image before committing ordered VisitMedia metad
         objectKey: undefined,
         contentUrl: '/api/media/media-1/content',
       },
-    ].map(({ objectKey: _objectKey, ...record }) => record),
+    ].map(
+      ({ objectKey: _objectKey, displayId: _displayId, ...record }) => record,
+    ),
   });
 });
 
@@ -522,6 +526,9 @@ function writableApplication(overrides = {}) {
   const state = {
     async list() {
       return [];
+    },
+    async findByDisplayId() {
+      return undefined;
     },
     async find() {
       return undefined;

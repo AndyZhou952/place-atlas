@@ -8,6 +8,10 @@ const visitRoot = fileURLToPath(new URL('.', import.meta.url));
 test('Visit handlers receive item projection through a narrow seam', () => {
   for (const filename of productionTypeScriptFiles(visitRoot)) {
     const source = readFileSync(filename, 'utf8');
+    if (filename.endsWith('/visit-item-projection.ts')) {
+      assert.match(source, /\bprojectCatalog\b/u, filename);
+      continue;
+    }
     assert.doesNotMatch(source, /\bprojectCatalog\b/u, filename);
     assert.doesNotMatch(source, /\bCatalogStateSnapshot\b/u, filename);
     assert.doesNotMatch(source, /\btoCatalogSnapshot\b/u, filename);

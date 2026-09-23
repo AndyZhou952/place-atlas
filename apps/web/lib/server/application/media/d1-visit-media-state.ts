@@ -3,9 +3,13 @@ import type {
   VisitMediaFilters,
   VisitMediaMetadata,
 } from '@/product/application/media/visit-media';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from '../d1-mutation-receipt-state.ts';
 
 interface VisitMediaRow {
   readonly id: string;
+  readonly display_id: string;
   readonly visit_id: string;
   readonly item_id: string;
   readonly object_key: string;
@@ -61,6 +65,14 @@ export class D1VisitMediaState implements VisitMediaRecordState {
     return row ? toVisitMediaMetadata(row) : undefined;
   }
 
+  async findByDisplayId(displayId: string) {
+    const row = await this.#database
+      .prepare(`${selectVisitMediaSql} WHERE display_id = ?`)
+      .bind(displayId)
+      .first<VisitMediaRow>();
+    return row ? toVisitMediaMetadata(row) : undefined;
+  }
+
   async getVisitContext(visitId: string) {
     const row = await this.#database
       .prepare(
@@ -78,18 +90,23 @@ export class D1VisitMediaState implements VisitMediaRecordState {
       : undefined;
   }
 
-  async insert(records: readonly VisitMediaMetadata[]) {
-    await this.#database.batch(
+  async insert(
+    records: readonly VisitMediaMetadata[],
+    atomicCommit?: AtomicMutationCommit,
+  ) {
+    await commitD1MutationAtomically(
+      this.#database,
       records.map((media) =>
         this.#database
           .prepare(
             `INSERT INTO visit_media
-             (id, visit_id, item_id, object_key, original_filename, content_type,
+             (id, display_id, visit_id, item_id, object_key, original_filename, content_type,
               byte_size, content_sha256, caption, display_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             media.id,
+            media.displayId,
             media.visitId,
             media.itemId,
             media.objectKey,
@@ -103,6 +120,7 @@ export class D1VisitMediaState implements VisitMediaRecordState {
             media.updatedAt,
           ),
       ),
+      atomicCommit,
     );
   }
 
@@ -110,11 +128,28 @@ export class D1VisitMediaState implements VisitMediaRecordState {
     id: string,
     caption: string | undefined,
     updatedAt: string,
+    atomicCommit?: AtomicMutationCommit,
   ) {
+    if (atomicCommit) {
+      const existing = await this.find(id);
+      if (!existing) return undefined;
+      await commitD1MutationAtomically(
+        this.#database,
+        [
+          this.#database
+            .prepare(
+              'UPDATE visit_media SET caption = ?, updated_at = ? WHERE id = ?',
+            )
+            .bind(caption ?? null, updatedAt, id),
+        ],
+        atomicCommit,
+      );
+      return { ...existing, caption, updatedAt };
+    }
     const row = await this.#database
       .prepare(
         `UPDATE visit_media SET caption = ?, updated_at = ? WHERE id = ?
-         RETURNING id, visit_id, item_id, object_key, original_filename,
+         RETURNING id, display_id, visit_id, item_id, object_key, original_filename,
                    content_type, byte_size, content_sha256, caption,
                    display_order, created_at, updated_at`,
       )
@@ -123,11 +158,25 @@ export class D1VisitMediaState implements VisitMediaRecordState {
     return row ? toVisitMediaMetadata(row) : undefined;
   }
 
-  async delete(id: string) {
+  async delete(id: string, atomicCommit?: AtomicMutationCommit) {
+    if (atomicCommit) {
+      const existing = await this.find(id);
+      if (!existing) return undefined;
+      await commitD1MutationAtomically(
+        this.#database,
+        [
+          this.#database
+            .prepare('DELETE FROM visit_media WHERE id = ?')
+            .bind(id),
+        ],
+        atomicCommit,
+      );
+      return existing;
+    }
     const row = await this.#database
       .prepare(
         `DELETE FROM visit_media WHERE id = ?
-         RETURNING id, visit_id, item_id, object_key, original_filename,
+         RETURNING id, display_id, visit_id, item_id, object_key, original_filename,
                    content_type, byte_size, content_sha256, caption,
                    display_order, created_at, updated_at`,
       )
@@ -140,6 +189,7 @@ export class D1VisitMediaState implements VisitMediaRecordState {
 function toVisitMediaMetadata(row: VisitMediaRow): VisitMediaMetadata {
   return {
     id: row.id,
+    displayId: row.display_id,
     visitId: row.visit_id,
     itemId: row.item_id,
     objectKey: row.object_key,
@@ -154,6 +204,6 @@ function toVisitMediaMetadata(row: VisitMediaRow): VisitMediaMetadata {
   };
 }
 
-const selectVisitMediaSql = `SELECT id, visit_id, item_id, object_key,
+const selectVisitMediaSql = `SELECT id, display_id, visit_id, item_id, object_key,
   original_filename, content_type, byte_size, content_sha256, caption,
   display_order, created_at, updated_at FROM visit_media`;

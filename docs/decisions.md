@@ -1,6 +1,6 @@
 # Japan Atlas 决策登记册
 
-最后更新：2026-09-12
+最后更新：2026-09-21
 
 本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
 
@@ -146,6 +146,32 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 允许使用明确不用于训练且提供受限保留配置的云模型处理批准的第三方材料与私人内容。提交前剥离 EXIF、Cookie、token 和无关凭证；应用日志只保留结构化结果。未来如私人媒体需要更强隔离，可在同一模型处理 port 后增加本地 adapter，而不改变产品核心。
 
+### D-020：未部署 reset migration 的一次性安全重排
+
+**状态：Accepted（2026-09-12）**
+
+原 `0003_reset_test_place_assessments.sql` 从未在生产执行。为先建立完整生产快照与恢复能力，允许一次性把其 SQL 按字节与 SHA-256 原样转为 non-runnable pending artifact；新的 active 0003 只建立持久化 maintenance fence、write lease 与 snapshot 控制结构。完整 before evidence 和全 D1 恢复演练通过后，原 reset SQL 才以 active 0004 发布，CI 必须证明 0004 与 pending artifact 逐字节一致。
+
+这不是修改已部署 migration 的先例。任何已经部署的 migration 继续不可修改；已保存但未部署且带原 reset 0003 的 Site version 16 永不发布。详细门禁见 `features/003-production-snapshot/spec.md`。
+
+### D-021：确定性项目命令路由与微信入站门
+
+**状态：Accepted（2026-09-13）**
+
+单一微信前门使用显式项目注册表。规范入口 `/jpmap` 必须在模型参与前通过 OpenClaw 原生 plugin command 进入受信任路由，且不得注册模型可选择的 Atlas tool；平台 auth 后仍精确绑定 sender、channel、direct from/to 与无 thread 上下文。无斜杠 `jpmap` 与连续 capture 只有在代码自有的 `PreModelIngressRouter` 位于 agent loop 之前且通过真实渠道零模型探针后才启用。路由逐项目绑定独立凭证、scope 和状态命名空间；普通助手模型以及任何其他项目均不能取得 Atlas 凭证。
+
+**重审条件：** OpenClaw/runtime/plugin/channel 版本或入站执行顺序改变，native command 或 ingress probe 失败，或者新增项目需要共享写权限时，关闭相关 capability gate 并重新评审。OpenClaw 2026.7.1 已证明 skill direct-dispatch 会把 optional tool 受普通 allowlist 约束，因此不得用全局 allowlist 作为回退。
+
+### D-022：Owner PoC 公开读取投影与 Owner 写门
+
+**状态：Accepted（2026-09-21）**
+
+用户已明确确认非敏感 PoC 展示内容可公开。Public Read v1 只开放 feature 005 规格定义的闭合 `PublicCatalogItemV1`、`PublicAssessmentV1`、`PublicVisitV1`、`PublicVisitMediaV1` 与照片二进制；授权必须先于 Application/R2，投影禁止领域对象直出。不得公开或由公开标识推导 object key、原文件名、hash、内部存储 ID、审计、receipt 或维护字段；未知读取默认要求 Owner session。所有浏览器写入仍要求 Owner session，Agent 使用独立 HMAC/scope。
+
+这是对 D-018 默认私人语义的有意 PoC 例外，不改变保留期限，也不承诺永久公开。录入真实敏感评论、Visit 或图片，或改变公开 DTO 前，必须收窄投影并重新安全评审。
+
+**重审条件：** 出现真实敏感内容、新读取 operation／字段、朋友分享之外的公开传播、多用户身份或匿名写入需求。
+
 ## 2. 提议中决策
 
 ### D-P01：OpenClaw 作为首个微信 runtime
@@ -167,6 +193,62 @@ OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin �
 **接受条件：** 微信 PoC 证明 24/7 需求，且本地 connector 同步协议可恢复。
 
 **重审条件：** 出现稳定官方 API、安全隔离的云浏览器，或本地可用性妨碍真实需求。
+
+### D-P03：Japan Atlas 云端核心与地点／路线供应商组合
+
+**状态：Proposed（2026-09-13）**
+
+PoC 将静态前端、Worker API、D1 与 R2 放在一个隔离 Cloudflare 环境。Nearby 的唯一候选全集来自 Japan Atlas Catalog；Google Geocoding/Routes 只提供请求内的位置与路线证据，DeepSeek 不参与距离或路线判断。地点发现仅属于 Catalog intake，Foursquare 已验证实验保留为未启用的可替换 adapter，最终供应商需在 Google Places、开放数据与用户确认数据之间按持久化许可、地图兼容、价格和日本分店质量另行决定。外部评分在许可证据完成前只瞬时显示或返回未知；walk-in／排队没有明确现时来源时一律 unknown。Lightsail 只承载 OpenClaw 与微信入口，因此未来可独立迁移到 Hetzner/OCI。
+
+**接受条件：** 完成条款/字段矩阵、固定日本样本校准、attribution/缓存合规检查、供应商 contract tests、配额与成本告警，并跑通隔离环境端到端测试。
+
+**重审条件：** 供应商条款、价格、覆盖或质量改变，出现可靠的 walk-in/queue 数据源，或真实流量超出 PoC 预算。
+
+### D-P04：Google 固定 origin 的 Cloudflare PoC 受限 egress 例外
+
+**状态：Proposed（2026-09-15；用户已于 2026-09-17 确认，仍待其余接受条件）**
+
+**用户确认：** 2026-09-17，同意隔离只读 PoC 采用本方案；其余接受条件仍须完成后才可转为 Accepted 或启用真实调用。
+
+**背景：** feature 004 规格要求 provider egress 在每次 DNS 解析和每一跳 redirect 上校验公网地址。`ProviderPolicyGateway` 因而把已校验的 `resolvedAddresses` 交给 transport；但 Cloudflare Workers 的标准 HTTPS `fetch` 只能按 URL 发起请求，不能把连接固定到这些地址，`resolveOverride` 对外部 Google 域名也不适用。显式校验与实际连接之间仍有 DNS TOCTOU 缝，不能把当前实现描述为满足逐 DNS／IP pin 保证。依据见 [Workers known issues](https://developers.cloudflare.com/workers/platform/known-issues/)、[Request `resolveOverride`](https://developers.cloudflare.com/workers/runtime-apis/request/#resolveoverride) 与 [Node DNS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/)。
+
+**提议：** 只在隔离的只读 Nearby PoC 中建立代码拥有的 Google 专用 transport adapter；构建时闭合的 endpoint tuple 仅为 `GET https://maps.googleapis.com:443/maps/api/geocode/json`、`POST https://routes.googleapis.com:443/distanceMatrix/v2:computeRouteMatrix`、`POST https://routes.googleapis.com:443/directions/v2:computeRoutes`，任何其他 host、port、path 或 method 组合都在发起网络请求前 fail closed。它的小接口只接受经过 schema 校验的 geocoding query、route matrix body 或 transit route body，不接受 URL；用户、模型和 provider 响应只能影响允许的 query/body 字段。Worker 使用平台 HTTPS/TLS 直接请求，设置 manual redirect，并把所有 3xx 当作 `dependency_failure`，不跟随任何跳转。
+
+这是相对现规格逐 DNS 校验并绑定已验证 IP 的**受限偏离**，不是等价实现。偏离只缩小固定 Google adapter 的网络威胁模型，不放宽通用 provider URL：任何其他 provider、payload 中返回的 URL 或未来任意 URL 抓取仍须经过原 `ProviderPolicyGateway` 的 origin/DNS/IP/redirect 契约；Cloudflare 无法兑现该契约时继续 fail closed。
+
+Google 调用仍必须经过已批准的 provider policy、字段许可与 warn/hard quota。secret 只在最终 transport 注入，缺失即 fail closed，且不得进入日志、D1/R2、prompt 或回执；Google 原始 JSON 只进入 adapter 内 mapper，只有批准的规范字段可离开 adapter；所有 Google 内容保持 request-only，不跨请求缓存或持久化。本提议不激活当前 `pending_review` policy，也不授权部署或使用真实凭证。
+
+**未选方案：** B 是增加能固定已验证 IP 并校验原 hostname TLS 的 egress proxy，可保留原保证，但会新增网络信任区、鉴权、证书、可用性、成本和部署运维，超出当前只读 PoC。C 是把 Google egress 放到 Lightsail/Node，以 custom DNS lookup 与 TLS `servername` 保留原保证；它会把 Google secret 和 Atlas 路线可用性绑定到目前只承载 OpenClaw 的 VM，增加跨区一跳和未来迁移耦合。两者在固定官方 origin、低流量、月预算 60 美元的 PoC 中收益不足，但仍是需要更强网络保证时的回退方案。
+
+**接受条件：** 用户明确接受上述受限偏离；独立架构／安全评审通过；contract tests 对三个允许 tuple 分别提供正测，并对 host、port、path、method 的每类变体提供负测，同时证明输入不能影响 endpoint、所有 redirect 拒绝、字段与 quota 失败关闭、缺 secret 失败关闭，以及 secret／原始响应不被记录、持久化或返回。供应商 policy 仍须在条款、credential scope、attribution 与预算证据通过后另行批准，之后才可启用真实调用。
+
+**重审条件：** 超出隔离只读 PoC；新增或改变 Google origin/path/method；需要跟随 redirect；任何用户、模型或 provider 数据开始影响目标 URL；复用本例外到其他 provider 或主动抓取返回 URL；Cloudflare 的 DNS/fetch/TLS 行为变化；发生 DNS、证书或 egress 安全异常。命中任一条件即关闭该 transport 并重新比较通用 gateway、B 或 C。
+
+### D-P05：独立只读 Google Route Sidecar
+
+**状态：Proposed（2026-09-21；上线前须独立评审）**
+
+Owner 写 Worker 不继承 D-P04 的隔离只读 egress 结论。Google Geocoding/walking Route Matrix 放入独立 Cloudflare Route Sidecar：Sidecar 配置 `workers_dev=false` 且无 routes，只持 Google key，不绑定 Owner 密码、owner D1/R2 或 Agent HMAC；owner-poc 通过窄结构化 service binding 发送本次位置线索与 Catalog shortlist 坐标。D-P04 的固定 endpoint、禁 redirect、字段许可仅在 Sidecar 内继续适用。
+
+owner-poc 在 service binding 调用前按 provider + SKU + UTC period 原子预留用量：Geocoding 8,000 requests/月、walking Route Matrix 8,000 billable elements/月，provider 失败不退款；Google Cloud quota 是第二道门。Transit Routes 暂不启用，启用前另定 cap、费用映射和 fixtures。Sidecar 只返回带 attribution/source/checkedAt 的闭合 evidence；原始 JSON、解析地址/坐标与路线 payload不写 D1/R2、日志、prompt 或 Leaflet。
+
+**接受条件：** 独立威胁模型与安全评审通过；preflight 证明配置无公网 route、直接公网 URL 不可达、未绑定 Worker 无法调用；固定 endpoint/redirect/secret、两个 hard cap、Matrix elements、并发、失败不退款、request-only、attribution 与公开 ToS/Privacy contract tests 全绿。
+
+**重审条件：** Sidecar 获得 Owner/Agent 凭证或业务存储、出现公共 route、启用 Transit/其他 provider、改变 Google endpoint，或任何请求数据能影响目标 URL。
+
+### D-P06：OpenClaw 同机的受限 Research Relay 信任区
+
+**状态：Proposed（2026-09-22；T-15 preflight 与独立威胁评审前不得启用）**
+
+Add 的 `CatalogIntakeModule` 与 D1 保持 research 预算权威，production `WebResearchPort` 暂提议由与 OpenClaw 同机的无状态 Research Relay 实现，以复用其 search/browser capability，而不把联网编排或写权限交给 Agent。每个 phase 外呼前，D1 transaction 必须原子标记整个 phase spent（失败不退款、无自动 retry），再签发短时 allowance，闭合包含 session、phase、Owner query 或 preview canonical URLs digest、max counts、deadline 与 requestId。Relay 只经 protected Cloudflare Tunnel/auth endpoint 接收 allowance，校验签名、期限、URL/redirect/count，关闭 transport retry，只返回签名的闭合 scalar evidence + usage 并立即丢弃 raw；response loss 视为 spent，回退 unknown/manual，绝不再次 egress。
+
+Relay 不持 D1、Owner Cookie/HMAC、Catalog 写凭证或产品数据；可为 transport replay defense 保留短时 requestId，但不能持久化 intake 内容。core 仍独占 session、phase reserve、preview digest、confirm refresh、provenance assignment、幂等与 Catalog publication 调用；Relay/OpenClaw 不执行 confirm。独立 relay secret 只在 Worker Secret 与 root-only host store；实现可在不改变 port 的情况下替换为批准的 Cloudflare search adapter。
+
+Relay-owned transport 只允许 HTTPS:443，拒绝 URL credentials、IP literal、非批准 scheme/port 与云 metadata hostname。初始 host 与每次 redirect 均解析 A+AAAA，拒绝 loopback、private、link-local、multicast、unspecified、CGNAT、ULA 及云 metadata ranges/hostnames；连接固定到验证后的 IP，同时保留原 hostname 的 TLS SNI/Host，每跳重新验证且最多 3 跳。OpenClaw search tool 只能提供 URL candidates；canonical page content 必须经该 hardened transport 抓取，不能由通用 browser fetch 旁路。
+
+**接受条件：** T-15 preflight 证明 exact OpenClaw tool binding、Tunnel/relay 身份、无公网旁路、allowance tamper/expiry/replay 拒绝、每阶段单次消费、response-loss 不重试、签名 scalar/usage、raw 丢弃与零产品存储；SSRF tests 覆盖 A+AAAA、禁止地址/metadata、TLS SNI/Host pin、逐跳 redirect 与 DNS rebinding fixtures；独立架构与安全评审通过。
+
+**重审／拒绝条件：** OpenClaw/transport 无法兑现上述闭合 binding 或 DNS/IP pin；Relay 需要 Owner/Catalog/D1 凭证或持久产品数据；存在公网/通用 browser fetch 旁路、自动 retry、未签名结果或 phase 二次 egress；Tunnel/host、DNS 或工具行为改变。命中任一条件即关闭 Relay并回退 unknown/manual，重新比较同 port 的替代 adapter。
 
 ## 3. 已替代决策
 

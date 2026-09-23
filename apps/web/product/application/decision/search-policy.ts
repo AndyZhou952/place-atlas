@@ -25,7 +25,7 @@ export function matchesAtlasQuery(item: AtlasItem, query: string): boolean {
   });
 }
 
-function normalizeSearchText(value: string): string {
+export function normalizeSearchText(value: string): string {
   return value
     .normalize('NFKC')
     .toLocaleLowerCase()

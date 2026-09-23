@@ -8,6 +8,27 @@ void application.execute({
 });
 void application.execute({ key: 'catalog.get', input: { id: 'item-1' } });
 void application.execute({
+  key: 'catalog.intake.discover',
+  input: { query: '鮮 さいとう', requestToken: 'request-1' },
+});
+void application.execute({
+  key: 'catalog.intake.select',
+  input: {
+    sessionId: 'session-1',
+    expectedSessionVersion: 1,
+    ordinal: 1,
+    requestResearch: false,
+  },
+});
+void application.execute({
+  key: 'catalog.intake.confirm',
+  input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+});
+void application.execute({
+  key: 'catalog.intake.cancel',
+  input: { sessionId: 'session-1', expectedSessionVersion: 1 },
+});
+void application.execute({
   key: 'catalog.save_discovered',
   input: {
     id: 'item-1',

@@ -11,6 +11,7 @@ import { openVisitMediaResponse } from './open-visit-media-response.ts';
 
 const metadata = {
   id: 'media-1',
+  displayId: 'pm_media-1',
   visitId: 'visit-1',
   itemId: 'item-1',
   objectKey: 'visits/visit-1/media-1',
@@ -23,7 +24,16 @@ const metadata = {
   updatedAt: '2026-09-10T08:00:00.000Z',
 };
 
-test('the media content adapter preserves bytes and private cache headers', async () => {
+const verifiedDisplayAccess = {
+  async allowsItem(itemId) {
+    return itemId === metadata.itemId;
+  },
+  async filterAllowed(records) {
+    return records.filter(({ itemId }) => itemId === metadata.itemId);
+  },
+};
+
+test('the media content adapter preserves bytes and emits fixed public headers', async () => {
   const body = new ReadableStream({
     start(controller) {
       controller.enqueue(Uint8Array.of(1, 2, 3));
@@ -36,16 +46,22 @@ test('the media content adapter preserves bytes and private cache headers', asyn
       new InMemoryMediaObjectStore(
         new Map([[metadata.objectKey, { body, etag: '"etag-1"' }]]),
       ),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 
-  const response = await openVisitMediaResponse(application, metadata.id);
+  const response = await openVisitMediaResponse(
+    application,
+    metadata.displayId,
+  );
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('cache-control'), 'private, max-age=3600');
-  assert.equal(response.headers.get('content-length'), '3');
+  assert.equal(response.headers.get('cache-control'), 'public, max-age=3600');
+  assert.equal(response.headers.get('content-disposition'), 'inline');
+  assert.equal(response.headers.get('content-length'), null);
   assert.equal(response.headers.get('content-type'), 'image/jpeg');
-  assert.equal(response.headers.get('etag'), '"etag-1"');
+  assert.equal(response.headers.get('etag'), null);
   assert.deepEqual(
     new Uint8Array(await response.arrayBuffer()),
     Uint8Array.of(1, 2, 3),
@@ -57,22 +73,26 @@ test('the media content adapter maps missing metadata and objects separately', a
     createMediaOperationGroup(
       new InMemoryVisitMediaState(),
       new InMemoryMediaObjectStore(),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
   const missingObjectApplication = createAtlasApplication(
     createMediaOperationGroup(
       new InMemoryVisitMediaState([metadata]),
       new InMemoryMediaObjectStore(),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 
   const missingMetadata = await openVisitMediaResponse(
     missingMetadataApplication,
-    'missing',
+    'pm_missing',
   );
   const missingObject = await openVisitMediaResponse(
     missingObjectApplication,
-    metadata.id,
+    metadata.displayId,
   );
 
   assert.equal(missingMetadata.status, 404);
@@ -92,10 +112,15 @@ test('cancelling the HTTP response body cancels the storage stream', async () =>
     createMediaOperationGroup(
       new InMemoryVisitMediaState([metadata]),
       new InMemoryMediaObjectStore(new Map([[metadata.objectKey, { body }]])),
+      undefined,
+      verifiedDisplayAccess,
     ),
   );
 
-  const response = await openVisitMediaResponse(application, metadata.id);
+  const response = await openVisitMediaResponse(
+    application,
+    metadata.displayId,
+  );
   await response.body.cancel('transport aborted');
 
   assert.equal(cancellations, 1);

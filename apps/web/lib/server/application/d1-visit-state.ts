@@ -8,6 +8,9 @@ import type {
   VisitRecordState,
 } from '@/product/application/visits/visit-state';
 import type { Visit } from '@/product/application/visits/visit';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface VisitRow {
   readonly id: string;
@@ -22,6 +25,7 @@ interface VisitRow {
 interface ItemContextRow {
   readonly item_id: string;
   readonly payload_json?: string | null;
+  readonly review_candidate_payload_json?: string | null;
   readonly override_title?: string | null;
   readonly override_description?: string | null;
   readonly override_personal_state?: PersonalState | null;
@@ -77,14 +81,26 @@ export class D1VisitState implements VisitRecordState {
     return row ? { ...toItemContext(row), visit: toVisit(row) } : undefined;
   }
 
-  async create({ visit, assessment }: CreateVisitRecords) {
-    const statements = [this.insertVisitStatement(visit)];
+  async create(
+    { visit, assessment }: CreateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ) {
+    const statements = [
+      this.insertVisitStatement(visit, Boolean(atomicCommit)),
+    ];
     if (assessment) statements.push(this.upsertRatingStatement(assessment));
-    const results = await this.#database.batch(statements);
+    const results = await commitD1MutationAtomically(
+      this.#database,
+      statements,
+      atomicCommit,
+    );
     return { inserted: (results[0]?.meta.changes ?? 0) > 0 };
   }
 
-  async update({ visit, assessment }: UpdateVisitRecords): Promise<void> {
+  async update(
+    { visit, assessment }: UpdateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
     const statements = [
       this.#database
         .prepare(
@@ -94,16 +110,19 @@ export class D1VisitState implements VisitRecordState {
         .bind(visit.visitedAt, visit.note ?? null, visit.updatedAt, visit.id),
     ];
     if (assessment) statements.push(this.upsertRatingStatement(assessment));
-    await this.#database.batch(statements);
+    await commitD1MutationAtomically(this.#database, statements, atomicCommit);
   }
 
-  private insertVisitStatement(visit: Visit): D1PreparedStatement {
+  private insertVisitStatement(
+    visit: Visit,
+    requireInsert: boolean,
+  ): D1PreparedStatement {
     return this.#database
       .prepare(
         `INSERT INTO visits
          (id, item_id, item_title, visited_at, note, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO NOTHING`,
+         ${requireInsert ? '' : 'ON CONFLICT(id) DO NOTHING'}`,
       )
       .bind(
         visit.id,
@@ -157,7 +176,8 @@ function toItemContext(row: ItemContextRow): VisitItemRecordContext {
   const hasAssessment = row.assessment_updated_at != null;
   return {
     itemId: row.item_id,
-    dynamicPayload: row.payload_json ?? undefined,
+    dynamicPayload:
+      row.payload_json ?? row.review_candidate_payload_json ?? undefined,
     override: hasOverride
       ? {
           itemId: row.item_id,
@@ -185,6 +205,7 @@ function toItemContext(row: ItemContextRow): VisitItemRecordContext {
 const itemContextSql = `WITH requested(item_id) AS (VALUES (?))
   SELECT requested.item_id,
          items.payload_json,
+         review_candidates.payload_json AS review_candidate_payload_json,
          overrides.title AS override_title,
          overrides.description AS override_description,
          overrides.personal_state AS override_personal_state,
@@ -198,6 +219,8 @@ const itemContextSql = `WITH requested(item_id) AS (VALUES (?))
          (SELECT COUNT(*) FROM visits WHERE item_id = requested.item_id) AS visit_count
   FROM requested
   LEFT JOIN atlas_items AS items ON items.id = requested.item_id
+  LEFT JOIN atlas_review_candidates AS review_candidates
+    ON review_candidates.id = requested.item_id
   LEFT JOIN atlas_item_overrides AS overrides ON overrides.item_id = requested.item_id
   LEFT JOIN place_assessments AS assessments ON assessments.item_id = requested.item_id
   LEFT JOIN atlas_item_tombstones AS tombstones ON tombstones.item_id = requested.item_id`;
@@ -208,6 +231,7 @@ const visitContextSql = `WITH requested_visit AS (
   )
   SELECT requested_visit.*,
          items.payload_json,
+         review_candidates.payload_json AS review_candidate_payload_json,
          overrides.title AS override_title,
          overrides.description AS override_description,
          overrides.personal_state AS override_personal_state,
@@ -221,6 +245,8 @@ const visitContextSql = `WITH requested_visit AS (
          (SELECT COUNT(*) FROM visits WHERE item_id = requested_visit.item_id) AS visit_count
   FROM requested_visit
   LEFT JOIN atlas_items AS items ON items.id = requested_visit.item_id
+  LEFT JOIN atlas_review_candidates AS review_candidates
+    ON review_candidates.id = requested_visit.item_id
   LEFT JOIN atlas_item_overrides AS overrides ON overrides.item_id = requested_visit.item_id
   LEFT JOIN place_assessments AS assessments ON assessments.item_id = requested_visit.item_id
   LEFT JOIN atlas_item_tombstones AS tombstones ON tombstones.item_id = requested_visit.item_id`;

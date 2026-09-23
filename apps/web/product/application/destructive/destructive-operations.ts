@@ -2,7 +2,8 @@ import {
   defineOperationGroup,
   type OperationDefinition,
 } from '../atlas-application.ts';
-import type { AtlasItem } from '../catalog/atlas-item.ts';
+import type { VisitItemProjection } from '../visits/visit-item-projection.ts';
+import type { VisitTarget } from '../visits/visit-target.ts';
 import { failure, success, type Result } from '../result.ts';
 import type {
   DestructiveItemProjection,
@@ -11,7 +12,7 @@ import type {
 } from './destructive-state.ts';
 
 export interface DeleteVisitResult {
-  readonly item: AtlasItem;
+  readonly item: VisitTarget;
 }
 
 export interface DeleteAtlasItemResult {
@@ -26,6 +27,7 @@ export interface DestructiveDependencies {
 export function createDestructiveOperationGroup(
   state: DestructiveRecordState,
   itemProjection: DestructiveItemProjection,
+  visitItemProjection: VisitItemProjection,
   objects: DestructiveMediaObjects,
   dependencies: DestructiveDependencies,
 ) {
@@ -41,24 +43,27 @@ export function createDestructiveOperationGroup(
       effect: 'destructive',
       validate: validateId,
     },
-    async handle({ id }) {
+    async handle({ id }, execution) {
       try {
         const context = await state.readVisitDeletion(id);
         if (!context) {
           return failure('not_found', 'Journal entry not found.');
         }
-        const item = itemProjection.project(context);
+        const item = visitItemProjection.project(context);
         if (!item) return failure('not_found', 'Atlas item not found.');
 
-        await state.commitVisitDeletion(id);
-        await deleteObjectsBestEffort(objects, context.mediaObjectKeys);
-        return success({
-          item: itemProjection.project({
+        const output = {
+          item: visitItemProjection.project({
             ...context,
             visitCount: Math.max(0, context.visitCount - 1),
-            mediaObjectKeys: [],
           })!,
-        });
+        };
+        await state.commitVisitDeletion(
+          id,
+          execution?.atomicMutation?.receiptFor(output),
+        );
+        await deleteObjectsBestEffort(objects, context.mediaObjectKeys);
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

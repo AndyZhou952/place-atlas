@@ -1,4 +1,4 @@
-import type { AtlasItem } from '../catalog/atlas-item.ts';
+import type { VisitTarget } from './visit-target.ts';
 
 export interface Visit {
   readonly id: string;
@@ -27,5 +27,5 @@ export interface VisitUpdate {
 
 export interface VisitMutationResult {
   readonly visit: Visit;
-  readonly item: AtlasItem;
+  readonly item: VisitTarget;
 }

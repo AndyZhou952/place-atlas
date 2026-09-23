@@ -43,7 +43,8 @@
 | DOC-03 | 文档 | 中文核心文档、统一决策与 Issue 跟踪规则 | — | 完成 | 实验 |
 | MAP-04 | 地图性能 | 托管环境 trace 和移动端验收；必要时比较矢量方案 | 当前 adapter | 进行中，[#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1) | 实验 |
 | MEDIA-02 | 媒体加固 | 服务端可信尺寸、缩略图、失败批次重试、孤儿清理与指标 | 现有媒体链路 | 进行中，[#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4) | 实验 |
-| CORE-14 | 生产切换 | 经批准后备份、四字段测试状态 reset、部署、对账与回退验证 | Agent-ready core PR CI | 下一步，需人工批准窗口 | 实验 |
+| OPS-00 | 生产快照安全 | owner-only snapshot/restore、全入口写入 fence、托管证明与 snapshot-only compatibility build | APP-01 | 进行中，[feature 003](../features/003-production-snapshot/tickets.md) | 实验 |
+| CORE-14 | 生产切换 | 经批准后备份、四字段测试状态 reset、部署、对账与回退验证 | OPS-00、Agent-ready core PR CI | 受阻，需人工批准窗口 | 实验 |
 | APP-01 | 应用边界 | 从 D1 store 抽取框架无关 ports/use cases | 当前 API | 完成 | 实验 |
 | APP-02 | 写入可靠性 | 通用幂等键、审计 receipt 和可恢复删除策略 | APP-01 | 下一步 | 实验 |
 | AGENT-01 | 类型化操作 | search/recommend/place/Visit/rating/tag/media/import 工具 | APP-01 | 完成 | 实验 |
@@ -69,15 +70,16 @@
 
 ## 4. 当前执行顺序
 
-1. Agent-ready core PR 的 GitHub CI 已通过；用户批准具体维护窗口后才执行 `CORE-14`，否则生产保持不变。
-2. 补通用幂等、授权、审计 receipt 和可恢复删除边界；媒体缩略图等低风险体验项继续放在 #4。
-3. 用非微信测试 adapter 验证所有 20 个日常操作及负面授权场景。
-4. 准备独立浏览器，完成范围受控的来源采集→证据→审核实验。
-5. 运行校准数据后确认自动判断／人工审核取舍。
-6. 实现并比较 Agent runtime，再做微信私聊 PoC。
-7. PoC 成功后才选择 24/7 region/provider，随后做稳定性和旅行演练。
+1. 先按 feature 003 完成 `OPS-00`：真实托管硬门、完整 snapshot/restore、snapshot-only compatibility build；任何证明缺失均失败关闭。
+2. `OPS-00` 完成后，仍须用户批准具体维护窗口才执行 `CORE-14`；此前不部署 active 0004 或 reset。
+3. 补通用幂等、授权、审计 receipt 和可恢复删除边界；媒体缩略图等低风险体验项继续放在 #4。
+4. 用非微信测试 adapter 验证所有 20 个日常操作及负面授权场景。
+5. 准备独立浏览器，完成范围受控的来源采集→证据→审核实验。
+6. 运行校准数据后确认自动判断／人工审核取舍。
+7. 实现并比较 Agent runtime，再做微信私聊 PoC。
+8. PoC 成功后才选择 24/7 region/provider，随后做稳定性和旅行演练。
 
-地图 #1 不阻塞第 2–6 步，除非已经影响基本数据操作。View 拆分也不应阻塞应用层抽取。
+地图 #1 不阻塞第 3–7 步，除非已经影响基本数据操作。View 拆分也不应阻塞应用层抽取。
 
 ## 5. 里程碑验收
 

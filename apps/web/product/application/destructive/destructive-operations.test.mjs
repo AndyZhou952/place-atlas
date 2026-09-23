@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { createAtlasApplication } from '../atlas-application.ts';
 import { createCatalogItemProjection } from '../catalog/catalog-item-projection.ts';
+import { createVisitTargetProjection } from '../visits/visit-item-projection.ts';
+import { createVisitOperationGroup } from '../visits/visit-operations.ts';
 import { createDestructiveOperationGroup } from './destructive-operations.ts';
 import { InMemoryDestructiveState } from './in-memory-destructive-state.ts';
 
@@ -35,6 +37,7 @@ test('deleting a Visit commits structured records before best-effort object clea
     createDestructiveOperationGroup(
       state,
       createCatalogItemProjection([item]),
+      createVisitTargetProjection([item]),
       objects,
       { clock },
     ),
@@ -83,6 +86,83 @@ test('Visit deletion derives final effective visited from remaining Visits or ma
       `${manualVisited} OR ${visitCount - 1}`,
     );
   }
+});
+
+test('Visit deletion accepts an owner-only Review Candidate and rolls effective visited back after its final Visit', async () => {
+  const candidate = reviewCandidate('review-one');
+  const state = stateWith({
+    async readVisitDeletion() {
+      return context({
+        itemId: candidate.id,
+        dynamicPayload: JSON.stringify(candidate),
+        visitCount: 1,
+      });
+    },
+  });
+  const application = createAtlasApplication(
+    createDestructiveOperationGroup(
+      state,
+      createCatalogItemProjection([]),
+      createVisitTargetProjection([]),
+      { async delete() {} },
+      { clock },
+    ),
+  );
+
+  const result = await application.execute({
+    key: 'visit.delete',
+    input: { id: 'candidate-visit' },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok && result.value.item.recordType, 'review_candidate');
+  assert.equal(result.ok && result.value.item.hasVisited, false);
+});
+
+test('an owner-only Review Candidate completes the create-update-delete Visit lifecycle and returns to unvisited', async () => {
+  const candidate = reviewCandidate('review-lifecycle');
+  const state = candidateVisitLifecycleState(candidate);
+  const visitProjection = createVisitTargetProjection([]);
+  const application = createAtlasApplication({
+    ...createVisitOperationGroup(state, visitProjection, {
+      clock,
+      idSource: { nextId: () => 'candidate-visit' },
+    }),
+    ...createDestructiveOperationGroup(
+      state,
+      createCatalogItemProjection([]),
+      visitProjection,
+      { async delete() {} },
+      { clock },
+    ),
+  });
+
+  const created = await application.execute({
+    key: 'visit.create',
+    input: {
+      id: 'candidate-visit',
+      itemId: candidate.id,
+      visitedAt: '2026-09-12',
+      note: 'First note',
+    },
+  });
+  const updated = await application.execute({
+    key: 'visit.update',
+    input: {
+      id: 'candidate-visit',
+      visitedAt: '2026-09-13',
+      note: 'Updated note',
+    },
+  });
+  const deleted = await application.execute({
+    key: 'visit.delete',
+    input: { id: 'candidate-visit' },
+  });
+
+  assert.equal(created.ok && created.value.item.hasVisited, true);
+  assert.equal(updated.ok && updated.value.item.hasVisited, true);
+  assert.equal(deleted.ok && deleted.value.item.hasVisited, false);
+  assert.deepEqual(await state.list(), []);
 });
 
 test('Visit deletion keeps success when object cleanup fails, but not when D1 fails', async () => {
@@ -238,6 +318,7 @@ test('the InMemory adapter removes the complete AtlasItem aggregate and exposes 
         overallRating: 4.5,
         isFavorite: true,
         manualVisited: true,
+        updatedAt: 'assessment-time',
       },
     ],
     visits: [{ id: 'visit-dynamic', itemId: dynamic.id }],
@@ -253,6 +334,7 @@ test('the InMemory adapter removes the complete AtlasItem aggregate and exposes 
     createDestructiveOperationGroup(
       state,
       createCatalogItemProjection([]),
+      createVisitTargetProjection([]),
       { async delete() {} },
       { clock },
     ),
@@ -277,6 +359,7 @@ test('destructive descriptors reject blank IDs and remain classified as destruct
   const definitions = createDestructiveOperationGroup(
     stateWith(),
     createCatalogItemProjection([item]),
+    createVisitTargetProjection([item]),
     { async delete() {} },
     { clock },
   );
@@ -306,6 +389,7 @@ function app(state, objects = { async delete() {} }) {
     createDestructiveOperationGroup(
       state,
       createCatalogItemProjection([item]),
+      createVisitTargetProjection([item]),
       objects,
       { clock },
     ),
@@ -362,5 +446,80 @@ function atlasItem(id) {
     personalState: 'candidate',
     tags: [],
     sources: [],
+  };
+}
+
+function reviewCandidate(id) {
+  return {
+    id,
+    recordType: 'review_candidate',
+    kind: 'food',
+    title: 'Needs review',
+    description: 'Awaiting owner review',
+    verificationStatus: 'needs_review',
+    personalState: 'candidate',
+    hasVisited: true,
+    tags: [],
+    reviewEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google_places',
+        placeId: `${id}-place`,
+      },
+      ownerFields: { title: 'Needs review' },
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: ['address', 'coordinates'],
+      warnings: [{ code: 'needs_review', message: 'Location needs review.' }],
+    },
+    updatedAt: '2026-09-12T12:00:00.000Z',
+  };
+}
+
+function candidateVisitLifecycleState(candidate) {
+  let visits = [];
+  let assessment;
+  const itemContext = () => ({
+    itemId: candidate.id,
+    dynamicPayload: JSON.stringify(candidate),
+    assessment,
+    tombstoned: false,
+    visitCount: visits.length,
+  });
+  return {
+    async list() {
+      return structuredClone(visits);
+    },
+    async readItemContext() {
+      return itemContext();
+    },
+    async readVisitContext(id) {
+      const visit = visits.find((entry) => entry.id === id);
+      return visit
+        ? { ...itemContext(), visit: structuredClone(visit) }
+        : undefined;
+    },
+    async create(records) {
+      visits.push(structuredClone(records.visit));
+      assessment = structuredClone(records.assessment);
+      return { inserted: true };
+    },
+    async update(records) {
+      visits = visits.map((entry) =>
+        entry.id === records.visit.id ? structuredClone(records.visit) : entry,
+      );
+      if (records.assessment) assessment = structuredClone(records.assessment);
+    },
+    async readVisitDeletion(id) {
+      const visit = visits.find((entry) => entry.id === id);
+      return visit ? { ...itemContext(), mediaObjectKeys: [] } : undefined;
+    },
+    async commitVisitDeletion(id) {
+      visits = visits.filter((entry) => entry.id !== id);
+    },
+    async readItemDeletion() {
+      return { ...itemContext(), mediaObjectKeys: [] };
+    },
+    async commitItemDeletion() {},
   };
 }

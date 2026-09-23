@@ -17,7 +17,7 @@
 - [x] T-11 WebMCP 与 capabilities 收缩 — Blocked by: T-10 — 从同一 adapter mapping 生成能力清单，持久操作不再读取 ViewModel cache。
 - [x] T-12 Reset migration 与维护工具 — Blocked by: T-05, T-09, T-11 — 新增封闭四字段 reset、D1/R2 快照验证和维护/回退 runbook；不执行生产 reset。
 - [x] T-13 最终收缩与架构适应度门 — Blocked by: T-02, T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-11, T-12 — 删除旧 writer/重复实现，加入依赖与 catalog 检查并通过完整 CI。
-- [ ] T-14 生产维护切换 — Blocked by: T-13 — 在独立代码门通过且用户批准窗口后，冻结写入、备份、reset、部署、对账、smoke 和恢复写入。
+- [ ] T-14 生产维护切换 — Blocked by: T-13, 003/T-26 — 在特性 003 完成 snapshot-only 部署、安全 before-evidence 交接、独立代码门通过且用户批准具体窗口后，冻结写入、备份、reset、部署、对账、smoke 和恢复写入。
 
 ## 每票 TDD 验收
 

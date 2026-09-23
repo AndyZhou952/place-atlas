@@ -1027,7 +1027,9 @@ function auditBrowserMapping(
       const pathValue = stringProperty(node, 'path');
       const bodyKind = stringProperty(node, 'bodyKind');
       const key = stringProperty(node, 'key');
-      const looksLikeMapping = Boolean(method || pathValue || bodyKind);
+      const looksLikeMapping = Boolean(
+        pathValue || bodyKind || (key && method),
+      );
       if (!looksLikeMapping) return;
       if (!method || !pathValue || !bodyKind || !key) {
         addViolation(violations, {
@@ -1530,9 +1532,19 @@ function auditUiModelAliases(
       const name =
         isCoreInterface || isCoreTypeLiteral ? statement.name.text : undefined;
       const owner = name ? manifest.coreModelOwners[name] : undefined;
+      const isApprovedUiAtlasItemProjection = Boolean(
+        isCoreTypeLiteral &&
+        name === 'AtlasItem' &&
+        path.normalize(candidate.filename) ===
+          path.normalize(manifest.uiCompatibilityModelFile) &&
+        isAllowedUiModelDeclaration(statement),
+      );
+
       if (
         name &&
-        (!owner || path.normalize(candidate.filename) !== path.normalize(owner))
+        (!owner ||
+          path.normalize(candidate.filename) !== path.normalize(owner)) &&
+        !isApprovedUiAtlasItemProjection
       ) {
         addViolation(violations, {
           rule: 'duplicate_core_model',
@@ -2113,7 +2125,9 @@ function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
   );
 }
 
-const allowedUiModelTypeExpressions: Readonly<Record<string, string>> = {
+const allowedUiModelTypeExpressions: Readonly<
+  Record<string, string | readonly string[]>
+> = {
   AtlasItemKind: 'CoreAtlasItemKind',
   AtlasView: "'map'|'inbox'|'journal'",
   AtlasKindFilter: "'all'|AtlasItemKind",
@@ -2125,14 +2139,18 @@ const allowedUiModelTypeExpressions: Readonly<Record<string, string>> = {
   TabelogSnapshot: 'CoreTabelogSnapshot',
   ReservationSnapshot: 'CoreReservationSnapshot',
   EventSchedule: 'CoreEventSchedule',
-  AtlasItem: 'CoreAtlasItem',
+  AtlasItem: [
+    'CoreAtlasItem',
+    'CoreAtlasItem&{readonlyoverallComment?:string;}',
+  ],
   AtlasItemEdit: 'CoreAtlasItemEdit',
   PlaceAssessment:
     "Omit<CorePlaceAssessment,'manualVisited'>&EffectiveVisitedProjection",
   PlaceAssessmentPatch:
     "Omit<CorePlaceAssessmentPatch,'manualVisited'>&EffectiveVisitedPatch",
   VisitRecord: 'CoreVisit',
-  VisitMediaRecord: 'CoreVisitMedia',
+  VisitMediaRecord:
+    "Pick<CoreVisitMedia,|'id'|'visitId'|'itemId'|'originalFilename'|'caption'|'displayOrder'|'contentUrl'>",
   NewVisit: 'CoreNewVisit',
   VisitUpdate: "Omit<CoreVisitUpdate,'id'>",
   VisitCreateResult: 'CoreVisitMutationResult',
@@ -2159,9 +2177,11 @@ const allowedUiModelInterfaces: Readonly<
 function isAllowedUiModelDeclaration(statement: ts.Statement): boolean {
   if (ts.isTypeAliasDeclaration(statement)) {
     const expected = allowedUiModelTypeExpressions[statement.name.text];
-    return Boolean(
-      expected && compactTypeText(statement.type.getText()) === expected,
-    );
+    if (!expected) return false;
+    const actual = compactTypeText(statement.type.getText());
+    return typeof expected === 'string'
+      ? actual === expected
+      : expected.includes(actual);
   }
   if (!ts.isInterfaceDeclaration(statement)) return false;
   const expected = allowedUiModelInterfaces[statement.name.text];

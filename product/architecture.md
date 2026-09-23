@@ -73,6 +73,7 @@ docs/                            稳定产品说明、路线图与已接受决�
 ## 6. 横切约定与决策
 
 - 所有外部输入先按版本化 schema 校验；网页、OCR、模型输出和文件元数据均不可信。错误映射稳定且不暴露内部或私密数据。
+- 匿名 Public Read 必须先以 verified Catalog 建立访问集合，再投影个人状态、Visit 或媒体；Review Candidate 即使已有个人记忆也只允许 Owner 读取，不得进入地图或 Nearby。
 - 所有 mutation 携带身份与稳定操作标识，执行权限检查、原子写入/补偿、结构化审计并返回可重放结果；删除及预约、付款、取消、对外消息需明确确认，见 [`D-008`](../docs/decisions.md)。
 - `有效行った = 存在 Visit OR manualVisited`；评分、Visit 与媒体保持分离，见 [`D-005、D-009、D-012`](../docs/decisions.md)。
 - 普通删除、日志、附件、第三方原始媒体和私人 Journal 遵守 [`D-017、D-018`](../docs/decisions.md)；云模型处理遵守 [`D-019`](../docs/decisions.md)。

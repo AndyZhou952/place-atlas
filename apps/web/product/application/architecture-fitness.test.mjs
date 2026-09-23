@@ -517,6 +517,64 @@ test('fitness rejects a floating operation group call', () => {
   );
 });
 
+test('fitness rejects an operation group that is not composed into the central catalog', () => {
+  withArchitectureFixture(
+    {
+      'product/application/conversation/isolated-operations.ts': `
+        import { defineOperationGroup, type OperationDefinition } from '../atlas-application.ts';
+        const isolated: OperationDefinition<'isolated.read', {}, {}, 'json'> = {
+          descriptor: {
+            key: 'isolated.read',
+            resultKind: 'json',
+            effect: 'read',
+            validate: (input) => input,
+          },
+          async handle() { return {}; },
+        };
+        export function createIsolatedOperationGroup() {
+          return defineOperationGroup({ 'isolated.read': isolated });
+        }
+      `,
+    },
+    ({ root, manifest }) => {
+      const owner = path.join(
+        root,
+        'product/application/conversation/isolated-operations.ts',
+      );
+      const baseline = auditArchitecture(manifest);
+      assert.ok(
+        baseline.some(({ rule }) => rule === 'unowned_operation_group'),
+      );
+
+      const registered = auditArchitecture({
+        ...manifest,
+        isolatedOperationGroupOwners: {
+          createIsolatedOperationGroup: owner,
+        },
+      });
+      assert.ok(
+        registered.some(
+          ({ rule }) =>
+            rule === 'unowned_operation_group' ||
+            rule === 'unowned_operation_definition',
+        ),
+      );
+
+      const wrongOwner = auditArchitecture({
+        ...manifest,
+        isolatedOperationGroupOwners: {
+          createIsolatedOperationGroup: path.join(
+            root,
+            'product/application/sample-operations.ts',
+          ),
+        },
+      });
+      assert.ok(
+        wrongOwner.some(({ rule }) => rule === 'unowned_operation_group'),
+      );
+    },
+  );
+});
 test('fitness rejects an empty composed application catalog', () => {
   withArchitectureFixture(
     {
@@ -1669,25 +1727,66 @@ test('fitness rejects unapproved declarations in the UI model adapter', () => {
   }
 });
 
+test('fitness permits only the exact AtlasItem UI projection', () => {
+  for (const projection of [
+    'CoreAtlasItem',
+    'CoreAtlasItem & { readonly overallComment?: string; }',
+  ]) {
+    withArchitectureFixture(
+      {
+        'features/atlas/model.ts': `
+        import type { AtlasItem as CoreAtlasItem } from '../../product/application/core-model.ts';
+        export type AtlasItem = ${projection};
+      `,
+      },
+      ({ manifest }) => {
+        const violations = auditArchitecture(manifest);
+        assert.equal(
+          violations.some(({ rule }) => rule === 'duplicate_core_model'),
+          false,
+        );
+        assert.equal(
+          violations.some(({ rule }) => rule === 'compatibility_adapter_shape'),
+          false,
+        );
+      },
+    );
+  }
+});
+
 test('fitness rejects a core record type literal in the feature adapter', () => {
-  withArchitectureFixture(
-    {
-      'features/atlas/model.ts': `export type AtlasItem = { readonly id: string };`,
-    },
-    ({ manifest }) => {
-      assert.ok(
-        auditArchitecture(manifest).some(
-          ({ rule }) => rule === 'duplicate_core_model',
-        ),
-      );
-    },
-  );
+  for (const projection of [
+    `{ readonly id: string }`,
+    `CoreAtlasItem & { readonly overallComment?: string; readonly extra?: string }`,
+  ]) {
+    withArchitectureFixture(
+      {
+        'features/atlas/model.ts': `
+          import type { AtlasItem as CoreAtlasItem } from '../../product/application/core-model.ts';
+          export type AtlasItem = ${projection};
+        `,
+      },
+      ({ manifest }) => {
+        const rules = new Set(
+          auditArchitecture(manifest).map(({ rule }) => rule),
+        );
+        assert.ok(rules.has('duplicate_core_model'), projection);
+        assert.ok(rules.has('compatibility_adapter_shape'), projection);
+      },
+    );
+  }
 });
 
 const expectedOperationKeys = [
+  'assessment.display',
   'assessment.update',
+  'nearby.recommend',
   'catalog.delete_item',
   'catalog.get',
+  'catalog.intake.cancel',
+  'catalog.intake.confirm',
+  'catalog.intake.discover',
+  'catalog.intake.select',
   'catalog.list',
   'catalog.save_discovered',
   'catalog.search',
@@ -1701,18 +1800,24 @@ const expectedOperationKeys = [
   'media.delete',
   'media.list',
   'media.open',
+  'media.openDisplay',
   'visit.create',
   'visit.delete',
+  'visit.getDisplay',
   'visit.list',
+  'visit.listDisplay',
   'visit.update',
 ];
 
 const expectedOperationGroupCreators = [
   'createImportJobOperationGroup',
   'createCatalogOperationGroup',
+  'createCatalogIntakeOperationGroup',
   'createPlaceAssessmentOperationGroup',
+  'createPublicDisplayOperationGroup',
   'createDecisionOperationGroup',
   'createVisitOperationGroup',
+  'createNearbyRecommendationOperationGroup',
   'createDestructiveOperationGroup',
   'createMediaOperationGroup',
 ];
@@ -1791,7 +1896,7 @@ function productionArchitectureManifest() {
       'features/atlas/distance.ts',
     ],
     expectedOperationKeys,
-    expectedMediaOperationKeys: ['media.open'],
+    expectedMediaOperationKeys: ['media.open', 'media.openDisplay'],
     expectedOperationGroupCreators,
     businessPolicyOwners: {
       search: path.join(

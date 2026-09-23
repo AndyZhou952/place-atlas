@@ -1,0 +1,15 @@
+# 架构评审（第 1 轮）
+
+- 日期: 2026-09-21
+- 评审方式: subagent
+- 结论: 需修改
+
+## 发现项
+
+- [严重] `architecture.md:10,30,43,61`：架构宣称“继承 D-P04”，却把 Google fixed-endpoint transport 装进同时承载 Owner 写入与私人 D1/R2 的 owner-poc composition。D-P04 的安全结论只覆盖隔离只读 Nearby Worker，并明确规定一旦超出该范围就关闭 transport 重审；此处不是可静默继承的增量。→ 画出新的信任区和数据流并作出决策：首选保留独立只读 Google route service，以窄的结构化端口供 owner-poc 调用；若同 Worker 部署，则必须形成新的 ADR/威胁模型，重新审查凭证、SSRF/egress、私人数据泄漏面与失败隔离，独立评审通过前 composition 保持关闭。
+- [严重] `architecture.md:16-23,35-40,52-57`：`Public GET` 直接贯穿 `AtlasApplication → owner-poc D1/R2`，没有 public-read projection、operation allowlist 或媒体授权边界，因而无法保护 CONTEXT/D-018 定义为私有的评论、VisitMedia 与 Journal 内容。按 HTTP method 粗分权限还会把未来新增 GET 自动公开，违背 fail-closed。→ 在 `OwnerHttpAdapter` 前建立闭合的 public operation/field manifest；私有读取经 `OwnerSession`，`media.open` 使用 Owner 鉴权或短期授权且不因 GET 自动放行。新增每个读取 operation 的匿名/Owner contract tests，未知 operation 默认拒绝。
+- [一般] `architecture.md:16,35-38,55`：`OwnerSession.authenticate(request) / issue(verifier) / revoke(session)` 没有表示“校验登录口令”这一步，反而让 verifier 成为 session issuance 参数；也没有给出 verifier/raw-secret 的唯一 binding 契约、轮换版本、失败关闭与登录滥用控制。该接口无法落实规格的密码保证，并已容易造成部署 preflight 与运行时代码使用不同 Secret 名。→ 将凭证验证与 session 验证分开成闭合接口，例如 `verifyLogin(candidate)`、`issueSession(subject,version)`、`verifySession(cookie)`、`clearSession()`；选定并记录唯一 Secret schema。至少加入同源检查、常量时间验证、有限会话期、Secret/session version 轮换和失败关闭；公开弱密码 PoC 若不做限流，须明确只允许假数据且在真实数据门前轮换并复审。
+- [一般] `architecture.md:17-23,35-40`：`AtlasApplication.execute({key,input})` 没有调用身份、稳定 mutation ID 或 canonical payload digest；把授权全留在两个 adapter，会使 Application Operations 无法履行产品架构要求的统一权限、幂等、审计和可重放 receipt，Web 与 Agent 仍可能各有一套写语义。→ 凭证本身不进入核心，但 adapter 应生成统一的 `InvocationContext {principal, channel, mutationId, payloadDigest}`，由同一个 mutation coordinator/Application Operation 执行授权后的原子 claim/write/receipt；读取可用最小 context。明确 Agent gateway receipt 与 Web receipt 复用同一语义而非两套表/规则。
+- [一般] `architecture.md:20-21,29-30,43`：单一 `provider_usage` 月度计数没有区分 Geocoding request、Route Matrix billable element 与 Transit Route request；也未说明在一个 Nearby 调用发出多个 provider 请求时如何逐项原子预留、如何处理并发和保守成本。仅在“任何 egress 前扣减”不能保证所扣单位正确。→ 将 ledger key 至少扩展为 provider+SKU+period，reservation 携带 billable units 与 micro-USD；matrix 使用 origins×destinations，批量拆分逐批预留，任何预留失败即不发对应 egress且不退款。把具体 caps 作为版本化部署配置/证据，并与 Google Cloud quota 双门核对。
+- [一般] `architecture.md:27,31,45-50`：从空库“向 `atlas_items` 幂等写入 seed”没有指定 seed 来源、版本、数量或 digest；“切换用户入口”也没有建模 Web 地址与 Lightsail/OpenClaw endpoint/HMAC 的两个独立发布步骤。现有旧 fixture 保留并不自动提供 owner-poc 的 seed 或 Agent 凭证迁移。→ 增加版本化 seed manifest（规范 payload、count、digest、来源）与空库 migration contract；部署流程分别列出新 Worker/R2/D1 创建、Secrets 注入、Web smoke、OpenClaw 新 endpoint/key 灰度、双入口验证和各自回退。回退不得修改旧资源，也不得声称把 owner-poc 新写数据带回旧只读环境。
+- [一般] `architecture.md:43,52-57`：Google 路线结果的 attribution、公开 ToS/Privacy 入口和 request-only 数据保留没有落在本片模块/测试缝中，而 feature 004 架构与 D-P04 将它们列为 provider 启用条件。→ 把 attribution 作为结构化 Nearby result 的强制字段并由 Web/微信 presenter 验证展示；在 provider adapter 明确 Google 原始响应、解析地址/坐标不进入 D1/R2/prompt/Leaflet，补日志/持久化负面测试和上线前 ToS/Privacy probe。

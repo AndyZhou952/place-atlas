@@ -1,4 +1,5 @@
-import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { getServerInvocationCoordinator } from '@/lib/server/application/server-invocation-coordinator';
+import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
 
 import {
   deleteVisitMediaResponse,
@@ -7,22 +8,27 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function PATCH(
+export const PATCH = withOwnerWriteAuth(async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   return updateVisitMediaCaptionResponse(
-    getServerAtlasApplication(),
+    getServerInvocationCoordinator(),
+    request,
     id,
     await request.json(),
   );
-}
+});
 
-export async function DELETE(
-  _request: Request,
+export const DELETE = withOwnerWriteAuth(async function DELETE(
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  return deleteVisitMediaResponse(getServerAtlasApplication(), id);
-}
+  return deleteVisitMediaResponse(
+    getServerInvocationCoordinator(),
+    request,
+    id,
+  );
+});

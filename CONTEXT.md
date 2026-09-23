@@ -20,6 +20,7 @@ _Avoid_：自动抓取结果
 
 **审核候选（Review Candidate）**：
 证据不足或冲突、必须由用户确认后才能成为可信条目的候选身份。
+只在 Owner Catalog／详情中可见；可承载 Owner 的 Visit 等个人记忆，但不得进入匿名 Public Read、地图或 Nearby。
 _Avoid_：低分条目、错误条目
 
 ### 个人记忆
@@ -33,7 +34,7 @@ _Avoid_：Visit 评分、食べログ评分
 _Avoid_：地点、评分卡、Journal 条目
 
 **到访媒体（VisitMedia）**：
-明确归属于一次 Visit、具有稳定身份、顺序与可选说明的私有图片。
+明确归属于一次 Visit、具有稳定身份、顺序与可选说明的图片；产品默认按私人内容处理，只有进入版本化 Public Read Projection 的非敏感 PoC 媒体才可匿名读取。
 _Avoid_：来源关键帧、第三方帖子媒体
 
 **有效到访状态（Effective Visited State）**：
@@ -58,6 +59,26 @@ _Avoid_：Atlas 条目、模型摘要
 把同一认证用户和对话中的连续评分、笔记与照片安全关联到一个明确地点／Visit 的短时上下文。
 _Avoid_：最近一次 Visit、聊天历史猜测
 
+**位置线索（Location Hint）**：
+用户手动输入的街区或地址文字，用于解析附近查询的候选地点；它不是可信坐标或路线事实。
+_Avoid_：当前位置、微信定位、模型坐标
+
+**可达候选（Reachable Candidate）**：
+具有可验证步行或公共交通路线证据的附近 Atlas 条目；没有路线证据的结果只能称为距离候选。
+_Avoid_：附近地点、模型推荐
+
+**地点建档会话（CatalogIntakeSession）**：
+把餐厅名解析为带来源证据的分店候选，经查重、消歧、预览和 owner 确认后创建或核验 AtlasItem 的短时上下文。
+_Avoid_：模型自动建店、只按名称合并、ImportJob
+
+**项目命令路由器（ProjectCommandRouter）**：
+在模型参与前，按显式项目命令和闭合子命令语法，把消息确定性分发到对应项目 adapter、凭证与状态命名空间。
+_Avoid_：模型意图路由、OpenClaw channel binding、通用工具选择
+
+**到店可行性快照（EntryAccessSnapshot）**：
+带来源与核验时间的 walk-in、预约要求和可选实时排队事实；未知信息保持未知。
+_Avoid_：可预约、模型估计排队、营业状态
+
 **第三方原始媒体（Third-party Raw Media）**：
 仅为提取证据临时取得的帖子图片、视频或音频，处理完成后最多保留 72 小时，不等同于可长期保存的 Evidence Manifest。
 _Avoid_：VisitMedia、来源证据
@@ -65,6 +86,15 @@ _Avoid_：VisitMedia、来源证据
 **应用操作（Application Operation）**：
 供 Web、Agent 与采集器共同调用、具有类型化输入输出和一致业务语义的产品能力。
 _Avoid_：数据库调用、页面事件、Agent tool 实现
+
+**调用上下文（InvocationContext）**：
+由可信入口验证凭证后生成的 actor、channel、operation scope 与请求时间上下文；写入另携带稳定 mutation ID。权威 payload digest 由协调器在 schema normalization 后统一计算，入口 digest 不是业务事实。
+_Avoid_：Cookie、HMAC secret、模型自报身份
+
+**公开读取投影（Public Read Projection）**：
+Owner PoC 对匿名访问者显式开放的版本化闭合 DTO allowlist。v1 公开 Catalog、个人总体状态与评论、Visit 展示、媒体展示元数据和照片二进制；禁止 object key、原文件名、hash、内部存储 ID 与审计数据。授权先于任何 Application/R2 调用，投影禁止领域对象直出；未知读取默认私有。
+Catalog 访问集合只包含 Verified Item；Review Candidate 及其评价、Visit、笔记与媒体始终保持 Owner-only。
+_Avoid_：所有 GET 自动公开、数据库行直出、永久公开承诺
 
 **渠道适配器（ChannelAdapter）**：
 把特定消息渠道的事件与回复转换为应用操作的可替换边界。

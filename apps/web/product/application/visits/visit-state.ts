@@ -1,4 +1,5 @@
 import type { PlaceAssessment } from '../assessments/place-assessment.ts';
+import type { AtomicMutationCommit } from '../atlas-application.ts';
 import type { AtlasItemOverrideRecord } from '../catalog/catalog-state.ts';
 import type { Visit } from './visit.ts';
 
@@ -30,7 +31,13 @@ export interface VisitRecordState {
   readItemContext(itemId: string): Promise<VisitItemRecordContext>;
   readVisitContext(id: string): Promise<VisitMutationContext | undefined>;
   /** Commits the Visit insert and optional rating side effect atomically. */
-  create(records: CreateVisitRecords): Promise<{ readonly inserted: boolean }>;
+  create(
+    records: CreateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<{ readonly inserted: boolean }>;
   /** Commits the Visit edit and optional rating side effect atomically. */
-  update(records: UpdateVisitRecords): Promise<void>;
+  update(
+    records: UpdateVisitRecords,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void>;
 }

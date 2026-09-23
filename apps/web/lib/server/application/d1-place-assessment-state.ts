@@ -3,6 +3,9 @@ import type {
   PlaceAssessmentContext,
   PlaceAssessmentRecordState,
 } from '@/product/application/assessments/place-assessment-state';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface AssessmentRow {
   readonly item_id: string;
@@ -54,8 +57,11 @@ export class D1PlaceAssessmentState implements PlaceAssessmentRecordState {
     };
   }
 
-  async save(assessment: PlaceAssessment): Promise<void> {
-    await this.#database
+  async save(
+    assessment: PlaceAssessment,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    const statement = this.#database
       .prepare(
         `INSERT INTO place_assessments
          (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at)
@@ -75,7 +81,7 @@ export class D1PlaceAssessmentState implements PlaceAssessmentRecordState {
         assessment.summary ?? null,
         assessment.updatedAt,
         assessment.updatedAt,
-      )
-      .run();
+      );
+    await commitD1MutationAtomically(this.#database, [statement], atomicCommit);
   }
 }

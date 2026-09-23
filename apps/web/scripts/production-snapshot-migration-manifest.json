@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "snapshotOnly": {
+    "activeMigrations": [
+      "0000_shallow_doctor_faustus.sql",
+      "0001_dapper_stranger.sql",
+      "0002_funny_wrecker.sql",
+      "0003_maintenance_controls.sql"
+    ]
+  },
+  "pendingReset": {
+    "path": "drizzle/pending/0004_reset_test_place_assessments.sql",
+    "sha256": "c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16"
+  },
+  "resetStage": {
+    "activeMigration": "0004_reset_test_place_assessments.sql",
+    "activeMigrations": [
+      "0000_shallow_doctor_faustus.sql",
+      "0001_dapper_stranger.sql",
+      "0002_funny_wrecker.sql",
+      "0003_maintenance_controls.sql",
+      "0004_reset_test_place_assessments.sql"
+    ]
+  },
+  "retiredSiteVersions": [16]
+}

@@ -67,6 +67,34 @@ test('the D1 Visit adapter maps list and item/assessment context without leaking
   assert.equal(database.roundTrips(), 2);
 });
 
+test('the D1 Visit adapter resolves an owner-only Review Candidate as a Visit target', async () => {
+  const candidatePayload = JSON.stringify({
+    recordType: 'review_candidate',
+    id: 'review-one',
+  });
+  const database = queryDatabase({
+    firstRow: {
+      item_id: 'review-one',
+      payload_json: null,
+      review_candidate_payload_json: candidatePayload,
+      tombstone_id: null,
+      visit_count: 0,
+    },
+  });
+
+  assert.deepEqual(
+    await new D1VisitState(database.value).readItemContext('review-one'),
+    {
+      itemId: 'review-one',
+      dynamicPayload: candidatePayload,
+      override: undefined,
+      assessment: undefined,
+      tombstoned: false,
+      visitCount: 0,
+    },
+  );
+});
+
 test('create uses one read plus one atomic D1 batch and reports ID insertion', async () => {
   const database = mutationDatabase({ insertChanges: 1 });
   const state = new D1VisitState(database.value);

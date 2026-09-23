@@ -29,11 +29,6 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
       { name: 'queue_creator_import', method: 'POST', path: '/api/inbox' },
       { name: 'create_visit', method: 'POST', path: '/api/journal' },
       {
-        name: 'list_visit_media',
-        method: 'GET',
-        path: '/api/media?visitId={visitId}',
-      },
-      {
         name: 'upload_visit_media',
         method: 'POST',
         contentType: 'multipart/form-data',
@@ -63,6 +58,29 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
   assert.equal(
     browserOperationHttpCatalog['media.attach'].bodyKind,
     'multipart',
+  );
+  assert.deepEqual(browserOperationHttpCatalog['nearby.recommend'], {
+    key: 'nearby.recommend',
+    method: 'GET',
+    path: '/api/nearby',
+    bodyKind: 'none',
+  });
+  for (const operation of ['discover', 'select', 'confirm', 'cancel']) {
+    assert.deepEqual(
+      browserOperationHttpCatalog[`catalog.intake.${operation}`],
+      {
+        key: `catalog.intake.${operation}`,
+        method: 'POST',
+        path: `/api/catalog-intake/${operation}`,
+        bodyKind: 'json',
+      },
+    );
+  }
+  assert.equal(
+    createAgentCapabilitiesDocument().operations.some(({ name }) =>
+      name.includes('intake'),
+    ),
+    false,
   );
   assert.equal(
     Object.values(browserOperationHttpCatalog).filter(

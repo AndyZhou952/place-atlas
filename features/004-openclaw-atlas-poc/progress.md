@@ -1,0 +1,53 @@
+# 进度
+
+- 特性: 004-openclaw-atlas-poc
+- 当前阶段: implement
+- 执行模式: interactive
+- 已加载: hf-workflow、hf-grill-with-docs、hf-domain-modeling、hf-grilling、hf-to-spec、hf-review、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-implement、hf-tdd
+- 已完成: 恢复产品架构、feature 001/003 边界及现有 AtlasApplication/HTTP/WebMCP 能力
+- 已完成: 只读核实 AWS OpenClaw、DeepSeek、微信文字链路已运行；腾讯插件支持媒体但未发现原生位置卡片类型
+- 已完成: 建立附近推荐、VisitCaptureSession、服务安全与端到端测试的设计树
+- 已完成: 用户确认只读优先的两阶段发布、草稿预览后确认写入，以及只使用手动街区／地址文字作为位置线索
+- 已完成: 用户确认 30 分钟暂停／24 小时过期及提交后显式追加规则
+- 已完成: 用户确认 Nearby 步行硬上限 15 分钟、默认未到访优先；无结果时才扩到 2 公里或门到门 20 分钟内的无需换乘电车候选
+- 已完成: 第 1 轮 hf-review 独立规格评审，并修正半写入可见性、到访评分、workspace 隔离、事件顺序、配额与量化验收边界
+- 已完成: 第 2 轮 hf-review 关闭首轮问题；按复审意见移除未校准 confidence／缓存阈值，并冻结各 capture 状态的迟到事件结果
+- 已完成: 第 3 轮 hf-review 关闭第二轮问题；补齐 terminal 状态新事件关闭、旧事件回放与新 session 规则
+- 已完成: 第 4 轮 hf-review 独立规格复审通过
+- 已完成: 用户新增并确认“仅输入餐厅名 → 查重／来源查询 → 分店消歧 → 预览确认 → 建档”需求，已纳入规格
+- 已完成: CatalogIntakeSession 第 1 轮增量评审发现强／弱查重与两步发布风险；已改为强 identity 才自动复用、弱匹配 owner 消歧、单事务最终状态／回执
+- 已完成: 补齐 verified 分店证据、并发确认、provider egress／条款门、Catalog→Visit 三分支与校准集
+- 已完成: CatalogIntakeSession 第 2 轮独立增量规格复审通过
+- 已完成: 用户确认最终默认值，以及每次推荐重新核验 walk-in／排队、不可得时显示未知
+- 已完成: 核实当前 OpenClaw 安装包含 direct tool dispatch 与 `before_agent_reply` 接口；确定单一微信前门＋规范 `/jpmap`＋项目隔离 registry
+- 已完成: 第 1 轮命令路由／EntryAccess 增量规格评审发现 bare alias hook 版本缺陷风险、路由与语法闭合、capture 状态、provenance 和 provider 安全问题
+- 已完成: 第 2 轮复审关闭首轮问题，并发现 capability gate 关闭时 bare 相似前缀的外部结果尚未闭合
+- 已完成: 改由代码自有的微信 `PreModelIngressRouter` 承担 capability-gated bare alias、疑似命令防火墙与连续 capture，gate 关闭时普通模型不取得项目能力
+- 已完成: 第 3 轮命令路由／EntryAccess 独立增量规格复审通过，无遗留发现
+- 已完成: 产出特性架构与 D-021/D-P03，冻结 Cloudflare 数据平面、可迁移 Agent host、确定性入口、provider ports、D1/R2 发布和 60 美元成本门
+- 已完成: 第 1 轮独立架构评审发现 3 项严重、6 项一般问题；已补齐权威 capture lookup、单一 VisitCapturePublisher、图片不进模型及全部一般项
+- 已完成: 第 2 轮独立架构复审通过，无遗留发现
+- 已完成: 用户确认 architecture.md；record 的逐图评分与非规范店名解析明确延期到实现前规格细化门
+- 已完成: 用户确认 T-01–T-14 ticket graph，并授权按独立文件所有权并行实施第一、第二阶段
+- 已完成: T-01 `/jpmap nearby` 假数据行走骨架与 read-only tool manifest
+- 已完成: T-02 HMAC 签名 Agent gateway、owner/channel/scope/nonce/audit/replay 边界
+- 已完成: T-05 ProviderPolicyGateway 与 Google/Foursquare 合规证据模板
+- 已完成: T-06–T-08 地址三态解析、步行 15 分钟优先、2 km／直达电车 20 分钟 fallback、walk-in／排队 unknown-first 完整回执
+- 已完成: T-03 本地隔离环境、fixture D1/R2 schema、成本计量、独立 Agent-PoC build/preflight；75 项 feature004 聚焦测试全绿，产物不含 OpenAI Sites 元数据
+- 已完成: T-04 首版 skill direct-dispatch 包已安装并证明普通模型 toolNames 为空；第二次 owner 真机探针暴露 OpenClaw 2026.7.1 会在 skill dispatch 前按普通 allowlist 过滤 optional tool，准确返回 `Tool not available` 且零 Worker egress。已拒绝用全局 allowlist 暴露工具的绕过方案。
+- 已完成: T-11 离线安全部分（Foursquare mapper、最多三候选、失败关闭、日本合成校准集）；一次脱敏真实日本探针 HTTP 200，发现并修正 Places API New 顶层经纬度 wire shape，独立代码复审通过
+- 已完成: T-03 的隔离 R2 bucket、四项 gateway Secrets 与 read-only Worker 已部署；真实签名请求命中 APAC D1 fixture 并写入脱敏成功审计。待补 Cloudflare/AWS 实际 usage/billing 校准后勾票。
+- 已确认: Foursquare 不进入 Nearby 或默认运行链路；T-11 改为可选地点发现供应商决策门，现有校准与 adapter 仅保留为未启用实验。
+- 阻塞: T-04 的原生 plugin command 已部署；完成 owner 微信真实命令与第二账号/群聊等负向 gate 后方可勾票。T-12 可使用 provider-neutral fixture 实施，不再被 Foursquare 阻塞，真实 Catalog intake 上线前另过供应商门。
+- 已完成: 第一、二阶段本地实现三轮独立代码门；第 3 轮通过，前两轮安全、架构与规格发现全部关闭
+- 进行中: OpenClaw client 0.2.0 已以 TDD 改成 `registerCommand` 并通过独立代码门；归档 SHA-256 为 `98e1b5462914e23241404f16e039ffca4b978bddebaab62d046d7bd2eeae1cbe`，Lightsail host preflight 全绿并完成安装／Gateway 重启。runtime inspection 显示插件 `loaded`、`commands=[jpmap]`、`toolNames=[]`。owner 已确认微信收到真实命令回复；仍待把本次回复与 D1 success audit／零模型 trace 关联，并完成第二账号、群聊等负向 gate 后勾选 T-04/T-09。
+
+- 已完成: 首次 owner 微信探针命中 skill 但因 session key 将大小写规范化、真实 adapter 保留大小写而被严格身份门拒绝，零 Worker egress；已从真实入站日志取得准确 ID，同步更新 Worker/OpenClaw 两端并通过线上签名检查。
+- 已完成: 核实真实腾讯微信 adapter 身份值为 `openclaw-weixin`／`direct`，修正 client 与 Worker binding；新增 client→Worker 跨边界测试并通过独立增量代码复审。
+- 已完成: T-06A 本地真实读取切片：5 条 repo Catalog seed（3 条 verified food）以幂等 D1 migration 落盘；D1 row／payload 双层一致性失败关闭；独立代码门第 2 轮通过。
+- 已完成: T-06A 真实候选粗筛与路线 adapter：持久坐标 Top-N、Google walking Route Matrix 批处理、仅步行层为空后限量 transit，以及 `银座`／`銀座`／`ginza` 日本约束 resolver；相关回归与独立代码门通过。
+- 已完成: T-12 provider-neutral Catalog intake 的 5 项评审问题经三轮独立代码门全部闭合；名称／街区／地址 discovery、强键复用、弱匹配提示、最多三候选、immutable preview 与取消均通过，仍无 CatalogWrite，线上 write gate 保持关闭。
+- 已完成: D-P04 固定 Google endpoint／禁 redirect 的 Cloudflare PoC 受限 egress 方案经三轮独立架构评审通过，用户于 2026-09-17 确认；Google v3 endpoint 修正经独立代码复审通过。其余 policy、凭证、真实调用与部署门仍关闭。
+- 已完成: T-06A 中央只读组合已把 D1 Catalog、Top-N 25、transit shortlist 5、三条固定 Google endpoint transport 与原子 D1 月度额度账本接入唯一 Agent route；中央代码门第 2 轮通过，39/39 回归和 0001→0002→0003 迁移链通过。
+- 已完成: Agent-PoC 部署门禁要求 `GOOGLE_MAPS_API_KEY` secret，runbook 固化 0001→0002→0003 与 pending-policy 禁用语义；部署就绪代码门第 2 轮通过，29/29 回归及真实 `build:agent-poc` 通过。
+- 阻塞: 真实 Google Nearby 上线仍需 owner 在 Google Cloud 启用 Billing、Geocoding API、Routes API、受限 key 与配额，并把 key 写入 Cloudflare Secret；当前执行环境也未提供 `CLOUDFLARE_API_TOKEN`，因此未执行远端 migration、policy activation 或 deploy。

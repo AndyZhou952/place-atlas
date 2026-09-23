@@ -1,4 +1,6 @@
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { rejectUncoordinatedOwnerPocWrite } from '@/lib/server/application/owner-poc-write-policy';
+import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
 import { isAtlasItem } from '@/product/application/catalog/catalog-projection';
 
 import { saveDiscoveredItemResponse } from './item-write-response';
@@ -10,7 +12,9 @@ export async function GET() {
   return listAtlasItemsResponse(getServerAtlasApplication());
 }
 
-export async function POST(request: Request) {
+export const POST = withOwnerWriteAuth(async function POST(request: Request) {
+  const unavailable = rejectUncoordinatedOwnerPocWrite();
+  if (unavailable) return unavailable;
   const item: unknown = await request.json();
   if (
     !isRecord(item) ||
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   return saveDiscoveredItemResponse(getServerAtlasApplication(), item);
-}
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

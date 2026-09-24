@@ -103,3 +103,31 @@ T-18 第 1 轮独立 Standards + Spec + UI 代码门为 **FAIL／需修改**：�
 ## Gate
 
 T-18 第 2 轮独立 Standards + Spec + UI **代码门 PASS／通过**：严重 0、一般 0、建议 0。该结论允许进入受控部署与现场演示取证，但不等于远端生产部署已经完成，也不授权在现场证据缺失时提前勾选 T-08、T-11 或 T-18。
+
+---
+
+# 第 3 轮部署手册与 CI 增量复核
+
+- 日期: 2026-09-24
+- 评审方式: subagent
+- 范围: Cloudflare owner-poc 部署手册，以及 architecture-fitness 触发后的 provider runtime projection 增量
+- 结论: 通过
+- auto-approved 2026-09-24
+
+## Standards
+
+无剩余发现项。
+
+部署手册首轮发现两处边界不一致：preflight 文案错误地声称拒绝任何 direct Google secret，与必需的第七个 `GOOGLE_PLACES_API_KEY` 冲突；cutover 只验证 Nearby／Route Sidecar，没有独立的 Places Add live probe、provider 前置门与零留存验收。修订后手册明确 exact seven-name allowlist、Owner Worker 唯一允许的 Google Places credential、Route Sidecar 专属 `GOOGLE_MAPS_API_KEY`，并分别列出 Routes 与 Places 的 review／restriction／quota 前置门、discover-select-cancel／授权 confirm、SKU reservation、attribution 和 D1/R2/log/DTO 零 raw/transient 留存检查。
+
+第二轮发现 smoke 文案把 active session 收窄成单个 selected Place ID，与合法 Top-3 candidate tuples 不符。最终已改为规格允许的 `{providerNamespace, placeId, ordinal, createdAt}` tuples，加上闭合 Owner input/application fields，并继续明确禁止 Google candidate name/address、raw response 与 derived hash。
+
+## Spec / CI architecture
+
+CI 首次运行发现 Agent route 直接 import `@/db`，触发 `route_storage_bypass`。最终修复没有添加白名单：新增无 I/O 的纯函数 `projectOwnerPocCatalogIntakeRuntime(bindings)`，只投影 `GOOGLE_PLACES_API_KEY` 与三项 reviewed provider mode；Web 由 `db/index` 调用该函数，Agent route 直接以其 bindings 调用同一函数，因此两端保持同一 runtime mapping，同时 route 不再依赖 storage module，Nearby 的 `GOOGLE_MAPS_API_KEY` 仍只存在于隔离 Route Sidecar／旧只读分支。
+
+共享 projection contract、Agent route contract、Web `typecheck`、`lint`、`format:check` 与 `git diff --check` 通过；主任务本地 architecture-fitness 已 **PASS**。远端 CI 必须等待该修复形成新提交后重新运行，当前不得写成 remote CI green。
+
+## Gate
+
+第 3 轮部署手册与 CI 增量复核 **PASS／通过**：严重 0、一般 0、建议 0。该结论关闭上述 runbook 与 architecture-fitness 代码发现；远端 CI 重跑和第 2 轮列出的现场发布／演示证据仍是后续独立门槛。

@@ -6,6 +6,7 @@ import {
   catalogIntakeProviderPolicy,
   googlePlacesSecretBindingName,
   inspectCatalogIntakeProviderModes,
+  projectOwnerPocCatalogIntakeRuntime,
 } from './catalog-intake-provider-mode-manifest.ts';
 
 test('owner-poc has a closed provider policy and Relay cannot be enabled while D-P06 is Proposed', () => {
@@ -31,6 +32,25 @@ test('owner-poc has a closed provider policy and Relay cannot be enabled while D
   );
 });
 
+test('the shared runtime projection maps only the reviewed catalog-intake bindings', () => {
+  assert.deepEqual(
+    projectOwnerPocCatalogIntakeRuntime({
+      GOOGLE_PLACES_API_KEY: 'server-secret',
+      CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
+      CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
+      CATALOG_INTAKE_RESEARCH_RELAY_MODE: 'relay_disabled_manual_unknown',
+    }),
+    {
+      googlePlacesApiKey: 'server-secret',
+      providerModes: {
+        googlePlaces: 'enabled',
+        durableGeocoder: 'enabled',
+        researchRelay: 'relay_disabled_manual_unknown',
+      },
+    },
+  );
+});
+
 test('Web and Agent production composition consume the same server runtime projection', async () => {
   const [server, agentRoute] = await Promise.all([
     readFile(new URL('./server-atlas-application.ts', import.meta.url), 'utf8'),
@@ -40,7 +60,7 @@ test('Web and Agent production composition consume the same server runtime proje
     ),
   ]);
   assert.match(server, /getOwnerPocCatalogIntakeRuntime\(\)/u);
-  assert.match(agentRoute, /getOwnerPocCatalogIntakeRuntime\(\)/u);
+  assert.match(agentRoute, /projectOwnerPocCatalogIntakeRuntime\(bindings\)/u);
   assert.match(server, /createOwnerPocComposition/u);
   assert.match(agentRoute, /createOwnerPocComposition/u);
 });

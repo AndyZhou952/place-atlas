@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 
+import { projectOwnerPocCatalogIntakeRuntime } from '../lib/server/application/catalog-intake-provider-mode-manifest';
 import type { RouteSidecarServiceBinding } from '../route-sidecar/metered-route-sidecar-client';
 
 export function getD1(): D1Database {
@@ -30,12 +31,5 @@ export function getRouteSidecarServiceBinding():
 }
 
 export function getOwnerPocCatalogIntakeRuntime() {
-  return {
-    googlePlacesApiKey: env.GOOGLE_PLACES_API_KEY,
-    providerModes: {
-      googlePlaces: env.CATALOG_INTAKE_GOOGLE_PLACES_MODE,
-      durableGeocoder: env.CATALOG_INTAKE_DURABLE_GEOCODER_MODE,
-      researchRelay: env.CATALOG_INTAKE_RESEARCH_RELAY_MODE,
-    },
-  };
+  return projectOwnerPocCatalogIntakeRuntime(env);
 }

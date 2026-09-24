@@ -13,11 +13,12 @@ void test('Agent route selects canonical owner composition with shared Add runti
   assert.ok(ownerBranch);
   assert.match(
     ownerBranch,
-    /createOwnerPocComposition\(\s*bindings\.DB,\s*bindings\.ROUTE_SIDECAR,\s*getOwnerPocCatalogIntakeRuntime\(\),?\s*\)/u,
+    /createOwnerPocComposition\(\s*bindings\.DB,\s*bindings\.ROUTE_SIDECAR,\s*projectOwnerPocCatalogIntakeRuntime\(bindings\),?\s*\)/u,
   );
-  assert.match(ownerBranch, /getOwnerPocCatalogIntakeRuntime/u);
+  assert.match(ownerBranch, /projectOwnerPocCatalogIntakeRuntime/u);
   assert.match(ownerBranch, /createServerAtlasApplication/u);
   assert.match(ownerBranch, /createOwnerPocAgentHttpHandler/u);
   assert.doesNotMatch(ownerBranch, /GOOGLE_MAPS_API_KEY|transit|foursquare/iu);
+  assert.doesNotMatch(source, /from ['"]@\/db['"]/u);
   assert.match(source, /createT06aGoogleNearbyComposition/u);
 });

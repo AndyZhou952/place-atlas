@@ -39,6 +39,26 @@ export interface CatalogIntakeProviderModes {
   readonly researchRelay?: string;
 }
 
+export interface OwnerPocCatalogIntakeRuntimeBindings {
+  readonly GOOGLE_PLACES_API_KEY?: string;
+  readonly CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;
+  readonly CATALOG_INTAKE_DURABLE_GEOCODER_MODE?: string;
+  readonly CATALOG_INTAKE_RESEARCH_RELAY_MODE?: string;
+}
+
+export function projectOwnerPocCatalogIntakeRuntime(
+  bindings: OwnerPocCatalogIntakeRuntimeBindings,
+) {
+  return {
+    googlePlacesApiKey: bindings.GOOGLE_PLACES_API_KEY,
+    providerModes: {
+      googlePlaces: bindings.CATALOG_INTAKE_GOOGLE_PLACES_MODE,
+      durableGeocoder: bindings.CATALOG_INTAKE_DURABLE_GEOCODER_MODE,
+      researchRelay: bindings.CATALOG_INTAKE_RESEARCH_RELAY_MODE,
+    },
+  };
+}
+
 export function inspectCatalogIntakeProviderModes(
   modes: CatalogIntakeProviderModes,
 ) {

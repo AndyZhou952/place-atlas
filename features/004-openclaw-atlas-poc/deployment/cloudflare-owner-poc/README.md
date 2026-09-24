@@ -47,7 +47,10 @@ npx wrangler r2 bucket create japan-atlas-owner-poc-media
 Copy `wrangler.owner-poc.jsonc` to the ignored
 `wrangler.owner-poc.local.jsonc` and replace only the D1 sentinel with the
 new database ID. Keep the template's single `ROUTE_SIDECAR` service binding;
-do not add the Google key or any direct provider binding to the Owner Worker.
+do not add the Nearby/Routes `GOOGLE_MAPS_API_KEY` or any direct route-provider
+binding to the Owner Worker. The separate server-only
+`GOOGLE_PLACES_API_KEY` used by Catalog Intake is provisioned as a Worker
+secret below and must never appear in Wrangler vars or built output.
 
 Import the old export only into the empty new database, then apply the
 owner-poc migration chain:
@@ -77,12 +80,16 @@ npx wrangler secret put AGENT_OWNER_ACTOR_ID --config wrangler.owner-poc.local.j
 npx wrangler secret put AGENT_OWNER_CONVERSATION_ID --config wrangler.owner-poc.local.jsonc
 npx wrangler secret put ATLAS_OWNER_PASSWORD --config wrangler.owner-poc.local.jsonc
 npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.local.jsonc
+npx wrangler secret put GOOGLE_PLACES_API_KEY --config wrangler.owner-poc.local.jsonc
 ```
 
 The session secret must be independently generated. `GOOGLE_MAPS_API_KEY` must
 never be attached to this owner Worker. It belongs only to the independently
 deployed isolated Route Sidecar; any key shared in chat must be rotated before
-real private data is used.
+real private data is used. `GOOGLE_PLACES_API_KEY` is a distinct server-only
+Catalog Intake credential. Restrict it in Google Cloud to the Places API (New),
+set a conservative provider quota/budget alert, and rely on the application's
+lower hard cap as the fail-closed backstop before enabling production Add.
 
 Save secret names only:
 
@@ -120,9 +127,10 @@ even when the legacy row is unchanged, blocks deployment.
 
 Preflight rejects the D1 sentinel, mismatched blue-green bindings, missing
 owner/Agent secret names, seed drift, Sites metadata, the old fixture binding,
-any direct Google, Transit, or Foursquare runtime metadata or secret, and any
-missing, extra, or malformed Route Sidecar service binding. Source and built
-artifacts must each contain exactly
+direct route-provider metadata or `GOOGLE_MAPS_API_KEY`, Transit/Foursquare
+runtime metadata or secrets, and any secret outside the reviewed seven-name
+allowlist. `GOOGLE_PLACES_API_KEY` is the only direct Google credential allowed
+on the Owner Worker. Source and built artifacts must each contain exactly
 `{binding: "ROUTE_SIDECAR", service: "japan-atlas-route-sidecar"}`.
 
 If secret setup created a fresh placeholder Worker and preflight passed,
@@ -161,11 +169,28 @@ Keep the old URL live. Against the new URL, verify in order:
 7. the D1 SKU ledger increments geocoding requests and walking matrix elements
    before provider egress, while R2 and business tables do not receive location
    hints, parsed coordinates, route payloads, or raw provider JSON.
+8. one Owner Add probe for a non-sensitive public place completes
+   discover -> select -> cancel first, then a separately authorized
+   discover -> select -> confirm when publishing that place is intended; the
+   candidate visibly carries the unmodified `Google Maps` attribution and the
+   selected details match the requested Place identity;
+9. the Places SKU ledger reserves Search Text and Place Details usage before
+   egress; active session state contains only the spec-allowed Place-ID tuples
+   `{providerNamespace, placeId, ordinal, createdAt}` plus closed Owner
+   input/application fields, and neither D1, R2, logs, nor public/Agent DTOs
+   contain Google candidate names/addresses, raw responses, or derived hashes.
 
-Run the first real Google probe only after the Route Sidecar security review,
-request-only review, public policy pages, and Google Cloud quota/budget guard
-all pass. Use a single probe, inspect only closed application output and
-aggregate ledger counts, and never save or print raw provider responses.
+Run the first real Nearby/Routes probe only after the Route Sidecar security
+review, request-only review, and its dedicated Google key quota/budget guard
+all pass. Run the first real Catalog Intake/Places probe only after the public
+Terms/Privacy and attribution checks pass, Places API (New) is enabled, the key
+has an API restriction limited to Places API (New), and the provider quota plus
+application hard caps are verified. If the serverless Worker cannot use a safe
+application restriction, record that fact and the reviewed compensating
+controls (encrypted Worker secret, exact API restriction, zero raw logging,
+and lower application hard cap) before proceeding. For each provider, use one
+probe, inspect only closed application output and aggregate ledger counts, and
+never save or print raw provider responses.
 
 Only then switch the shared link or custom route to the new Worker.
 

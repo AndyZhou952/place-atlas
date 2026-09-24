@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: T-15 done（最终独立 code/security review PASS，并于 2026-09-23 获用户确认；下一张中央汇合票为 T-17）
+- 当前阶段: T-17 done（第 3 轮独立 code/UI review PASS，并于 2026-09-24 获用户确认；下一张中央汇合票为 T-18）
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -55,8 +55,10 @@
 - 已完成: T-15 的 phase allowance、签名 allowance/result、跨进程 replay defense、response-loss 单次 egress、闭合 scalar/usage、raw 零产品存储、confirm refresh/warning/version，以及 HTTPS:443、A+AAAA、IP pin、SNI/Host、逐跳 redirect 与 DNS rebinding 防线均已实现；production composition 保持 Relay default-disabled/manual-unknown
 - 已完成: T-15 最终独立 code/security review PASS，严重 0 / 一般 0 / 建议 0；focused contracts 92/92、完整测试 601/601、TypeScript、lint、format、migration、diff 与 owner-poc production build 全部通过。用户于 2026-09-23 回复 `continue` 并确认 contract/security slice；验收记录见 `reviews/t15-demo-acceptance-2026-09-23.md`
 - 已保留: D-P06 仍为 Proposed；真实 Node/OpenClaw/Tunnel adapter、身份与 Secret 装配、host replay-store 权限／重启恢复、无公网／browser-fetch 旁路和真实负向 probes 属 T-18 preflight。未通过时只能以 `relay_disabled_manual_unknown` 发布基础 Add
+- 已完成: T-17 Web Confirm、确定性 `/jpmap add <query> -> select <n> -> confirm|cancel`、recent committed receipt recovery 与 cancel replay 已通过同一真实 D1 的 Owner-cookie Web / signed-HMAC Agent 双入口 E2E；verified 进入公开 Catalog/地图/Nearby，needs-review 保持 Owner-only，conflict 必须显示完整新 preview 并显式二次确认
+- 已完成: T-17 第 3 轮独立 code/UI review PASS，严重 0 / 一般 0 / 建议 0；architecture fitness 62/62、focused 10/10、OpenClaw plugin/src-dist、TypeScript/lint/format/migration/diff 全绿，10 张真实 Chromium production React 截图与 ARIA/focus/computed CSS 通过。用户于 2026-09-24 回复 `continue` 并确认收口；验收记录见 `reviews/t17-demo-acceptance-2026-09-24.md`
 - 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
-- 未完成: T-08、T-09，以及 T-17–T-20 的 Add/Record 工作；T-18 的 readiness drafts 已完成，但实际生产发布仍受 T-08、T-11、T-17 阻塞
+- 未完成: T-08、T-09，以及 T-18–T-20 的 Add/Record 工作；T-18 readiness drafts 已完成，实际生产发布仍受 T-08 与 T-11 阻塞
 - 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
-- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14/T-15/T-16 的代码门与用户确认均已关闭；D-P06 在 T-18 production preflight 与独立威胁复审通过前仍为 Proposed，T-08 仍等待获授权后的 endpoint/key 切换、重启与 live signed 正反向证明
-- 下一步: 按红→绿→重构实现 T-17 Web confirm 与确定性 `/jpmap add` 双 adapter E2E；Research Relay 保持 disabled/manual-unknown，不提前执行 T-18 production provider/deploy
+- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14/T-15/T-16/T-17 的代码门与用户确认均已关闭；D-P06 在 T-18 production preflight 与独立威胁复审通过前仍为 Proposed，T-08 仍等待 endpoint/key 切换、重启与 live signed 正反向证明
+- 下一步: 执行 T-18 Add production preflight、蓝绿发布、公开/Owner/Agent smoke 与回退演练；若 Relay/Tunnel 任一保证未闭合，则以 `relay_disabled_manual_unknown` 发布基础 Add

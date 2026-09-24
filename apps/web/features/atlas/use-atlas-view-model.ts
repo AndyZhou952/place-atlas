@@ -171,6 +171,23 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     setReviewCandidateLoadRevision((revision) => revision + 1);
   }, []);
 
+  const reloadCatalogViews = useCallback(() => {
+    const loadId = crypto.randomUUID();
+    dispatch({ type: 'items.load.started', loadId });
+    void browserAtlasApplication
+      .execute({
+        key: 'catalog.list',
+        input: { profile: 'full_merged_catalog' },
+      })
+      .then((loadedItems) =>
+        dispatch({ type: 'items.loaded', loadId, items: loadedItems }),
+      )
+      .catch(() => {
+        setNotice('The place was saved, but the map could not refresh yet.');
+      });
+    setReviewCandidateLoadRevision((revision) => revision + 1);
+  }, []);
+
   const setMediaVisitPending = useCallback(
     (visitId: string, pending: boolean) => {
       setPendingMediaVisitIds((current) => {
@@ -758,6 +775,7 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     personalFilter,
     query,
     reloadReviewCandidates,
+    reloadCatalogViews,
     reviewCandidates: visibleReviewCandidates,
     reviewCandidateLoadState: visibleReviewCandidateLoadState,
     queueImport,

@@ -123,6 +123,145 @@ test('D1 intake state persists scoped minimal candidates, replaces active sessio
   );
 });
 
+test('D1 resolves the active Add conversation before the most recent committed receipt', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  const now = new Date('2026-09-22T10:10:00.000Z');
+  const state = new D1CatalogIntakeState(toD1(sqlite), { now: () => now });
+  const active = candidateSession('session-active', 'request-active', '鮨');
+  await state.createReplacingActive(active);
+  const committed = {
+    ...scope,
+    sessionId: 'session-committed',
+    sessionVersion: 4,
+    state: 'committed',
+    committedFromVersion: 3,
+    requestToken: 'request-committed',
+    normalizedOwnerQuery: '鮨青空',
+    terminalAt: '2026-09-22T10:05:00.000Z',
+    retainUntil: '2027-03-21T10:05:00.000Z',
+    mutationKey: 'mutation-1',
+    previewVersion: 3,
+    evidenceDigest: 'a'.repeat(64),
+    outcome: {
+      status: 'committed_verified',
+      itemId: 'item-1',
+      receiptRef: 'receipt-1',
+      replayed: false,
+    },
+  };
+  sqlite
+    .prepare(
+      'INSERT INTO catalog_intake_terminal_refs ' +
+        '(session_id, owner_id, channel, conversation_id, state, ' +
+        'session_version, source_version, request_token, normalized_owner_query, ' +
+        'terminal_at_ms, retain_until_ms, terminal_json) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(
+      committed.sessionId,
+      committed.ownerId,
+      committed.channel,
+      committed.conversationId,
+      committed.state,
+      committed.sessionVersion,
+      committed.committedFromVersion,
+      committed.requestToken,
+      committed.normalizedOwnerQuery,
+      Date.parse(committed.terminalAt),
+      Date.parse(committed.retainUntil),
+      JSON.stringify(committed),
+    );
+
+  assert.deepEqual(await state.resolve(scope), {
+    state: 'candidates_ready',
+    sessionId: 'session-active',
+    sessionVersion: 1,
+  });
+  sqlite.exec('DELETE FROM catalog_intake_sessions');
+  assert.deepEqual(await state.resolve(scope), {
+    state: 'committed',
+    sessionId: 'session-committed',
+    sessionVersion: 4,
+    previewVersion: 3,
+  });
+  const cancelled = {
+    ...scope,
+    sessionId: 'session-cancelled',
+    sessionVersion: 2,
+    state: 'cancelled',
+    cancelledFromVersion: 1,
+    requestToken: 'request-cancelled',
+    normalizedOwnerQuery: '天ぷら',
+    terminalAt: '2026-09-22T10:06:00.000Z',
+    retainUntil: '2027-03-21T10:06:00.000Z',
+  };
+  sqlite
+    .prepare(
+      'INSERT INTO catalog_intake_terminal_refs ' +
+        '(session_id, owner_id, channel, conversation_id, state, ' +
+        'session_version, source_version, request_token, normalized_owner_query, ' +
+        'terminal_at_ms, retain_until_ms, terminal_json) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(
+      cancelled.sessionId,
+      cancelled.ownerId,
+      cancelled.channel,
+      cancelled.conversationId,
+      cancelled.state,
+      cancelled.sessionVersion,
+      cancelled.cancelledFromVersion,
+      cancelled.requestToken,
+      cancelled.normalizedOwnerQuery,
+      Date.parse(cancelled.terminalAt),
+      Date.parse(cancelled.retainUntil),
+      JSON.stringify(cancelled),
+    );
+  const expired = {
+    ...scope,
+    sessionId: 'session-expired',
+    sessionVersion: 2,
+    state: 'expired',
+    expiredFromVersion: 1,
+    expiredAt: '2026-09-22T10:07:00.000Z',
+    terminalAt: '2026-09-22T10:07:00.000Z',
+    retainUntil: '2026-09-23T10:07:00.000Z',
+  };
+  sqlite
+    .prepare(
+      'INSERT INTO catalog_intake_terminal_refs ' +
+        '(session_id, owner_id, channel, conversation_id, state, ' +
+        'session_version, source_version, request_token, normalized_owner_query, ' +
+        'terminal_at_ms, retain_until_ms, terminal_json) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(
+      expired.sessionId,
+      expired.ownerId,
+      expired.channel,
+      expired.conversationId,
+      expired.state,
+      expired.sessionVersion,
+      expired.expiredFromVersion,
+      'request-expired',
+      '焼鳥',
+      Date.parse(expired.terminalAt),
+      Date.parse(expired.retainUntil),
+      JSON.stringify(expired),
+    );
+  assert.deepEqual(await state.resolve(scope), {
+    state: 'committed',
+    sessionId: 'session-committed',
+    sessionVersion: 4,
+    previewVersion: 3,
+  });
+  assert.equal(
+    await state.resolve({ ...scope, conversationId: 'other-dm' }),
+    undefined,
+  );
+});
+
 test('D1 intake state atomically consumes the initial research phase once with its reserved budget', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(await readFile(migration, 'utf8'));

@@ -29,7 +29,7 @@ export interface CatalogIntakeUiError {
 export interface CatalogIntakeUiState {
   readonly stage: CatalogIntakeUiStage;
   readonly previousStage?: CatalogIntakeUiStage;
-  readonly lastOperation?: 'discover' | 'select' | 'cancel';
+  readonly lastOperation?: 'discover' | 'select' | 'confirm' | 'cancel';
   readonly query: string;
   readonly title: string;
   readonly area: string;
@@ -64,6 +64,7 @@ export type CatalogIntakeUiAction =
   | { readonly type: 'candidate_selected'; readonly ordinal: number }
   | { readonly type: 'discover_started'; readonly requestToken: string }
   | { readonly type: 'select_started' }
+  | { readonly type: 'confirm_started' }
   | { readonly type: 'cancel_started' }
   | {
       readonly type: 'discover_succeeded';
@@ -120,6 +121,12 @@ export function reduceCatalogIntakeUi(
       return toStage(state, 'loading', {
         previousStage: state.stage,
         lastOperation: 'select',
+        error: undefined,
+      });
+    case 'confirm_started':
+      return toStage(state, 'loading', {
+        previousStage: state.stage,
+        lastOperation: 'confirm',
         error: undefined,
       });
     case 'cancel_started':

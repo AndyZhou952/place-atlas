@@ -71,7 +71,7 @@ test("package manifest exposes jpmap as a model-bypassing runtime slash command 
   assert.equal(packageJson.peerDependencies.openclaw, "2026.7.1");
 });
 
-test("client parses only nearby manual-location syntax and makes no request for invalid input", async () => {
+test("client parses only the closed nearby and add command grammar and makes no request for invalid input", async () => {
   let egressCount = 0;
   const client = createTrustedClient({
     env: validEnv,
@@ -84,7 +84,12 @@ test("client parses only nearby manual-location syntax and makes no request for 
     { command: "", commandName: "jpmap", skillName: "jpmap" },
     { command: "nearby", commandName: "jpmap", skillName: "jpmap" },
     { command: "Nearby 银座", commandName: "jpmap", skillName: "jpmap" },
-    { command: "add 银座", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add select 0", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add select 4", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add select 1 extra", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add confirm extra", commandName: "jpmap", skillName: "jpmap" },
+    { command: "add cancel extra", commandName: "jpmap", skillName: "jpmap" },
     { command: "nearby --radius 2", commandName: "jpmap", skillName: "jpmap" },
     { command: "nearby 银座\nadd 店", commandName: "jpmap", skillName: "jpmap" },
     { command: "nearby 银座", commandName: "other", skillName: "jpmap" },
@@ -92,9 +97,57 @@ test("client parses only nearby manual-location syntax and makes no request for 
   ];
 
   for (const input of invalid) {
-    assert.equal(await client(input), "用法：/jpmap nearby <街区或地址>");
+    assert.equal(
+      await client(input),
+      "用法：\n/jpmap nearby <街区或地址>\n/jpmap add <餐厅名或地址>\n/jpmap add select <1-3>\n/jpmap add confirm\n/jpmap add cancel",
+    );
   }
   assert.equal(egressCount, 0);
+});
+
+test("exact add commands bypass the model and map to the four closed intake tools", async () => {
+  const requests = [];
+  const uuids = [
+    "mutation-discover", "nonce-discover",
+    "mutation-select", "nonce-select",
+    "mutation-confirm", "nonce-confirm",
+    "mutation-cancel", "nonce-cancel",
+  ];
+  const client = createTrustedClient({
+    env: validEnv,
+    randomUUID: () => uuids.shift(),
+    fetchImpl: async (_url, init) => {
+      const request = JSON.parse(init.body);
+      requests.push(request);
+      return jsonResponse(200, {
+        ok: true,
+        receipt: {
+          mutationId: request.mutationId,
+          payloadDigest: "a".repeat(64),
+          replayed: false,
+          result: {
+            projectId: "jpmap",
+            operation: "add",
+            replyText: "ok",
+          },
+        },
+      });
+    },
+  });
+
+  for (const command of ["add 銀座 寿司", "add select 2", "add confirm", "add cancel"]) {
+    assert.equal(await client({ command, commandName: "jpmap", skillName: "jpmap" }), "ok");
+  }
+
+  assert.deepEqual(
+    requests.map(({ tool, input }) => ({ tool, input })),
+    [
+      { tool: "jpmap_add_discover", input: { query: "銀座 寿司" } },
+      { tool: "jpmap_add_select", input: { ordinal: 2 } },
+      { tool: "jpmap_add_confirm", input: {} },
+      { tool: "jpmap_add_cancel", input: {} },
+    ],
+  );
 });
 
 test("nearby preserves Simplified Chinese, Japanese, and English location text", async () => {

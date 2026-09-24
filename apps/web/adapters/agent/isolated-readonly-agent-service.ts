@@ -7,6 +7,8 @@ import { createAgentServiceGateway } from '../../product/application/conversatio
 import {
   createAgentToolCatalog,
   createProjectCommandRouter,
+  type CatalogIntakeApplicationDefinitions,
+  type CatalogIntakeConversationResolver,
   type NearbyApplicationDefinitions,
 } from '../../product/application/conversation/project-command-router.ts';
 import { createAgentHttpHandler } from './agent-http-mapping.ts';
@@ -50,15 +52,32 @@ export function createIsolatedReadonlyAgentHttpHandler(
 
 export function createOwnerPocAgentHttpHandler(
   bindings: OwnerPocAgentBindings,
-  application: AtlasApplication<NearbyApplicationDefinitions>,
+  application: AtlasApplication<
+    NearbyApplicationDefinitions & CatalogIntakeApplicationDefinitions
+  >,
+  conversationResolver: CatalogIntakeConversationResolver,
   clock: { readonly nowMs: () => number } = { nowMs: Date.now },
 ) {
-  return createReadonlyAgentHttpHandler(
-    bindings,
-    application,
-    hasSafeOwnerPocBindings(bindings),
+  if (!hasSafeOwnerPocBindings(bindings)) return unavailableHandler();
+  const gateway = createAgentServiceGateway({
+    router: createProjectCommandRouter(application, {
+      catalogIntakeApplication: application,
+      conversationResolver,
+    }),
+    toolCatalog: createAgentToolCatalog(),
+    manifestPhase: 'owner',
+    keys: createSingleOwnerAgentKeyStore({
+      keyId: bindings.AGENT_JPMAP_KEY_ID,
+      secret: bindings.AGENT_JPMAP_HMAC_SECRET,
+      actorId: bindings.AGENT_OWNER_ACTOR_ID,
+      conversationId: bindings.AGENT_OWNER_CONVERSATION_ID,
+      scopes: ['atlas:nearby:read', 'atlas:intake:write'],
+    }),
+    state: new D1AgentGatewayState(bindings.DB),
+    audit: new D1AgentAuditSink(bindings.DB, clock.nowMs),
     clock,
-  );
+  });
+  return createAgentHttpHandler(gateway);
 }
 
 function createReadonlyAgentHttpHandler(

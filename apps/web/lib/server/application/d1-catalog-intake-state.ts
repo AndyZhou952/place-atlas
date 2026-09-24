@@ -7,6 +7,10 @@ import type {
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { catalogIntakeResearchBudgets } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { hasCanonicalCatalogIntakeWarningOrder } from '../../../product/application/catalog-intake/catalog-intake-warning-policy.ts';
+import type {
+  CatalogIntakeConversationReference,
+  CatalogIntakeConversationResolver,
+} from '../../../product/application/conversation/project-command-router.ts';
 
 interface JsonRow {
   readonly value_json: string;
@@ -28,7 +32,9 @@ interface ResearchEligibilityRow {
   readonly research_digest: string | null;
 }
 
-export class D1CatalogIntakeState implements CatalogIntakeStatePort {
+export class D1CatalogIntakeState
+  implements CatalogIntakeStatePort, CatalogIntakeConversationResolver
+{
   readonly #database: D1Database;
   readonly #clock: { now(): Date };
 
@@ -107,6 +113,28 @@ export class D1CatalogIntakeState implements CatalogIntakeStatePort {
       )
       .first<JsonRow>();
     return terminal ? parseStored(terminal.value_json) : undefined;
+  }
+
+  async resolve(
+    scope: CatalogIntakeScope,
+  ): Promise<CatalogIntakeConversationReference | undefined> {
+    const active = await this.#database
+      .prepare(findConversationActiveSql)
+      .bind(scope.ownerId, scope.channel, scope.conversationId)
+      .first<JsonRow>();
+    if (active) return toConversationReference(parseStored(active.value_json));
+    const terminal = await this.#database
+      .prepare(findRecentTerminalSql)
+      .bind(
+        scope.ownerId,
+        scope.channel,
+        scope.conversationId,
+        this.#clock.now().getTime(),
+      )
+      .first<JsonRow>();
+    return terminal
+      ? toConversationReference(parseStored(terminal.value_json))
+      : undefined;
   }
 
   async compareAndSwap(input: {
@@ -369,11 +397,20 @@ const findActiveSql =
   'SELECT session_json AS value_json FROM catalog_intake_sessions ' +
   'WHERE session_id = ? AND ' +
   scopeWhere;
+const findConversationActiveSql =
+  'SELECT session_json AS value_json FROM catalog_intake_sessions WHERE ' +
+  scopeWhere +
+  ' LIMIT 1';
 const findTerminalSql =
   'SELECT terminal_json AS value_json FROM catalog_intake_terminal_refs ' +
   'WHERE session_id = ? AND ' +
   scopeWhere +
   ' AND retain_until_ms > ?';
+const findRecentTerminalSql =
+  'SELECT terminal_json AS value_json FROM catalog_intake_terminal_refs WHERE ' +
+  scopeWhere +
+  " AND state = 'committed' AND retain_until_ms > ? " +
+  'ORDER BY terminal_at_ms DESC, session_id DESC LIMIT 1';
 const updateActiveSql =
   'UPDATE catalog_intake_sessions SET state = ?, session_version = ?, ' +
   'session_json = ?, last_accepted_activity_at_ms = ?, expires_at_ms = ?, ' +
@@ -496,6 +533,35 @@ function parseStored(json: string): CatalogIntakeStoredSession {
     throw new Error('Catalog intake session has invalid warning order.');
   }
   return parsed as CatalogIntakeStoredSession;
+}
+
+function toConversationReference(
+  session: CatalogIntakeStoredSession,
+): CatalogIntakeConversationReference | undefined {
+  if (session.state === 'candidates_ready') {
+    return {
+      state: session.state,
+      sessionId: session.sessionId,
+      sessionVersion: session.sessionVersion,
+    };
+  }
+  if (session.state === 'preview_ready') {
+    return {
+      state: session.state,
+      sessionId: session.sessionId,
+      sessionVersion: session.sessionVersion,
+      previewVersion: session.preview.previewVersion,
+    };
+  }
+  if (session.state === 'committed') {
+    return {
+      state: session.state,
+      sessionId: session.sessionId,
+      sessionVersion: session.sessionVersion,
+      previewVersion: session.previewVersion,
+    };
+  }
+  return undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

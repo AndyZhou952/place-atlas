@@ -184,7 +184,9 @@ function parseMutationRow(
     typeof result !== 'object' ||
     Array.isArray(result) ||
     (result as { readonly projectId?: unknown }).projectId !== 'jpmap' ||
-    (result as { readonly operation?: unknown }).operation !== 'nearby' ||
+    !['nearby', 'add'].includes(
+      String((result as { readonly operation?: unknown }).operation),
+    ) ||
     typeof (result as { readonly replyText?: unknown }).replyText !== 'string'
   ) {
     throw new Error('Stored Agent receipt is invalid.');
@@ -280,6 +282,7 @@ export function createSingleOwnerAgentKeyStore(input: {
   readonly secret: string;
   readonly actorId: string;
   readonly conversationId: string;
+  readonly scopes?: readonly string[];
 }): AgentServiceKeyStore {
   const key: AgentServiceKey = {
     keyId: input.keyId,
@@ -292,7 +295,7 @@ export function createSingleOwnerAgentKeyStore(input: {
       conversationId: input.conversationId,
       conversationType: 'direct',
     },
-    scopes: ['atlas:nearby:read'],
+    scopes: input.scopes ?? ['atlas:nearby:read'],
   };
   return {
     async find(keyId) {

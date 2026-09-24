@@ -10,6 +10,8 @@ import {
   createCatalogIntakeOperationGroup,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createCatalogRead } from '../../../product/application/catalog/catalog-read.ts';
+import { createProjectCommandRouter } from '../../../product/application/conversation/project-command-router.ts';
+import { createNearbyRecommendationOperationGroup } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
 import { D1CatalogState } from './d1-catalog-state.ts';
@@ -1042,6 +1044,183 @@ test('AtlasApplication replays the committed D1 receipt after the first confirm 
   assert.equal(expiredReplay.error.code, 'not_found');
   assert.equal(count(sqlite, 'atlas_items'), 1);
   assert.equal(count(sqlite, 'catalog_intake_publish_receipts'), 1);
+});
+
+test('deterministic Agent Add publishes a verified D1 item that Catalog and Nearby can read', async () => {
+  const now = new Date('2026-09-23T02:00:00.000Z');
+  const sqlite = await migratedDatabase();
+  const database = toD1(sqlite);
+  const state = new D1CatalogIntakeState(database, { now: () => now });
+  const catalog = createCatalogRead(new D1CatalogState(database), []);
+  const candidate = {
+    durableIdentity: {
+      providerNamespace: 'google-places',
+      placeId: 'place-agent-e2e',
+      ordinal: 1,
+    },
+    transientPresentation: {
+      name: 'Agent transient name',
+      address: 'Agent transient address',
+      attribution: {
+        label: 'Google Maps',
+        url: 'https://maps.google.com/',
+      },
+    },
+  };
+  const intakeModule = createCatalogIntakeModule({
+    discoveryPort: {
+      async discover() {
+        return { ok: true, value: { candidates: [candidate], hasMore: false } };
+      },
+      async refetch() {
+        return { ok: true, value: candidate };
+      },
+    },
+    durableGeocoderPort: {
+      async propose() {
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress: '東京都中央区銀座1-1-1',
+            latitude: 35.671,
+            longitude: 139.765,
+            provider: 'fixture-durable-geocoder',
+            sourceUrl: 'https://fixture.invalid/geocoder/agent-e2e',
+            license: 'Fixture durable evidence',
+            checkedAt: now.toISOString(),
+          },
+        };
+      },
+    },
+    statePort: state,
+    atlasCatalogIntakePort: new D1AtlasCatalogIntakePublisher(database, {
+      now: () => now,
+      nextId: () => 'agent-verified-1',
+    }),
+    clock: { now: () => now },
+    idSource: { nextId: () => 'session-agent-e2e' },
+    catalogRevision: { read: async () => 'catalog-r1' },
+  });
+  const application = createAtlasApplication({
+    ...createCatalogIntakeOperationGroup(intakeModule),
+    ...createNearbyRecommendationOperationGroup({
+      clock: { now: () => now },
+      routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
+      catalog,
+      locationResolver: {
+        async resolve() {
+          return {
+            status: 'resolved',
+            location: {
+              canonicalAddress: '東京都中央区銀座',
+              point: { latitude: 35.671, longitude: 139.764 },
+            },
+            attribution: {
+              label: 'Fixture geocoder',
+              url: 'https://fixture.invalid/geocoder',
+            },
+            provenance: {
+              providerId: 'fixture-geocoder',
+              policyVersion: 'fixture-v1',
+              sourceUrl: 'https://fixture.invalid/geocoder?query=ginza',
+              checkedAt: now.toISOString(),
+            },
+          };
+        },
+      },
+      routeProvider: {
+        async walking() {
+          return {
+            status: 'fresh',
+            durationSeconds: 480,
+            distanceMeters: 600,
+            checkedAt: now.toISOString(),
+            attribution: {
+              label: 'Fixture routes',
+              url: 'https://fixture.invalid/routes',
+            },
+          };
+        },
+      },
+      entryAccessProvider: {
+        async inspectWalkIn() {
+          return {
+            status: 'unknown',
+            warning: 'Walk-in status is unavailable.',
+          };
+        },
+        async inspectQueue() {
+          return { status: 'unknown', warning: 'Queue status is unavailable.' };
+        },
+      },
+      entryAccessPolicy: {
+        policyVersion: 'fixture-entry-v1',
+        allowedSourceOrigins: ['https://fixture.invalid'],
+        maximumAgeMs: 5 * 60 * 1000,
+        clock: { now: () => now },
+      },
+      personalFacts: {
+        async read() {
+          return { manualVisited: false, visitCount: 0 };
+        },
+      },
+      mapDeepLink: (item) =>
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`,
+    }),
+  });
+  const router = createProjectCommandRouter(application, {
+    catalogIntakeApplication: application,
+    conversationResolver: state,
+  });
+  const context = {
+    requestToken: 'agent-e2e-request',
+    invocation: {
+      ownerId: 'owner-agent',
+      channel: 'openclaw-weixin',
+      conversationId: 'owner-dm',
+    },
+  };
+
+  assert.equal(
+    (await router.dispatch('/jpmap add 銀座テスト店', context)).value.step,
+    'candidates',
+  );
+  assert.equal(
+    (await router.dispatch('/jpmap add select 1', context)).value.step,
+    'preview',
+  );
+  const committed = await router.dispatch('/jpmap add confirm', context);
+  assert.equal(committed.ok, true);
+  assert.equal(committed.value.step, 'committed');
+  assert.equal(committed.value.intake.status, 'committed_verified');
+
+  const verified = await catalog.list('verified_catalog');
+  assert.deepEqual(
+    verified.map(({ id, title, address, verificationStatus }) => ({
+      id,
+      title,
+      address,
+      verificationStatus,
+    })),
+    [
+      {
+        id: 'agent-verified-1',
+        title: '銀座テスト店',
+        address: '東京都中央区銀座1-1-1',
+        verificationStatus: 'verified',
+      },
+    ],
+  );
+  const nearby = await application.execute({
+    key: 'nearby.recommend',
+    input: { locationHint: '銀座' },
+  });
+  assert.equal(nearby.ok, true);
+  assert.deepEqual(
+    nearby.value.recommendations.map(({ itemId }) => itemId),
+    ['agent-verified-1'],
+  );
 });
 
 async function migratedDatabase() {

@@ -1,5 +1,11 @@
 import type { ProviderUsagePort } from '../../product/provider-policy/provider-policy-gateway.ts';
 
+export type ProviderUsageSku =
+  | 'geocoding.requests'
+  | 'walking_matrix.elements'
+  | 'places.search_text.requests'
+  | 'places.details.requests';
+
 export class D1ProviderUsage implements ProviderUsagePort {
   private readonly database: D1Database;
   private readonly now: () => Date;
@@ -11,7 +17,7 @@ export class D1ProviderUsage implements ProviderUsagePort {
 
   async reserve(reservation: {
     readonly providerId: string;
-    readonly sku?: 'geocoding.requests' | 'walking_matrix.elements';
+    readonly sku?: ProviderUsageSku;
     readonly units?: number;
     readonly requests: 1;
     readonly costUsd: number;
@@ -85,7 +91,7 @@ export class D1ProviderUsage implements ProviderUsagePort {
 
   async #reserveSkuUnits(reservation: {
     readonly providerId: string;
-    readonly sku?: 'geocoding.requests' | 'walking_matrix.elements';
+    readonly sku?: ProviderUsageSku;
     readonly units?: number;
     readonly requests: 1;
     readonly costUsd: number;
@@ -107,7 +113,7 @@ export class D1ProviderUsage implements ProviderUsagePort {
       !Number.isSafeInteger(reservation.hardUnitLimit) ||
       reservation.hardUnitLimit === undefined ||
       reservation.hardUnitLimit < 1 ||
-      (reservation.sku === 'geocoding.requests' && reservation.units !== 1)
+      (reservation.sku !== 'walking_matrix.elements' && reservation.units !== 1)
     ) {
       return 'cost_exceeded';
     }

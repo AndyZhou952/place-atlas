@@ -35,8 +35,10 @@ runbook.
 
 ## Runtime secrets and identity binding
 
-Supply these variables to the OpenClaw Gateway process through its root-only
-service environment file or equivalent secret manager:
+Supply these variables to the OpenClaw Gateway process through either a
+service-account-owned `0600` environment file for the reviewed user-level
+systemd deployment, a root-owned service environment file for a system-level
+deployment, or an equivalent secret manager:
 
 ```text
 JPMAP_AGENT_ENDPOINT=https://<isolated-worker-host>/api/agent/v1/tools
@@ -106,3 +108,75 @@ the approved operator channel. Then, on the OpenClaw host:
 Any missing configuration or trusted identity context, non-HTTPS endpoint,
 timeout, rejected HTTP response, oversized response, malformed reply, or URL
 location returns a fixed error and does not expose internal details.
+
+## Atomic Agent endpoint/key switch and rollback
+
+The host-side switch helper changes only the OpenClaw service environment
+file. It does not install a package, restart a service, call the Worker, or
+change the Web route. Run it only after the release and Worker credentials have
+passed their separate preflight.
+
+The current environment file must already contain exactly one of each of the
+five reviewed `JPMAP_*` names shown above and no other `JPMAP_*` name. The
+helper preserves the current Owner actor and conversation values; only the
+endpoint, key ID, and HMAC secret are replaced. Existing unrelated environment
+assignments and comments are preserved.
+
+Place each new value in its own protected regular file. Values are never CLI
+arguments and therefore do not enter shell history or the process list. The
+endpoint must be HTTPS with the exact `/api/agent/v1/tools` path and no URL
+credentials, query, or fragment. The key ID, HMAC secret, and existing Owner
+IDs must be bounded single-line values without control characters. All input
+files and the current environment must be owner-only; symbolic links and hard
+links are rejected.
+
+```bash
+chmod 600 /controlled/new-endpoint /controlled/new-key-id /controlled/new-hmac
+node scripts/agent-target-switch.mjs switch \
+  --environment-file /controlled/openclaw.env \
+  --backup-file /controlled/openclaw.env.jpmap-rollback-001 \
+  --endpoint-file /controlled/new-endpoint \
+  --key-id-file /controlled/new-key-id \
+  --hmac-secret-file /controlled/new-hmac
+```
+
+Use absolute paths. The backup must be in the same directory as the service
+environment and must not already exist. The helper validates every input before
+writing, creates a protected `0600` rollback snapshot, then writes a `0600`
+same-directory temporary file and atomically renames it over the environment.
+It retains the environment file's uid/gid. A service-account-owned `0600` file
+implements the service-identity-only secret policy for this user-level systemd
+deployment. Prefer running the command as that service account. When an
+administrator runs it as root, the helper still preserves the service account
+ownership; any other caller is rejected.
+
+Successful output contains only the status, the five configuration names, and
+SHA-256 digests. It never prints a value. Record only those non-secret fields
+in rollout evidence. A failure before the atomic rename prints only a closed
+error code and leaves the live environment unchanged. If the rename commits but
+the directory durability sync cannot be confirmed, the command succeeds with
+`switched_durability_unconfirmed` (or
+`rolled_back_durability_unconfirmed`). Treat that status as already switched:
+inspect the live file owner, mode, five names, and reported digest immediately;
+do not blindly retry. If the rename itself fails after the rollback snapshot was
+safely created, keep that snapshot for operator recovery.
+
+The helper deliberately does not reload or restart OpenClaw. After a successful
+switch, separately inspect the file owner/mode and configuration-name presence,
+then perform the reviewed user-level Gateway restart and signed positive and
+negative probes. Do not copy values into evidence.
+
+Rollback replaces only the Agent environment and leaves the Web entry point
+unchanged:
+
+```bash
+node scripts/agent-target-switch.mjs rollback \
+  --environment-file /controlled/openclaw.env \
+  --backup-file /controlled/openclaw.env.jpmap-rollback-001
+```
+
+Rollback validates both files, preserves service ownership, performs the same
+atomic replacement, and does not consume or rewrite the snapshot. Restart and
+probe the Gateway separately. To restore the green target after a rollback
+rehearsal, run `switch` again with the same protected green input files and a
+new, non-existing backup filename; never overwrite either rollback snapshot.

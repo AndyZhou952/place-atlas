@@ -8,6 +8,7 @@ import {
 } from '@/adapters/agent/isolated-readonly-agent-service';
 import { createT06aGoogleNearbyComposition } from '@/adapters/agent/t06a-google-nearby-composition';
 import { createOwnerPocComposition } from '@/lib/server/application/owner-poc-composition';
+import { projectOwnerPocCatalogIntakeRuntime } from '@/lib/server/application/catalog-intake-provider-mode-manifest';
 import { D1CatalogIntakeState } from '@/lib/server/application/d1-catalog-intake-state';
 import { createServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function POST(request: Request): Promise<Response> {
     const composition = createOwnerPocComposition(
       bindings.DB,
       bindings.ROUTE_SIDECAR,
+      projectOwnerPocCatalogIntakeRuntime(bindings),
     );
     const application = createServerAtlasApplication(
       bindings.DB,

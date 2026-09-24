@@ -58,6 +58,14 @@ test('only owner-poc uses the daily cleanup wrapper while Agent keeps its existi
   );
   assert.match(entrypoint, /vinext\/server\/fetch-handler/u);
   assert.match(entrypoint, /runD1CatalogIntakeCleanup/u);
+
+  const maintenance = await readFile(
+    new URL('./catalog-intake-maintenance.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(maintenance, /D1CatalogIntakeState/u);
+  assert.match(maintenance, /D1NominatimPolicyState/u);
+  assert.match(maintenance, /\.cleanup\(now\)/u);
 });
 
 function stripJsonComments(value) {

@@ -144,6 +144,38 @@ test('Nominatim keeps the owner restaurant query when the draft supplies only an
   );
 });
 
+test('Nominatim allows Owner confirm refresh and reuses the shared durable cache', async () => {
+  let transportCalls = 0;
+  const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };
+  const adapter = createNominatimDurableGeocoderAdapter({
+    endpoint: 'https://nominatim.openstreetmap.org/search',
+    identifyingUserAgent:
+      'JapanAtlasOwnerPoC/1.0 (+https://example.test/terms)',
+    referer: 'https://example.test/',
+    transport: {
+      async search() {
+        transportCalls += 1;
+        return { ok: true, value: [] };
+      },
+    },
+    cache: createInMemoryDurableGeocoderCache(),
+    rateGate: createNominatimApplicationRateGate(clock),
+    clock,
+  });
+  const input = {
+    dataClassification: 'public_place_query',
+    ownerQuery: '鮨青空',
+    ownerDraft: { area: '銀座' },
+  };
+  await adapter.propose({ ...input, trigger: 'owner_intake_select' });
+  const refreshed = await adapter.propose({
+    ...input,
+    trigger: 'owner_intake_confirm',
+  });
+  assert.deepEqual(refreshed, { ok: true, value: { status: 'no_match' } });
+  assert.equal(transportCalls, 1);
+});
+
 test('Nominatim ignores damaged cache data and keeps the official endpoint replaceable only at the port seam', async () => {
   let transportCalls = 0;
   const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };

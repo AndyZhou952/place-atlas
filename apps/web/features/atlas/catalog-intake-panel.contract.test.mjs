@@ -11,6 +11,8 @@ test('Owner Add panel is a separate accessible intake surface before collection 
 
   assert.match(panel, /<fieldset/u);
   assert.match(panel, /type="radio"/u);
+  assert.match(panel, /translate="no"/u);
+  assert.match(panel, /candidate\.attribution\.label/u);
   assert.match(panel, /aria-busy/u);
   assert.match(panel, /aria-live="polite"/u);
   assert.match(panel, /aria-invalid/u);
@@ -55,6 +57,20 @@ test('Owner Add confirm exposes loading and retries the same confirm operation',
   assert.match(panel, /Confirming and saving…/u);
   assert.match(panel, /state\.previousStage === 'preview'/u);
   assert.match(panel, /disabled=\{busy\}/u);
+});
+
+test('Google candidate attribution keeps the official text treatment legible and unbroken', async () => {
+  const [panel, styles] = await Promise.all([
+    readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../../app/globals.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(panel, /className="catalog-intake-google-attribution"/u);
+  assert.match(panel, /translate="no"/u);
+  assert.match(
+    styles,
+    /\.catalog-intake-google-attribution[\s\S]*font-family: Roboto, Arial, sans-serif;[\s\S]*font-size: 1rem;[\s\S]*font-weight: 400;[\s\S]*white-space: nowrap;/u,
+  );
 });
 
 test('Owner can confirm the reviewed preview from the Add panel', async () => {

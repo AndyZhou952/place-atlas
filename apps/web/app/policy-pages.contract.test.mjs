@@ -38,3 +38,22 @@ void test('Privacy publicly explains request-only location handling and links pr
   assert.match(privacySource, /https:\/\/policies\.google\.com\/privacy/u);
   assert.match(privacySource, /<Link href="\/terms"/u);
 });
+
+void test('public policy explains Owner-only Add provider boundaries and Nominatim cache retention', () => {
+  assert.match(termsSource, /Add is an Owner-only/u);
+  assert.match(termsSource, /not persisted or rendered on Leaflet/u);
+  assert.match(termsSource, /Public\s+Nominatim/u);
+  assert.match(
+    termsSource,
+    /https:\/\/cloud\.google\.com\/maps-platform\/terms/u,
+  );
+  assert.match(termsSource, /Google Maps Platform Terms of Service/u);
+  assert.match(privacySource, /stores\s+only the selected Google Place ID/u);
+  assert.match(
+    privacySource,
+    /provider request envelopes, and raw responses are\s+not stored/u,
+  );
+  assert.match(privacySource, /Owner-submitted query remains/u);
+  assert.match(privacySource, /cached for up to 30 days/u);
+  assert.match(privacySource, /effective 24 September 2026/u);
+});

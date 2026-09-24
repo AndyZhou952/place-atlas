@@ -31,6 +31,10 @@ interface AgentGatewayBindings {
 
 export interface OwnerPocAgentBindings extends AgentGatewayBindings {
   readonly ROUTE_SIDECAR?: RouteSidecarServiceBinding;
+  readonly GOOGLE_PLACES_API_KEY?: string;
+  readonly CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;
+  readonly CATALOG_INTAKE_DURABLE_GEOCODER_MODE?: string;
+  readonly CATALOG_INTAKE_RESEARCH_RELAY_MODE?: string;
 }
 
 export interface IsolatedReadonlyAgentBindings extends AgentGatewayBindings {

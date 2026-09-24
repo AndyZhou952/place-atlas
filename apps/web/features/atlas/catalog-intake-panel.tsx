@@ -238,9 +238,11 @@ function CandidateStep({
                 </span>
               </label>
               <a
+                className="catalog-intake-google-attribution"
                 href={candidate.attribution.url}
                 target="_blank"
                 rel="noreferrer"
+                translate="no"
               >
                 {candidate.attribution.label}
               </a>

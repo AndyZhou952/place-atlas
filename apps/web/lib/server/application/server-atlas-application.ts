@@ -3,6 +3,7 @@ import {
   getD1,
   getMediaBucket,
   getRouteSidecarServiceBinding,
+  getOwnerPocCatalogIntakeRuntime,
 } from '@/db';
 import { verifiedAtlasItems } from '@/features/atlas/verified-items';
 import { createAtlasApplication } from '@/product/application/atlas-application';
@@ -125,7 +126,11 @@ export function getServerAtlasApplication() {
     return createServerAtlasApplication(
       database,
       mediaBucket,
-      createOwnerPocComposition(database, getRouteSidecarServiceBinding()),
+      createOwnerPocComposition(
+        database,
+        getRouteSidecarServiceBinding(),
+        getOwnerPocCatalogIntakeRuntime(),
+      ),
     );
   }
   return createServerAtlasApplication(database, mediaBucket);

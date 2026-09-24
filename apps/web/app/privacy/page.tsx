@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       </header>
 
       <article className="policy-article">
-        <p className="eyebrow">Public policy · effective 21 September 2026</p>
+        <p className="eyebrow">Public policy · effective 24 September 2026</p>
         <h1>Privacy notice</h1>
         <p className="policy-lede">
           Japan Atlas keeps its public reading surface separate from the private
@@ -66,6 +66,23 @@ export default function PrivacyPage() {
             </a>
             . Japan Atlas retains only the structured result needed to show the
             current response, its attribution, source, and check time.
+          </p>
+        </section>
+
+        <section>
+          <h2>Owner place intake</h2>
+          <p>
+            When the Owner starts Add, the submitted place query is sent to
+            Google Places for a transient candidate list. Japan Atlas stores
+            only the selected Google Place ID as provider identity; candidate
+            names, addresses, provider request envelopes, and raw responses are
+            not stored and no Google Places content is sent to Leaflet. The
+            Owner-submitted query remains in the intake session for recovery. On
+            selection, the public Nominatim service may receive that public
+            place query to propose a durable OpenStreetMap address and
+            coordinates. Valid Nominatim proposals, source attribution, license,
+            and check time may be cached for up to 30 days before confirmation;
+            they enter the Atlas catalog only after Owner confirmation.
           </p>
         </section>
 

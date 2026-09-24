@@ -71,7 +71,7 @@ Evidence fields: D-P06 status; review reference/digest; secret and binding names
 - [ ] The operation manifest exposes exactly the reviewed Nearby and four intake operations appropriate to the release; no Record/media/destructive/maintenance/reset or infrastructure tool is visible.
 - [ ] Owner DM identity/channel/direct/no-thread checks occur before Worker egress; second sender/group/thread/wrong scope/nonce replay tests have zero business/provider mutation.
 - [ ] Endpoint/key switch and exact rollback targets are recorded independently from Web routing in a controlled non-repository operator inventory; rotation of one surface does not alter the other. Repository evidence stores only the inventory's irreversible digest and opaque lookup reference.
-- [ ] Root-only secret storage and service environment permissions are evidenced by mode/owner metadata only.
+- [ ] Service-identity-only secret storage and service environment permissions are evidenced by mode/owner metadata only: system-level systemd uses root-owned storage, while the current user-level systemd deployment uses a protected-directory, service-account-owned `0600` environment file.
 
 Evidence fields: version strings; package/config digests; required-name presence booleans; scope/operation names; zero-model counter; sanitized positive/negative result counts; rollback result.
 

@@ -1,11 +1,12 @@
 {
   "name": "@japan-atlas/openclaw-jpmap",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "files": [
     "dist",
     "openclaw.plugin.json",
     "scripts/host-preflight.mjs",
+    "scripts/agent-target-switch.mjs",
     "README.md"
   ],
   "type": "module",
@@ -13,7 +14,7 @@
     "build": "node scripts/build.mjs",
     "preflight:host": "node scripts/host-preflight.mjs",
     "test": "node --test test/*.test.mjs",
-    "lint": "node --check src/index.mjs && node --check src/jpmap-client.mjs && node --check src/host-preflight.mjs && node --check scripts/host-preflight.mjs && node --check test/jpmap-plugin.contract.test.mjs && node --check test/jpmap-hardening.contract.test.mjs"
+    "lint": "node --check src/index.mjs && node --check src/jpmap-client.mjs && node --check src/host-preflight.mjs && node --check scripts/host-preflight.mjs && node --check scripts/agent-target-switch.mjs && node --check test/jpmap-plugin.contract.test.mjs && node --check test/jpmap-hardening.contract.test.mjs && node --check test/agent-target-switch.contract.test.mjs"
   },
   "peerDependencies": {
     "openclaw": "2026.7.1"

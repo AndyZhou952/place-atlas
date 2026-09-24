@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: T-18 已完成生产发布、live durable-geocoder 与主机回退演练，等待真实微信 DM 和 Google Console 安全／成本门
+- 当前阶段: T-18 已完成生产发布、Google 控制、真实微信 Nearby、live durable-geocoder 与主机回退；0.3.1 热修已部署，等待真实微信 Add select 最终复验
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -61,6 +61,8 @@
 - 已完成待真实微信验收: Lightsail 已安装 OpenClaw plugin 0.3.0，原子切换 owner endpoint 并重启；零模型 signed Nearby/Add、`银座/銀座/ginza`、第二 sender、thread/group、wrong actor/tool 与 nonce replay probes 通过；旧 endpoint rollback→restart→probe→green restore 演练通过
 - 已完成: Worker 首次演练识别并立即撤下 pre-secret 过旧版本；post-secret 正确候选经 0% override、实际 100% rollback 与 green restore 均为 HTTP 200。runbook 已新增“最后一次 Secret 更新后重抓 deployment inventory”的强制步骤
 - 已完成: deployment preflight 证明 durable-geocoder mode 已启用；本次 pinned/reviewed release 包含固定 Nominatim identity、D1 全局 1 req/s、30 天 cache、provider replacement seam 与闭合 provenance contracts。歧义/无单一匹配输入按设计返回 unknown/clarification；公开单一匹配 `東京タワー` 的 production select 返回 known `durable_geocoder_observed`，OpenStreetMap source、license、checkedAt 均有效，随后 cancel 且未发布测试 Catalog item
-- 未完成: T-08、T-11 尚余真实 Owner 微信 DM 演示验收；T-18 另需 Google Cloud application restriction、provider quota 与 budget alert 证据；T-09 语义 proposal 与 T-19–T-20 Record 仍未开始
+- 已完成: Owner 真实微信 DM 已证明 `/jpmap nearby 银座` 的 connector delivery、Google 位置解析和合法 empty-Catalog reply；`/jpmap add 東京タワー` discover 与 cancel 也成功。Owner 同时确认 Places API (New)-only key restriction、所请求的成本控制及 budget alert 已配置；T-08 与 T-11 门关闭
+- 已修复待最终微信复验: 真实 `/jpmap add select 1` 暴露 OpenClaw 0.3.0 全命令固定 4 秒超时及 Nearby 错误文案；0.3.1 经 TDD、独立 review 0 findings、GitHub CI、host preflight、安装/重启后 inspect 和签名 discover→select→cancel probe 全部通过。证据见 `evidence/t18-real-wechat-hotfix-2026-09-24.md`
+- 未完成: T-18 仅余 Owner 在真实微信用 0.3.1 重试 Add discover→select→cancel 并确认 select 返回 preview/clarification；T-09 语义 proposal 与 T-19–T-20 Record 仍未开始
 - 阶段门禁: D-P06 继续保持 Proposed，Research Relay 生产模式为 `relay_disabled_manual_unknown`；基础 Add 不依赖 Tabelog/预约自动研究
-- 下一步: Owner 在真实微信 DM 依次发送 `/jpmap nearby 银座`、`/jpmap add <公开餐厅名或地址>`、`/jpmap add cancel` 并确认回复；Owner 补 Google key application restriction、provider quota 与 budget alert 证据后再执行 hf-ship
+- 下一步: Owner 在真实微信 DM 发送 `/jpmap add 東京タワー`、`/jpmap add select 1`、`/jpmap add cancel`；select 若返回保存前预览或明确追问，即执行 hf-ship 关闭 T-18

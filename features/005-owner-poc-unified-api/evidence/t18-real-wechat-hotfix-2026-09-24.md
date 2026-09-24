@@ -61,9 +61,11 @@ it did not time out or expose private data. The Owner's preceding real WeChat
 Nearby request had already completed successfully, so this transient provider
 outcome does not reopen connector-delivery acceptance.
 
-## Remaining acceptance
+## Final acceptance
 
-T-18 remains open only until the Owner repeats the real WeChat Add sequence on
-plugin 0.3.1 and confirms that `add select 1` now returns a preview or explicit
-clarification before cancelling. No further Google Console or deployment
-configuration action is currently requested.
+The Owner repeated the real WeChat sequence on plugin 0.3.1. Discover returned
+the public Tokyo Tower candidate, select returned `保存前预览` with Google
+identity plus durable OpenStreetMap address/coordinates/source/license/time,
+and cancel closed the session without publishing the test place. The Owner
+confirmed “回复正常”. No further Google Console or deployment configuration
+action remains for T-18.

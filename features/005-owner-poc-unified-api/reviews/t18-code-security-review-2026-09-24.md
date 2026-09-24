@@ -128,6 +128,8 @@ CI 首次运行发现 Agent route 直接 import `@/db`，触发 `route_storage_b
 
 共享 projection contract、Agent route contract、Web `typecheck`、`lint`、`format:check` 与 `git diff --check` 通过；主任务本地 architecture-fitness 已 **PASS**。远端 CI 必须等待该修复形成新提交后重新运行，当前不得写成 remote CI green。
 
+第二轮 CI 还暴露了一个已过时的 Browser binding contract：它仍要求 `GOOGLE_PLACES_API_KEY` 字面量直接出现在 `db/index`，与共享纯 projection 的新接缝冲突。测试已改为同时验证 `db/index` 调用 `projectOwnerPocCatalogIntakeRuntime(env)`、provider manifest 冻结 Places key name，并保留 Browser composition 使用 Route Sidecar／共享 Add runtime 及不得引入 `GOOGLE_MAPS_API_KEY`、Transit、Foursquare 的断言。该单文件 contract 已由本评审独立复跑 1/1 通过，未弱化生产边界。未改动的 `assessment-reset-maintenance` 本地 sandbox 单文件启动异常不归因于本增量；它在既有两轮远端 CI 中通过，但包含本次修复的新远端 CI 仍须提交后重跑，当前仍不得记为 green。
+
 ## Gate
 
 第 3 轮部署手册与 CI 增量复核 **PASS／通过**：严重 0、一般 0、建议 0。该结论关闭上述 runbook 与 architecture-fitness 代码发现；远端 CI 重跑和第 2 轮列出的现场发布／演示证据仍是后续独立门槛。

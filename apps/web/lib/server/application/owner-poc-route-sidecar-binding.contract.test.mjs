@@ -7,11 +7,16 @@ const serverApplicationUrl = new URL(
   './server-atlas-application.ts',
   import.meta.url,
 );
+const providerManifestUrl = new URL(
+  './catalog-intake-provider-mode-manifest.ts',
+  import.meta.url,
+);
 
 void test('Browser owner composition receives the private Route Sidecar and shared Add runtime', async () => {
-  const [dbSource, serverSource] = await Promise.all([
+  const [dbSource, serverSource, providerManifest] = await Promise.all([
     readFile(dbSourceUrl, 'utf8'),
     readFile(serverApplicationUrl, 'utf8'),
+    readFile(providerManifestUrl, 'utf8'),
   ]);
 
   assert.match(
@@ -22,7 +27,11 @@ void test('Browser owner composition receives the private Route Sidecar and shar
     serverSource,
     /createOwnerPocComposition\(\s*database,\s*getRouteSidecarServiceBinding\(\),\s*getOwnerPocCatalogIntakeRuntime\(\),?\s*\)/u,
   );
-  assert.match(dbSource, /GOOGLE_PLACES_API_KEY/u);
+  assert.match(
+    dbSource,
+    /projectOwnerPocCatalogIntakeRuntime\(env\)/u,
+  );
+  assert.match(providerManifest, /GOOGLE_PLACES_API_KEY/u);
   assert.doesNotMatch(
     `${dbSource}\n${serverSource}`,
     /GOOGLE_MAPS_API_KEY|transit|foursquare/iu,

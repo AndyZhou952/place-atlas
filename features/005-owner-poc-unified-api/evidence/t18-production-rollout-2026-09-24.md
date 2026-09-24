@@ -47,8 +47,13 @@ Nominatim request per second through D1, a 30-day D1 cache, the replaceable
 using a public restaurant name and address still produced
 `locationEvidence.status = unknown`; an address-only attempt reached the
 documented clarification path. Both sessions were cancelled and published no
-Catalog item. Consequently the contract/configuration evidence is present,
-but a successful live Nominatim observation is not yet claimed.
+Catalog item. A direct, privacy-safe candidate-count check showed those inputs
+did not yield one unambiguous Nominatim result. A final production probe used
+the public, single-match query `東京タワー`; discover returned one candidate,
+select returned `preview_ready`, and the location evidence was known
+`durable_geocoder_observed` with the official OpenStreetMap source origin,
+non-empty license, and valid `checkedAt`. The session was cancelled and did
+not publish a Catalog item.
 
 The version was promoted to 100%; the ordinary production URL returned HTTP
 200 for the root and Terms pages and exposed the new Add/policy markers.
@@ -106,11 +111,6 @@ environment snapshots and the plugin rollback archive were retained.
   were not available to this rollout. Until reviewed, the compensating
   controls are the encrypted Worker Secret, Places-API-only intent, no raw
   logging/persistence, and the lower D1-backed request/cost hard caps.
-- One production Add selection must return known
-  `durable_geocoder_observed` evidence with an official OpenStreetMap source,
-  non-empty license, and valid `checkedAt`; the current live result is
-  fail-soft `unknown` and must be investigated or explicitly accepted as a PoC
-  limitation.
 - T-08 and T-11 remain unchecked until the real WeChat DM result is accepted.
-  T-18 additionally remains unchecked until the live durable-geocoder result
-  and Google Console restriction/quota/budget evidence are resolved.
+  T-18 additionally remains unchecked until Google Console
+  restriction/quota/budget evidence is resolved.

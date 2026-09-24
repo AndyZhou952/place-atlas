@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: T-18 已完成生产发布与主机回退演练，等待真实微信 DM、live durable-geocoder 与 Google Console 安全／成本门
+- 当前阶段: T-18 已完成生产发布、live durable-geocoder 与主机回退演练，等待真实微信 DM 和 Google Console 安全／成本门
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -60,7 +60,7 @@
 - 已完成待真实微信验收: PR #15 已通过 GitHub CI 并合入 `main`；owner-poc D1 `0006`–`0009`、第七个 Places Secret、fresh seed/preflight、0% version override、100% promotion、公开/Owner Add discover-select-cancel 与脱敏 D1 aggregate 均通过；证据见 `evidence/t18-production-rollout-2026-09-24.md`
 - 已完成待真实微信验收: Lightsail 已安装 OpenClaw plugin 0.3.0，原子切换 owner endpoint 并重启；零模型 signed Nearby/Add、`银座/銀座/ginza`、第二 sender、thread/group、wrong actor/tool 与 nonce replay probes 通过；旧 endpoint rollback→restart→probe→green restore 演练通过
 - 已完成: Worker 首次演练识别并立即撤下 pre-secret 过旧版本；post-secret 正确候选经 0% override、实际 100% rollback 与 green restore 均为 HTTP 200。runbook 已新增“最后一次 Secret 更新后重抓 deployment inventory”的强制步骤
-- 已验证但未关闭: deployment preflight 证明 durable-geocoder mode 已启用；本次 pinned/reviewed release 包含固定 Nominatim identity、D1 全局 1 req/s、30 天 cache、provider replacement seam 与闭合 provenance contracts；追加生产探针的 location evidence 仍为 fail-soft `unknown`，address-only 输入进入 clarification，尚未取得带 OpenStreetMap source/license/checkedAt 的 live known evidence
-- 未完成: T-08、T-11 尚余真实 Owner 微信 DM 演示验收；T-18 另需 live durable-geocoder known evidence，以及 Google Cloud application restriction、provider quota 与 budget alert 证据；T-09 语义 proposal 与 T-19–T-20 Record 仍未开始
+- 已完成: deployment preflight 证明 durable-geocoder mode 已启用；本次 pinned/reviewed release 包含固定 Nominatim identity、D1 全局 1 req/s、30 天 cache、provider replacement seam 与闭合 provenance contracts。歧义/无单一匹配输入按设计返回 unknown/clarification；公开单一匹配 `東京タワー` 的 production select 返回 known `durable_geocoder_observed`，OpenStreetMap source、license、checkedAt 均有效，随后 cancel 且未发布测试 Catalog item
+- 未完成: T-08、T-11 尚余真实 Owner 微信 DM 演示验收；T-18 另需 Google Cloud application restriction、provider quota 与 budget alert 证据；T-09 语义 proposal 与 T-19–T-20 Record 仍未开始
 - 阶段门禁: D-P06 继续保持 Proposed，Research Relay 生产模式为 `relay_disabled_manual_unknown`；基础 Add 不依赖 Tabelog/预约自动研究
-- 下一步: Owner 在真实微信 DM 依次发送 `/jpmap nearby 银座`、`/jpmap add <公开餐厅名或地址>`、`/jpmap add cancel` 并确认回复；项目侧调查 live Nominatim unknown/clarification；Owner 补 Google key application restriction、provider quota 与 budget alert 证据后再执行 hf-ship
+- 下一步: Owner 在真实微信 DM 依次发送 `/jpmap nearby 银座`、`/jpmap add <公开餐厅名或地址>`、`/jpmap add cancel` 并确认回复；Owner 补 Google key application restriction、provider quota 与 budget alert 证据后再执行 hf-ship

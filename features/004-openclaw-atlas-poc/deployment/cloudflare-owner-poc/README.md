@@ -97,6 +97,19 @@ Save secret names only:
 npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json > .wrangler/owner-poc-secret-names.json
 ```
 
+Each `wrangler secret put` creates and deploys a new Worker version. After the
+last secret update, capture the owner deployment inventory again and keep it
+under the ignored `.wrangler/` directory:
+
+```text
+npx wrangler deployments list --config wrangler.owner-poc.local.jsonc --json > .wrangler/owner-poc-post-secret-deployments.json
+```
+
+Use that post-secret version—not an older pre-secret inventory entry—as the
+rollback candidate. Before assigning it traffic, place it at 0% beside the new
+version and prove it with a version-override request. A candidate that fails
+that override probe is not a rollback target.
+
 On a fresh target, the first `wrangler secret put` can create a placeholder Worker
 using Wrangler's default configuration. This is expected; do not modify or deploy
 the old Worker.

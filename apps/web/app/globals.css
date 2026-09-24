@@ -591,6 +591,18 @@
   border-left: 1px solid var(--line);
 }
 
+.catalog-intake-candidates > div > a.catalog-intake-google-attribution {
+  flex-shrink: 0;
+  color: #5e5e5e;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 1rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
 .catalog-intake-clarification {
   margin: 0;
   padding: 0.65rem;

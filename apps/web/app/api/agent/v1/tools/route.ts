@@ -10,6 +10,7 @@ import { createT06aGoogleNearbyComposition } from '@/adapters/agent/t06a-google-
 import { createOwnerPocComposition } from '@/lib/server/application/owner-poc-composition';
 import { D1CatalogIntakeState } from '@/lib/server/application/d1-catalog-intake-state';
 import { createServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { getOwnerPocCatalogIntakeRuntime } from '@/db';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request): Promise<Response> {
@@ -19,6 +20,7 @@ export async function POST(request: Request): Promise<Response> {
     const composition = createOwnerPocComposition(
       bindings.DB,
       bindings.ROUTE_SIDECAR,
+      getOwnerPocCatalogIntakeRuntime(),
     );
     const application = createServerAtlasApplication(
       bindings.DB,

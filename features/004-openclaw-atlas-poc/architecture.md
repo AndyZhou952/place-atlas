@@ -37,7 +37,7 @@
 
 - `AgentToolCatalog` 是唯一 Agent manifest 投影，不复用 browser capability 清单；read 阶段只含 nearby，write 阶段只增 intake/capture，默认拒绝 destructive、maintenance、reset、底层 save/update/delete，隐藏 key 也不能直接调用。
 - 签名 canonical bytes 固定为 method、规范 path/query、原始 body digest、timestamp、nonce、key ID；常量时间比较，窗口 ≤5 分钟，nonce 按 `(projectId,keyId,nonce)` 唯一且保留超过窗口。
-- 传输重试使用新 nonce、同一 mutation ID；业务层以 canonical payload digest 回放同一 receipt，不同 digest 返回 conflict。Lightsail secret 只在 root-only secret store，Worker secret 只在 Cloudflare Secrets，D1 仅存 key metadata。
+- 传输重试使用新 nonce、同一 mutation ID；业务层以 canonical payload digest 回放同一 receipt，不同 digest 返回 conflict。Lightsail secret 只在 service-identity-only secret store：系统级 systemd 使用 root-owned，当前 user-level systemd 使用受保护目录内的 service-account-owned `0600` 文件，不对组或其他用户开放。Worker secret 只在 Cloudflare Secrets，D1 仅存 key metadata。
 - key 轮换允许短 overlap，随后撤销旧 key；contract tests 覆盖时钟漂移、重放、撤销、阶段 manifest 与越权隐藏操作。
 
 ## 5. Capture 原子可见性

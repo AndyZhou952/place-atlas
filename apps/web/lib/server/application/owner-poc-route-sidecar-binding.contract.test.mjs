@@ -8,7 +8,7 @@ const serverApplicationUrl = new URL(
   import.meta.url,
 );
 
-void test('Browser owner composition receives the same optional private Route Sidecar binding', async () => {
+void test('Browser owner composition receives the private Route Sidecar and shared Add runtime', async () => {
   const [dbSource, serverSource] = await Promise.all([
     readFile(dbSourceUrl, 'utf8'),
     readFile(serverApplicationUrl, 'utf8'),
@@ -20,8 +20,9 @@ void test('Browser owner composition receives the same optional private Route Si
   );
   assert.match(
     serverSource,
-    /createOwnerPocComposition\(\s*database,\s*getRouteSidecarServiceBinding\(\),?\s*\)/u,
+    /createOwnerPocComposition\(\s*database,\s*getRouteSidecarServiceBinding\(\),\s*getOwnerPocCatalogIntakeRuntime\(\),?\s*\)/u,
   );
+  assert.match(dbSource, /GOOGLE_PLACES_API_KEY/u);
   assert.doesNotMatch(
     `${dbSource}\n${serverSource}`,
     /GOOGLE_MAPS_API_KEY|transit|foursquare/iu,

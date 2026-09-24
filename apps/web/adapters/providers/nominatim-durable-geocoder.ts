@@ -57,7 +57,8 @@ export function createNominatimDurableGeocoderAdapter(options: {
           'area',
           'coordinates',
         ]) ||
-        input.trigger !== 'owner_intake_select' ||
+        (input.trigger !== 'owner_intake_select' &&
+          input.trigger !== 'owner_intake_confirm') ||
         input.dataClassification !== 'public_place_query'
       ) {
         return failure(

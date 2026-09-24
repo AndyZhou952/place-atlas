@@ -69,6 +69,8 @@ test("package manifest exposes jpmap as a model-bypassing runtime slash command 
   }
   assert.deepEqual(packageJson.openclaw.extensions, ["./dist/index.mjs"]);
   assert.equal(packageJson.peerDependencies.openclaw, "2026.7.1");
+  assert.equal(packageJson.version, "0.3.0");
+  assert.equal(manifest.version, packageJson.version);
 });
 
 test("client parses only the closed nearby and add command grammar and makes no request for invalid input", async () => {

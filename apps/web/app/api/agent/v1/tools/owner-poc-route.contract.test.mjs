@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const routeUrl = new URL('./route.ts', import.meta.url);
 
-void test('Agent route selects canonical owner composition without giving it a Google key', async () => {
+void test('Agent route selects canonical owner composition with shared Add runtime but no Nearby key', async () => {
   const source = await readFile(routeUrl, 'utf8');
   const ownerBranch = source.match(
     /if \(deployment\.ATLAS_DEPLOYMENT_ENV === 'owner-poc'\)([\s\S]*?)\n  \}/u,
@@ -13,8 +13,9 @@ void test('Agent route selects canonical owner composition without giving it a G
   assert.ok(ownerBranch);
   assert.match(
     ownerBranch,
-    /createOwnerPocComposition\(\s*bindings\.DB,\s*bindings\.ROUTE_SIDECAR,?\s*\)/u,
+    /createOwnerPocComposition\(\s*bindings\.DB,\s*bindings\.ROUTE_SIDECAR,\s*getOwnerPocCatalogIntakeRuntime\(\),?\s*\)/u,
   );
+  assert.match(ownerBranch, /getOwnerPocCatalogIntakeRuntime/u);
   assert.match(ownerBranch, /createServerAtlasApplication/u);
   assert.match(ownerBranch, /createOwnerPocAgentHttpHandler/u);
   assert.doesNotMatch(ownerBranch, /GOOGLE_MAPS_API_KEY|transit|foursquare/iu);

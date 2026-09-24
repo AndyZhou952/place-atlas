@@ -14,6 +14,20 @@ void test('the owner PoC template selects only blue-green D1 and R2 resources', 
   assert.deepEqual(config.vars, {
     ATLAS_DATASET: 'owner-poc',
     ATLAS_DEPLOYMENT_ENV: 'owner-poc',
+    CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
+    CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
+    CATALOG_INTAKE_RESEARCH_RELAY_MODE: 'relay_disabled_manual_unknown',
+  });
+  assert.equal(config.preview_urls, false);
+  assert.deepEqual(config.observability, {
+    enabled: true,
+    head_sampling_rate: 0.05,
+    redact_query_string: true,
+    logs: {
+      enabled: true,
+      head_sampling_rate: 0.05,
+      invocation_logs: false,
+    },
   });
   assert.deepEqual(config.d1_databases, [
     {
@@ -54,6 +68,7 @@ void test('owner PoC preflight accepts only a matching blue-green artifact with 
     'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
+    'GOOGLE_PLACES_API_KEY',
   ].map((name) => ({ name, type: 'secret_text' }));
 
   assert.deepEqual(
@@ -91,6 +106,7 @@ void test('owner PoC preflight rejects placeholders, missing owner secrets, and 
         'built_runtime_metadata_forbidden',
         'missing_secret:ATLAS_OWNER_PASSWORD',
         'missing_secret:ATLAS_OWNER_SESSION_SECRET',
+        'missing_secret:GOOGLE_PLACES_API_KEY',
       ],
     },
   );
@@ -108,6 +124,7 @@ void test('owner PoC rejects direct Google, Transit, or Foursquare runtime capab
     'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
+    'GOOGLE_PLACES_API_KEY',
   ].map((name) => ({ name, type: 'secret_text' }));
 
   for (const forbidden of [
@@ -161,6 +178,7 @@ void test('owner PoC preflight requires exactly one well-formed private Route Si
     'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
+    'GOOGLE_PLACES_API_KEY',
   ].map((name) => ({ name, type: 'secret_text' }));
 
   const cases = [
@@ -226,4 +244,29 @@ void test('owner PoC preflight requires exactly one well-formed private Route Si
       scenario.name,
     );
   }
+});
+
+void test('owner PoC preflight rejects an unexpected encrypted secret name', async () => {
+  const template = JSON.parse(
+    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
+  );
+  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
+  const secrets = [
+    'AGENT_JPMAP_KEY_ID',
+    'AGENT_JPMAP_HMAC_SECRET',
+    'AGENT_OWNER_ACTOR_ID',
+    'AGENT_OWNER_CONVERSATION_ID',
+    'ATLAS_OWNER_PASSWORD',
+    'ATLAS_OWNER_SESSION_SECRET',
+    'GOOGLE_PLACES_API_KEY',
+    'UNREVIEWED_EXTRA_SECRET',
+  ].map((name) => ({ name, type: 'secret_text' }));
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: structuredClone(template),
+      remoteSecrets: secrets,
+    }),
+    { ready: false, blockers: ['unexpected_secret:UNREVIEWED_EXTRA_SECRET'] },
+  );
 });

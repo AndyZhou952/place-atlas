@@ -8,18 +8,47 @@ import {
 import { createD1MeteredRouteSidecarClient } from '../../../route-sidecar/d1-metered-route-sidecar-client.ts';
 import type { RouteSidecarServiceBinding } from '../../../route-sidecar/metered-route-sidecar-client.ts';
 import { createRouteSidecarNearbyAdapter } from '../../../route-sidecar/route-sidecar-nearby-adapter.ts';
+import { D1ProviderUsage } from '../../../adapters/agent/d1-provider-usage.ts';
+import { createGooglePlaceDiscoveryAdapter } from '../../../adapters/providers/google-place-discovery.ts';
+import { createGooglePlacesNewClient } from '../../../adapters/providers/google-places-new-client.ts';
+import { createNominatimDurableGeocoderAdapter } from '../../../adapters/providers/nominatim-durable-geocoder.ts';
+import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
+import { createCatalogIntakeModule } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
+import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
+import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
+import { D1NominatimPolicyState } from './d1-nominatim-policy-state.ts';
+import {
+  inspectCatalogIntakeProviderModes,
+  type CatalogIntakeProviderModes,
+} from './catalog-intake-provider-mode-manifest.ts';
+
+export interface OwnerPocCatalogIntakeOptions {
+  readonly googlePlacesApiKey?: string;
+  readonly providerModes?: CatalogIntakeProviderModes;
+  readonly fetch?: typeof fetch;
+  readonly clock?: { now(): Date };
+  readonly idSource?: { nextId(): string };
+}
+
+export const ownerPocNominatimIdentity = {
+  endpoint: 'https://nominatim.openstreetmap.org/search',
+  identifyingUserAgent:
+    'JapanAtlasOwnerPoC/1.0 (+https://japan-atlas-owner-poc.japan-atlas-poc.workers.dev/terms)',
+  referer: 'https://japan-atlas-owner-poc.japan-atlas-poc.workers.dev/',
+} as const;
 
 export function createOwnerPocComposition(
   database: D1Database,
   routeSidecarService?: RouteSidecarServiceBinding,
+  intakeOptions: OwnerPocCatalogIntakeOptions = {},
 ) {
   const catalogRead = createD1OwnerPocCatalogRead(database);
-  const clock = { now: () => new Date() };
+  const clock = intakeOptions.clock ?? { now: () => new Date() };
   const routeEvidence = createRouteSidecarNearbyAdapter(
     createD1MeteredRouteSidecarClient({
       database,
       service: routeSidecarService,
-      clock: clock.now,
+      clock: () => clock.now(),
     }),
   );
   const agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'> = {
@@ -49,11 +78,64 @@ export function createOwnerPocComposition(
       item.officialUrl ??
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`,
   };
+  const providerModes = inspectCatalogIntakeProviderModes(
+    intakeOptions.providerModes ?? {},
+  );
+  const state = new D1CatalogIntakeState(database, clock);
+  const usage = new D1ProviderUsage(database, () => clock.now());
+  const discovery = createGooglePlaceDiscoveryAdapter(
+    createGooglePlacesNewClient({
+      ...(providerModes.googlePlaces === 'enabled'
+        ? { apiKey: intakeOptions.googlePlacesApiKey }
+        : {}),
+      usage,
+      ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+    }),
+  );
+  const nominatimState = new D1NominatimPolicyState(database, clock);
+  const durableGeocoder =
+    providerModes.durableGeocoder === 'enabled'
+      ? createNominatimDurableGeocoderAdapter({
+          ...ownerPocNominatimIdentity,
+          transport: createNominatimFixedEndpointTransport(
+            intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {},
+          ),
+          cache: nominatimState,
+          rateGate: nominatimState,
+          clock,
+        })
+      : undefined;
+  const idSource = intakeOptions.idSource ?? {
+    nextId: () => crypto.randomUUID(),
+  };
+  const catalogIntakeModule = createCatalogIntakeModule({
+    discoveryPort: discovery,
+    ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),
+    statePort: state,
+    atlasCatalogIntakePort: new D1AtlasCatalogIntakePublisher(database, {
+      now: () => clock.now(),
+      nextId: () => idSource.nextId(),
+    }),
+    clock,
+    idSource,
+    catalogRevision: {
+      async read() {
+        const row = await database
+          .prepare(
+            'SELECT revision_number FROM atlas_catalog_revision WHERE singleton = 1',
+          )
+          .first<{ revision_number: number }>();
+        return row ? `catalog-r${row.revision_number}` : 'catalog-missing';
+      },
+    },
+  });
 
   return {
     catalogRead,
     catalogItemProjection: createCatalogItemProjection([]),
     visitItemProjection: createVisitTargetProjection([]),
     agentNearby,
+    catalogIntakeModule,
+    providerModes,
   };
 }

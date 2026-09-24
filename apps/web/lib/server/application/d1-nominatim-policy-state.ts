@@ -5,6 +5,7 @@ import {
 
 interface CacheRow {
   readonly result_json: string;
+  readonly cached_at_ms: number;
 }
 
 export class D1NominatimPolicyState {
@@ -34,12 +35,15 @@ export class D1NominatimPolicyState {
   async get(key: string): Promise<DurableGeocoderProposal | undefined> {
     const row = await this.#database
       .prepare(
-        'SELECT result_json FROM catalog_intake_nominatim_cache ' +
+        'SELECT result_json, cached_at_ms FROM catalog_intake_nominatim_cache ' +
           'WHERE provider_id = ? AND query_key = ?',
       )
       .bind(providerId, key)
       .first<CacheRow>();
     if (!row) return undefined;
+    if (row.cached_at_ms + cacheTtlMs <= this.#clock.now().getTime()) {
+      return undefined;
+    }
     try {
       return validateDurableGeocoderProposal(JSON.parse(row.result_json));
     } catch {
@@ -67,6 +71,20 @@ export class D1NominatimPolicyState {
       )
       .run();
   }
+
+  async cleanup(now: Date): Promise<number> {
+    const result = await this.#database
+      .prepare(
+        'DELETE FROM catalog_intake_nominatim_cache WHERE cached_at_ms <= ?',
+      )
+      .bind(now.getTime() - cacheRetentionMs)
+      .run();
+    return Number(result.meta?.changes ?? 0);
+  }
 }
 
 const providerId = 'nominatim.openstreetmap.org';
+export const nominatimCacheTtlMs = 30 * 24 * 60 * 60 * 1000;
+const cacheTtlMs = nominatimCacheTtlMs;
+export const nominatimCacheRetentionMs = nominatimCacheTtlMs;
+const cacheRetentionMs = nominatimCacheRetentionMs;

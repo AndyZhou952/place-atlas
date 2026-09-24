@@ -85,6 +85,35 @@ test('D1 Nominatim policy state shares one atomic application rate gate and cach
   );
 });
 
+test('D1 Nominatim cache expires stale values and scheduled cleanup removes retained rows', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migration, 'utf8'));
+  let now = new Date('2026-09-24T00:00:00.000Z');
+  const state = new D1NominatimPolicyState(toD1(sqlite), { now: () => now });
+  const proposal = {
+    status: 'resolved',
+    normalizedAddress: '東京都中央区銀座4丁目1-2',
+    latitude: 35.6717,
+    longitude: 139.765,
+    provider: 'nominatim.openstreetmap.org',
+    sourceUrl: 'https://www.openstreetmap.org/node/456',
+    license: 'OpenStreetMap contributors, ODbL 1.0',
+    checkedAt: now.toISOString(),
+  };
+  await state.set('query', proposal);
+  assert.deepEqual(await state.get('query'), proposal);
+
+  now = new Date('2026-10-25T00:00:00.000Z');
+  assert.equal(await state.get('query'), undefined);
+  assert.equal(await state.cleanup(now), 1);
+  assert.equal(
+    sqlite
+      .prepare('SELECT COUNT(*) AS count FROM catalog_intake_nominatim_cache')
+      .get().count,
+    0,
+  );
+});
+
 function toD1(database) {
   return {
     prepare(sql) {

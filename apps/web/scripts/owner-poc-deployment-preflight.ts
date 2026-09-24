@@ -11,6 +11,7 @@ const requiredSecretNames = [
   'AGENT_OWNER_CONVERSATION_ID',
   'ATLAS_OWNER_PASSWORD',
   'ATLAS_OWNER_SESSION_SECRET',
+  'GOOGLE_PLACES_API_KEY',
 ] as const;
 
 interface WranglerConfig {
@@ -51,6 +52,9 @@ export function inspectOwnerPocDeployment(input: {
   if (!hasExactRouteSidecarBinding(input.sourceConfig.services)) {
     blockers.push('source_route_sidecar_binding_invalid');
   }
+  if (!hasSafeObservability(input.sourceConfig)) {
+    blockers.push('source_observability_invalid');
+  }
   if (isPlaceholderId(sourceDatabase?.database_id)) {
     blockers.push('d1_database_id_placeholder');
   }
@@ -66,6 +70,9 @@ export function inspectOwnerPocDeployment(input: {
   }
   if (!hasExactRouteSidecarBinding(input.builtConfig.services)) {
     blockers.push('built_route_sidecar_binding_invalid');
+  }
+  if (!hasSafeObservability(input.builtConfig)) {
+    blockers.push('built_observability_invalid');
   }
   if (
     containsForbiddenRuntimeMetadata(input.sourceConfig) ||
@@ -88,6 +95,8 @@ export function inspectOwnerPocDeployment(input: {
   for (const name of availableSecrets) {
     if (/google.*maps|foursquare|transit/iu.test(name)) {
       blockers.push(`forbidden_secret:${name}`);
+    } else if (!(requiredSecretNames as readonly string[]).includes(name)) {
+      blockers.push(`unexpected_secret:${name}`);
     }
   }
 
@@ -326,7 +335,29 @@ function hasOwnerPocGuard(value: unknown): boolean {
   return (
     isRecord(value) &&
     value.ATLAS_DEPLOYMENT_ENV === 'owner-poc' &&
-    value.ATLAS_DATASET === 'owner-poc'
+    value.ATLAS_DATASET === 'owner-poc' &&
+    value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled' &&
+    value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled' &&
+    value.CATALOG_INTAKE_RESEARCH_RELAY_MODE === 'relay_disabled_manual_unknown'
+  );
+}
+
+function hasSafeObservability(config: WranglerConfig): boolean {
+  if (!isRecord(config.observability)) return false;
+  const observability = config.observability;
+  if (!isRecord(observability.logs)) return false;
+  return (
+    config.preview_urls === false &&
+    observability.enabled === true &&
+    observability.redact_query_string === true &&
+    typeof observability.head_sampling_rate === 'number' &&
+    observability.head_sampling_rate > 0 &&
+    observability.head_sampling_rate <= 0.05 &&
+    observability.logs.enabled === true &&
+    observability.logs.invocation_logs === false &&
+    typeof observability.logs.head_sampling_rate === 'number' &&
+    observability.logs.head_sampling_rate > 0 &&
+    observability.logs.head_sampling_rate <= 0.05
   );
 }
 

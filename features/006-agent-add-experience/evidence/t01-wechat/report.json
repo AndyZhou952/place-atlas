@@ -1,0 +1,70 @@
+{
+  "renderer": "Playwright Chromium",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "productionPresenter": "apps/web/product/application/conversation/wechat-catalog-intake-presenter.ts",
+  "scenarios": {
+    "three-candidates": {
+      "fixture": "three transient Google candidates",
+      "replySha256": "cc72b9fec9cd1cb85dabd5812d18b8deba5b3d4db7fe78adc69a78ac6ce9fafc",
+      "codePoints": 196,
+      "utf16Characters": 196,
+      "clientWidth": 312,
+      "scrollWidth": 312,
+      "clientHeight": 361,
+      "scrollHeight": 361,
+      "noHorizontalOverflow": true,
+      "screenshot": "evidence/t01-wechat/three-candidates-390x844.png"
+    },
+    "complete-preview": {
+      "fixture": "known location, Tabelog, and reservation preview",
+      "replySha256": "82e2883a7922cf71872429771bc090a9ef156c6fb88f47e2dd579459b4f69383",
+      "codePoints": 173,
+      "utf16Characters": 173,
+      "clientWidth": 312,
+      "scrollWidth": 312,
+      "clientHeight": 316,
+      "scrollHeight": 316,
+      "noHorizontalOverflow": true,
+      "screenshot": "evidence/t01-wechat/complete-preview-390x844.png"
+    },
+    "warning-conflict": {
+      "fixture": "conflict with two duplicate and four coded warnings",
+      "replySha256": "33d774f5ab126ac0ef41769c23b3f651bde3ed045e4f0e2d7b94f7f07491232b",
+      "codePoints": 281,
+      "utf16Characters": 281,
+      "clientWidth": 312,
+      "scrollWidth": 312,
+      "clientHeight": 494,
+      "scrollHeight": 494,
+      "noHorizontalOverflow": true,
+      "screenshot": "evidence/t01-wechat/warning-conflict-390x844.png"
+    },
+    "success": {
+      "fixture": "committed needs-review outcome",
+      "replySha256": "e245e3c59d634e2783f59fd3da71025465be9086da809e162242464b6a591fa8",
+      "codePoints": 50,
+      "utf16Characters": 50,
+      "clientWidth": 312,
+      "scrollWidth": 312,
+      "clientHeight": 72,
+      "scrollHeight": 72,
+      "noHorizontalOverflow": true,
+      "screenshot": "evidence/t01-wechat/success-390x844.png"
+    },
+    "failed-no-write": {
+      "fixture": "failed-no-write outcome",
+      "replySha256": "90bb2a5f11b1f685b6787fed7c232d2c45dc7d48f0ed60dd29f67297f2129603",
+      "codePoints": 59,
+      "utf16Characters": 59,
+      "clientWidth": 312,
+      "scrollWidth": 312,
+      "clientHeight": 95,
+      "scrollHeight": 95,
+      "noHorizontalOverflow": true,
+      "screenshot": "evidence/t01-wechat/failed-no-write-390x844.png"
+    }
+  }
+}

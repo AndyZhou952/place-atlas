@@ -39,12 +39,26 @@ export async function updatePlaceAssessmentResponse(
         ...(input.summary === undefined ? {} : { summary: input.summary }),
       },
     },
+    projectResult: projectAssessmentMutationResult,
     errors: {
       invalidInput: 'Invalid personal item update',
       notFound: 'Atlas item not found',
       dependencyFailure: 'The personal place status could not be saved.',
     },
   });
+}
+
+function projectAssessmentMutationResult(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.item)) return value;
+
+  return {
+    ...value,
+    item: {
+      ...value.item,
+      personalRating: value.item.personalRating ?? null,
+      overallComment: value.item.overallComment ?? null,
+    },
+  };
 }
 
 function isPersonalItemPatch(value: unknown): value is PersonalItemPatch {

@@ -38,7 +38,17 @@ test('reset-stage packaging accepts the reviewed pending bytes as the sole activ
     path.join(root, 'scripts/production-snapshot-migration-manifest.json'),
     JSON.stringify({
       schemaVersion: 1,
-      snapshotOnly: { activeMigrations: activeMigrations.slice(0, -1) },
+      snapshotOnly: {
+        activeMigrations: activeMigrations.slice(0, -1),
+        activeMigrationSha256: Object.fromEntries(
+          activeMigrations
+            .slice(0, -1)
+            .map((migration) => [
+              migration,
+              'b4e0497804e46e0a0b0b8c31975b062152d551bac49c3c2e80932567b4085dcd',
+            ]),
+        ),
+      },
       pendingReset: {
         path: 'drizzle/pending/0004_reset_test_place_assessments.sql',
         sha256:
@@ -47,6 +57,14 @@ test('reset-stage packaging accepts the reviewed pending bytes as the sole activ
       resetStage: {
         activeMigration: activeMigrations.at(-1),
         activeMigrations,
+        activeMigrationSha256: Object.fromEntries(
+          activeMigrations.map((migration, index) => [
+            migration,
+            index === activeMigrations.length - 1
+              ? 'c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16'
+              : 'b4e0497804e46e0a0b0b8c31975b062152d551bac49c3c2e80932567b4085dcd',
+          ]),
+        ),
       },
       retiredSiteVersions: [16],
     }),

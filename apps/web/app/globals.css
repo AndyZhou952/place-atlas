@@ -2498,7 +2498,6 @@ button.personal-rating-inline:focus-visible {
   line-height: 1.6;
 }
 
-.inbox-grid,
 .journal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2516,53 +2515,39 @@ button.personal-rating-inline:focus-visible {
   font-size: 1.05rem;
 }
 
-.collector-status {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.collector-status > div {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-}
-
-.collector-status svg {
-  width: 1.05rem;
-  color: var(--moss);
-}
-
-.collector-status .pending svg {
-  color: var(--gold);
-}
-
-.collector-status span {
-  display: grid;
-  gap: 0.12rem;
-}
-
-.collector-status strong {
-  font-size: 0.8rem;
-}
-
-.collector-status small {
-  color: var(--ink-soft);
-  font-size: 0.7rem;
-}
-
-.job-section {
+.review-section {
   margin-top: 1.5rem;
 }
 
-.job-section h3 {
+.review-section h3 {
   font-family: var(--font-display);
   font-size: 1rem;
 }
 
-.job-list,
+@media (width <= 640px) {
+  .review-section .empty-panel button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .review-section summary,
+  .review-section a {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+}
+
+.review-list,
 .journal-list {
   display: grid;
   gap: 0.65rem;
+}
+
+.review-list {
+  padding: 0;
+  list-style: none;
 }
 
 .journal-browser {
@@ -2608,7 +2593,7 @@ button.personal-rating-inline:focus-visible {
   padding: 0;
 }
 
-.job-row,
+.review-card,
 .journal-entry,
 .empty-panel {
   border: 1px solid var(--line);
@@ -2616,7 +2601,7 @@ button.personal-rating-inline:focus-visible {
   background: var(--paper-raised);
 }
 
-.job-row {
+.review-card > header {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -2624,21 +2609,22 @@ button.personal-rating-inline:focus-visible {
   padding: 0.75rem;
 }
 
-.job-row > svg {
+.review-card > header > svg {
   width: 1rem;
   color: var(--vermilion);
 }
 
-.job-row div {
+.review-card > header > div {
   display: grid;
   gap: 0.12rem;
+  min-width: 0;
 }
 
-.job-row strong {
+.review-card > header strong {
   font-size: 0.82rem;
 }
 
-.job-row div span {
+.review-card > header div span {
   overflow: hidden;
   color: var(--ink-soft);
   font-size: 0.68rem;
@@ -2646,7 +2632,7 @@ button.personal-rating-inline:focus-visible {
   white-space: nowrap;
 }
 
-.job-status {
+.review-status {
   padding: 0.25rem 0.5rem;
   border-radius: 999px;
   background: #eee3c7;
@@ -2654,6 +2640,45 @@ button.personal-rating-inline:focus-visible {
   font-size: 0.66rem;
   font-weight: 750;
   text-transform: capitalize;
+}
+
+.review-evidence {
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.review-evidence summary {
+  padding: 0.65rem 0.75rem;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.review-evidence dl,
+.review-evidence > ul {
+  margin: 0;
+  padding: 0 0.75rem 0.75rem 2rem;
+}
+
+.review-evidence dl {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 0.75rem;
+}
+
+.review-evidence dl > div {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 0.6rem;
+}
+
+.review-evidence dt {
+  font-weight: 700;
+}
+
+.review-evidence dd {
+  margin: 0;
 }
 
 .empty-panel {
@@ -2849,7 +2874,6 @@ button.personal-rating-inline:focus-visible {
     min-height: calc(100svh - 8rem);
   }
 
-  .inbox-grid,
   .journal-grid {
     grid-template-columns: 1fr;
   }
@@ -2985,6 +3009,15 @@ button.personal-rating-inline:focus-visible {
 
   .single-workspace {
     padding: 1.6rem 1rem 3rem;
+  }
+
+  .review-card > header {
+    grid-template-columns: auto 1fr;
+  }
+
+  .review-status {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .fact-grid {

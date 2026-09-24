@@ -148,32 +148,6 @@ export function createAtlasWebMcpTools({
       },
     },
     {
-      name: 'queue_creator_import',
-      title: 'Queue creator import',
-      description:
-        'Create a durable acquisition job for a creator profile, channel, or post URL.',
-      inputSchema: objectInputSchema(
-        {
-          creatorName: { type: 'string' },
-          sourceRef: { type: 'string' },
-          platform: { type: 'string' },
-        },
-        ['creatorName', 'sourceRef'],
-      ),
-      annotations: writeAnnotations,
-      async execute(input) {
-        const job = await application.execute({
-          key: browserOperationHttpCatalog['import.queue'].key,
-          input: {
-            creatorName: readString(input, 'creatorName'),
-            sourceRef: readString(input, 'sourceRef'),
-            platform: readOptionalString(input, 'platform'),
-          },
-        });
-        return { queued: true, job };
-      },
-    },
-    {
       name: 'update_item_preferences',
       title: 'Update favorite or visited status',
       description:

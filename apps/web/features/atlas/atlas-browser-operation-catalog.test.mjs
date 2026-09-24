@@ -26,7 +26,6 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
         path: '/api/items/{id}/personal',
       },
       { name: 'delete_atlas_item', method: 'DELETE', path: '/api/items/{id}' },
-      { name: 'queue_creator_import', method: 'POST', path: '/api/inbox' },
       { name: 'create_visit', method: 'POST', path: '/api/journal' },
       {
         name: 'upload_visit_media',
@@ -79,6 +78,19 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
   assert.equal(
     createAgentCapabilitiesDocument().operations.some(({ name }) =>
       name.includes('intake'),
+    ),
+    false,
+  );
+  assert.equal(
+    Object.keys(browserOperationHttpCatalog).some((key) =>
+      key.startsWith('import.'),
+    ),
+    false,
+  );
+  assert.equal(
+    createAgentCapabilitiesDocument().operations.some(
+      ({ name, path }) =>
+        name === 'queue_creator_import' || path.startsWith('/api/inbox'),
     ),
     false,
   );

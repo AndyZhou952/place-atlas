@@ -87,6 +87,51 @@ test('an optimistic overall comment is visible immediately and restores the publ
   assert.equal(state.items[0].overallComment, 'A confirmed comment.');
 });
 
+test('a personal mutation response cannot replace Tabelog or other catalog facts', () => {
+  const catalogItem = {
+    ...item,
+    address: '東京都新宿区百人町1丁目24-8',
+    latitude: 35.7008,
+    longitude: 139.6972,
+    tabelog: {
+      score: 3.87,
+      url: 'https://tabelog.com/tokyo/A1304/A130404/13286023/',
+      checkedAt: '2026-09-24T08:00:00.000Z',
+    },
+    sources: [
+      {
+        label: 'Tabelog',
+        role: 'tabelog',
+        url: 'https://tabelog.com/tokyo/A1304/A130404/13286023/',
+      },
+    ],
+  };
+  let state = createAtlasViewModelState({ items: [catalogItem] });
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.started',
+    itemId: item.id,
+    mutationId: 'personal-rating',
+    patch: { personalRating: 3.5 },
+  });
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'item.mutation.succeeded',
+    itemId: item.id,
+    mutationId: 'personal-rating',
+    item: {
+      ...item,
+      personalRating: 3.5,
+      isFavorite: false,
+      hasVisited: false,
+    },
+  });
+
+  assert.equal(state.items[0].personalRating, 3.5);
+  assert.deepEqual(state.items[0].tabelog, catalogItem.tabelog);
+  assert.deepEqual(state.items[0].sources, catalogItem.sources);
+  assert.equal(state.items[0].address, catalogItem.address);
+});
+
 test('a late initial read does not erase an in-flight optimistic mutation', () => {
   let state = createAtlasViewModelState({ items: [item] });
   state = reduceAtlasViewModelState(state, {
@@ -246,25 +291,6 @@ test('a completed media batch rejects an older media read', () => {
   assert.deepEqual(state.media, [stored]);
 });
 
-test('a queued import rejects an older ImportJob read', () => {
-  const stored = { id: 'import-new', status: 'queued' };
-  let state = createAtlasViewModelState();
-  state = reduceAtlasViewModelState(state, {
-    type: 'import-jobs.load.started',
-    loadId: 'old-imports',
-  });
-  state = reduceAtlasViewModelState(state, {
-    type: 'import-job.prepended',
-    importJob: stored,
-  });
-  state = reduceAtlasViewModelState(state, {
-    type: 'import-jobs.loaded',
-    loadId: 'old-imports',
-    importJobs: [],
-  });
-  assert.deepEqual(state.importJobs, [stored]);
-});
-
 test('an item deletion rejects older Visit and media reads but later refreshes still converge', () => {
   const visit = {
     id: 'visit-deleted-item',
@@ -279,10 +305,8 @@ test('an item deletion rejects older Visit and media reads but later refreshes s
     visitId: visit.id,
     itemId: item.id,
   };
-  const importJob = { id: 'import-existing', status: 'queued' };
   let state = createAtlasViewModelState({
     items: [item],
-    importJobs: [importJob],
     visits: [visit],
     media: [media],
   });
@@ -297,10 +321,6 @@ test('an item deletion rejects older Visit and media reads but later refreshes s
   state = reduceAtlasViewModelState(state, {
     type: 'media.load.started',
     loadId: 'before-item-delete',
-  });
-  state = reduceAtlasViewModelState(state, {
-    type: 'import-jobs.load.started',
-    loadId: 'unrelated-import-read',
   });
 
   state = reduceAtlasViewModelState(state, {
@@ -322,16 +342,10 @@ test('an item deletion rejects older Visit and media reads but later refreshes s
     loadId: 'before-item-delete',
     items: [item],
   });
-  state = reduceAtlasViewModelState(state, {
-    type: 'import-jobs.loaded',
-    loadId: 'unrelated-import-read',
-    importJobs: [],
-  });
 
   assert.deepEqual(state.items, []);
   assert.deepEqual(state.visits, []);
   assert.deepEqual(state.media, []);
-  assert.deepEqual(state.importJobs, []);
 
   state = reduceAtlasViewModelState(state, {
     type: 'visits.load.started',

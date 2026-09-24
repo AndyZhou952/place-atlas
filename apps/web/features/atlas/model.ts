@@ -23,7 +23,7 @@ import type {
 } from '@/product/application/visits/visit';
 
 export type AtlasItemKind = CoreAtlasItemKind;
-export type AtlasView = 'map' | 'inbox' | 'journal';
+export type AtlasView = 'map' | 'review' | 'journal';
 export type AtlasKindFilter = 'all' | AtlasItemKind;
 export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited';
 export type PersonalState = CorePersonalState;
@@ -54,12 +54,6 @@ export type PlaceAssessmentPatch = Omit<
   'manualVisited'
 > &
   EffectiveVisitedPatch;
-
-export type {
-  ImportJob,
-  ImportStatus,
-  NewImportJob,
-} from '@/product/application/import-jobs/import-job';
 
 export type VisitRecord = CoreVisit;
 export type VisitMediaRecord = Pick<

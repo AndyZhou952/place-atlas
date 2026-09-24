@@ -29,9 +29,6 @@ const coreModelAliases = [
   'EventSchedule',
   'PlaceAssessment',
   'PlaceAssessmentPatch',
-  'ImportJob',
-  'ImportStatus',
-  'NewImportJob',
   'VisitRecord',
   'VisitMediaRecord',
   'NewVisit',
@@ -1466,23 +1463,6 @@ test('fitness treats both pure type re-export forms as runtime erased', () => {
   }
 });
 
-test('fitness accepts individually type-only model adapter re-exports', () => {
-  withArchitectureFixture(
-    {
-      'features/atlas/model.ts': `
-        import type { AtlasItem as CoreAtlasItem } from '../../product/application/core-model.ts';
-        export type AtlasItem = CoreAtlasItem;
-        export {
-          type ImportJob,
-          type ImportStatus,
-          type NewImportJob,
-        } from '../../product/application/core-model.ts';
-      `,
-    },
-    ({ manifest }) => assert.deepEqual(auditArchitecture(manifest), []),
-  );
-});
-
 test('fitness keeps mixed and runtime re-exports eager', () => {
   for (const reexport of [
     `export { type Foo, runtimeValue } from './allowed-owner.ts';`,
@@ -1792,9 +1772,6 @@ const expectedOperationKeys = [
   'catalog.search',
   'catalog.update_item',
   'decision.nearby',
-  'import.delete',
-  'import.list',
-  'import.queue',
   'media.attach',
   'media.caption',
   'media.delete',
@@ -1810,7 +1787,6 @@ const expectedOperationKeys = [
 ];
 
 const expectedOperationGroupCreators = [
-  'createImportJobOperationGroup',
   'createCatalogOperationGroup',
   'createCatalogIntakeOperationGroup',
   'createPlaceAssessmentOperationGroup',
@@ -1838,9 +1814,6 @@ function productionCoreModelOwners() {
     EventSchedule: owner('catalog/atlas-item.ts'),
     PlaceAssessment: owner('assessments/place-assessment.ts'),
     PlaceAssessmentPatch: owner('assessments/place-assessment.ts'),
-    ImportJob: owner('import-jobs/import-job.ts'),
-    ImportStatus: owner('import-jobs/import-job.ts'),
-    NewImportJob: owner('import-jobs/import-job.ts'),
     VisitRecord: owner('visits/visit.ts'),
     VisitMediaRecord: owner('media/visit-media.ts'),
     NewVisit: owner('visits/visit.ts'),
@@ -1894,6 +1867,20 @@ function productionArchitectureManifest() {
       'lib/server/media-policy.ts',
       'lib/server/media-policy.test.mjs',
       'features/atlas/distance.ts',
+      'product/application/import-jobs/import-job.ts',
+      'product/application/import-jobs/import-job-state.ts',
+      'product/application/import-jobs/import-job-operations.ts',
+      'product/application/import-jobs/in-memory-import-job-state.ts',
+      'product/application/import-jobs/import-job-list.test.mjs',
+      'product/application/import-jobs/import-job-write.test.mjs',
+      'lib/server/application/d1-import-job-state.ts',
+      'lib/server/application/d1-import-job-state.test.mjs',
+      'app/api/inbox/route.ts',
+      'app/api/inbox/[id]/route.ts',
+      'app/api/inbox/import-job-write-response.ts',
+      'app/api/inbox/import-job-write-response.test.mjs',
+      'app/api/inbox/list-import-jobs-response.ts',
+      'app/api/inbox/list-import-jobs-response.test.mjs',
     ],
     expectedOperationKeys,
     expectedMediaOperationKeys: ['media.open', 'media.openDisplay'],

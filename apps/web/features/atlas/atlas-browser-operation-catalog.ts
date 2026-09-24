@@ -98,13 +98,6 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     bodyKind: 'none',
     capability: { name: 'delete_atlas_item' },
   },
-  'import.queue': {
-    key: 'import.queue',
-    method: 'POST',
-    path: '/api/inbox',
-    bodyKind: 'json',
-    capability: { name: 'queue_creator_import' },
-  },
   'visit.create': {
     key: 'visit.create',
     method: 'POST',
@@ -149,12 +142,6 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     path: '/api/media/{id}',
     bodyKind: 'none',
     capability: { name: 'delete_visit_media' },
-  },
-  'import.list': {
-    key: 'import.list',
-    method: 'GET',
-    path: '/api/inbox',
-    bodyKind: 'none',
   },
   'visit.list': {
     key: 'visit.list',

@@ -1,6 +1,6 @@
 # Japan Atlas 决策登记册
 
-最后更新：2026-09-21
+最后更新：2026-09-24
 
 本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
 
@@ -59,9 +59,9 @@ Web 与未来 Agent 必须先共享可测试的持久操作，不能把聊天层
 
 ### D-007：Web Access 是可替换采集器
 
-**状态：Accepted（2026-09-06）**
+**状态：Superseded（2026-09-24，被 D-023 取代）**
 
-分享来源是可靠默认入口；登录浏览器支持用户触发的批量 discovery。Web Access 可作为第一实现，但不能成为核心依赖。社交 Cookie 留在本地隔离 profile，连接器只上传规范化证据。
+该决定曾把登录浏览器与批量 discovery 作为近期能力。当前不再提供 creator／ImportJob collector；若未来出现经确认的外部来源需求，只能在 D-023 的 proposal-only 边界重新立项。
 
 ### D-008：外部动作需要确认
 
@@ -119,7 +119,7 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 **状态：Accepted（2026-09-12）**
 
-当前保持单仓库，Web 常驻核心采用单部署单元的模块化单体，在内部以 Application Operation、port 与 adapter 建立真实接缝，不立即拆微服务。高权限本地 connector 必须位于独立短时进程与信任区。首个切片只做现有地点、个人状态、Visit、媒体、ImportJob、搜索与 nearby 的行为保持式迁移；推荐、身份确认和对话式采集分别立项。
+当前保持单仓库，Web 常驻核心采用单部署单元的模块化单体，在内部以 Application Operation、port 与 adapter 建立真实接缝，不立即拆微服务。高权限本地 connector 必须位于独立短时进程与信任区。首个切片完成地点、个人状态、Visit、媒体、搜索与 nearby 的行为保持式迁移；历史 ImportJob 部分已由 D-023 取代。推荐、身份确认和对话式采集分别立项。
 
 **2026-09-12 补充：** 旧 `/api/nearby` 会把缺失的 `lat` 或 `lon` 经 `Number(null)` 意外解释为 `0`。用户确认这是缺陷而非兼容契约；缺失、非数值或越界坐标必须统一映射为 HTTP 400 `invalid_input`。
 
@@ -172,6 +172,14 @@ Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewM
 
 **重审条件：** 出现真实敏感内容、新读取 operation／字段、朋友分享之外的公开传播、多用户身份或匿名写入需求。
 
+### D-023：Catalog Intake 是当前唯一建档路径
+
+**状态：Accepted（2026-09-24）**
+
+网页与 Agent 都通过 `Catalog Intake → Preview/Confirm → Verified Item 或 Review Candidate` 建档。证据不足或冲突的候选只对 Owner Review 可见，不得进入公开地图或 Nearby。creator ImportJob 的 UI、route、application operation 和 runtime adapter 已退役，不再视为当前 capability。
+
+Acquisition & Review 仅保留为未来 proposal 边界：任何新来源 adapter 都必须产出 Evidence Manifest／Review Candidate，并重新经过独立规格、权限、评测和确认门；不得恢复旧队列或绕过 Catalog Intake 直接发布。已部署的 `import_jobs` 表与数据只为 migration 兼容保留，后续只能以新增安全 migration 处理。
+
 ## 2. 提议中决策
 
 ### D-P01：OpenClaw 作为首个微信 runtime
@@ -188,7 +196,7 @@ OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin �
 
 **状态：Proposed（原 ADR 0002）**
 
-消息 gateway、API、轻量 worker 和提醒常驻云端；社交平台登录浏览器留在本机按需运行，只上传规范化 manifest。
+消息 gateway、API、轻量 worker 和提醒常驻云端；若未来批准高权限来源 adapter，其登录浏览器留在本机按需运行，只上传规范化 manifest。当前没有此类 collector runtime。
 
 **接受条件：** 微信 PoC 证明 24/7 需求，且本地 connector 同步协议可恢复。
 
@@ -259,7 +267,7 @@ Relay-owned transport 只允许 HTTPS:443，拒绝 URL credentials、IP literal�
 | 每条 Journal 记录拥有评分 | Superseded | 每地点一个 PlaceAssessment，Visit 独立可重复 |
 | 大图库在时间线内全部展开 | Superseded | 四缩略图＋单图弹窗 |
 | 媒体只能保存 Visit 后追加 | Superseded | Journal 创建时可同步选择图片，同时保留后续追加 |
-| 一开始全面处理创作者历史 | Superseded | Discovery 后只 enrichment 选中／高相关内容 |
+| creator 历史／ImportJob 队列 | Superseded | 当前只走 Catalog Intake + Review；Acquisition 仅保留未来 proposal 边界 |
 | Postgres/PostGIS 是近期既定迁移 | Superseded | D1/R2 为 v1 基线，达到明确触发条件再评估 |
 
 ## 4. 待决策
@@ -268,7 +276,7 @@ Relay-owned transport 只允许 HTTPS:443，拒绝 URL credentials、IP literal�
 |---|---|---|
 | OpenClaw 是否最终采用 | 微信 adapter 开发前 | 统一 runtime 场景、主账号 PoC 和安全评审 |
 | 24/7 API/gateway 的 host、region 与预算 | 微信 PoC 通过后 | APAC/EU 实测延迟、月成本、备份与运维可靠性 |
-| Sites owner-only 与 Bot 的服务鉴权边界 | 发放任何云端 Agent credential 前 | scoped API 原型、签名、权限和审计测试 |
+| Bot 服务鉴权的长期加固边界 | 扩大 Agent 写入范围前 | 现有 scoped API、签名、权限和审计负面测试 |
 | 是否更换地图引擎／瓦片供应商 | #1 trace 后 | 当前 Leaflet/OSM 与合规矢量方案的移动端数据 |
 | 每月基础设施与模型预算 | 采购云资源前 | 实际消息量、媒体、模型与日志成本 |
 

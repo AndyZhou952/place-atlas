@@ -47,9 +47,9 @@ _Avoid_：永久删除、隐藏状态
 
 ### 采集与 Agent
 
-**导入任务（ImportJob）**：
-用户发起、可恢复并可观察进度的一次来源采集请求。
-_Avoid_：后台脚本、可信地点
+**采集提案（Acquisition Proposal）**：
+未来可选 adapter 把外部线索转换为 Evidence Manifest／Review Candidate 的边界提案；当前没有 creator collector、ImportJob API 或后台导入队列。
+_Avoid_：当前产品能力、可信地点、绕过 Catalog Intake 的写入
 
 **证据清单（Evidence Manifest）**：
 连接器输出的版本化来源记录，保存原始线索、提取方法和证据定位，不直接代表可信结论。
@@ -69,7 +69,7 @@ _Avoid_：附近地点、模型推荐
 
 **地点建档会话（CatalogIntakeSession）**：
 把餐厅名解析为带来源证据的分店候选，经查重、消歧、预览和 owner 确认后创建或核验 AtlasItem 的短时上下文。
-_Avoid_：模型自动建店、只按名称合并、ImportJob
+_Avoid_：模型自动建店、只按名称合并、批量 creator 导入
 
 **项目命令路由器（ProjectCommandRouter）**：
 在模型参与前，按显式项目命令和闭合子命令语法，把消息确定性分发到对应项目 adapter、凭证与状态命名空间。
@@ -110,8 +110,10 @@ _Avoid_：Visit、长期一级入口
 
 ## 当前实现边界
 
-- Web、WebMCP 与未来渠道统一经类型化 `AtlasApplication` 调用 20 个静态 operation；只有 `media.open` 返回媒体流，其余操作返回闭合 JSON `Result`。
-- Import、Catalog、Assessment、Decision、Visit、Destructive 与 Media 七个 group 只在服务器组合根装配一次；Product Core 不依赖 React、Next、D1/R2 或渠道 SDK。
+- Web、WebMCP 与渠道统一经类型化 `AtlasApplication` 调用 26 个静态 operation；只有 `media.open` 返回媒体流，其余操作返回闭合 JSON `Result`。
+- Catalog、Catalog Intake、Public Display、Assessment、Decision、Nearby Recommendation、Visit、Destructive 与 Media 九个 group 只在服务器组合根装配一次；Product Core 不依赖 React、Next、D1/R2 或渠道 SDK。
+- 当前新增地点的唯一产品路径是 `Catalog Intake → Preview/Confirm → Verified Item 或 Review Candidate`。Review Candidate 只供 Owner 审核；creator／ImportJob collector 不是当前 capability。
+- 已部署环境可能仍含 `import_jobs` 物理表；它仅作为 migration 兼容遗留保留，不表示存在 ImportJob 领域能力、route 或 UI，清理须另走安全 migration。
 - 浏览器遵循 `View → ViewModel → Browser AtlasApplication adapter`；持久事实来自服务器，乐观状态使用可失效的读取 token 防止旧请求覆盖已提交结果。
 - Search、评分归一化与有效到访状态各只有一个 Product Core policy；HTTP、Browser、capabilities 与 WebMCP 共用一份 operation-to-transport mapping。
 - 架构适应度测试使用 TypeScript AST 与受控坏 fixture，持续检查依赖方向、无环、唯一 catalog/mapping/policy、adapter 薄层及公开诊断脱敏。

@@ -21,7 +21,7 @@
 | `has_visited`（adapter 中解释为 `manualVisited`） | `0` |
 | `summary` | `NULL` |
 
-以下内容必须逐项保持：所有表与记录集合、`created_at`／`updated_at`、AtlasItem 与 override、Visit、VisitMedia metadata、ImportJob、tombstone、旧 `journal_entries`，以及完整 R2 object-key manifest。已有 Visit 的地点在 reset 后仍由 `存在 Visit OR manualVisited` 推导为 `行った`。
+以下内容必须逐项保持：所有表与记录集合、`created_at`／`updated_at`、AtlasItem 与 override、Visit、VisitMedia metadata、遗留 `import_jobs` 物理表／行、tombstone、旧 `journal_entries`，以及完整 R2 object-key manifest。保留遗留表仅为 migration 安全，不恢复已退役的 ImportJob capability。已有 Visit 的地点在 reset 后仍由 `存在 Visit OR manualVisited` 推导为 `行った`。
 
 原 reset SQL 当前仍位于 [`0003_reset_test_place_assessments.sql`](../apps/web/drizzle/0003_reset_test_place_assessments.sql)，但从未部署。按 D-020 实现时只能原样移动为 pending artifact，并在门禁通过后原样成为 active 0004；SQL 字节与 checksum 不可修改。已部署 migration 仍一律不可移动或修改，未来变化必须新增 migration。
 
@@ -130,7 +130,7 @@ npm run maintenance:assessment-reset -- verify \
 
 仅在独立代码评审通过并由用户批准具体窗口后执行：
 
-1. 冻结所有个人状态、Visit、媒体、地点、Inbox 与 WebMCP 写入并排空旧请求。
+1. 冻结所有个人状态、Visit、媒体、地点、Catalog Intake 与 WebMCP 写入并排空旧请求；Review 当前只读，但仍纳入只读烟测。
 2. 导出完整 D1 snapshot，校验备份可读；导出完整 R2 object-key manifest。
 3. 以同一 maintenance ID/source scope、不同 capture ID 与不同 D1/R2 来源生成前后证据；在新建的本地 `.snapshot.sqlite` 副本上重新运行 dry-run、rehearse 和 verify。
 4. 保留旧部署版本，确认 active 0004 与 pending reset checksum/字节完全一致，才可对生产 D1 应用该 migration；migration 本身不访问 R2。

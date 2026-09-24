@@ -1,11 +1,11 @@
 # Japan Atlas 系统架构与开发指南
 
 状态：有效架构基线
-最后更新：2026-09-12
+最后更新：2026-09-24
 
 ## 1. 架构原则
 
-Japan Atlas 是一个产品核心加多个可替换入口：私有地图、浏览器 Agent、未来微信和 CLI 都必须调用同一套应用操作并读取同一份持久数据。
+Japan Atlas 是一个产品核心加多个可替换入口：公开只读／Owner 写入地图、浏览器 Agent、微信／OpenClaw 和 CLI 都必须调用同一套应用操作并读取同一份持久数据。
 
 采用两项互补原则：
 
@@ -34,12 +34,14 @@ flowchart LR
       OBJ[(R2 私有媒体)]
       AUDIT[(来源与审计)]
     end
-    subgraph Acquisition[可替换采集层]
-      JOB[ImportJob]
-      BROWSER[本地登录浏览器]
-      EXTRACT[正文 / ASR / OCR]
-      RESOLVE[实体解析]
-      REVIEW[人工审核]
+    subgraph Intake[当前建档与审核]
+      DISCOVER[Catalog Intake]
+      PREVIEW[Preview / Confirm]
+      REVIEW[Review Candidate]
+    end
+    subgraph Acquisition[未来提案边界]
+      PROPOSAL[Acquisition Proposal]
+      EVIDENCE[Evidence Manifest]
     end
     WX --> CA --> RT --> API
     WEB --> API
@@ -47,31 +49,33 @@ flowchart LR
     API --> UC --> DB
     UC --> OBJ
     UC --> AUDIT
-    API --> JOB --> BROWSER --> EXTRACT --> RESOLVE --> REVIEW --> API
+    API --> DISCOVER --> PREVIEW --> REVIEW
+    PROPOSAL -. 未实现 .-> EVIDENCE -. 候选输入 .-> REVIEW
 ```
 
 ## 3. 当前实现与目标边界
 
 ### 已实现
 
-- 私有 Sites Web 应用；
+- 公开只读、Owner 写入的 Sites Web 应用；
 - D1 schema、不可变 migration 和持久 API；
-- AtlasItem、ImportJob、PlaceAssessment、Visit 与 VisitMedia；
+- AtlasItem、CatalogIntakeSession、Review Candidate、PlaceAssessment、Visit 与 VisitMedia；
 - R2 私有图片、签名／大小／哈希校验、说明和删除；
 - 地图、搜索、筛选、乐观写入和 Journal 纠错；
 - WebMCP 浏览器工具与 Web UI 共用 Browser AtlasApplication／HTTP 操作；
 - 框架无关的 `AtlasApplication`、静态 operation catalog、领域 handlers 与 D1/R2/InMemory ports；
 - 全部现有 HTTP 读写经唯一 server composition 调用同一 Application Operations；
 - Browser、capabilities 与 WebMCP 共用同一 HTTP/operation mapping；
+- 网页与微信／OpenClaw 共用 Catalog Intake 的 discover、select、confirm、cancel，证据不足的结果只进入 Owner Review；
 - 架构适应度测试覆盖依赖方向、无环、handler 隔离、operation key 与旧 store 绕行；
 - CI 的格式、Lint、类型、单元测试与生产构建。
 
 ### 尚未实现或尚未形成服务边界
 
 - 供 24/7 Agent 使用的 scoped authentication、授权和审计；
-- 能消费 ImportJob 的本地 collector worker；
+- Acquisition & Review 的未来 proposal adapter（当前没有 creator collector、ImportJob route 或后台导入队列）；
 - 对话式 Visit capture session；
-- 微信/OpenClaw 适配器、重试恢复和七天 soak；
+- 微信／OpenClaw 的 Record／照片适配、重试恢复和七天 soak；
 - 生产备份恢复、弱网策略和提醒 worker。
 
 浏览器 WebMCP 已能执行多项读写操作，但它不是面向云端 Bot 的最终安全 API。
@@ -88,7 +92,7 @@ React View
             -> State / Object Port
               <- D1 / R2 Adapter
 
-WebMCP / 未来微信 Adapter
+WebMCP / 微信 Adapter
   -> 同一 Application Use Case
   -> 不导入 React、D1 或 R2 实现
 ```
@@ -98,7 +102,7 @@ WebMCP / 未来微信 Adapter
 | Product Core | 类型化 Application Operations、业务不变量、领域类型与 ports | `apps/web/product/application/**` |
 | UI 类型兼容层 | Product Core record 的 type alias 与 Web-only view/filter 类型 | `apps/web/features/atlas/model.ts` |
 | 可信初始目录 | 经来源核验的内置记录 | `apps/web/features/atlas/verified-items.ts` |
-| View | 地图、列表、详情、备用 Inbox／Journal | `apps/web/features/atlas/atlas-screen.tsx` |
+| View | 地图、列表、详情、Owner Review／Journal | `apps/web/features/atlas/atlas-screen.tsx` |
 | ViewModel | 客户端状态、乐观更新、API 编排与回滚 | `apps/web/features/atlas/use-atlas-view-model.ts` |
 | Browser Adapter | 类型化 HTTP 调用 | `apps/web/features/atlas/atlas-api-client.ts` |
 | 共享 Browser mapping | Browser、capabilities 与 WebMCP 的唯一 HTTP/operation 映射 | `apps/web/features/atlas/atlas-browser-operation-catalog.ts` |
@@ -119,7 +123,8 @@ WebMCP / 未来微信 Adapter
 | Source assertion | 派生事实的 URL、观察时间、证据位置和采集方法；当前部分仍内嵌于目录记录 |
 | 外部评分快照 | 分数、评论数、来源 URL 与核验日期；不是永久事实 |
 | Reservation snapshot | 预约方式、放号范围、例外、来源和核验时间；实时库存不作长期事实 |
-| `ImportJob` | 可恢复的采集请求和状态；不保存社交账号 Cookie |
+| `CatalogIntakeSession` | 餐厅发现、候选选择、版本化 Preview、确认／取消的短时状态；过期或冲突不得静默写入 |
+| Review Candidate | 证据不足或冲突的 Owner-only 地点；不得进入公开地图或 Nearby |
 | `PlaceAssessment` | 每地点一个可空总体评分、喜欢、显式到访状态和长期总结 |
 | `Visit` | 可重复的到访日期与可选笔记；不拥有独立评分 |
 | `VisitMedia` | Visit 归属、R2 object key、MIME、大小、哈希、顺序和可选说明 |
@@ -127,18 +132,20 @@ WebMCP / 未来微信 Adapter
 
 有效到访状态已经统一为 `存在 Visit OR manualVisited`：真实 Visit 不能被人工“没去过”覆盖；删除最后一条 Visit 后，仅当此前独立保存了 `manualVisited=true` 才继续显示 `行った`。D1 adapter 在内部把旧列 `has_visited` 解释为 `manualVisited`，HTTP compatibility adapter 继续接受旧字段名 `hasVisited`；业务核心和新接口不得使用旧语义，`personalState: visited` 也不参与有效到访计算。
 
-`journal_entries` 是旧兼容表，不应承载新功能；新开发只使用 `visits` 与 `place_assessments`，待迁移安全窗口确定后再删除旧表。
+`journal_entries` 是旧兼容表，不应承载新功能；新开发只使用 `visits` 与 `place_assessments`，待迁移安全窗口确定后再删除旧表。已部署环境中的 `import_jobs` 也只是遗留物理表：当前没有对应的领域 capability、route 或 UI；只能通过后续安全 migration 清理，不能把表存在解释为 ImportJob 仍受支持。
 
 ## 6. 应用操作与写入契约
 
 当前唯一静态 catalog 覆盖：
 
 - 地点：list、get、保存 `needs_review` 采集结果、update、delete；
+- 地点建档：discover、select、confirm、cancel；
 - 发现：search、nearby；
 - 个人状态：rating、favorite、manual visited、summary update；
 - Visit：list、create、update、delete；
 - 媒体：attach、list/content、caption、delete；
-- 采集：ImportJob list、queue、delete。
+
+当前不包含 creator／ImportJob 的 list、queue 或 delete 操作。未来 Acquisition Proposal 若获确认，必须先形成新的 operation contract 和证据边界，不能复用遗留物理表绕过 Catalog Intake／Review。
 
 这些 operation 由领域 group 静态组合一次；JSON 与 media-stream key 在类型层分离，不能 runtime registration。HTTP route 只解析协议和映射 `Result`，不得导入数据库、对象存储或重新实现评分、到访、目录合并、搜索、距离与删除规则。
 
@@ -166,8 +173,8 @@ WebMCP / 未来微信 Adapter
 ## 7. 数据、部署与安全边界
 
 - v1 结构化数据以 D1 为基线，私有媒体以 R2 为基线；只有出现明确规模、空间查询或服务限制证据时才重新评估 Postgres/PostGIS。
-- Sites owner-only 边界只适合当前私有网页。云端 Bot 需要独立 scoped credential、签名、授权和审计边界。
-- 24/7 产品核心与按需本地采集分离：消息/API/提醒常驻云端，登录社交平台的浏览器留在本机隔离 profile。
+- Sites 当前使用公开读取投影与 Owner session 写门。云端 Bot 使用独立 scoped credential、签名、授权和审计边界；两种入口不得互换凭证。
+- 24/7 产品核心与任何未来的高权限来源 adapter 分离：消息/API/提醒常驻云端；若以后确有登录来源需求，其浏览器只能留在本机隔离 profile。
 - 浏览器 Cookie 不上传云端；本地控制端口仅绑定 loopback，完成任务后停止高权限采集会话。
 - 浏览器控制即使只绑定 loopback，也可能被同机不可信进程利用并执行任意页面脚本；它必须短时启停，且不能与常驻 Agent 共用权限域或凭证。
 - 第三方网页、OCR、评论、文件名和模型输出均视为不可信输入。

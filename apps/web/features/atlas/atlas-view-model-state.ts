@@ -1,9 +1,4 @@
-import type {
-  AtlasItem,
-  ImportJob,
-  VisitMediaRecord,
-  VisitRecord,
-} from './model';
+import type { AtlasItem, VisitMediaRecord, VisitRecord } from './model';
 
 interface PendingItemMutation {
   readonly mutationId: string;
@@ -12,14 +7,12 @@ interface PendingItemMutation {
 
 interface ActiveLoads {
   readonly items?: string;
-  readonly importJobs?: string;
   readonly visits?: string;
   readonly media?: string;
 }
 
 export interface AtlasViewModelState {
   readonly items: AtlasItem[];
-  readonly importJobs: ImportJob[];
   readonly visits: VisitRecord[];
   readonly media: VisitMediaRecord[];
   readonly itemBases: Readonly<Record<string, AtlasItem>>;
@@ -36,12 +29,6 @@ export type AtlasViewModelStateAction =
       readonly loadId: string;
       readonly items: readonly AtlasItem[];
     }
-  | { readonly type: 'import-jobs.load.started'; readonly loadId: string }
-  | {
-      readonly type: 'import-jobs.loaded';
-      readonly loadId: string;
-      readonly importJobs: readonly ImportJob[];
-    }
   | { readonly type: 'visits.load.started'; readonly loadId: string }
   | {
       readonly type: 'visits.loaded';
@@ -56,7 +43,6 @@ export type AtlasViewModelStateAction =
     }
   | { readonly type: 'item.received'; readonly item: AtlasItem }
   | { readonly type: 'item.removed'; readonly itemId: string }
-  | { readonly type: 'import-job.prepended'; readonly importJob: ImportJob }
   | { readonly type: 'visit.prepended'; readonly visit: VisitRecord }
   | {
       readonly type: 'visit.received';
@@ -97,14 +83,12 @@ export type AtlasViewModelStateAction =
 export function createAtlasViewModelState(
   initial: {
     readonly items?: readonly AtlasItem[];
-    readonly importJobs?: readonly ImportJob[];
     readonly visits?: readonly VisitRecord[];
     readonly media?: readonly VisitMediaRecord[];
   } = {},
 ): AtlasViewModelState {
   return {
     items: [...(initial.items ?? [])],
-    importJobs: [...(initial.importJobs ?? [])],
     visits: [...(initial.visits ?? [])],
     media: [...(initial.media ?? [])],
     itemBases: {},
@@ -136,16 +120,6 @@ export function reduceAtlasViewModelState(
         activeLoads: clearLoad(state.activeLoads, 'items'),
       };
     }
-    case 'import-jobs.load.started':
-      return startLoad(state, 'importJobs', action.loadId);
-    case 'import-jobs.loaded':
-      return state.activeLoads.importJobs === action.loadId
-        ? {
-            ...state,
-            importJobs: [...action.importJobs],
-            activeLoads: clearLoad(state.activeLoads, 'importJobs'),
-          }
-        : state;
     case 'visits.load.started':
       return startLoad(state, 'visits', action.loadId);
     case 'visits.loaded':
@@ -189,11 +163,6 @@ export function reduceAtlasViewModelState(
         pendingItemMutations,
       };
     }
-    case 'import-job.prepended':
-      return {
-        ...invalidateLoad(state, 'importJobs'),
-        importJobs: [action.importJob, ...state.importJobs],
-      };
     case 'visit.prepended':
       return {
         ...invalidateLoad(state, 'visits'),
@@ -305,12 +274,39 @@ function settleItemMutation(
   },
   authoritativeItem?: AtlasItem,
 ): AtlasViewModelState {
-  const base = authoritativeItem ?? state.itemBases[action.itemId];
+  const currentBase =
+    state.itemBases[action.itemId] ?? findItem(state.items, action.itemId);
+  const base = authoritativeItem
+    ? mergePersonalProjection(currentBase, authoritativeItem)
+    : currentBase;
   if (!base) return state;
   const pending = (state.pendingItemMutations[action.itemId] ?? []).filter(
     (mutation) => mutation.mutationId !== action.mutationId,
   );
   return projectItem(state, action.itemId, base, pending);
+}
+
+function mergePersonalProjection(
+  catalogBase: AtlasItem | undefined,
+  authoritativeItem: AtlasItem,
+): AtlasItem {
+  if (!catalogBase) return authoritativeItem;
+
+  return {
+    ...catalogBase,
+    ...('personalRating' in authoritativeItem
+      ? { personalRating: authoritativeItem.personalRating }
+      : {}),
+    ...('isFavorite' in authoritativeItem
+      ? { isFavorite: authoritativeItem.isFavorite }
+      : {}),
+    ...('hasVisited' in authoritativeItem
+      ? { hasVisited: authoritativeItem.hasVisited }
+      : {}),
+    ...('overallComment' in authoritativeItem
+      ? { overallComment: authoritativeItem.overallComment }
+      : {}),
+  };
 }
 
 function projectItem(

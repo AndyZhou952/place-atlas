@@ -40,8 +40,6 @@ function createTools(overrides = {}) {
           return { ...item, ...operation.input };
         case 'catalog.delete_item':
           return { id: operation.input.id, deleted: true };
-        case 'import.queue':
-          return { id: 'job-1', ...operation.input, status: 'queued' };
         case 'visit.create':
           return { visit: { id: 'visit-1' }, item };
         case 'visit.update':
@@ -113,18 +111,6 @@ test('WebMCP keeps the existing tool names, input schemas, and annotations', () 
             },
           },
           required: ['id', 'title', 'description', 'personalState'],
-        },
-        writeAnnotations,
-      ),
-      contract(
-        'queue_creator_import',
-        {
-          properties: {
-            creatorName: { type: 'string' },
-            sourceRef: { type: 'string' },
-            platform: { type: 'string' },
-          },
-          required: ['creatorName', 'sourceRef'],
         },
         writeAnnotations,
       ),
@@ -240,10 +226,6 @@ test('persistent WebMCP tools execute Browser AtlasApplication operations instea
     description: 'Description',
     personalState: 'saved',
   });
-  await byName.get('queue_creator_import').execute({
-    creatorName: 'Creator',
-    sourceRef: 'https://example.test',
-  });
   await byName.get('update_item_preferences').execute({
     id: item.id,
     isFavorite: true,
@@ -284,7 +266,6 @@ test('persistent WebMCP tools execute Browser AtlasApplication operations instea
     [
       'catalog.list',
       'catalog.update_item',
-      'import.queue',
       'assessment.update',
       'assessment.update',
       'visit.create',
@@ -297,11 +278,11 @@ test('persistent WebMCP tools execute Browser AtlasApplication operations instea
     ],
   );
   assert.deepEqual(calls[0].input, { profile: 'full_merged_catalog' });
-  assert.deepEqual(calls[3].input.patch, {
+  assert.deepEqual(calls[2].input.patch, {
     isFavorite: true,
     manualVisited: false,
   });
-  assert.deepEqual(calls[4].input.patch, { overallRating: 4.3 });
+  assert.deepEqual(calls[3].input.patch, { overallRating: 4.3 });
 });
 
 test('nearby uses the full merged Application profile while focus stays UI-only', async () => {

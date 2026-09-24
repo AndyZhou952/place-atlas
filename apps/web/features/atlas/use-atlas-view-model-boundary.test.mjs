@@ -18,5 +18,6 @@ test('the React ViewModel sends every persistent operation through the Browser A
     source,
     /fetchAtlasItems|fetchImportJobs|fetchVisits|fetchVisitMedia|updateItemAssessment|uploadVisitMedia|deleteAtlasItem/,
   );
+  assert.doesNotMatch(source, /import\.(?:list|queue)|queueImport|importJobs/u);
   assert.doesNotMatch(source, /hasAnotherVisit|distanceInKm|visitCount/);
 });

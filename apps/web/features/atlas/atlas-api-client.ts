@@ -1,8 +1,6 @@
 import type {
   AtlasItem,
   AtlasItemEdit,
-  ImportJob,
-  NewImportJob,
   NewVisit,
   PlaceAssessmentPatch,
   VisitCreateResult,
@@ -71,14 +69,6 @@ interface BrowserOperationMap {
   readonly 'catalog.delete_item': {
     readonly input: { readonly id: string };
     readonly output: { readonly id: string; readonly deleted: true };
-  };
-  readonly 'import.list': {
-    readonly input: Readonly<Record<string, never>>;
-    readonly output: readonly ImportJob[];
-  };
-  readonly 'import.queue': {
-    readonly input: NewImportJob;
-    readonly output: ImportJob;
   };
   readonly 'visit.list': {
     readonly input: Readonly<Record<string, never>>;
@@ -161,6 +151,14 @@ interface BrowserOperationMap {
   };
 }
 
+type AssessmentMutationWireItem = Omit<
+  AtlasItem,
+  'personalRating' | 'overallComment'
+> & {
+  readonly personalRating: number | null;
+  readonly overallComment: string | null;
+};
+
 type BrowserOperationInput<Key extends BrowserOperationKey> =
   BrowserOperationMap[Key]['input'];
 type BrowserOperationOutput<Key extends BrowserOperationKey> =
@@ -216,7 +214,7 @@ export function createBrowserAtlasApplication(
     'assessment.update': ({ itemId, patch }, mutationId) => {
       const { manualVisited, ...rest } = patch;
       return requestMutationJson<{
-        readonly item: AtlasItem;
+        readonly item: AssessmentMutationWireItem;
       }>(
         transport,
         browserOperationPath('assessment.update', { id: itemId }),
@@ -230,7 +228,11 @@ export function createBrowserAtlasApplication(
               : { hasVisited: manualVisited }),
           }),
         },
-      ).then(({ item }) => item);
+      ).then(({ item }) => ({
+        ...item,
+        personalRating: item.personalRating ?? undefined,
+        overallComment: item.overallComment ?? undefined,
+      }));
     },
     'catalog.update_item': ({ id, ...edit }) =>
       requestJson(
@@ -249,13 +251,6 @@ export function createBrowserAtlasApplication(
           method: browserOperationHttpCatalog['catalog.delete_item'].method,
         },
       ),
-    'import.list': () =>
-      requestJson(transport, browserOperationPath('import.list')),
-    'import.queue': (input) =>
-      requestJson(transport, browserOperationPath('import.queue'), {
-        method: browserOperationHttpCatalog['import.queue'].method,
-        body: JSON.stringify(input),
-      }),
     'visit.list': () => loadPublicVisits(transport),
     'visit.create': (input, mutationId) =>
       requestMutationJson(

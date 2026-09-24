@@ -1,0 +1,240 @@
+{
+  "candidateId": "verified-2",
+  "routeFixtureSha256": "8defa9d61b6b0b20e0505db480d926ab6070498967c52d38840d0639cb90f056",
+  "publicCandidateAbsent": true,
+  "evidence": [
+    {
+      "state": "signed-out",
+      "viewportName": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "/home/ubuntu/.codex/worktrees/b7ed/jp-food-event-map/features/006-agent-add-experience/evidence/ui/t09-review-persisted-desktop-signed-out.png",
+      "sha256": "e7c57f602a3618750aa3941b761d5d45e6448b8768d5ba652214d831a020fb74",
+      "layout": {
+        "clientWidth": 1440,
+        "scrollWidth": 1440,
+        "workspaceClientWidth": 1440,
+        "workspaceScrollWidth": 1440
+      },
+      "accessibility": {
+        "primaryTargets": [
+          {
+            "name": "Owner login",
+            "width": 96.703125,
+            "height": 32
+          }
+        ],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Owner login",
+            "width": 96.703125,
+            "height": 32
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      }
+    },
+    {
+      "state": "list",
+      "viewportName": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "/home/ubuntu/.codex/worktrees/b7ed/jp-food-event-map/features/006-agent-add-experience/evidence/ui/t09-review-persisted-desktop-list.png",
+      "sha256": "03d59ee32b843384657749db3614b09ece89d0a71995a112c7e8c6790ca46e56",
+      "layout": {
+        "clientWidth": 1440,
+        "scrollWidth": 1440,
+        "workspaceClientWidth": 1440,
+        "workspaceScrollWidth": 1440
+      },
+      "accessibility": {
+        "primaryTargets": [],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Evidence details",
+            "width": 1367.625,
+            "height": 38.046875
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      },
+      "renderedCandidateId": "verified-2",
+      "routeFixtureSha256": "8defa9d61b6b0b20e0505db480d926ab6070498967c52d38840d0639cb90f056"
+    },
+    {
+      "state": "loading",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "workspaceClientWidth": 390,
+        "workspaceScrollWidth": 390
+      },
+      "accessibility": {
+        "primaryTargets": [],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 1,
+        "interactiveTargets": [],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      }
+    },
+    {
+      "state": "signed-out",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "/home/ubuntu/.codex/worktrees/b7ed/jp-food-event-map/features/006-agent-add-experience/evidence/ui/t09-review-persisted-mobile-signed-out.png",
+      "sha256": "1745a8c9590384988a2a12b1ba31fd260b499b947f2449e8ac846e8abb603984",
+      "layout": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "workspaceClientWidth": 390,
+        "workspaceScrollWidth": 390
+      },
+      "accessibility": {
+        "primaryTargets": [
+          {
+            "name": "Owner login",
+            "width": 96.703125,
+            "height": 44
+          }
+        ],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Owner login",
+            "width": 96.703125,
+            "height": 44
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      }
+    },
+    {
+      "state": "error",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "workspaceClientWidth": 390,
+        "workspaceScrollWidth": 390
+      },
+      "accessibility": {
+        "primaryTargets": [
+          {
+            "name": "Try again",
+            "width": 79.84375,
+            "height": 44
+          }
+        ],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Try again",
+            "width": 79.84375,
+            "height": 44
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      }
+    },
+    {
+      "state": "empty",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "workspaceClientWidth": 390,
+        "workspaceScrollWidth": 390
+      },
+      "accessibility": {
+        "primaryTargets": [
+          {
+            "name": "Open Add",
+            "width": 84.28125,
+            "height": 44
+          }
+        ],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Open Add",
+            "width": 84.28125,
+            "height": 44
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      }
+    },
+    {
+      "state": "list",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "/home/ubuntu/.codex/worktrees/b7ed/jp-food-event-map/features/006-agent-add-experience/evidence/ui/t09-review-persisted-mobile-list.png",
+      "sha256": "caa37fe3b8a96c459be8a8ca4e2118b4498c05b370bf0b4b109e995a1167a29a",
+      "layout": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "workspaceClientWidth": 390,
+        "workspaceScrollWidth": 390
+      },
+      "accessibility": {
+        "primaryTargets": [],
+        "unnamedButtons": 0,
+        "headingCount": 2,
+        "liveRegions": 0,
+        "interactiveTargets": [
+          {
+            "name": "Evidence details",
+            "width": 114.25,
+            "height": 44
+          }
+        ],
+        "duplicateIds": [],
+        "missingAriaReferences": []
+      },
+      "renderedCandidateId": "verified-2",
+      "routeFixtureSha256": "8defa9d61b6b0b20e0505db480d926ab6070498967c52d38840d0639cb90f056"
+    }
+  ]
+}

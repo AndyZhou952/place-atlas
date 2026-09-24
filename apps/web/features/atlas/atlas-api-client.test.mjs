@@ -39,7 +39,9 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
           overallComment: item.overallComment,
         });
       }
-      return mutationResponse(init, { item });
+      return mutationResponse(init, {
+        item: { ...item, personalRating: null },
+      });
     },
   });
 
@@ -69,7 +71,7 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
       hasVisited: false,
     },
   ]);
-  assert.deepEqual(updated, item);
+  assert.deepEqual(updated, { ...item, personalRating: undefined });
   assert.equal(calls[0].url, '/api/items');
   assert.equal(calls[0].init?.method, undefined);
   assert.equal(calls[1].url, '/api/items/place-1/personal');
@@ -228,8 +230,7 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
           typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body,
       });
       const isList =
-        (url === '/api/inbox' ||
-          url === '/api/journal' ||
+        (url === '/api/journal' ||
           url === '/api/owner/catalog/review-candidates' ||
           url.startsWith('/api/media?') ||
           url.startsWith('/api/nearby?')) &&
@@ -254,11 +255,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
   await application.execute({
     key: 'catalog.delete_item',
     input: { id: 'place / 1' },
-  });
-  await application.execute({ key: 'import.list', input: {} });
-  await application.execute({
-    key: 'import.queue',
-    input: { creatorName: 'Creator', sourceRef: 'https://example.test' },
   });
   await application.execute({ key: 'visit.list', input: {} });
   await application.execute({
@@ -324,12 +320,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       url: '/api/items/place%20%2F%201',
       method: 'DELETE',
       body: undefined,
-    },
-    { url: '/api/inbox', method: 'GET', body: undefined },
-    {
-      url: '/api/inbox',
-      method: 'POST',
-      body: { creatorName: 'Creator', sourceRef: 'https://example.test' },
     },
     { url: '/api/journal', method: 'GET', body: undefined },
     {

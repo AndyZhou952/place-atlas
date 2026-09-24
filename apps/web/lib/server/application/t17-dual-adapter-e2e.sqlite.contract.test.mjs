@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
@@ -11,12 +11,15 @@ import {
   D1AgentGatewayState,
 } from '../../../adapters/agent/d1-agent-gateway-adapters.ts';
 import { catalogIntakeResponse } from '../../../app/api/catalog-intake/catalog-intake-response.ts';
+import { listAtlasItemsResponse } from '../../../app/api/items/list-atlas-items-response.ts';
+import { createOwnerReviewCandidateListGet } from '../../../app/api/owner/catalog/review-candidates/owner-review-candidate-route.ts';
 import { createAtlasApplication } from '../../../product/application/atlas-application.ts';
 import {
   createCatalogIntakeModule,
   createCatalogIntakeOperationGroup,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createCatalogRead } from '../../../product/application/catalog/catalog-read.ts';
+import { createCatalogReadOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
 import { signAgentHttpRequest } from '../../../product/application/conversation/agent-request-signing.ts';
 import { createAgentServiceGateway } from '../../../product/application/conversation/agent-service-gateway.ts';
 import {
@@ -232,6 +235,53 @@ test('real Owner-cookie Web and signed Agent adapters share D1 intake, recovery,
   );
   assert.equal(reviewReconfirm.body.status, 'committed_needs_review');
 
+  // Exercise the Owner-only HTTP read seam against the same persisted D1 row
+  // produced by Catalog Intake. This is deliberately not a hand-built DTO.
+  const ownerReviewGet = createOwnerReviewCandidateListGet({
+    authorizeOwnerRead: (request) => ownerAuth.authorizeRead(request),
+    getApplication() {
+      return createAtlasApplication(createCatalogReadOperationGroup(catalog));
+    },
+  });
+  const anonymousReviewResponse = await ownerReviewGet(
+    new Request('https://atlas.example/api/owner/catalog/review-candidates'),
+  );
+  assert.equal(anonymousReviewResponse.status, 401);
+  const ownerReviewResponse = await ownerReviewGet(
+    new Request('https://atlas.example/api/owner/catalog/review-candidates', {
+      headers: { cookie },
+    }),
+  );
+  assert.equal(ownerReviewResponse.status, 200);
+  const ownerReviewCandidates = await ownerReviewResponse.json();
+  assert.equal(
+    ownerReviewCandidates.some(({ title }) => title === 'Web Needs Review'),
+    true,
+  );
+  if (process.env.T08_REVIEW_ROUTE_OUTPUT) {
+    await writeFile(
+      process.env.T08_REVIEW_ROUTE_OUTPUT,
+      `${JSON.stringify(ownerReviewCandidates, null, 2)}\n`,
+      'utf8',
+    );
+  }
+  const publicResponse = await listAtlasItemsResponse(
+    createAtlasApplication(createCatalogReadOperationGroup(catalog)),
+  );
+  assert.equal(publicResponse.status, 200);
+  const publicItems = await publicResponse.json();
+  assert.equal(
+    publicItems.some(({ id }) => id === ownerReviewCandidates[0].id),
+    false,
+  );
+  if (process.env.T09_PUBLIC_ROUTE_OUTPUT) {
+    await writeFile(
+      process.env.T09_PUBLIC_ROUTE_OUTPUT,
+      `${JSON.stringify(publicItems, null, 2)}\n`,
+      'utf8',
+    );
+  }
+
   const agent = createAgentHarness(database, application, state);
   const agentDiscover = await agent.send(
     'jpmap_add_discover',
@@ -293,7 +343,11 @@ test('real Owner-cookie Web and signed Agent adapters share D1 intake, recovery,
   );
   assert.match(
     agentReviewConfirm.body.receipt.result.replyText,
-    /本次没有写入/u,
+    /^资料有变化，本次尚未写入。/u,
+  );
+  assert.match(
+    agentReviewConfirm.body.receipt.result.replyText,
+    /同意新版：\/jpmap add confirm/u,
   );
   const agentReviewReconfirm = await agent.send(
     'jpmap_add_confirm',

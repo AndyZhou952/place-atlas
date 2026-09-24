@@ -3,7 +3,7 @@
 智能体为推进设计提出的默认选择；在实现前由用户确认或推翻。
 
 - A-1 2026-09-12 [已确认] 下一阶段先在现有仓库内抽取模块化 application ports/use cases，不立即拆出独立微服务 — 用户确认采用模块化单体作为当前形态。
-- A-2 2026-09-12 [已确认] 第一个 Agent-ready 行走骨架只迁移现有地点、个人状态、Visit、媒体、ImportJob、搜索与 nearby 行为；推荐、身份确认和对话采集另立特性 — 用户确认先做行为保持式迁移。
+- A-2 2026-09-12 [部分取代] 第一个 Agent-ready 行走骨架迁移现有地点、个人状态、Visit、媒体、搜索与 nearby 行为；原 ImportJob 部分已由 A-51 取代。
 - A-3 2026-09-11 [生效] 服务端图片尺寸、失败批次重试和孤儿清理作为独立媒体特性，可与 application layer 规格并行，但不共同修改同一核心文件 — 默认理由：缩短主链且降低合并冲突。
 - A-4 2026-09-12 [已确认] 有 Visit 时有效到访状态始终为真；人工“没去过”不能隐藏真实 Visit，mutation 必须返回有效状态 — 用户确认统一 `行った` 真值。
 - A-5 2026-09-11 [生效] 当前不开放无评分、无笔记的纯照片 Visit；等 VisitCaptureSession 能提供明确归属和生命周期后再评估 — 默认理由：与现有 API 一致并避免孤立媒体。
@@ -48,3 +48,4 @@
 - A-48 2026-09-22 [已确认] Tabelog 采用 Owner-directed、single-intake、Agent-first best-effort research 主路径，Owner 接受个人非商用 PoC 的当期来源风险；禁止批量、Google SERP HTML/internal API、绕过页面限制与保存正文/HTML/图片；`agent_observed/observedAt`，Owner 手填或修改为 `owner_asserted/assertedAt`，手填/unknown 是兜底。精确技术预算由 A-50 定义，不声称为用户逐项确认。
 - A-49 2026-09-22 [已确认] Add session 状态固定为 discovering/candidates_ready/preview_ready/committed/cancelled/expired，accepted activity 后 30 分钟、恰好 30:00 即过期；服务端以 `add-confirm:v1 + ownerId + operation + serverSessionId + currentPreviewVersion + authoritativePreviewDigest` 派生 key，confirm-time refresh 后原子写 receipt。committed 可回放 180 天；Record 不继承此例外。— 用户于 2026-09-22 确认最终增量架构。
 - A-50 2026-09-22 [已确认] Add 单次 research 技术预算总计 1 search/5 pages/60 秒，phase reserve 不可借用：initial 最多 1 search+3 pages+35 秒，confirm refresh 不新 search、只用 preview canonical URLs且最多 2 pages+25 秒；每 request 最多 15 秒/3 redirects。— 用户于 2026-09-22 确认最终增量架构。
+- A-51 2026-09-24 [已确认] 当前新增地点只走 Catalog Intake + Review Candidate；creator／ImportJob UI、route 与领域 capability 退役。遗留 `import_jobs` 表仅作 migration 兼容，Acquisition & Review 只保留未来 proposal 边界。Screenshot-to-Add 是低优先级独立 backlog，前置 Stable Place Enrichment，当前不实现任何图片入口或绕过确认的写入。

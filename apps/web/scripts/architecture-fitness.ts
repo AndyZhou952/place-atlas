@@ -1966,20 +1966,11 @@ function isAllowedModelImport(
 }
 
 function isAllowedModelExport(
-  statement: ts.ExportDeclaration,
-  source: string,
-  manifest: ArchitectureFitnessManifest,
+  _statement: ts.ExportDeclaration,
+  _source: string,
+  _manifest: ArchitectureFitnessManifest,
 ): boolean {
-  const importJobOwner = path.normalize(manifest.coreModelOwners.ImportJob);
-  return (
-    source === importJobOwner &&
-    isEntirelyTypeOnlyExport(statement) &&
-    hasExactNamedExports(statement, [
-      { imported: 'ImportJob', exported: 'ImportJob', typeOnly: true },
-      { imported: 'ImportStatus', exported: 'ImportStatus', typeOnly: true },
-      { imported: 'NewImportJob', exported: 'NewImportJob', typeOnly: true },
-    ])
-  );
+  return false;
 }
 
 function hasDirectTopLevelSideEffect(source: ts.SourceFile): boolean {
@@ -2129,7 +2120,7 @@ const allowedUiModelTypeExpressions: Readonly<
   Record<string, string | readonly string[]>
 > = {
   AtlasItemKind: 'CoreAtlasItemKind',
-  AtlasView: "'map'|'inbox'|'journal'",
+  AtlasView: "'map'|'review'|'journal'",
   AtlasKindFilter: "'all'|AtlasItemKind",
   AtlasPersonalFilter: "'all'|'unvisited'|'visited'",
   PersonalState: 'CorePersonalState',

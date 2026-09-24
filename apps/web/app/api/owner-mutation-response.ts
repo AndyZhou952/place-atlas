@@ -16,6 +16,7 @@ export async function ownerMutationResponse(input: {
   readonly operation: string;
   readonly operationInput: unknown;
   readonly successStatus?: number;
+  readonly projectResult?: (result: unknown) => unknown;
   readonly errors: ErrorMessages;
 }): Promise<Response> {
   const mutationId = input.request.headers.get(atlasMutationIdHeader);
@@ -34,7 +35,13 @@ export async function ownerMutationResponse(input: {
     },
   });
   if (result.ok) {
-    return Response.json(result.value, { status: input.successStatus ?? 200 });
+    const value = input.projectResult
+      ? {
+          ...result.value,
+          result: input.projectResult(result.value.result),
+        }
+      : result.value;
+    return Response.json(value, { status: input.successStatus ?? 200 });
   }
   switch (result.error.kind) {
     case 'invalid_input':

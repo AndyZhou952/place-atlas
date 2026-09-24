@@ -77,6 +77,7 @@ export class LeafletMapAdapter implements AtlasMapAdapter {
       marker.bindTooltip(tooltip, { direction: 'top', offset: [0, -28] });
       marker.on('click', () => this.onSelect(entry.item.id));
       marker.addTo(this.layer);
+      marker.getElement()?.setAttribute('data-atlas-marker-id', entry.item.id);
       this.markers.set(entry.item.id, {
         marker,
         signature: entry.signature,

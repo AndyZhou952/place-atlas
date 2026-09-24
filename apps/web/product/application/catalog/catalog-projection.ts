@@ -49,8 +49,11 @@ export function projectCatalog(
 
   for (const [id, item] of itemsById) {
     const assessment = assessmentsByItem.get(id);
+    const catalogItem = isAtlasItem(item)
+      ? projectIntakeCatalogFacts(item)
+      : item;
     itemsById.set(id, {
-      ...item,
+      ...catalogItem,
       personalRating: assessment?.overallRating,
       isFavorite: assessment?.isFavorite ?? false,
       hasVisited: isEffectivelyVisited(
@@ -61,6 +64,26 @@ export function projectCatalog(
   }
 
   return [...itemsById.values()];
+}
+
+function projectIntakeCatalogFacts(item: AtlasItem): AtlasItem {
+  const evidence = item.intakeEvidence?.tabelog;
+  if (item.tabelog || evidence?.status !== 'known') return item;
+
+  return {
+    ...item,
+    tabelog: {
+      score: evidence.score,
+      ...(evidence.reviewCount === undefined
+        ? {}
+        : { reviewCount: evidence.reviewCount }),
+      url: evidence.url,
+      checkedAt:
+        evidence.provenance === 'owner_asserted'
+          ? evidence.assertedAt
+          : evidence.observedAt,
+    },
+  };
 }
 
 export function isAtlasCatalogEntry(

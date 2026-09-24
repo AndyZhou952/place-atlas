@@ -2,11 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const routePaths = [
-  './inbox/route.ts',
-  './nearby/route.ts',
-  './media/route.ts',
-];
+const routePaths = ['./nearby/route.ts', './media/route.ts'];
 
 void test('non-public v1 GET routes are owner guarded before application composition', async () => {
   for (const routePath of routePaths) {

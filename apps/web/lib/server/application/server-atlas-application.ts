@@ -28,8 +28,6 @@ import {
   type NearbyRecommendOperationDependencies,
 } from '@/product/application/decision/agent-nearby-operation';
 import { createDestructiveOperationGroup } from '@/product/application/destructive/destructive-operations';
-import { createImportJobOperationGroup } from '@/product/application/import-jobs/import-job-operations';
-import type { ImportJobDependencies } from '@/product/application/import-jobs/import-job-operations';
 import {
   createMediaOperationGroup,
   type MediaDependencies,
@@ -44,7 +42,6 @@ import {
 
 import { D1CatalogState } from './d1-catalog-state';
 import { D1DestructiveState } from './d1-destructive-state';
-import { D1ImportJobState } from './d1-import-job-state';
 import { D1PlaceAssessmentState } from './d1-place-assessment-state';
 import { D1VisitMediaState } from './media/d1-visit-media-state';
 import { R2MediaObjectStore } from './media/r2-media-object-store';
@@ -76,10 +73,6 @@ export function createServerAtlasApplication(
   const mediaState = new D1VisitMediaState(database);
   const publicDisplayAccess = createPublicDisplayAccess(catalogRead);
   return createAtlasApplication({
-    ...createImportJobOperationGroup(
-      new D1ImportJobState(database),
-      dependencies,
-    ),
     ...createCatalogOperationGroup(catalogRead, {
       state: catalogState,
       clock: dependencies.clock,
@@ -136,8 +129,7 @@ export function getServerAtlasApplication() {
   return createServerAtlasApplication(database, mediaBucket);
 }
 
-export interface ServerAtlasDependencies
-  extends ImportJobDependencies, MediaDependencies {
+export interface ServerAtlasDependencies extends MediaDependencies {
   readonly catalogRead?: CatalogRead;
   readonly catalogItemProjection?: CatalogItemProjection;
   readonly visitItemProjection?: VisitItemProjection;

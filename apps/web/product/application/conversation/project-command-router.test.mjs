@@ -266,6 +266,34 @@ test('deterministic /jpmap add commands traverse the four shared intake operatio
     cancelledReplay.ok && cancelledReplay.value.intake.replayed,
     true,
   );
+  assert.equal(
+    discovered.ok && discovered.value.replyText,
+    'Japan Atlas｜请选择餐厅\n\n' +
+      '1. 鮨青空\n' +
+      '   地址：東京都中央区銀座\n' +
+      '   来源：Google Maps\n\n' +
+      '回复：/jpmap add select <编号>',
+  );
+  assert.equal(
+    selected.ok && selected.value.replyText,
+    'Japan Atlas｜请确认\n\n' +
+      '餐厅：鮨青空\n' +
+      '地址：東京都中央区銀座\n' +
+      '地图定位：待补充\n' +
+      'Tabelog：未找到\n' +
+      '预约：未知\n\n' +
+      '待补充：地图定位，Tabelog，预约\n\n' +
+      '保存：/jpmap add confirm\n' +
+      '取消：/jpmap add cancel',
+  );
+  assert.equal(
+    confirmed.ok && confirmed.value.replyText,
+    'Japan Atlas｜已保存并加入地图。',
+  );
+  assert.equal(
+    cancelled.ok && cancelled.value.replyText,
+    'Japan Atlas｜本次 Add 已取消。',
+  );
   assert.deepEqual(
     calls.map(([operation, input]) => [operation, input]),
     [
@@ -293,7 +321,7 @@ test('deterministic /jpmap add commands traverse the four shared intake operatio
   );
 });
 
-test('Agent confirm conflict returns the complete refreshed preview before another explicit confirm', async () => {
+test('Agent confirm conflict returns the compact refreshed preview before another explicit confirm', async () => {
   const refreshed = richPreview();
   let confirmCalls = 0;
   const application = createAtlasApplication(
@@ -341,17 +369,256 @@ test('Agent confirm conflict returns the complete refreshed preview before anoth
   assert.equal(result.ok, true);
   assert.equal(result.value.step, 'preview');
   for (const expected of [
-    '本次没有写入',
-    'Preview v4',
-    '4.21 · 321 reviews',
-    'Reservation required',
-    'Possible duplicate',
-    'Warning: Tabelog evidence changed.',
-    '再次发送 /jpmap add confirm',
+    '资料有变化，本次尚未写入',
+    '餐厅：鮨青空',
+    '地图定位：已确认',
+    'Tabelog：4.21 · 321 条评价',
+    '预约：Reservation required',
+    '可能与已有地点重复：Existing Sushi',
+    '部分资料可能已过期',
+    '同意新版：/jpmap add confirm',
   ]) {
     assert.match(result.value.replyText, new RegExp(expected, 'u'));
   }
+  for (const forbidden of [
+    'Preview v4',
+    'google_places',
+    '35.671',
+    '139.765',
+    'OpenStreetMap',
+    'Tabelog evidence changed.',
+    'existing-1',
+  ]) {
+    assert.equal(result.value.replyText.includes(forbidden), false, forbidden);
+  }
   assert.equal(confirmCalls, 1);
+});
+
+test('all Add operation failures use the channel presenter without leaking provider messages', async () => {
+  for (const [failureKind, expectedKind, expectedMessage] of [
+    [
+      'unauthorized',
+      'invalid_input',
+      'Japan Atlas｜Owner 身份未通过验证，本次没有写入。',
+    ],
+    [
+      'forbidden',
+      'invalid_input',
+      'Japan Atlas｜Owner 身份未通过验证，本次没有写入。',
+    ],
+    [
+      'rate_limited',
+      'dependency_failure',
+      'Japan Atlas｜添加功能暂时不可用，请稍后重试。',
+    ],
+    [
+      'dependency_failure',
+      'dependency_failure',
+      'Japan Atlas｜添加功能暂时不可用，请稍后重试。',
+    ],
+    [
+      'invalid_input',
+      'invalid_input',
+      'Japan Atlas｜Add 输入无效，本次没有写入。请检查命令后重试。',
+    ],
+    [
+      'unexpected_failure',
+      'unexpected_failure',
+      'Japan Atlas｜Add 请求未能完成，本次没有写入。请稍后重试。',
+    ],
+  ]) {
+    const application = createAtlasApplication(
+      createCatalogIntakeOperationGroup({
+        async discover() {
+          return {
+            ok: false,
+            error: {
+              kind: failureKind,
+              code: failureKind,
+              message: 'provider secret body must not escape',
+            },
+          };
+        },
+        async select() {
+          throw new Error('not used');
+        },
+        async confirm() {
+          throw new Error('not used');
+        },
+        async cancel() {
+          throw new Error('not used');
+        },
+      }),
+    );
+    const router = createProjectCommandRouter(application, {
+      catalogIntakeApplication: application,
+      conversationResolver: { async resolve() {} },
+    });
+    const result = await router.dispatch('/jpmap add 鮨青空', {
+      requestToken: `failure-${failureKind}`,
+      invocation: {
+        ownerId: 'wechat-owner',
+        channel: 'openclaw-weixin',
+        conversationId: 'owner-dm',
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      error: { kind: expectedKind, message: expectedMessage },
+    });
+  }
+});
+
+test('router covers no-candidate, clarification, expiry, failed-no-write, and all commit outcomes', async () => {
+  let reference = {
+    state: 'candidates_ready',
+    sessionId: 'session-variants',
+    sessionVersion: 1,
+  };
+  let selectExpired = false;
+  let confirmOutput = {
+    status: 'failed_no_write',
+    reason: 'transaction',
+  };
+  const application = createAtlasApplication(
+    createCatalogIntakeOperationGroup({
+      async discover() {
+        return {
+          ok: true,
+          value: {
+            status: 'clarification_required',
+            sessionId: 'session-variants',
+            sessionVersion: 1,
+            candidates: [],
+            hasMore: false,
+            expiresAt: '2026-09-24T12:00:00.000Z',
+          },
+        };
+      },
+      async select() {
+        if (selectExpired) {
+          return {
+            ok: false,
+            error: {
+              kind: 'conflict',
+              code: 'expired',
+              message: 'internal expiry detail',
+            },
+          };
+        }
+        return {
+          ok: true,
+          value: {
+            status: 'clarification_required',
+            sessionId: 'session-variants',
+            sessionVersion: 2,
+            clarification: {
+              code: 'missing_area_or_address',
+              prompt: '请补充分店或街区。',
+              fields: ['area'],
+            },
+            expiresAt: '2026-09-24T12:00:00.000Z',
+          },
+        };
+      },
+      async confirm() {
+        return { ok: true, value: confirmOutput };
+      },
+      async cancel() {
+        throw new Error('not used');
+      },
+    }),
+  );
+  const router = createProjectCommandRouter(application, {
+    catalogIntakeApplication: application,
+    conversationResolver: {
+      async resolve() {
+        return reference;
+      },
+    },
+  });
+  const context = {
+    requestToken: 'variant-1',
+    invocation: {
+      ownerId: 'wechat-owner',
+      channel: 'openclaw-weixin',
+      conversationId: 'owner-dm',
+    },
+  };
+
+  const empty = await router.dispatch('/jpmap add 不存在', context);
+  assert.equal(
+    empty.ok && empty.value.replyText,
+    'Japan Atlas｜没有找到明确候选。请补充分店、街区或完整地址后重新 Add。',
+  );
+
+  const clarification = await router.dispatch('/jpmap add select 1', context);
+  assert.equal(
+    clarification.ok && clarification.value.replyText,
+    'Japan Atlas｜需要补充信息\n\n请补充分店或街区。\n\n' +
+      '请补充后重新发送 /jpmap add <餐厅名 + 分店或街区>。',
+  );
+
+  selectExpired = true;
+  const expired = await router.dispatch('/jpmap add select 1', context);
+  assert.deepEqual(expired, {
+    ok: false,
+    error: {
+      kind: 'conflict',
+      message:
+        'Japan Atlas｜本次 Add 已过期，没有写入。请重新发送 /jpmap add <餐厅名>。',
+    },
+  });
+
+  reference = {
+    state: 'preview_ready',
+    sessionId: 'session-variants',
+    sessionVersion: 2,
+    previewVersion: 2,
+  };
+  const outcomes = [
+    [
+      { status: 'failed_no_write', reason: 'transaction' },
+      'Japan Atlas｜本次没有写入。请重新查看 preview 后重试，或发送 /jpmap add cancel。',
+    ],
+    [
+      {
+        status: 'committed_verified',
+        itemId: 'verified',
+        receiptRef: 'hidden-1',
+        replayed: false,
+      },
+      'Japan Atlas｜已保存并加入地图。',
+    ],
+    [
+      {
+        status: 'committed_needs_review',
+        itemId: 'review',
+        receiptRef: 'hidden-2',
+        replayed: false,
+      },
+      'Japan Atlas｜已保存到 Owner 待审核；补全地址或定位后才会进入地图和 Nearby。',
+    ],
+    [
+      {
+        status: 'reused_existing',
+        itemId: 'existing',
+        receiptRef: 'hidden-3',
+        replayed: false,
+      },
+      'Japan Atlas｜已关联已有地点，没有重复建档。',
+    ],
+  ];
+  for (const [output, expected] of outcomes) {
+    confirmOutput = output;
+    const result = await router.dispatch('/jpmap add confirm', context);
+    assert.equal(result.ok && result.value.replyText, expected);
+    assert.equal(
+      result.ok && result.value.replyText.includes('hidden-'),
+      false,
+    );
+  }
 });
 
 function previewOutput() {

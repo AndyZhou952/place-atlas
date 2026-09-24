@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -29,16 +30,27 @@ test('reset-stage packaging rejects an active 0004 whose bytes differ from pendi
   const pendingReset = readFileSync(
     path.join(webRoot, 'drizzle/pending/0004_reset_test_place_assessments.sql'),
   );
+  const activeReset = Buffer.concat([
+    pendingReset,
+    Buffer.from('-- altered\n'),
+  ]);
   writeFileSync(path.join(pending, activeMigrations.at(-1)), pendingReset);
-  writeFileSync(
-    path.join(drizzle, activeMigrations.at(-1)),
-    Buffer.concat([pendingReset, Buffer.from('-- altered\n')]),
-  );
+  writeFileSync(path.join(drizzle, activeMigrations.at(-1)), activeReset);
   writeFileSync(
     path.join(root, 'scripts/production-snapshot-migration-manifest.json'),
     JSON.stringify({
       schemaVersion: 1,
-      snapshotOnly: { activeMigrations: activeMigrations.slice(0, -1) },
+      snapshotOnly: {
+        activeMigrations: activeMigrations.slice(0, -1),
+        activeMigrationSha256: Object.fromEntries(
+          activeMigrations
+            .slice(0, -1)
+            .map((migration) => [
+              migration,
+              'b4e0497804e46e0a0b0b8c31975b062152d551bac49c3c2e80932567b4085dcd',
+            ]),
+        ),
+      },
       pendingReset: {
         path: 'drizzle/pending/0004_reset_test_place_assessments.sql',
         sha256:
@@ -47,6 +59,14 @@ test('reset-stage packaging rejects an active 0004 whose bytes differ from pendi
       resetStage: {
         activeMigration: activeMigrations.at(-1),
         activeMigrations,
+        activeMigrationSha256: Object.fromEntries(
+          activeMigrations.map((migration, index) => [
+            migration,
+            index === activeMigrations.length - 1
+              ? createHash('sha256').update(activeReset).digest('hex')
+              : 'b4e0497804e46e0a0b0b8c31975b062152d551bac49c3c2e80932567b4085dcd',
+          ]),
+        ),
       },
       retiredSiteVersions: [16],
     }),

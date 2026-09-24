@@ -110,6 +110,79 @@ test('rating, favorite, manual visited and summary update independently', async 
   });
 });
 
+test('personal mutations preserve intake Tabelog facts in every response and catalog read-back', async () => {
+  const spicyCurry = {
+    ...item,
+    id: 'spicy-curry-roka',
+    title: 'SPICY CURRY 魯珈',
+    intakeEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google-places',
+        placeId: 'spicy-curry-roka-google-place',
+      },
+      ownerFields: {
+        title: 'SPICY CURRY 魯珈',
+        address: '東京都新宿区百人町1丁目24-8',
+        area: '大久保・新宿',
+        coordinates: { latitude: 35.7008, longitude: 139.6972 },
+      },
+      locationEvidence: {
+        status: 'known',
+        provenance: 'owner_asserted',
+        address: '東京都新宿区百人町1丁目24-8',
+        latitude: 35.7008,
+        longitude: 139.6972,
+        assertedAt: '2026-09-24T08:00:00.000Z',
+      },
+      tabelog: {
+        status: 'known',
+        score: 3.87,
+        url: 'https://tabelog.com/tokyo/A1304/A130404/13286023/',
+        provenance: 'owner_asserted',
+        assertedAt: '2026-09-24T08:00:00.000Z',
+        freshness: 'fresh',
+      },
+      reservation: { status: 'unknown' },
+      unknownFields: ['reservation'],
+      warnings: [],
+    },
+  };
+  const state = new InMemoryPlaceAssessmentState({
+    dynamicPayloads: [JSON.stringify(spicyCurry)],
+  });
+  const catalog = createCatalogRead(state, []);
+  const application = createAtlasApplication(
+    createPlaceAssessmentOperationGroup(catalog, state, { clock }),
+  );
+
+  const expectedTabelog = {
+    score: 3.87,
+    url: 'https://tabelog.com/tokyo/A1304/A130404/13286023/',
+    checkedAt: '2026-09-24T08:00:00.000Z',
+  };
+  for (const patch of [
+    { overallRating: 3.5 },
+    { isFavorite: true },
+    { manualVisited: true },
+    { summary: 'A favorite curry.' },
+  ]) {
+    const result = await application.execute({
+      key: 'assessment.update',
+      input: { itemId: spicyCurry.id, patch },
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.ok && result.value.item.tabelog, expectedTabelog);
+  }
+
+  const reloaded = await catalog.get(spicyCurry.id);
+  assert.deepEqual(reloaded?.tabelog, expectedTabelog);
+  assert.equal(reloaded?.personalRating, 3.5);
+  assert.deepEqual(
+    reloaded?.intakeEvidence?.tabelog,
+    spicyCurry.intakeEvidence.tabelog,
+  );
+});
+
 test('effective visited is manualVisited OR Visit count for every truth-table row', async () => {
   for (const [manualVisited, visitCount, expected] of [
     [false, 0, false],

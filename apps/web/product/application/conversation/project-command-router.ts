@@ -9,13 +9,17 @@ import type {
   CatalogIntakeSelectOutput,
   createCatalogIntakeOperationGroup,
 } from '../catalog-intake/catalog-intake-coordinator.ts';
-import { presentCatalogIntakePreviewText } from '../catalog-intake/catalog-intake-preview-presenter.ts';
 import type {
   NearbyRecommendApplicationDefinitions,
   NearbyRecommendResult,
 } from '../decision/agent-nearby-operation.ts';
 import { failure, success, type Result } from '../result.ts';
 import { presentNearbyWechatResult } from './nearby-wechat-presenter.ts';
+import {
+  presentWechatCatalogIntake,
+  type WechatCatalogIntakeOperationFailureKind,
+  type WechatCatalogIntakePresentation,
+} from './wechat-catalog-intake-presenter.ts';
 
 export interface NearbyRecommendationInput {
   readonly locationHint: string;
@@ -102,7 +106,10 @@ export function createProjectCommandRouter(
         if (!options || !context) {
           return failure(
             'dependency_failure',
-            'Japan Atlas 添加功能暂时不可用。',
+            presentWechatCatalogIntake({
+              state: 'operation_failure',
+              kind: 'dependency_failure',
+            }),
           );
         }
         return dispatchCatalogIntakeCommand(parsed.value, context, options);
@@ -293,13 +300,17 @@ async function dispatchCatalogIntakeCommand(
       },
       executionContext,
     );
-    if (!result.ok) return catalogIntakeFailure(result.error.kind);
+    if (!result.ok) return catalogIntakeFailure(result.error);
     return success({
       projectId: 'jpmap',
       operation: 'add',
       step: 'candidates',
       intake: result.value,
-      replyText: presentDiscover(result.value),
+      replyText: presentWechatCatalogIntake(
+        result.value.candidates.length
+          ? { state: 'candidates', output: result.value }
+          : { state: 'no_candidates' },
+      ),
     });
   }
 
@@ -309,7 +320,10 @@ async function dispatchCatalogIntakeCommand(
   if (!current) {
     return failure(
       'not_found',
-      '当前对话没有可继续的 Add。请先发送 /jpmap add <餐厅名>。',
+      presentWechatCatalogIntake({
+        state: 'operation_failure',
+        kind: 'not_found',
+      }),
     );
   }
 
@@ -327,7 +341,7 @@ async function dispatchCatalogIntakeCommand(
       },
       executionContext,
     );
-    if (!result.ok) return catalogIntakeFailure(result.error.kind);
+    if (!result.ok) return catalogIntakeFailure(result.error);
     const step =
       result.value.status === 'preview_ready' ? 'preview' : 'clarification';
     return success({
@@ -335,7 +349,11 @@ async function dispatchCatalogIntakeCommand(
       operation: 'add',
       step,
       intake: result.value,
-      replyText: presentSelect(result.value),
+      replyText: presentWechatCatalogIntake(
+        result.value.status === 'preview_ready'
+          ? { state: 'preview', preview: result.value.preview }
+          : { state: 'clarification', output: result.value },
+      ),
     });
   }
 
@@ -353,7 +371,7 @@ async function dispatchCatalogIntakeCommand(
       },
       executionContext,
     );
-    if (!result.ok) return catalogIntakeFailure(result.error.kind);
+    if (!result.ok) return catalogIntakeFailure(result.error);
     const step =
       result.value.status === 'conflict'
         ? 'preview'
@@ -365,7 +383,13 @@ async function dispatchCatalogIntakeCommand(
       operation: 'add',
       step,
       intake: result.value,
-      replyText: presentConfirm(result.value),
+      replyText: presentWechatCatalogIntake(
+        result.value.status === 'conflict'
+          ? { state: 'conflict', preview: result.value.newPreview }
+          : result.value.status === 'failed_no_write'
+            ? { state: 'failed_no_write' }
+            : { state: 'success', status: result.value.status },
+      ),
     });
   }
 
@@ -380,71 +404,77 @@ async function dispatchCatalogIntakeCommand(
     },
     executionContext,
   );
-  if (!result.ok) return catalogIntakeFailure(result.error.kind);
+  if (!result.ok) return catalogIntakeFailure(result.error);
   return success({
     projectId: 'jpmap',
     operation: 'add',
     step: 'cancelled',
     intake: result.value,
-    replyText: 'Japan Atlas｜本次 Add 已取消。',
+    replyText: presentWechatCatalogIntake({ state: 'cancelled' }),
   });
 }
 
-function catalogIntakeFailure(kind: string): ProjectCommandResult {
+function catalogIntakeFailure(error: {
+  readonly kind: string;
+  readonly code?: string;
+}): ProjectCommandResult {
+  const kind = catalogIntakeFailureCode(error);
+  const presentation: WechatCatalogIntakePresentation =
+    kind === 'expired'
+      ? { state: 'expired' }
+      : { state: 'operation_failure', kind };
   return failure(
-    kind === 'dependency_failure' ? 'dependency_failure' : mapFailureKind(kind),
-    kind === 'dependency_failure'
-      ? 'Japan Atlas 添加功能暂时不可用，请稍后重试。'
-      : 'Japan Atlas Add 请求未能完成。',
+    mapFailureKind(kind),
+    presentWechatCatalogIntake(presentation),
   );
+}
+
+function catalogIntakeFailureCode(error: {
+  readonly kind: string;
+  readonly code?: string;
+}): WechatCatalogIntakeOperationFailureKind | 'expired' {
+  const allowed = new Set([
+    'invalid_input',
+    'unauthorized',
+    'forbidden',
+    'not_found',
+    'conflict',
+    'expired',
+    'dependency_failure',
+    'rate_limited',
+    'unexpected_failure',
+  ]);
+  const candidate = error.code ?? error.kind;
+  return allowed.has(candidate)
+    ? (candidate as WechatCatalogIntakeOperationFailureKind | 'expired')
+    : 'unexpected_failure';
 }
 
 function mapFailureKind(
   kind: string,
-): 'invalid_input' | 'not_found' | 'conflict' | 'unexpected_failure' {
+):
+  | 'invalid_input'
+  | 'not_found'
+  | 'conflict'
+  | 'dependency_failure'
+  | 'unexpected_failure' {
+  if (kind === 'dependency_failure' || kind === 'rate_limited') {
+    return 'dependency_failure';
+  }
+  if (kind === 'unauthorized' || kind === 'forbidden') return 'invalid_input';
   if (kind === 'invalid_input' || kind === 'not_found' || kind === 'conflict') {
     return kind;
   }
+  if (kind === 'expired') return 'conflict';
   return 'unexpected_failure';
 }
 
 function intakeStateConflict(): ProjectCommandResult {
   return failure(
     'conflict',
-    'Add 阶段已经变化，请按当前回复中的下一步指令操作。',
+    presentWechatCatalogIntake({
+      state: 'operation_failure',
+      kind: 'conflict',
+    }),
   );
-}
-
-function presentDiscover(output: CatalogIntakeDiscoverOutput): string {
-  if (!output.candidates.length) {
-    return 'Japan Atlas｜没有找到明确候选。请补充街区或完整地址后重新 Add。';
-  }
-  const candidates = output.candidates.map(
-    (candidate) =>
-      `${candidate.ordinal}. ${candidate.transientName}\n${candidate.transientAddress}\n来源：${candidate.attribution.label}`,
-  );
-  return `Japan Atlas｜请选择餐厅\n${candidates.join('\n')}\n回复：/jpmap add select <编号>`;
-}
-
-function presentSelect(output: CatalogIntakeSelectOutput): string {
-  if (output.status === 'clarification_required') {
-    return `Japan Atlas｜需要补充信息\n${output.clarification.prompt}`;
-  }
-  return `Japan Atlas｜保存前预览\n${presentCatalogIntakePreviewText(output.preview)}\n回复：/jpmap add confirm 或 /jpmap add cancel`;
-}
-
-function presentConfirm(output: CatalogIntakeConfirmOutput): string {
-  if (output.status === 'conflict') {
-    return `Japan Atlas｜资料在确认时发生变化，本次没有写入。\n${presentCatalogIntakePreviewText(output.newPreview)}\n请完整检查刷新后的事实；仅在同意此版本后再次发送 /jpmap add confirm，或发送 /jpmap add cancel。`;
-  }
-  if (output.status === 'failed_no_write') {
-    return 'Japan Atlas｜本次没有写入，请检查预览后重试。';
-  }
-  const label =
-    output.status === 'committed_needs_review'
-      ? '已保存到 Owner 待审核目录'
-      : output.status === 'reused_existing'
-        ? '已关联现有地点'
-        : '已保存并加入地图目录';
-  return `Japan Atlas｜${label}\n回执：${output.receiptRef}`;
 }

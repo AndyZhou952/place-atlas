@@ -1,0 +1,24 @@
+{
+  "renderer": "Playwright Chromium",
+  "baseUrl": "http://127.0.0.1:4319/",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "fixture": {
+    "title": "SPICY CURRY 魯珈",
+    "persistedTabelog": 3.87,
+    "savedPersonalRating": 3.5
+  },
+  "mutationRequests": 1,
+  "immediateState": {
+    "list": "マイ 3.5\n食べログ 3.87",
+    "detail": "マイスコア\n3.5\n食べログ\n3.87\nreviews\n0 visits"
+  },
+  "reloadState": {
+    "list": "マイ 3.5\n食べログ 3.87",
+    "detail": "マイスコア\n3.5\n食べログ\n3.87\nreviews\n0 visits"
+  },
+  "screenshot": "evidence/ui/t07-tabelog-and-personal-rating-desktop.png",
+  "screenshotSha256": "43ea66c6defd8edf369f2496a5749f02029352fc4ce9e2dbbe420bde09d2e999"
+}

@@ -14,7 +14,6 @@ import type {
   AtlasPersonalFilter,
   AtlasSummary,
   AtlasView,
-  NewImportJob,
   NewVisit,
   PlaceAssessmentPatch,
   VisitRecord,
@@ -39,7 +38,7 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     reduceAtlasViewModelState,
     createAtlasViewModelState({ items: verifiedAtlasItems }),
   );
-  const { importJobs, items, media, visits } = state;
+  const { items, media, visits } = state;
   const [kind, setKind] = useState<AtlasKindFilter>('all');
   const [personalFilter, setPersonalFilter] =
     useState<AtlasPersonalFilter>('all');
@@ -51,7 +50,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
   const [nearbyResult, setNearbyResult] = useState<NearbyRecommendResult>();
   const [nearbyBusy, setNearbyBusy] = useState(false);
   const [nearbyError, setNearbyError] = useState('');
-  const [busy, setBusy] = useState(false);
   const [journalBusy, setJournalBusy] = useState(false);
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(
     new Set(),
@@ -80,15 +78,10 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
   useEffect(() => {
     const loadIds = {
       items: crypto.randomUUID(),
-      importJobs: crypto.randomUUID(),
       visits: crypto.randomUUID(),
       media: crypto.randomUUID(),
     };
     dispatch({ type: 'items.load.started', loadId: loadIds.items });
-    dispatch({
-      type: 'import-jobs.load.started',
-      loadId: loadIds.importJobs,
-    });
     dispatch({ type: 'visits.load.started', loadId: loadIds.visits });
     dispatch({ type: 'media.load.started', loadId: loadIds.media });
     void Promise.all([
@@ -102,15 +95,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
             type: 'items.loaded',
             loadId: loadIds.items,
             items: loadedItems,
-          }),
-        ),
-      browserAtlasApplication
-        .execute({ key: 'import.list', input: {} })
-        .then((loadedJobs) =>
-          dispatch({
-            type: 'import-jobs.loaded',
-            loadId: loadIds.importJobs,
-            importJobs: loadedJobs,
           }),
         ),
       browserAtlasApplication
@@ -270,29 +254,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     },
     [setItemPending],
   );
-
-  const queueImport = useCallback(async (input: NewImportJob) => {
-    setBusy(true);
-    setNotice('');
-    try {
-      const job = await browserAtlasApplication.execute({
-        key: 'import.queue',
-        input,
-      });
-      dispatch({ type: 'import-job.prepended', importJob: job });
-      setNotice(
-        'Import queued. It will start when the collector worker is connected.',
-      );
-      return job;
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : 'Could not queue import.',
-      );
-      throw error;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
 
   const addVisit = useCallback(
     async (input: NewVisit) => {
@@ -724,7 +685,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
       updateItem: saveItemEdit,
       updateAssessment: saveAssessment,
       removeItem,
-      queueImport,
       addJournal: addVisit,
       media,
       updateMediaCaption: saveMediaCaption,
@@ -739,7 +699,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
       items,
       locateNearby,
       media,
-      queueImport,
       removeItem,
       removeMedia,
       removeVisit,
@@ -756,9 +715,7 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     addVisit,
     addVisitMedia,
     editVisit,
-    busy,
     distances,
-    importJobs,
     items,
     favoriteOnly,
     isItemPending: (id: string) => pendingItemIds.has(id),
@@ -778,7 +735,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     reloadCatalogViews,
     reviewCandidates: visibleReviewCandidates,
     reviewCandidateLoadState: visibleReviewCandidateLoadState,
-    queueImport,
     removeItem,
     removeMedia,
     removeVisit,

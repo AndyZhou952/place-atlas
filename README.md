@@ -4,7 +4,9 @@
 
 ## 当前状态
 
-项目处于实验阶段。私有地图、D1 持久数据、R2 照片、搜索、个人状态、Visit/Journal 与浏览器 Agent 操作已经可用；框架无关 Agent 服务层、创作者采集、微信渠道和旅行级运维仍在开发。
+项目处于实验阶段。公开只读地图、Owner 写入、D1 持久数据、R2 照片、搜索、个人状态、Visit/Journal、Catalog Intake／Review，以及受限的微信／OpenClaw Nearby 与 Add PoC 已经可用；对话式 Record、自动外部研究和旅行级运维仍在开发。
+
+第一次使用请先阅读 [Owner 使用手册](docs/user-manual.md)，其中包含网页操作、微信命令、Add 恢复方法和当前限制。
 
 ## 快速开始
 

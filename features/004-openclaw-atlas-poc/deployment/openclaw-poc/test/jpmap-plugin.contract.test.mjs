@@ -322,6 +322,28 @@ test("client emits the canonical signed read-only request and returns only a bou
   );
 });
 
+test("client passes the server Add reply through byte-for-byte without presentation logic", async () => {
+  const serverReply =
+    "Japan Atlas｜请确认\n\n餐厅：🍣 鮨青空\n地址：東京都中央区銀座 1-1-1\n\n保存：/jpmap add confirm\n取消：/jpmap add cancel";
+  const client = createTrustedClient({
+    env: validEnv,
+    randomUUID: sequenceUUIDs("add-passthrough"),
+    fetchImpl: async (_url, init) => {
+      const request = JSON.parse(init.body);
+      return jsonResponse(200, successfulReceipt(request, serverReply));
+    },
+  });
+
+  const reply = await client({
+    command: "add select 1",
+    commandName: "jpmap",
+    skillName: "jpmap",
+  });
+
+  assert.equal(reply, serverReply);
+  assert.deepEqual(Array.from(reply), Array.from(serverReply));
+});
+
 test("client fails closed for missing config, non-HTTPS, HTTP errors, malformed replies, and timeout", async () => {
   let egressCount = 0;
   for (const env of [

@@ -27,14 +27,12 @@ import {
   ExternalLink,
   Heart,
   ImagePlus,
-  Inbox,
   ListFilter,
   LocateFixed,
   MapPin,
   NotebookPen,
   Pencil,
   Search,
-  Send,
   Sparkles,
   Star,
   Trash2,
@@ -85,7 +83,7 @@ const kindLabel: Record<AtlasItemKind, string> = {
 
 const navItems: readonly { value: AtlasView; label: string }[] = [
   { value: 'map', label: 'Map' },
-  { value: 'inbox', label: 'Inbox' },
+  { value: 'review', label: 'Review' },
   { value: 'journal', label: 'Journal' },
 ];
 
@@ -156,8 +154,8 @@ export function AtlasScreen() {
       {vm.view === 'map' ? (
         <MapWorkspace vm={vm} nearbyFocusRequest={nearbyFocusRequest} />
       ) : null}
-      {vm.view === 'inbox' ? (
-        <InboxWorkspace vm={vm} onRequestOwnerLogin={owner.toggle} />
+      {vm.view === 'review' ? (
+        <ReviewWorkspace vm={vm} onRequestOwnerLogin={owner.toggle} />
       ) : null}
       {vm.view === 'journal' ? <JournalWorkspace vm={vm} /> : null}
       <footer className="site-footer">
@@ -1337,110 +1335,26 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
-function InboxWorkspace({
+function ReviewWorkspace({
   vm,
   onRequestOwnerLogin,
 }: {
   readonly vm: AtlasViewModel;
   readonly onRequestOwnerLogin: () => void;
 }) {
-  const [creatorName, setCreatorName] = useState('');
-  const [sourceRef, setSourceRef] = useState('');
-
-  async function submit(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    try {
-      await vm.queueImport({ creatorName, sourceRef });
-      setCreatorName('');
-      setSourceRef('');
-    } catch {
-      // The view model presents the error in the notice bar.
-    }
-  }
-
   return (
-    <section className="single-workspace" id="inbox">
+    <section className="single-workspace review-workspace" id="review">
       <div className="workspace-intro">
-        <p className="eyebrow">Acquisition inbox</p>
-        <h2>Queue a creator once, review the places later.</h2>
+        <p className="eyebrow">Owner review</p>
+        <h2>Review places before they join your map.</h2>
         <p>
-          A job is persisted immediately. Web Access will run through a
-          dedicated logged-in browser; uncertain identities must remain in
-          review instead of entering the map.
+          Candidates stay private until their identity and location have enough
+          evidence. Verified places remain available while you review.
         </p>
       </div>
 
-      <div className="inbox-grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>New creator import</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="stacked-form" onSubmit={submit}>
-              <label htmlFor="creator-name">
-                Creator name
-                <Input
-                  id="creator-name"
-                  value={creatorName}
-                  onChange={(event) => setCreatorName(event.target.value)}
-                  placeholder="e.g. 在日本摸鱼的小超人"
-                  required
-                />
-              </label>
-              <label htmlFor="source-ref">
-                Profile, channel, post URL, or platform ID
-                <Input
-                  id="source-ref"
-                  value={sourceRef}
-                  onChange={(event) => setSourceRef(event.target.value)}
-                  placeholder="rednote:274834935"
-                  required
-                />
-              </label>
-              <Button type="submit" disabled={vm.busy}>
-                <Send data-icon="inline-start" /> Queue import
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Collector status</CardTitle>
-          </CardHeader>
-          <CardContent className="collector-status">
-            <div>
-              <CheckCircle2 aria-hidden="true" />
-              <span>
-                <strong>Intake database ready</strong>
-                <small>Jobs and review counts persist in D1.</small>
-              </span>
-            </div>
-            <div>
-              <CheckCircle2 aria-hidden="true" />
-              <span>
-                <strong>Agent endpoints ready</strong>
-                <small>
-                  Map, edit, queue, and journal actions share one API.
-                </small>
-              </span>
-            </div>
-            <div className="pending">
-              <Clock3 aria-hidden="true" />
-              <span>
-                <strong>Collector worker pending</strong>
-                <small>
-                  Web Access is installed locally; browser login and worker
-                  bridge are next.
-                </small>
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <section
-        className="job-section"
+        className="review-section"
         aria-labelledby="review-candidates-title"
         aria-busy={vm.reviewCandidateLoadState === 'loading'}
       >
@@ -1487,58 +1401,67 @@ function InboxWorkspace({
         ) : null}
         {vm.reviewCandidateLoadState === 'ready' &&
         vm.reviewCandidates.length ? (
-          <ul className="job-list" aria-label="Places requiring Owner review">
+          <ul
+            className="review-list"
+            aria-label="Places requiring Owner review"
+          >
             {vm.reviewCandidates.map((candidate) => (
-              <li key={candidate.id} className="job-row">
-                <CircleHelp aria-hidden="true" />
-                <div>
-                  <strong>{candidate.title}</strong>
-                  <span>
-                    {candidate.location.status === 'known'
-                      ? candidate.location.address
-                      : 'Address unknown'}
-                    {' · '}
-                    {candidate.area.status === 'known'
-                      ? candidate.area.value
-                      : 'Area unknown'}
-                  </span>
-                </div>
-                <span className="job-status">Needs review</span>
+              <li
+                key={candidate.id}
+                className="review-card"
+                data-review-candidate-id={candidate.id}
+              >
+                <header>
+                  <CircleHelp aria-hidden="true" />
+                  <div>
+                    <strong>{candidate.title}</strong>
+                    <span>
+                      {candidate.location.status === 'known'
+                        ? candidate.location.address
+                        : 'Address unknown'}
+                      {' · '}
+                      {candidate.area.status === 'known'
+                        ? candidate.area.value
+                        : 'Area unknown'}
+                    </span>
+                  </div>
+                  <span className="review-status">Needs review</span>
+                </header>
+                <details className="review-evidence">
+                  <summary>Evidence details</summary>
+                  <dl>
+                    <div>
+                      <dt>Map location</dt>
+                      <dd>
+                        {candidate.location.status === 'known'
+                          ? 'Available'
+                          : 'Missing'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Still needed</dt>
+                      <dd>
+                        {candidate.unknownFields.length
+                          ? candidate.unknownFields.join(', ')
+                          : 'Owner verification'}
+                      </dd>
+                    </div>
+                  </dl>
+                  {candidate.warnings.length ? (
+                    <ul aria-label="Review warnings">
+                      {candidate.warnings.map((warning) => (
+                        <li key={`${candidate.id}-${warning.code}`}>
+                          {warning.message}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </details>
               </li>
             ))}
           </ul>
         ) : null}
       </section>
-
-      <div className="job-section">
-        <h3>Import jobs</h3>
-        {vm.importJobs.length ? (
-          <div className="job-list">
-            {vm.importJobs.map((job) => (
-              <article key={job.id} className="job-row">
-                <Inbox aria-hidden="true" />
-                <div>
-                  <strong>{job.creatorName}</strong>
-                  <span>
-                    {job.platform} · {job.sourceRef}
-                  </span>
-                </div>
-                <span className={`job-status status-${job.status}`}>
-                  {job.status.replace('_', ' ')}
-                </span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-panel">
-            <Inbox aria-hidden="true" />
-            <strong>No imports queued yet.</strong>
-            <span>
-              Add a creator above; this list contains real persisted jobs only.
-            </span>
-          </div>
-        )}
-      </div>
     </section>
   );
 }

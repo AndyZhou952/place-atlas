@@ -33,7 +33,7 @@
 | Atlas Catalog | 维护 Atlas 条目的规范身份、可信状态、来源断言与时效事实；独占 verified/abstain 与发布决策 | 地点类型、发布证据标准、来源及预约/活动新鲜度规则 |
 | Personal Memory | 维护地点评价、Visit、VisitMedia、有效到访状态与回收站生命周期 | 个人记忆不变量、媒体归属、恢复和保留策略 |
 | Decision Support | 执行搜索、nearby、硬条件筛选与后续推荐 | 搜索匹配、地理实现、候选排序与解释策略 |
-| Acquisition & Review | 把 ImportJob 经连接器、提取和实体解析转为 Evidence Manifest 与 Review Candidate，不发布可信条目 | 社交平台、浏览器自动化、OCR/ASR/模型与候选生成规则 |
+| Acquisition & Review | 提案边界：未来 adapter 可把用户提供的外部线索转为 Evidence Manifest 与 Review Candidate，但不能发布可信条目；当前无 collector／ImportJob runtime | 可选来源、提取方式、OCR/ASR/模型与候选生成规则 |
 | Conversation Coordination | 把渠道消息、Agent runtime 与短时 capture session 映射到应用操作 | 微信协议、harness、对话状态、附件到 Visit 的关联策略 |
 
 允许的 context map（箭头只表示代码依赖；未列出的模块间依赖均禁止）：
@@ -41,11 +41,11 @@
 ```text
 Web/UI adapter ──同步──> Application Operations ──同步──> Catalog / Personal Memory / Decision Support
 Channel adapter ──消息──> Conversation Coordination ──同步──> Application Operations
-Application Operations ──同步启动/读取结果──> Acquisition & Review
+Application Operations ──未来可选 proposal──> Acquisition & Review
 Infrastructure adapters ──实现 ports──> Product Core
 ```
 
-数据交接为 `Acquisition → Evidence Manifest / Review Candidate → Application Operations → Atlas Catalog`；Atlas Catalog 独占 verified、abstain 与发布决策。Application Operations 是唯一跨模块协调者；领域模块不得互调或反向依赖入口，Conversation 只解释渠道上下文。依赖图必须无环。来源媒体与私人 VisitMedia 不跨用同一生命周期。
+未来数据交接提案为 `Acquisition Proposal → Evidence Manifest / Review Candidate → Application Operations → Atlas Catalog`；它不是当前运行时队列。当前建档只走 `Catalog Intake → Preview/Confirm → Verified Item 或 Review Candidate`。Atlas Catalog 独占 verified、abstain 与发布决策。Application Operations 是唯一跨模块协调者；领域模块不得互调或反向依赖入口，Conversation 只解释渠道上下文。依赖图必须无环。来源媒体与私人 VisitMedia 不跨用同一生命周期。
 
 ## 4. 开发视图
 
@@ -64,11 +64,11 @@ docs/                            稳定产品说明、路线图与已接受决�
 
 ## 5. 关键场景
 
-1. **来源到地图**：用户发起导入 → Acquisition 保存 Evidence Manifest 并产出 Review Candidate → Application Operations 交给 Catalog → Catalog 独占自动发布、abstain 或提交人工审核的决定 → 可信条目出现在所有入口。【可信与可追溯、框架无关、私密】
+1. **地点建档到地图**：Owner 提交餐厅名与分店线索 → Catalog Intake 返回最多三个候选 → Owner 选择并核对 Preview → Confirm 后由 Catalog 决定成为 Verified Item 或 Review Candidate → 只有可信条目出现在公开地图与 Nearby。【可信与可追溯、框架无关、私密】
 2. **附近决策**：渠道提交位置与条件 → Conversation 转成交互意图 → Application Operations 调用 Decision Support 执行硬筛选与可替换排序 → 返回少量候选及未知/过期提示。【旅行可用、框架无关】
 3. **对话到访**：用户发送评分、笔记及连续照片 → Conversation 确认明确地点/会话 → Application Operations 调用 Personal Memory 写入一次 Visit → 地图读取同一结果；重复消息不重复写入。【写入可靠、私密、旅行可用】
 4. **删除与恢复**：任意入口确认普通删除 → Application Operations 调用所属模块进入回收站 → 30 天内恢复或到期清理 D1/R2；显式永久删除再次确认并即时清理主存储。【写入可靠、私密】
-5. **更换入口或实现**：同一应用操作经测试 adapter、WebMCP 和未来微信执行，或由替代存储/模型实现承接，结果满足同一契约。【框架无关、写入可靠】
+5. **更换入口或实现**：同一应用操作经测试 adapter、WebMCP 和微信执行，或由替代存储/模型实现承接，结果满足同一契约。【框架无关、写入可靠】
 
 ## 6. 横切约定与决策
 
@@ -82,8 +82,8 @@ docs/                            稳定产品说明、路线图与已接受决�
 
 ## 7. 演进路径与复核触发
 
-1. 先从现有 Web 垂直切片抽取 Application Operations 与测试 adapter，保持地点、个人状态、Visit、媒体、ImportJob、搜索和 nearby 行为。
-2. 再补齐媒体恢复、统一幂等/审计/授权；随后分别接入采集审核、推荐、对话采集和候选 Agent runtime。
+1. 先从现有 Web 垂直切片抽取 Application Operations 与测试 adapter，保持地点、个人状态、Visit、媒体、搜索和 nearby 行为；该步已完成。
+2. 继续加固 Catalog Intake／Review、媒体恢复、统一幂等/审计/授权；随后分别接入推荐、对话采集和候选 Agent runtime。Acquisition & Review 仅在出现经确认的新来源需求时作为 proposal 复核，不恢复 creator／ImportJob 队列。
 3. 微信 PoC 通过后才选择 24/7 host/region；最后完成备份恢复、七天 soak 和纯手机旅行演练。
 4. 任一触发命中即重开产品架构：可信条目 ≥10,000 或地理查询 p95 ≥500 ms；后台操作 p95 ≥2.5 s 且影响 Agent 运维；出现第二个独立发布团队或两个必须独立伸缩/故障隔离的常驻工作负载；移动地图 fixture 条件下稳定 p95 ≥400 ms 或帧间隔 p95 ≥50 ms；连续两次保留/恢复审计失败。
 5. 所有 p95 触发使用同一版本化测量协议：固定设备/数据/网络 fixture，预热后至少 100 个完成样本；生产观测采用滚动七天且至少 100 个样本。阈值连续两个窗口超标才触发，协议版本变化须经架构评审。

@@ -74,12 +74,6 @@ void application.execute({
     profile: 'verified_catalog',
   },
 });
-void application.execute({ key: 'import.list', input: {} });
-void application.execute({
-  key: 'import.queue',
-  input: { sourceRef: 'https://example.com', creatorName: 'Creator' },
-});
-void application.execute({ key: 'import.delete', input: { id: 'job-1' } });
 void application.execute({ key: 'media.list', input: {} });
 void application.execute({
   key: 'media.attach',
@@ -131,7 +125,5 @@ void application.openMedia({
   key: 'catalog.update_item',
   input: { id: 'item-1' },
 });
-// @ts-expect-error import.list is not present in the media operation key set.
-void application.openMedia({ key: 'import.list', input: {} });
 // @ts-expect-error runtime operation registration is not part of the static catalog.
 void application.execute({ key: 'unregistered.operation', input: {} });

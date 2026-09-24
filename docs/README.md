@@ -1,17 +1,18 @@
 # Japan Atlas 文档导航
 
-最后更新：2026-09-12
+最后更新：2026-09-24
 
 这里仅保留会直接指导产品、开发和后续决策的文档。实施历史、低优先级问题、实验记录和逐次验收证据由 GitHub Issues 与 Git 历史保存，不再复制到 `/docs`。
 
 ## 新成员阅读顺序
 
-1. [产品基线](product.md)：产品为谁服务、主要流程、体验与数据语义。
-2. [系统架构与开发指南](architecture.md)：系统边界、代码分层、数据模型、接口、安全和本地开发。
-3. [路线图](roadmap.md)：当前阶段、任务依赖、下一步与 v1 完成标准。
-4. [采集与评测](ingestion-and-evaluation.md)：创作者内容采集、地点识别、预约核验和评测方法。
-5. [决策登记册](decisions.md)：已接受、已替代和待验证的关键决策。
-6. [数据维护手册](maintenance.md)：reset 的 dry-run、全量验证、本地副本演练与回退门禁。
+1. [Owner 使用手册](user-manual.md)：网页操作、微信命令、Add 恢复方法和当前限制。
+2. [产品基线](product.md)：产品为谁服务、主要流程、体验与数据语义。
+3. [系统架构与开发指南](architecture.md)：系统边界、代码分层、数据模型、接口、安全和本地开发。
+4. [路线图](roadmap.md)：当前阶段、任务依赖、下一步与 v1 完成标准。
+5. [采集与评测](ingestion-and-evaluation.md)：未来 Acquisition Proposal 的证据、地点识别、预约核验和评测边界；不是当前运行时能力。
+6. [决策登记册](decisions.md)：已接受、已替代和待验证的关键决策。
+7. [数据维护手册](maintenance.md)：reset 的 dry-run、全量验证、本地副本演练与回退门禁。
 
 ## 当前状态
 
@@ -19,17 +20,18 @@
 
 已经可用：
 
-- 仅所有者可访问的地图与持久化数据库；
+- 公开只读地图、Owner-only 写入与持久化数据库；
 - 经来源核验的地点、活动和建筑记录；
 - 地点编辑、确定性搜索、喜欢／到访状态与个人评分；
 - 可重复 Visit、照片上传、说明、弹窗浏览与 Journal 纠错；
+- 餐厅 Catalog Intake、Preview／Confirm、Owner Review Candidate 与确定性 Nearby／Add 命令；
 - Web UI 与浏览器 Agent 共用的 HTTP 操作；
 - 格式、Lint、类型、单元测试和生产构建 CI。
 
 尚未形成完整闭环：
 
-- 与存储实现解耦的 Agent 应用层和服务端鉴权；
-- 独立浏览器创作者采集与人工审核；
+- 通用 Agent 语义层、Record 会话和完整服务端鉴权加固；
+- Acquisition & Review 的任何未来来源 adapter（当前无 creator／ImportJob collector）；
 - 对话式照片 capture session；
 - OpenClaw／微信适配器及七天稳定性验证；
 - 24/7 部署、备份恢复、弱网与纯手机旅行演练。

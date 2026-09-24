@@ -13,17 +13,17 @@ void test('an anonymous private GET is rejected before Application or D1 runs', 
     },
     async () => {
       reads += 1;
-      return Response.json([{ sourceRef: 'must-not-leak' }]);
+      return Response.json([{ title: 'private candidate' }]);
     },
   );
 
   const response = await protectedRead(
-    new Request('https://atlas.example/api/inbox'),
+    new Request('https://atlas.example/api/owner/catalog/review-candidates'),
   );
 
   assert.equal(response.status, 401);
   assert.equal(reads, 0);
-  assert.doesNotMatch(await response.text(), /sourceRef/u);
+  assert.doesNotMatch(await response.text(), /private candidate/u);
 });
 
 void test('an authenticated private GET reaches its handler', async () => {

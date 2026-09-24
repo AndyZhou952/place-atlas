@@ -52,6 +52,36 @@ test('the personal HTTP adapter maps legacy hasVisited into one mutation envelop
   assert.equal(envelope.invocation.channel, 'web');
 });
 
+test('the personal HTTP adapter represents cleared optional values as explicit nulls', async () => {
+  const response = await updatePlaceAssessmentResponse(
+    coordinator(async (input) =>
+      okReceipt(input.mutationId, {
+        assessment: {
+          itemId: 'place-one',
+          isFavorite: false,
+          manualVisited: false,
+          updatedAt: '2026-09-24T09:00:00.000Z',
+        },
+        item: {
+          id: 'place-one',
+          isFavorite: false,
+          hasVisited: false,
+        },
+      }),
+    ),
+    request,
+    'place-one',
+    { overallRating: null, summary: null },
+  );
+
+  assert.equal(response.status, 200);
+  const receipt = await response.json();
+  assert.equal(receipt.result.item.personalRating, null);
+  assert.equal(receipt.result.item.overallComment, null);
+  assert.equal('personalRating' in receipt.result.item, true);
+  assert.equal('overallComment' in receipt.result.item, true);
+});
+
 test('the personal adapter requires a mutation ID and preserves stable error statuses', async () => {
   let calls = 0;
   const missingId = await updatePlaceAssessmentResponse(

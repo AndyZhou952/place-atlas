@@ -109,6 +109,12 @@ Any missing configuration or trusted identity context, non-HTTPS endpoint,
 timeout, rejected HTTP response, oversized response, malformed reply, or URL
 location returns a fixed error and does not expose internal details.
 
+Runtime deadlines are operation-aware: Nearby retains its 4-second read
+deadline; Add discover, confirm, and cancel use the 30-second write-receipt
+budget; Add select uses 45 seconds so its bounded 35-second initial provider
+phase still has coordination headroom. The test-only `timeoutMs` option
+explicitly overrides these defaults.
+
 ## Atomic Agent endpoint/key switch and rollback
 
 The host-side switch helper changes only the OpenClaw service environment

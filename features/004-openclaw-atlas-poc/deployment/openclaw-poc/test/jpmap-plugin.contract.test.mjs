@@ -69,7 +69,7 @@ test("package manifest exposes jpmap as a model-bypassing runtime slash command 
   }
   assert.deepEqual(packageJson.openclaw.extensions, ["./dist/index.mjs"]);
   assert.equal(packageJson.peerDependencies.openclaw, "2026.7.1");
-  assert.equal(packageJson.version, "0.3.0");
+  assert.equal(packageJson.version, "0.3.1");
   assert.equal(manifest.version, packageJson.version);
 });
 
@@ -149,6 +149,66 @@ test("exact add commands bypass the model and map to the four closed intake tool
       { tool: "jpmap_add_confirm", input: {} },
       { tool: "jpmap_add_cancel", input: {} },
     ],
+  );
+});
+
+test("add select can return its preview after its bounded initial-provider budget", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const fetchStarted = Promise.withResolvers();
+  let resolveFetch;
+  let observedSignal;
+  const client = createTrustedClient({
+    env: validEnv,
+    randomUUID: sequenceUUIDs("slow-select"),
+    fetchImpl: async (_url, init) => {
+      const request = JSON.parse(init.body);
+      observedSignal = init.signal;
+      fetchStarted.resolve();
+      return new Promise((resolve, reject) => {
+        resolveFetch = () => resolve(jsonResponse(200, successfulReceipt(request, "preview ready")));
+        init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    },
+  });
+
+  const routed = client({
+    command: "add select 1",
+    commandName: "jpmap",
+    skillName: "jpmap",
+  });
+  await fetchStarted.promise;
+  t.mock.timers.tick(35_001);
+
+  assert.equal(observedSignal.aborted, false);
+  resolveFetch();
+  assert.equal(await routed, "preview ready");
+});
+
+test("add HTTP failures use the add-specific unavailable reply", async () => {
+  const client = createTrustedClient({
+    env: validEnv,
+    fetchImpl: async () => jsonResponse(503, { ok: false }),
+  });
+
+  assert.equal(
+    await client({ command: "add select 1", commandName: "jpmap", skillName: "jpmap" }),
+    "Japan Atlas 添加功能暂时不可用，请稍后重试。",
+  );
+});
+
+test("add timeout failures use the add-specific unavailable reply", async () => {
+  const client = createTrustedClient({
+    env: validEnv,
+    timeoutMs: 5,
+    fetchImpl: async (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      }),
+  });
+
+  assert.equal(
+    await client({ command: "add select 1", commandName: "jpmap", skillName: "jpmap" }),
+    "Japan Atlas 添加功能暂时不可用，请稍后重试。",
   );
 });
 
@@ -332,4 +392,25 @@ function jsonResponse(status, body) {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function sequenceUUIDs(label) {
+  const values = [`mutation-${label}`, `nonce-${label}`];
+  return () => values.shift();
+}
+
+function successfulReceipt(request, replyText) {
+  return {
+    ok: true,
+    receipt: {
+      mutationId: request.mutationId,
+      payloadDigest: "a".repeat(64),
+      replayed: false,
+      result: {
+        projectId: "jpmap",
+        operation: request.tool === "jpmap_nearby" ? "nearby" : "add",
+        replyText,
+      },
+    },
+  };
 }

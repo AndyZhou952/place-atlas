@@ -5,9 +5,18 @@ const usageReply =
 const urlInputReply = "请复制地图中的街区或地址文字，不要发送链接。";
 const configurationReply = "Japan Atlas 配置不可用，请联系管理员。";
 const unavailableReply = "Japan Atlas 附近查询暂时不可用，请稍后重试。";
+const addUnavailableReply = "Japan Atlas 添加功能暂时不可用，请稍后重试。";
 const maximumReplyCharacters = 4_096;
 const maximumResponseBytes = 16_384;
-const defaultTimeoutMs = 4_000;
+const defaultNearbyTimeoutMs = 4_000;
+// Add writes retain the product's 30-second receipt budget. Select also covers
+// its bounded 35-second initial provider-research phase plus coordination time.
+const defaultAddTimeoutMsByTool = Object.freeze({
+  jpmap_add_discover: 30_000,
+  jpmap_add_select: 45_000,
+  jpmap_add_confirm: 30_000,
+  jpmap_add_cancel: 30_000,
+});
 
 export const JPMAP_REQUIRED_SCOPE = "atlas:nearby:read";
 
@@ -16,7 +25,7 @@ export function createJpmapRouterClient(options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const nowMs = options.nowMs ?? Date.now;
   const randomUUID = options.randomUUID ?? (() => crypto.randomUUID());
-  const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
+  const timeoutOverrideMs = options.timeoutMs;
   const trustedActor = resolveTrustedOwnerCommandContext(options.commandContext, env);
 
   return async function route(input) {
@@ -28,8 +37,12 @@ export function createJpmapRouterClient(options = {}) {
     const parsed = parseProjectCommand(input);
     if (parsed.kind === "url") return urlInputReply;
     if (parsed.kind !== "valid") return usageReply;
+    const operationUnavailableReply =
+      parsed.operation === "add" ? addUnavailableReply : unavailableReply;
 
     const controller = new AbortController();
+    const timeoutMs =
+      timeoutOverrideMs ?? defaultAddTimeoutMsByTool[parsed.tool] ?? defaultNearbyTimeoutMs;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const timestamp = `${Math.floor(nowMs() / 1_000)}`;
@@ -73,11 +86,11 @@ export function createJpmapRouterClient(options = {}) {
         body,
         signal: controller.signal,
       });
-      if (!response?.ok) return unavailableReply;
+      if (!response?.ok) return operationUnavailableReply;
       const payload = await readBoundedJson(response);
-      return readBoundedReply(payload, mutationId, parsed.operation) ?? unavailableReply;
+      return readBoundedReply(payload, mutationId, parsed.operation) ?? operationUnavailableReply;
     } catch {
-      return unavailableReply;
+      return operationUnavailableReply;
     } finally {
       clearTimeout(timeout);
     }

@@ -1,7 +1,7 @@
 # 进度
 
 - 特性: 005-owner-poc-unified-api
-- 当前阶段: T-17 done（第 3 轮独立 code/UI review PASS，并于 2026-09-24 获用户确认；下一张中央汇合票为 T-18）
+- 当前阶段: T-18 已完成生产发布与主机回退演练，等待真实微信 DM、live durable-geocoder 与 Google Console 安全／成本门
 - 执行模式: interactive
 - 已加载: hf-workflow、hf-to-spec、hf-to-architecture、hf-codebase-design、hf-to-tickets、hf-ui-design、hf-review、hf-ship
 - 已完成: 基于现有 AtlasApplication、Web browser adapter、Agent gateway、Catalog intake、Nearby 与 D1 schema 完成现状审计
@@ -57,8 +57,10 @@
 - 已保留: D-P06 仍为 Proposed；真实 Node/OpenClaw/Tunnel adapter、身份与 Secret 装配、host replay-store 权限／重启恢复、无公网／browser-fetch 旁路和真实负向 probes 属 T-18 preflight。未通过时只能以 `relay_disabled_manual_unknown` 发布基础 Add
 - 已完成: T-17 Web Confirm、确定性 `/jpmap add <query> -> select <n> -> confirm|cancel`、recent committed receipt recovery 与 cancel replay 已通过同一真实 D1 的 Owner-cookie Web / signed-HMAC Agent 双入口 E2E；verified 进入公开 Catalog/地图/Nearby，needs-review 保持 Owner-only，conflict 必须显示完整新 preview 并显式二次确认
 - 已完成: T-17 第 3 轮独立 code/UI review PASS，严重 0 / 一般 0 / 建议 0；architecture fitness 62/62、focused 10/10、OpenClaw plugin/src-dist、TypeScript/lint/format/migration/diff 全绿，10 张真实 Chromium production React 截图与 ARIA/focus/computed CSS 通过。用户于 2026-09-24 回复 `continue` 并确认收口；验收记录见 `reviews/t17-demo-acceptance-2026-09-24.md`
-- 已完成本地代码门但未完成现场验收: T-08 独立本地代码评审 PASS；`52.78.102.220` 的 OpenClaw/plugin 只读 SSH 检查健康，但当前仍使用旧 endpoint，且尚未授权 endpoint/key 切换、重启与 signed 正反向 probes，因此 T-08 保持未勾选
-- 未完成: T-08、T-09，以及 T-18–T-20 的 Add/Record 工作；T-18 readiness drafts 已完成，实际生产发布仍受 T-08 与 T-11 阻塞
-- 未完成: T-11 的永久 OpenClaw 切换与回退演练仍受 T-08 阻塞
-- 阶段门禁: Add 增量规格、架构及 T-12/T-13/T-14/T-15/T-16/T-17 的代码门与用户确认均已关闭；D-P06 在 T-18 production preflight 与独立威胁复审通过前仍为 Proposed，T-08 仍等待 endpoint/key 切换、重启与 live signed 正反向证明
-- 下一步: 执行 T-18 Add production preflight、蓝绿发布、公开/Owner/Agent smoke 与回退演练；若 Relay/Tunnel 任一保证未闭合，则以 `relay_disabled_manual_unknown` 发布基础 Add
+- 已完成待真实微信验收: PR #15 已通过 GitHub CI 并合入 `main`；owner-poc D1 `0006`–`0009`、第七个 Places Secret、fresh seed/preflight、0% version override、100% promotion、公开/Owner Add discover-select-cancel 与脱敏 D1 aggregate 均通过；证据见 `evidence/t18-production-rollout-2026-09-24.md`
+- 已完成待真实微信验收: Lightsail 已安装 OpenClaw plugin 0.3.0，原子切换 owner endpoint 并重启；零模型 signed Nearby/Add、`银座/銀座/ginza`、第二 sender、thread/group、wrong actor/tool 与 nonce replay probes 通过；旧 endpoint rollback→restart→probe→green restore 演练通过
+- 已完成: Worker 首次演练识别并立即撤下 pre-secret 过旧版本；post-secret 正确候选经 0% override、实际 100% rollback 与 green restore 均为 HTTP 200。runbook 已新增“最后一次 Secret 更新后重抓 deployment inventory”的强制步骤
+- 已验证但未关闭: deployment preflight 证明 durable-geocoder mode 已启用；本次 pinned/reviewed release 包含固定 Nominatim identity、D1 全局 1 req/s、30 天 cache、provider replacement seam 与闭合 provenance contracts；追加生产探针的 location evidence 仍为 fail-soft `unknown`，address-only 输入进入 clarification，尚未取得带 OpenStreetMap source/license/checkedAt 的 live known evidence
+- 未完成: T-08、T-11 尚余真实 Owner 微信 DM 演示验收；T-18 另需 live durable-geocoder known evidence，以及 Google Cloud application restriction、provider quota 与 budget alert 证据；T-09 语义 proposal 与 T-19–T-20 Record 仍未开始
+- 阶段门禁: D-P06 继续保持 Proposed，Research Relay 生产模式为 `relay_disabled_manual_unknown`；基础 Add 不依赖 Tabelog/预约自动研究
+- 下一步: Owner 在真实微信 DM 依次发送 `/jpmap nearby 银座`、`/jpmap add <公开餐厅名或地址>`、`/jpmap add cancel` 并确认回复；项目侧调查 live Nominatim unknown/clarification；Owner 补 Google key application restriction、provider quota 与 budget alert 证据后再执行 hf-ship

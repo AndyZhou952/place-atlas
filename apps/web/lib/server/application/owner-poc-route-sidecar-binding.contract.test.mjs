@@ -27,10 +27,7 @@ void test('Browser owner composition receives the private Route Sidecar and shar
     serverSource,
     /createOwnerPocComposition\(\s*database,\s*getRouteSidecarServiceBinding\(\),\s*getOwnerPocCatalogIntakeRuntime\(\),?\s*\)/u,
   );
-  assert.match(
-    dbSource,
-    /projectOwnerPocCatalogIntakeRuntime\(env\)/u,
-  );
+  assert.match(dbSource, /projectOwnerPocCatalogIntakeRuntime\(env\)/u);
   assert.match(providerManifest, /GOOGLE_PLACES_API_KEY/u);
   assert.doesNotMatch(
     `${dbSource}\n${serverSource}`,

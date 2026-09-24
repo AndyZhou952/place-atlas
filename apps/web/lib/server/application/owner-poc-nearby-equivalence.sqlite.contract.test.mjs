@@ -7,8 +7,13 @@ import { createOwnerPocAgentHttpHandler } from '../../../adapters/agent/isolated
 import { nearbyAtlasItemsResponse } from '../../../app/api/nearby/nearby-atlas-items-response.ts';
 import { createAtlasApplication } from '../../../product/application/atlas-application.ts';
 import { signAgentHttpRequest } from '../../../product/application/conversation/agent-request-signing.ts';
+import {
+  createCatalogIntakeOperationGroup,
+  createUnavailableCatalogIntakeModule,
+} from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createNearbyRecommendationOperationGroup } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { createOwnerPocComposition } from './owner-poc-composition.ts';
+import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
 
 const migrationRoot = new URL(
   '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
@@ -111,12 +116,15 @@ void test('canonical Browser HTTP and signed Agent HMAC return equivalent nearby
     },
   };
   const composition = createOwnerPocComposition(database, routeSidecar);
-  const application = createAtlasApplication(
-    createNearbyRecommendationOperationGroup({
+  const application = createAtlasApplication({
+    ...createNearbyRecommendationOperationGroup({
       ...composition.agentNearby,
       catalog: composition.catalogRead,
     }),
-  );
+    ...createCatalogIntakeOperationGroup(
+      createUnavailableCatalogIntakeModule(),
+    ),
+  });
   const mediaCalls = [];
   const media = {
     async get() {
@@ -143,9 +151,12 @@ void test('canonical Browser HTTP and signed Agent HMAC return equivalent nearby
     AGENT_OWNER_CONVERSATION_ID: 'owner-dm',
     ROUTE_SIDECAR: routeSidecar,
   };
-  const handleAgent = createOwnerPocAgentHttpHandler(bindings, application, {
-    nowMs: () => nowMs,
-  });
+  const handleAgent = createOwnerPocAgentHttpHandler(
+    bindings,
+    application,
+    new D1CatalogIntakeState(database),
+    { nowMs: () => nowMs },
+  );
   const logLines = [];
   const originalConsole = {
     log: console.log,

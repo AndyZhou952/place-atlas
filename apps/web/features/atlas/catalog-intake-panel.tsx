@@ -5,16 +5,25 @@ import { CheckCircle2, CircleAlert, Plus, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { presentCatalogIntakePreview } from '@/product/application/catalog-intake/catalog-intake-preview-presenter';
 
 import { useCatalogIntake } from './use-catalog-intake';
 
-export function CatalogIntakePanel() {
-  const intake = useCatalogIntake();
+export function CatalogIntakePanel({
+  onCommitted,
+}: {
+  readonly onCommitted?: () => void;
+}) {
+  const intake = useCatalogIntake(onCommitted);
   const { state } = intake;
   const [submitted, setSubmitted] = useState(false);
   const queryRef = useRef<HTMLInputElement>(null);
   const stageHeadingRef = useRef<HTMLHeadingElement>(null);
   const busy = state.stage === 'loading';
+  const confirmInProgress =
+    busy &&
+    state.lastOperation === 'confirm' &&
+    (state.previousStage === 'preview' || state.previousStage === 'conflict');
   const queryInvalid = submitted && !state.query.trim();
 
   useEffect(() => {
@@ -81,7 +90,7 @@ export function CatalogIntakePanel() {
       </form>
 
       <div className="catalog-intake-live" aria-live="polite">
-        {busy ? <p>Building the next Add step…</p> : null}
+        {busy ? <p>{loadingMessage(state.lastOperation)}</p> : null}
       </div>
 
       {state.stage !== 'idle' && state.stage !== 'loading' ? (
@@ -135,14 +144,39 @@ export function CatalogIntakePanel() {
         <CandidateStep intake={intake} showClarification />
       ) : null}
 
-      {state.stage === 'preview' && state.preview ? (
-        <PreviewStep preview={state.preview} onCancel={intake.cancel} />
+      {(state.stage === 'preview' || confirmInProgress) && state.preview ? (
+        <PreviewStep
+          preview={state.preview}
+          onConfirm={intake.confirm}
+          onCancel={intake.cancel}
+          busy={confirmInProgress}
+          confirmLabel={
+            confirmInProgress ? 'Confirming and saving…' : 'Confirm and save'
+          }
+        />
       ) : null}
 
-      {state.stage === 'expired' || state.stage === 'conflict' ? (
+      {state.stage === 'conflict' && state.preview ? (
+        <div className="catalog-intake-conflict" role="alert">
+          <CircleAlert aria-hidden="true" />
+          <strong>Evidence changed during confirmation.</strong>
+          <p>
+            Review the refreshed facts below. Nothing new was saved; confirm
+            again only if this version is correct.
+          </p>
+          <PreviewStep
+            preview={state.preview}
+            onConfirm={intake.confirm}
+            onCancel={intake.cancel}
+            confirmLabel="Review changed preview and confirm again"
+          />
+        </div>
+      ) : null}
+
+      {state.stage === 'expired' ? (
         <div className="catalog-intake-state is-attention" role="alert">
           <CircleAlert aria-hidden="true" />
-          <strong>{state.error?.message ?? 'The preview changed.'}</strong>
+          <strong>{state.error?.message ?? 'The preview expired.'}</strong>
           <p>Create a new preview from the retained Owner input.</p>
           <Button type="button" onClick={() => void intake.startFresh()}>
             Generate a new preview
@@ -153,7 +187,13 @@ export function CatalogIntakePanel() {
       {state.stage === 'success' ? (
         <output className="catalog-intake-state is-success" aria-live="polite">
           <CheckCircle2 aria-hidden="true" />
-          <strong>Place saved to the Owner catalog.</strong>
+          <strong>{successMessage(state.success?.status)}</strong>
+          {state.success?.status === 'committed_needs_review' ? (
+            <p>
+              It is not visible on the public map or Nearby yet. Complete the
+              missing evidence from Owner review.
+            </p>
+          ) : null}
           <span className="catalog-intake-note">
             Receipt {state.success?.receiptRef}
           </span>
@@ -280,70 +320,81 @@ function CandidateStep({
 
 function PreviewStep({
   preview,
+  onConfirm,
   onCancel,
+  confirmLabel = 'Confirm and save',
+  busy = false,
 }: {
   readonly preview: NonNullable<IntakeController['state']['preview']>;
+  readonly onConfirm: () => Promise<void>;
   readonly onCancel: () => Promise<void>;
+  readonly confirmLabel?: string;
+  readonly busy?: boolean;
 }) {
-  const title = preview.ownerFields.title ?? preview.titleProposal?.value;
-  const address = preview.ownerFields.address ?? preview.addressProposal?.value;
-  const location = preview.locationEvidence;
+  const presentation = presentCatalogIntakePreview(preview);
   return (
     <div className="catalog-intake-preview">
+      <p className="catalog-intake-note">{presentation.versionLabel}</p>
       <dl>
-        <div>
-          <dt>Name</dt>
-          <dd>{title ?? 'Unknown'}</dd>
-        </div>
-        <div>
-          <dt>Address</dt>
-          <dd>{address ?? 'Unknown — needs review'}</dd>
-        </div>
-        <div>
-          <dt>Coordinates</dt>
-          <dd>
-            {location.status === 'known'
-              ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
-              : 'Unknown — excluded from Nearby'}
-          </dd>
-        </div>
+        {presentation.fields.map((item) => (
+          <div key={item.key}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+            <dd className="catalog-intake-source">
+              {item.evidence}
+              {item.evidenceAt ? ` · ${formatTimestamp(item.evidenceAt)}` : ''}
+              {item.license ? ` · ${item.license}` : ''}
+              {item.sourceUrl ? (
+                <>
+                  {' · '}
+                  <a href={item.sourceUrl} target="_blank" rel="noreferrer">
+                    Source
+                  </a>
+                </>
+              ) : null}
+            </dd>
+          </div>
+        ))}
       </dl>
-      {location.status === 'known' &&
-      location.provenance === 'durable_geocoder_observed' ? (
-        <p className="catalog-intake-source">
-          <a href={location.sourceUrl} target="_blank" rel="noreferrer">
-            {location.provider} source
-          </a>{' '}
-          · {location.license} · checked {formatTimestamp(location.checkedAt)}
-        </p>
+      {presentation.duplicates.length ? (
+        <div className="catalog-intake-state is-attention">
+          <strong>Possible duplicates</strong>
+          <ul>
+            {presentation.duplicates.map((duplicate) => (
+              <li key={duplicate.itemId}>
+                {duplicate.title}
+                {duplicate.address ? ` · ${duplicate.address}` : ''} ·{' '}
+                {duplicate.match} match
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
-      {preview.unknownFields.length ? (
+      {presentation.unknownFields.length ? (
         <p className="catalog-intake-note">
-          Still unknown: {preview.unknownFields.join(', ')}.
+          Still unknown: {presentation.unknownFields.join(', ')}.
         </p>
       ) : null}
-      {preview.warnings.length ? (
+      {presentation.warnings.length ? (
         <ul className="catalog-intake-warning-list">
-          {preview.warnings.map((warning) => (
+          {presentation.warnings.map((warning) => (
             <li key={warning.code}>{warning.message}</li>
           ))}
         </ul>
       ) : null}
       <div className="catalog-intake-actions">
+        <Button type="button" onClick={() => void onConfirm()} disabled={busy}>
+          {confirmLabel}
+        </Button>
         <Button
           type="button"
-          disabled
-          aria-describedby="catalog-intake-confirm-disabled"
+          variant="ghost"
+          onClick={() => void onCancel()}
+          disabled={busy}
         >
-          Confirm and save
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => void onCancel()}>
           Cancel
         </Button>
       </div>
-      <p id="catalog-intake-confirm-disabled" className="catalog-intake-note">
-        Final catalog publishing is not connected yet.
-      </p>
     </div>
   );
 }
@@ -369,4 +420,30 @@ function formatTimestamp(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function loadingMessage(
+  operation: IntakeController['state']['lastOperation'],
+): string {
+  const messages = {
+    discover: 'Finding possible matches…',
+    select: 'Building the review preview…',
+    confirm: 'Confirming and saving…',
+    cancel: 'Cancelling this Add session…',
+  } as const;
+  return operation ? messages[operation] : 'Building the next Add step…';
+}
+
+function successMessage(
+  status:
+    | NonNullable<IntakeController['state']['success']>['status']
+    | undefined,
+): string {
+  if (status === 'committed_verified') {
+    return 'Place saved and available on the verified map and Nearby.';
+  }
+  if (status === 'committed_needs_review') {
+    return 'Place saved to Owner review.';
+  }
+  return 'Existing place reused; no duplicate was created.';
 }

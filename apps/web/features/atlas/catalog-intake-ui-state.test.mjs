@@ -114,6 +114,20 @@ test('catalog intake UI traverses candidates, clarification, preview, conflict, 
   assert.equal(state.stage, 'success');
 });
 
+test('catalog intake UI keeps the preview identity while confirm is loading', () => {
+  let state = reduceCatalogIntakeUi(catalogIntakeInitialState(), {
+    type: 'select_succeeded',
+    output: previewOutput(),
+  });
+
+  state = reduceCatalogIntakeUi(state, { type: 'confirm_started' });
+
+  assert.equal(state.stage, 'loading');
+  assert.equal(state.previousStage, 'preview');
+  assert.equal(state.lastOperation, 'confirm');
+  assert.equal(state.preview?.previewVersion, 3);
+});
+
 function previewOutput() {
   return {
     status: 'preview_ready',

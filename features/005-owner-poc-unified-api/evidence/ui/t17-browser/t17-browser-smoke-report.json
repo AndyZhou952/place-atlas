@@ -1,0 +1,103 @@
+{
+  "baseUrl": "http://127.0.0.1:4317/",
+  "renderer": "Playwright Chromium",
+  "scenarios": {
+    "keyboard-focus": {
+      "text": "Source",
+      "outlineStyle": "auto",
+      "outlineWidth": "1px"
+    },
+    "desktop-preview": {
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Review the proposal\" [level=4]\n  - paragraph: Preview v4\n  - term: Place identity\n  - definition: google-places / ChIJ-atlas-aoyama\n  - definition: Google identity\n  - term: Name\n  - definition: Sushi Aozora\n  - definition:\n    - text: Agent observed · Sep 23, 2026, 12:00 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/name\n  - term: Area\n  - definition: Ginza\n  - definition: Owner asserted\n  - term: Address\n  - definition: 8-3-1 Ginza, Chuo City, Tokyo\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Coordinates\n  - definition: 35.67100, 139.76500\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Tabelog\n  - definition: 4.21 · 321 reviews\n  - definition:\n    - text: Agent observed · stale · Sep 23, 2026, 12:02 PM ·\n    - link \"Source\":\n      - /url: https://tabelog.com/tokyo/example/\n  - term: Reservation\n  - definition: Reservation required · 30 days ahead · Book one month ahead · Seats release monthly · Official website\n  - definition:\n    - text: Agent observed · fresh · Sep 23, 2026, 12:03 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/reservations\n  - strong: Possible duplicates\n  - list:\n    - listitem: Sushi Aozora Annex · 8-3-2 Ginza, Chuo City, Tokyo · strong match\n  - paragraph: \"Still unknown: walk-in queue status.\"\n  - list:\n    - listitem: Tabelog evidence may be stale.\n  - button \"Confirm and save\"\n  - button \"Cancel\""
+    },
+    "mobile-preview": {
+      "geometry": {
+        "clientWidth": 322,
+        "scrollWidth": 322,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Review the proposal\" [level=4]\n  - paragraph: Preview v4\n  - term: Place identity\n  - definition: google-places / ChIJ-atlas-aoyama\n  - definition: Google identity\n  - term: Name\n  - definition: Sushi Aozora\n  - definition:\n    - text: Agent observed · Sep 23, 2026, 12:00 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/name\n  - term: Area\n  - definition: Ginza\n  - definition: Owner asserted\n  - term: Address\n  - definition: 8-3-1 Ginza, Chuo City, Tokyo\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Coordinates\n  - definition: 35.67100, 139.76500\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Tabelog\n  - definition: 4.21 · 321 reviews\n  - definition:\n    - text: Agent observed · stale · Sep 23, 2026, 12:02 PM ·\n    - link \"Source\":\n      - /url: https://tabelog.com/tokyo/example/\n  - term: Reservation\n  - definition: Reservation required · 30 days ahead · Book one month ahead · Seats release monthly · Official website\n  - definition:\n    - text: Agent observed · fresh · Sep 23, 2026, 12:03 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/reservations\n  - strong: Possible duplicates\n  - list:\n    - listitem: Sushi Aozora Annex · 8-3-2 Ginza, Chuo City, Tokyo · strong match\n  - paragraph: \"Still unknown: walk-in queue status.\"\n  - list:\n    - listitem: Tabelog evidence may be stale.\n  - button \"Confirm and save\"\n  - button \"Cancel\""
+    },
+    "confirm-loading": {
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "true"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\" [disabled]:\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\" [disabled]\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - paragraph: Confirming and saving…\n  - paragraph: Preview v4\n  - term: Place identity\n  - definition: google-places / ChIJ-atlas-aoyama\n  - definition: Google identity\n  - term: Name\n  - definition: Sushi Aozora\n  - definition:\n    - text: Agent observed · Sep 23, 2026, 12:00 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/name\n  - term: Area\n  - definition: Ginza\n  - definition: Owner asserted\n  - term: Address\n  - definition: 8-3-1 Ginza, Chuo City, Tokyo\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Coordinates\n  - definition: 35.67100, 139.76500\n  - definition:\n    - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n    - link \"Source\":\n      - /url: https://www.openstreetmap.org/node/1\n  - term: Tabelog\n  - definition: 4.21 · 321 reviews\n  - definition:\n    - text: Agent observed · stale · Sep 23, 2026, 12:02 PM ·\n    - link \"Source\":\n      - /url: https://tabelog.com/tokyo/example/\n  - term: Reservation\n  - definition: Reservation required · 30 days ahead · Book one month ahead · Seats release monthly · Official website\n  - definition:\n    - text: Agent observed · fresh · Sep 23, 2026, 12:03 PM ·\n    - link \"Source\":\n      - /url: https://restaurant.example/reservations\n  - strong: Possible duplicates\n  - list:\n    - listitem: Sushi Aozora Annex · 8-3-2 Ginza, Chuo City, Tokyo · strong match\n  - paragraph: \"Still unknown: walk-in queue status.\"\n  - list:\n    - listitem: Tabelog evidence may be stale.\n  - button \"Confirming and saving…\" [disabled]\n  - button \"Cancel\" [disabled]"
+    },
+    "retryable-error": {
+      "expectedFocus": "Add needs attention",
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Add needs attention\" [level=4]\n  - alert:\n    - strong: Fixture provider unavailable.\n    - paragraph: Your input is still here. Sign in as Owner if prompted, then retry.\n    - button \"Retry\""
+    },
+    "verified-success": {
+      "expectedFocus": "Place saved",
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Place saved\" [level=4]\n  - status:\n    - strong: Place saved and available on the verified map and Nearby.\n    - text: Receipt receipt-verified"
+    },
+    "needs-review-success": {
+      "expectedFocus": "Place saved",
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Place saved\" [level=4]\n  - status:\n    - strong: Place saved to Owner review.\n    - paragraph: It is not visible on the public map or Nearby yet. Complete the missing evidence from Owner review.\n    - text: Receipt receipt-needs-review"
+    },
+    "confirm-conflict": {
+      "expectedFocus": "Preview changed",
+      "geometry": {
+        "clientWidth": 381,
+        "scrollWidth": 381,
+        "noHorizontalOverflow": true,
+        "backgroundColor": "rgb(251, 248, 241)",
+        "borderTopColor": "rgb(189, 64, 37)",
+        "fontFamily": "Inter, \"Helvetica Neue\", Arial, sans-serif",
+        "ariaBusy": "false"
+      },
+      "ariaSnapshot": "- region \"Add a place\":\n  - paragraph: Owner catalog desk\n  - heading \"Add a place\" [level=3]\n  - text: Preview first\n  - paragraph: Start with a restaurant name. Nothing enters your map until a later confirmed publish step.\n  - text: Restaurant name or address\n  - textbox \"Restaurant name or address\":\n    - /placeholder: e.g. 鮨青空, Ginza\n    - text: Sushi Aozora, Ginza\n  - button \"Find matches\"\n  - text: Try a neighborhood or full copied address when the name is ambiguous.\n  - heading \"Preview changed\" [level=4]\n  - alert:\n    - strong: Evidence changed during confirmation.\n    - paragraph: Review the refreshed facts below. Nothing new was saved; confirm again only if this version is correct.\n    - paragraph: Preview v5\n    - term: Place identity\n    - definition: google-places / ChIJ-atlas-aoyama\n    - definition: Google identity\n    - term: Name\n    - definition: Sushi Aozora\n    - definition:\n      - text: Agent observed · Sep 23, 2026, 12:00 PM ·\n      - link \"Source\":\n        - /url: https://restaurant.example/name\n    - term: Area\n    - definition: Ginza\n    - definition: Owner asserted\n    - term: Address\n    - definition: 8-3-1 Ginza, Chuo City, Tokyo\n    - definition:\n      - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n      - link \"Source\":\n        - /url: https://www.openstreetmap.org/node/1\n    - term: Coordinates\n    - definition: 35.67100, 139.76500\n    - definition:\n      - text: Durable geocoder observed · Sep 23, 2026, 12:01 PM · OpenStreetMap contributors, ODbL 1.0 ·\n      - link \"Source\":\n        - /url: https://www.openstreetmap.org/node/1\n    - term: Tabelog\n    - definition: 4.25 · 338 reviews\n    - definition:\n      - text: Agent observed · stale · Sep 23, 2026, 12:02 PM ·\n      - link \"Source\":\n        - /url: https://tabelog.com/tokyo/example/\n    - term: Reservation\n    - definition: Reservation required · 30 days ahead · Book one month ahead · Seats release monthly · Official website\n    - definition:\n      - text: Agent observed · fresh · Sep 23, 2026, 12:03 PM ·\n      - link \"Source\":\n        - /url: https://restaurant.example/reservations\n    - strong: Possible duplicates\n    - list:\n      - listitem: Sushi Aozora Annex · 8-3-2 Ginza, Chuo City, Tokyo · strong match\n    - paragraph: \"Still unknown: walk-in queue status.\"\n    - list:\n      - listitem: Tabelog evidence may be stale.\n    - button \"Review changed preview and confirm again\"\n    - button \"Cancel\""
+    },
+    "conflict-reconfirm": {
+      "clicked": true,
+      "finalText": "Place saved and available on the verified map and Nearby."
+    }
+  }
+}

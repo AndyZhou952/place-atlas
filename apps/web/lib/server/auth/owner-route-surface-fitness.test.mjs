@@ -172,6 +172,29 @@ void test('every owner business write is coordinated or fails closed before lega
   }
 });
 
+void test('legacy POST /api/items remains an authenticated 503 in owner-poc', () => {
+  const routeSource = readFileSync(
+    path.join(apiRoot, 'items/route.ts'),
+    'utf8',
+  );
+  const responseSource = readFileSync(
+    fileURLToPath(
+      new URL('../../../app/api/owner-mutation-response.ts', import.meta.url),
+    ),
+    'utf8',
+  );
+
+  assert.match(routeSource, /export const POST = withOwnerWriteAuth/u);
+  assert.match(
+    routeSource,
+    /const unavailable = rejectUncoordinatedOwnerPocWrite\(\);\s*if \(unavailable\) return unavailable;/u,
+  );
+  assert.match(
+    responseSource,
+    /ownerPocWriteUnavailableResponse\(\): Response \{[\s\S]*?status: 503/u,
+  );
+});
+
 function route(filename, methods, policy) {
   return {
     filename,

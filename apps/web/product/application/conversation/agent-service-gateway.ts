@@ -1,5 +1,8 @@
-import type { NearbyRecommendResult } from '../decision/agent-nearby-operation.ts';
-import { createAgentToolCatalog } from './project-command-router.ts';
+import {
+  createAgentToolCatalog,
+  type ProjectCommandDispatchContext,
+  type ProjectCommandReply,
+} from './project-command-router.ts';
 import {
   agentSignatureHeaders,
   canonicalAgentRequestBytes,
@@ -131,15 +134,11 @@ interface AgentServiceError {
 
 type AgentAuditResultKind = 'success' | AgentServiceErrorKind;
 
-interface ProjectCommandReply {
-  readonly projectId: 'jpmap';
-  readonly operation: 'nearby';
-  readonly nearby: NearbyRecommendResult;
-  readonly replyText: string;
-}
-
 interface ProjectCommandRouter {
-  dispatch(command: string): Promise<
+  dispatch(
+    command: string,
+    context?: ProjectCommandDispatchContext,
+  ): Promise<
     | { readonly ok: true; readonly value: ProjectCommandReply }
     | {
         readonly ok: false;
@@ -159,7 +158,7 @@ interface ProjectCommandRouter {
 interface AgentToolCatalog {
   manifest(
     projectId: 'jpmap',
-    phase: 'read',
+    phase: 'read' | 'owner',
   ): ReturnType<ReturnType<typeof createAgentToolCatalog>['manifest']>;
 }
 
@@ -170,6 +169,7 @@ interface AgentServiceGatewayDependencies {
   readonly state: AgentGatewayState;
   readonly audit: AgentAuditSink;
   readonly clock: { readonly nowMs: () => number };
+  readonly manifestPhase?: 'read' | 'owner';
 }
 
 interface AgentRequestBody {
@@ -191,6 +191,7 @@ export function createAgentServiceGateway(
         | {
             readonly body: AgentRequestBody;
             readonly key: AgentServiceKey;
+            readonly operation: string;
           }
         | undefined;
       try {
@@ -224,12 +225,13 @@ export function createAgentServiceGateway(
         }
         const body = parsed.value;
         const key = authenticated.key;
-        auditContext = { body, key };
+        auditContext = { body, key, operation: 'unknown' };
         if (body.projectId !== key.projectId) {
           await recordAudit(
             dependencies,
             body,
             key,
+            'unknown',
             'unauthorized',
             false,
             startedAt,
@@ -237,24 +239,30 @@ export function createAgentServiceGateway(
           return errorResponse('unauthorized');
         }
 
-        const manifest = dependencies.toolCatalog.manifest('jpmap', 'read');
+        const manifest = dependencies.toolCatalog.manifest(
+          'jpmap',
+          dependencies.manifestPhase ?? 'read',
+        );
         const tool = manifest.tools.find((entry) => entry.name === body.tool);
-        if (!tool || tool.effect !== 'read') {
+        if (!tool) {
           await recordAudit(
             dependencies,
             body,
             key,
+            'unknown',
             'forbidden',
             false,
             startedAt,
           );
           return errorResponse('forbidden');
         }
+        auditContext = { body, key, operation: tool.operation };
         if (!key.scopes.includes(tool.requiredScope)) {
           await recordAudit(
             dependencies,
             body,
             key,
+            tool.operation,
             'forbidden',
             false,
             startedAt,
@@ -266,6 +274,7 @@ export function createAgentServiceGateway(
             dependencies,
             body,
             key,
+            tool.operation,
             'forbidden',
             false,
             startedAt,
@@ -273,12 +282,13 @@ export function createAgentServiceGateway(
           return errorResponse('forbidden');
         }
 
-        const locationHint = validateNearbyToolInput(body.input);
-        if (!locationHint) {
+        const command = validateAgentToolCommand(body.tool, body.input);
+        if (!command) {
           await recordAudit(
             dependencies,
             body,
             key,
+            tool.operation,
             'invalid_input',
             false,
             startedAt,
@@ -289,15 +299,36 @@ export function createAgentServiceGateway(
         const payloadDigest = await sha256Hex(
           encoder.encode(canonicalJson(body)),
         );
-        const routed = await dependencies.router.dispatch(
-          `/jpmap nearby ${locationHint}`,
-        );
+        const dispatchContext: ProjectCommandDispatchContext = {
+          requestToken: body.mutationId,
+          invocation: {
+            ownerId: key.owner.actorId,
+            channel: key.owner.channel,
+            conversationId: key.owner.conversationId,
+          },
+        };
+        if (tool.effect !== 'read') {
+          return await handleWriteCommand({
+            dependencies,
+            body,
+            key,
+            operation: tool.operation,
+            command,
+            context: dispatchContext,
+            payloadDigest,
+            claimId: authenticated.nonce,
+            startedAt,
+          });
+        }
+
+        const routed = await dependencies.router.dispatch(command);
         if (!routed.ok) {
           const response = errorResponse(routed.error.kind);
           await recordAudit(
             dependencies,
             body,
             key,
+            tool.operation,
             routed.error.kind,
             false,
             startedAt,
@@ -311,7 +342,15 @@ export function createAgentServiceGateway(
           result: routed.value,
           replayed: false,
         };
-        await recordAudit(dependencies, body, key, 'success', false, startedAt);
+        await recordAudit(
+          dependencies,
+          body,
+          key,
+          tool.operation,
+          'success',
+          false,
+          startedAt,
+        );
         return { status: 200, body: { ok: true, receipt } };
       } catch {
         if (auditContext) {
@@ -320,6 +359,7 @@ export function createAgentServiceGateway(
               dependencies,
               auditContext.body,
               auditContext.key,
+              auditContext.operation,
               'unexpected_failure',
               false,
               startedAt,
@@ -332,6 +372,130 @@ export function createAgentServiceGateway(
       }
     },
   };
+}
+
+async function handleWriteCommand(input: {
+  readonly dependencies: AgentServiceGatewayDependencies;
+  readonly body: AgentRequestBody;
+  readonly key: AgentServiceKey;
+  readonly operation: string;
+  readonly command: string;
+  readonly context: ProjectCommandDispatchContext;
+  readonly payloadDigest: string;
+  readonly claimId: string;
+  readonly startedAt: number;
+}): Promise<AgentServiceResponse> {
+  const identity: AgentMutationIdentity = {
+    projectId: input.key.projectId,
+    mutationId: input.body.mutationId,
+    payloadDigest: input.payloadDigest,
+    claimId: input.claimId,
+  };
+  const claim = await input.dependencies.state.claimMutation(identity);
+  if (claim.kind === 'conflict') {
+    await recordAudit(
+      input.dependencies,
+      input.body,
+      input.key,
+      input.operation,
+      'conflict',
+      false,
+      input.startedAt,
+    );
+    return errorResponse('conflict');
+  }
+  if (claim.kind === 'replay') {
+    return replayWriteReceipt(input, claim.receipt);
+  }
+  if (claim.kind === 'pending') {
+    const settled = await input.dependencies.state.waitForMutation(identity);
+    if (settled.kind === 'replay') {
+      return replayWriteReceipt(input, settled.receipt);
+    }
+    const kind =
+      settled.kind === 'conflict' ? 'conflict' : 'dependency_failure';
+    await recordAudit(
+      input.dependencies,
+      input.body,
+      input.key,
+      input.operation,
+      kind,
+      false,
+      input.startedAt,
+    );
+    return errorResponse(kind);
+  }
+
+  let claimOpen = true;
+  try {
+    const routed = await input.dependencies.router.dispatch(
+      input.command,
+      input.context,
+    );
+    if (!routed.ok) {
+      await input.dependencies.state.releaseMutation(identity);
+      claimOpen = false;
+      const response = errorResponse(routed.error.kind);
+      await recordAudit(
+        input.dependencies,
+        input.body,
+        input.key,
+        input.operation,
+        routed.error.kind,
+        false,
+        input.startedAt,
+      );
+      return response;
+    }
+    const stored = await input.dependencies.state.commitMutation({
+      identity,
+      receipt: {
+        mutationId: input.body.mutationId,
+        payloadDigest: input.payloadDigest,
+        result: routed.value,
+      },
+    });
+    claimOpen = false;
+    const receipt = { ...stored, replayed: false };
+    await recordAudit(
+      input.dependencies,
+      input.body,
+      input.key,
+      input.operation,
+      'success',
+      false,
+      input.startedAt,
+    );
+    return { status: 200, body: { ok: true, receipt } };
+  } catch (error) {
+    if (claimOpen) {
+      await input.dependencies.state.releaseMutation(identity);
+    }
+    throw error;
+  }
+}
+
+async function replayWriteReceipt(
+  input: {
+    readonly dependencies: AgentServiceGatewayDependencies;
+    readonly body: AgentRequestBody;
+    readonly key: AgentServiceKey;
+    readonly operation: string;
+    readonly startedAt: number;
+  },
+  stored: StoredAgentGatewayReceipt,
+): Promise<AgentServiceResponse> {
+  const receipt = { ...stored, replayed: true };
+  await recordAudit(
+    input.dependencies,
+    input.body,
+    input.key,
+    input.operation,
+    'success',
+    true,
+    input.startedAt,
+  );
+  return { status: 200, body: { ok: true, receipt } };
 }
 
 export class InMemoryAgentGatewayState implements AgentGatewayState {
@@ -614,24 +778,46 @@ function sameActor(left: AgentActor, right: AgentActor): boolean {
   );
 }
 
-function validateNearbyToolInput(
+function validateAgentToolCommand(
+  tool: string,
   input: Readonly<Record<string, unknown>>,
 ): string | undefined {
+  if (tool === 'jpmap_add_confirm' || tool === 'jpmap_add_cancel') {
+    if (!hasOnlyKeys(input, [])) return undefined;
+    return tool === 'jpmap_add_confirm'
+      ? '/jpmap add confirm'
+      : '/jpmap add cancel';
+  }
+  if (tool === 'jpmap_add_select') {
+    if (
+      !hasOnlyKeys(input, ['ordinal']) ||
+      !Number.isInteger(input.ordinal) ||
+      Number(input.ordinal) < 1 ||
+      Number(input.ordinal) > 3
+    ) {
+      return undefined;
+    }
+    return `/jpmap add select ${String(input.ordinal)}`;
+  }
+  const field = tool === 'jpmap_nearby' ? 'locationHint' : 'query';
   if (
-    !hasOnlyKeys(input, ['locationHint']) ||
-    typeof input.locationHint !== 'string'
+    (tool !== 'jpmap_nearby' && tool !== 'jpmap_add_discover') ||
+    !hasOnlyKeys(input, [field]) ||
+    typeof input[field] !== 'string'
   ) {
     return undefined;
   }
-  const locationHint = input.locationHint.trim();
+  const value = input[field].normalize('NFC').trim();
   if (
-    !locationHint ||
-    locationHint.length > 1_000 ||
-    /[\r\n]/u.test(locationHint)
+    !value ||
+    value.length > (tool === 'jpmap_nearby' ? 1_000 : 500) ||
+    !hasNoControlCharacters(value)
   ) {
     return undefined;
   }
-  return locationHint;
+  return tool === 'jpmap_nearby'
+    ? `/jpmap nearby ${value}`
+    : `/jpmap add ${value}`;
 }
 
 function isBoundedText(value: unknown): value is string {
@@ -695,6 +881,7 @@ async function recordAudit(
   dependencies: AgentServiceGatewayDependencies,
   body: AgentRequestBody,
   key: AgentServiceKey,
+  operation: string,
   resultKind: AgentAuditResultKind,
   replayed: boolean,
   startedAt: number,
@@ -705,7 +892,7 @@ async function recordAudit(
     actorId: body.actor.actorId,
     channel: body.actor.channel,
     conversationId: body.actor.conversationId,
-    operation: body.tool === 'jpmap_nearby' ? 'nearby.recommend' : body.tool,
+    operation,
     mutationId: body.mutationId,
     resultKind,
     replayed,

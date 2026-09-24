@@ -11,8 +11,16 @@ import {
   reduceCatalogIntakeUi,
   type CatalogIntakeUiError,
 } from './catalog-intake-ui-state';
+import type { CatalogIntakeConfirmOutput } from '../../product/application/catalog-intake/catalog-intake-coordinator';
 
-export function useCatalogIntake() {
+type CommittedCatalogIntakeOutput = Exclude<
+  CatalogIntakeConfirmOutput,
+  { readonly status: 'conflict' | 'failed_no_write' }
+>;
+
+export function useCatalogIntake(
+  onCommitted?: (output: CommittedCatalogIntakeOutput) => void,
+) {
   const [state, dispatch] = useReducer(
     reduceCatalogIntakeUi,
     undefined,
@@ -111,6 +119,7 @@ export function useCatalogIntake() {
 
   const confirm = useCallback(async () => {
     if (!state.preview) return;
+    dispatch({ type: 'confirm_started' });
     try {
       const output = await browserAtlasApplication.execute({
         key: 'catalog.intake.confirm',
@@ -120,16 +129,20 @@ export function useCatalogIntake() {
         },
       });
       dispatch({ type: 'confirm_succeeded', output });
+      if (output.status !== 'conflict' && output.status !== 'failed_no_write') {
+        onCommitted?.(output);
+      }
     } catch (error) {
       dispatch({ type: 'request_failed', error: toUiError(error) });
     }
-  }, [state.preview]);
+  }, [onCommitted, state.preview]);
 
   const retry = useCallback(() => {
     if (state.lastOperation === 'select') return select();
+    if (state.lastOperation === 'confirm') return confirm();
     if (state.lastOperation === 'cancel') return cancel();
     return discover();
-  }, [cancel, discover, select, state.lastOperation]);
+  }, [cancel, confirm, discover, select, state.lastOperation]);
 
   return {
     state,

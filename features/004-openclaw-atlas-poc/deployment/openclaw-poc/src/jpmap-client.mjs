@@ -1,6 +1,7 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
-const usageReply = "用法：/jpmap nearby <街区或地址>";
+const usageReply =
+  "用法：\n/jpmap nearby <街区或地址>\n/jpmap add <餐厅名或地址>\n/jpmap add select <1-3>\n/jpmap add confirm\n/jpmap add cancel";
 const urlInputReply = "请复制地图中的街区或地址文字，不要发送链接。";
 const configurationReply = "Japan Atlas 配置不可用，请联系管理员。";
 const unavailableReply = "Japan Atlas 附近查询暂时不可用，请稍后重试。";
@@ -24,7 +25,7 @@ export function createJpmapRouterClient(options = {}) {
       return configurationReply;
     }
 
-    const parsed = parseNearbyCommand(input);
+    const parsed = parseProjectCommand(input);
     if (parsed.kind === "url") return urlInputReply;
     if (parsed.kind !== "valid") return usageReply;
 
@@ -43,10 +44,10 @@ export function createJpmapRouterClient(options = {}) {
       const body = JSON.stringify({
         version: "1",
         projectId: "jpmap",
-        tool: "jpmap_nearby",
+        tool: parsed.tool,
         mutationId,
         actor: trustedActor,
-        input: { locationHint: parsed.locationHint },
+        input: parsed.input,
       });
       const bodyDigest = await sha256Hex(encoder.encode(body));
       const signature = await hmacSha256Hex(
@@ -74,7 +75,7 @@ export function createJpmapRouterClient(options = {}) {
       });
       if (!response?.ok) return unavailableReply;
       const payload = await readBoundedJson(response);
-      return readBoundedReply(payload, mutationId) ?? unavailableReply;
+      return readBoundedReply(payload, mutationId, parsed.operation) ?? unavailableReply;
     } catch {
       return unavailableReply;
     } finally {
@@ -120,7 +121,7 @@ export function canonicalAgentRequestBytes(request) {
   ].join("\n");
 }
 
-function parseNearbyCommand(input) {
+function parseProjectCommand(input) {
   if (
     !isRecord(input) ||
     input.commandName !== "jpmap" ||
@@ -131,17 +132,54 @@ function parseNearbyCommand(input) {
   ) {
     return { kind: "invalid" };
   }
-  const match = /^nearby[ \t]+(.+?\S)[ \t]*$/u.exec(input.command);
-  const locationHint = match?.[1]?.trim();
-  if (
-    !locationHint ||
-    locationHint.length > 1_000 ||
-    /(?:^|[ \t])--[A-Za-z0-9_-]+(?:[ \t]|$)/u.test(locationHint)
-  ) {
-    return { kind: "invalid" };
+  const nearby = /^nearby[ \t]+(.+?\S)[ \t]*$/u.exec(input.command);
+  if (nearby) {
+    const locationHint = nearby[1].trim();
+    if (
+      locationHint.length > 1_000 ||
+      /(?:^|[ \t])--[A-Za-z0-9_-]+(?:[ \t]|$)/u.test(locationHint)
+    ) {
+      return { kind: "invalid" };
+    }
+    if (isUrlShaped(locationHint)) return { kind: "url" };
+    return {
+      kind: "valid",
+      tool: "jpmap_nearby",
+      operation: "nearby",
+      input: { locationHint },
+    };
   }
-  if (isUrlShaped(locationHint)) return { kind: "url" };
-  return { kind: "valid", locationHint };
+  const discover = /^add[ \t]+(.+?\S)[ \t]*$/u.exec(input.command);
+  const query = discover?.[1]?.trim();
+  if (
+    query &&
+    query.length <= 500 &&
+    !/^(?:select|confirm|cancel)(?:[ \t]|$)/u.test(query) &&
+    !/(?:^|[ \t])--[A-Za-z0-9_-]+(?:[ \t]|$)/u.test(query)
+  ) {
+    return {
+      kind: "valid",
+      tool: "jpmap_add_discover",
+      operation: "add",
+      input: { query },
+    };
+  }
+  const select = /^add[ \t]+select[ \t]+([1-3])[ \t]*$/u.exec(input.command);
+  if (select) {
+    return {
+      kind: "valid",
+      tool: "jpmap_add_select",
+      operation: "add",
+      input: { ordinal: Number(select[1]) },
+    };
+  }
+  if (/^add[ \t]+confirm[ \t]*$/u.test(input.command)) {
+    return { kind: "valid", tool: "jpmap_add_confirm", operation: "add", input: {} };
+  }
+  if (/^add[ \t]+cancel[ \t]*$/u.test(input.command)) {
+    return { kind: "valid", tool: "jpmap_add_cancel", operation: "add", input: {} };
+  }
+  return { kind: "invalid" };
 }
 
 function isUrlShaped(value) {
@@ -230,7 +268,7 @@ async function readBoundedJson(response) {
   }
 }
 
-function readBoundedReply(payload, mutationId) {
+function readBoundedReply(payload, mutationId, operation) {
   if (
     !isRecord(payload) ||
     payload.ok !== true ||
@@ -240,7 +278,7 @@ function readBoundedReply(payload, mutationId) {
     typeof payload.receipt.replayed !== "boolean" ||
     !isRecord(payload.receipt.result) ||
     payload.receipt.result.projectId !== "jpmap" ||
-    payload.receipt.result.operation !== "nearby"
+    payload.receipt.result.operation !== operation
   ) {
     return undefined;
   }

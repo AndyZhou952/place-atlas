@@ -72,7 +72,7 @@ function createHarness(options = {}) {
         return projectRouter.dispatch(command);
       },
     },
-    toolCatalog: createAgentToolCatalog(),
+    toolCatalog: options.toolCatalog ?? createAgentToolCatalog(),
     keys: {
       async find(keyId) {
         if (keyId !== 'key-1') return undefined;
@@ -167,6 +167,307 @@ test('canonical bytes and signed HTTP request cross the read-only gateway into A
       durationMs: 0,
     },
   ]);
+});
+
+test('audit operation comes from the authorized manifest entry', async () => {
+  const manifestCatalog = createAgentToolCatalog();
+  const harness = createHarness({
+    toolCatalog: {
+      manifest(projectId, phase) {
+        const manifest = manifestCatalog.manifest(projectId, phase);
+        return {
+          ...manifest,
+          tools: manifest.tools.map((tool) =>
+            tool.name === 'jpmap_nearby'
+              ? { ...tool, operation: 'manifest.authority' }
+              : tool,
+          ),
+        };
+      },
+    },
+  });
+  const response = await harness.handle(
+    await signAgentHttpRequest({
+      url: 'https://atlas.test/api/agent/v1/tools',
+      method: 'POST',
+      body: requestBody(),
+      keyId: 'key-1',
+      secret,
+      timestamp: '1789300800',
+      nonce: 'manifest-operation-nonce',
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(harness.audits.at(-1)?.operation, 'manifest.authority');
+});
+
+test('Owner Add discovery is scoped, deterministic, and replays one stored gateway receipt', async () => {
+  const dispatchCalls = [];
+  const audits = [];
+  const gateway = createAgentServiceGateway({
+    router: {
+      async dispatch(command, context) {
+        dispatchCalls.push([command, context]);
+        return {
+          ok: true,
+          value: {
+            projectId: 'jpmap',
+            operation: 'add',
+            step: 'candidates',
+            intake: {
+              status: 'candidates_ready',
+              sessionId: 'session-1',
+              sessionVersion: 1,
+              candidates: [],
+              hasMore: false,
+              expiresAt: '2026-09-23T12:30:00.000Z',
+            },
+            replyText: 'Japan Atlas｜请选择餐厅',
+          },
+        };
+      },
+    },
+    toolCatalog: createAgentToolCatalog(),
+    manifestPhase: 'owner',
+    keys: {
+      async find(keyId) {
+        return keyId === 'key-1'
+          ? {
+              keyId,
+              projectId: 'jpmap',
+              secret,
+              active: true,
+              owner,
+              scopes: ['atlas:nearby:read', 'atlas:intake:write'],
+            }
+          : undefined;
+      },
+    },
+    state: new InMemoryAgentGatewayState(),
+    audit: {
+      async record(event) {
+        audits.push(event);
+      },
+    },
+    clock: { nowMs: () => Date.parse('2026-09-13T12:00:00.000Z') },
+  });
+  const first = await signAgentHttpRequest({
+    url: 'https://atlas.test/api/agent/v1/tools',
+    method: 'POST',
+    body: requestBody({
+      tool: 'jpmap_add_discover',
+      mutationId: 'wechat-add-1',
+      input: { query: ' 鮨青空 ' },
+    }),
+    keyId: 'key-1',
+    secret,
+    timestamp: '1789300800',
+    nonce: 'add-nonce-1',
+  });
+  const retry = await signAgentHttpRequest({
+    url: 'https://atlas.test/api/agent/v1/tools',
+    method: 'POST',
+    body: requestBody({
+      tool: 'jpmap_add_discover',
+      mutationId: 'wechat-add-1',
+      input: { query: ' 鮨青空 ' },
+    }),
+    keyId: 'key-1',
+    secret,
+    timestamp: '1789300800',
+    nonce: 'add-nonce-2',
+  });
+  const transportReplay = await signAgentHttpRequest({
+    url: 'https://atlas.test/api/agent/v1/tools',
+    method: 'POST',
+    body: requestBody({
+      tool: 'jpmap_add_discover',
+      mutationId: 'wechat-add-1',
+      input: { query: ' 鮨青空 ' },
+    }),
+    keyId: 'key-1',
+    secret,
+    timestamp: '1789300800',
+    nonce: 'add-nonce-2',
+  });
+  const handle = createAgentHttpHandler(gateway);
+
+  const firstResponse = await handle(first);
+  const retryResponse = await handle(retry);
+  const replayResponse = await handle(transportReplay);
+  const firstPayload = await firstResponse.json();
+  const retryPayload = await retryResponse.json();
+
+  assert.equal(firstResponse.status, 200);
+  assert.equal(retryResponse.status, 200);
+  assert.equal(replayResponse.status, 401);
+  assert.equal(firstPayload.ok, true);
+  assert.equal(retryPayload.ok && retryPayload.receipt.replayed, true);
+  assert.deepEqual(dispatchCalls, [
+    [
+      '/jpmap add 鮨青空',
+      {
+        requestToken: 'wechat-add-1',
+        invocation: {
+          ownerId: 'wechat-owner',
+          channel: 'wechat',
+          conversationId: 'owner-dm',
+        },
+      },
+    ],
+  ]);
+  assert.deepEqual(
+    audits.map((event) => [event.operation, event.resultKind, event.replayed]),
+    [
+      ['catalog.intake.discover', 'success', false],
+      ['catalog.intake.discover', 'success', true],
+      ['unknown', 'unauthorized', false],
+    ],
+  );
+});
+
+test('Owner Add rejects wrong scope, a second account, and group chat before mutation claim', async () => {
+  const scenarios = [
+    {
+      name: 'wrong scope',
+      scopes: ['atlas:nearby:read'],
+      actor: owner,
+    },
+    {
+      name: 'second account',
+      scopes: ['atlas:intake:write'],
+      actor: { ...owner, actorId: 'second-account' },
+    },
+    {
+      name: 'group chat',
+      scopes: ['atlas:intake:write'],
+      actor: {
+        ...owner,
+        conversationId: 'group-1',
+        conversationType: 'group',
+      },
+    },
+  ];
+
+  for (const [index, scenario] of scenarios.entries()) {
+    let dispatchCalls = 0;
+    let claimCalls = 0;
+    const nonceState = new InMemoryAgentGatewayState();
+    const gateway = createAgentServiceGateway({
+      router: {
+        async dispatch() {
+          dispatchCalls += 1;
+          throw new Error('forbidden request reached router');
+        },
+      },
+      toolCatalog: createAgentToolCatalog(),
+      manifestPhase: 'owner',
+      keys: {
+        async find(keyId) {
+          return keyId === 'key-1'
+            ? {
+                keyId,
+                projectId: 'jpmap',
+                secret,
+                active: true,
+                owner,
+                scopes: scenario.scopes,
+              }
+            : undefined;
+        },
+      },
+      state: {
+        consumeNonce: (input) => nonceState.consumeNonce(input),
+        async claimMutation() {
+          claimCalls += 1;
+          return { kind: 'claimed' };
+        },
+        waitForMutation: (input) => nonceState.waitForMutation(input),
+        commitMutation: (input) => nonceState.commitMutation(input),
+        releaseMutation: (input) => nonceState.releaseMutation(input),
+      },
+      audit: { async record() {} },
+      clock: { nowMs: () => Date.parse('2026-09-13T12:00:00.000Z') },
+    });
+    const request = await signAgentHttpRequest({
+      url: 'https://atlas.test/api/agent/v1/tools',
+      method: 'POST',
+      body: requestBody({
+        tool: 'jpmap_add_discover',
+        mutationId: `forbidden-add-${index}`,
+        actor: scenario.actor,
+        input: { query: '鮨青空' },
+      }),
+      keyId: 'key-1',
+      secret,
+      timestamp: '1789300800',
+      nonce: `forbidden-add-${index}`,
+    });
+
+    const response = await createAgentHttpHandler(gateway)(request);
+
+    assert.equal(response.status, 403, scenario.name);
+    assert.equal(dispatchCalls, 0, scenario.name);
+    assert.equal(claimCalls, 0, scenario.name);
+  }
+});
+
+test('Owner Add releases a gateway claim when dispatch fails unexpectedly', async () => {
+  const baseState = new InMemoryAgentGatewayState();
+  let releaseCalls = 0;
+  const gateway = createAgentServiceGateway({
+    router: {
+      async dispatch() {
+        throw new Error('simulated dispatch failure');
+      },
+    },
+    toolCatalog: createAgentToolCatalog(),
+    manifestPhase: 'owner',
+    keys: {
+      async find(keyId) {
+        return keyId === 'key-1'
+          ? {
+              keyId,
+              projectId: 'jpmap',
+              secret,
+              active: true,
+              owner,
+              scopes: ['atlas:intake:write'],
+            }
+          : undefined;
+      },
+    },
+    state: {
+      consumeNonce: (input) => baseState.consumeNonce(input),
+      claimMutation: (input) => baseState.claimMutation(input),
+      waitForMutation: (input) => baseState.waitForMutation(input),
+      commitMutation: (input) => baseState.commitMutation(input),
+      async releaseMutation(input) {
+        releaseCalls += 1;
+        return baseState.releaseMutation(input);
+      },
+    },
+    audit: { async record() {} },
+    clock: { nowMs: () => Date.parse('2026-09-13T12:00:00.000Z') },
+  });
+  const request = await signAgentHttpRequest({
+    url: 'https://atlas.test/api/agent/v1/tools',
+    method: 'POST',
+    body: requestBody({
+      tool: 'jpmap_add_discover',
+      mutationId: 'dispatch-failure-1',
+      input: { query: '銀座テスト店' },
+    }),
+    keyId: 'key-1',
+    secret,
+    timestamp: '1789300800',
+    nonce: 'dispatch-failure-nonce-1',
+  });
+
+  const response = await createAgentHttpHandler(gateway)(request);
+  assert.equal(response.status, 500);
+  assert.equal(releaseCalls, 1);
 });
 
 test('transport replay is rejected while distinct nonces execute transient reads', async () => {

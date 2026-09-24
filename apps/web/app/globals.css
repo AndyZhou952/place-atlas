@@ -647,6 +647,30 @@
   line-height: 1.45;
 }
 
+.catalog-intake-conflict {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border-left: 2px solid var(--vermilion);
+  background: var(--paper);
+  color: var(--vermilion-dark);
+}
+
+.catalog-intake-conflict > svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.catalog-intake-conflict > p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.catalog-intake-conflict .catalog-intake-preview {
+  color: var(--ink);
+}
+
 @media (max-width: 480px) {
   .catalog-intake-search-row {
     flex-direction: column;

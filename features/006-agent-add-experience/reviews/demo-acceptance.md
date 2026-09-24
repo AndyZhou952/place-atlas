@@ -2,7 +2,7 @@
 
 - 日期：2026-09-24
 - 模式：interactive
-- 状态：等待 Owner 在线确认
+- 状态：接受
 - 自动化结论：通过
 
 ## 可见验收路径
@@ -21,4 +21,4 @@
 
 ## Owner 反馈
 
-- 待线上部署后确认：Review 页面已无 Creator Import；个人评分写入后 Tabelog badge 仍在；微信 Add 回复长度和分组可用。
+- 2026-09-24 Owner 在线确认个人评分写入后 Tabelog badge 仍保留，回复“ok没问题”。Review／Creator Import 收缩与微信短回复已有自动化和真实渲染证据；随后发现的 `/jpmap add select 1` 会话续接异常作为独立热修处理，不回塞已通过评审的 Feature 006。

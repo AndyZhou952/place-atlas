@@ -33,7 +33,7 @@ export function createResearchRelayServer(
   const now = overrides.now ?? (() => new Date());
   const sourcePolicy = createTabelogResearchSourcePolicy();
   const researchAdapters =
-    configuration.webProvider === "direct_duckduckgo"
+    configuration.webProvider === "direct_yahoo_japan"
       ? createDirectWebResearchAdapters({ sourcePolicy })
       : createOpenClawGatewayResearchAdapters({
           endpoint: configuration.openClawEndpoint,
@@ -300,14 +300,14 @@ function readConfiguration(environment: NodeJS.ProcessEnv) {
     resultKeyVersion: requiredIdentifier(environment.RESEARCH_RESULT_KEY_VERSION),
     resultSecret: requiredSecret(environment.RESEARCH_RESULT_HMAC_SECRET),
     deepSeekApiKey: requiredSecret(environment.DEEPSEEK_API_KEY),
-    webProvider: environment.RESEARCH_WEB_PROVIDER ?? "direct_duckduckgo",
+    webProvider: environment.RESEARCH_WEB_PROVIDER ?? "direct_yahoo_japan",
     openClawEndpoint: environment.OPENCLAW_TOOLS_ENDPOINT ?? "http://127.0.0.1:18789/tools/invoke",
     openClawToken: environment.OPENCLAW_GATEWAY_TOKEN,
     sqlitePath: environment.RESEARCH_RELAY_SQLITE_PATH,
     port: Number(environment.RESEARCH_RELAY_PORT ?? "18791"),
   };
   if (
-    !["direct_duckduckgo", "openclaw_gateway"].includes(values.webProvider) ||
+    !["direct_yahoo_japan", "openclaw_gateway"].includes(values.webProvider) ||
     (values.webProvider === "openclaw_gateway" && !validSecret(values.openClawToken)) ||
     typeof values.sqlitePath !== "string" ||
     !isAbsolute(values.sqlitePath) ||
@@ -320,7 +320,7 @@ function readConfiguration(environment: NodeJS.ProcessEnv) {
   }
   return {
     ...values,
-    webProvider: values.webProvider as "direct_duckduckgo" | "openclaw_gateway",
+    webProvider: values.webProvider as "direct_yahoo_japan" | "openclaw_gateway",
     openClawToken: values.openClawToken ?? "",
     sqlitePath: values.sqlitePath,
   };

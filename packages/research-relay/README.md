@@ -7,7 +7,7 @@ Tunnel.
 
 The first policy version is intentionally narrow:
 
-- one fixed-endpoint DuckDuckGo HTML search request;
+- one fixed-endpoint Yahoo Japan HTML search request;
 - up to three canonical Tabelog restaurant-detail URLs;
 - pinned-DNS HTTPS fetches with redirect, response-size, and SSRF controls;
 - DeepSeek extracts only Tabelog score and explicit reservation facts;
@@ -36,12 +36,12 @@ RESEARCH_RELAY_SQLITE_PATH
 Optional names:
 
 ```text
-RESEARCH_WEB_PROVIDER=direct_duckduckgo
+RESEARCH_WEB_PROVIDER=direct_yahoo_japan
 RESEARCH_RELAY_PORT=18791
 ```
 
-`direct_duckduckgo` is the default and needs no search credential. It uses only
-the fixed DuckDuckGo HTML endpoint and accepts only canonical Tabelog detail
+`direct_yahoo_japan` is the default and needs no search credential. It uses only
+the fixed Yahoo Japan HTML endpoint and accepts only canonical Tabelog detail
 results. For compatibility testing, `RESEARCH_WEB_PROVIDER=openclaw_gateway`
 is available and additionally requires `OPENCLAW_GATEWAY_TOKEN`; it is not the
 default product architecture.

@@ -15,19 +15,16 @@ test("repository-owned web adapter searches a fixed endpoint and fetches only ap
     sourcePolicy: createTabelogResearchSourcePolicy(),
     dns: {
       async resolve(hostname) {
-        return hostname === "html.duckduckgo.com"
-          ? dnsAnswer(["52.142.124.215"])
+        return hostname === "search.yahoo.co.jp"
+          ? dnsAnswer(["183.79.250.251"])
           : dnsAnswer(["13.112.237.100"]);
       },
     },
     connector: {
       async request(input) {
         calls.push(input);
-        if (input.hostHeader === "html.duckduckgo.com") {
-          const result = (url, label) => {
-            const wrapped = `https://duckduckgo.com/l/?uddg=${encodeURIComponent(url)}`;
-            return `<a class="result__a" href="${wrapped.replaceAll("&", "&amp;")}">${label}</a>`;
-          };
+        if (input.hostHeader === "search.yahoo.co.jp") {
+          const result = (url, label) => `<a class="result" href="${url}">${label}</a>`;
           return response(
             input,
             `${result(englishDetailUrl, "Aldebaran English")}
@@ -58,10 +55,9 @@ test("repository-owned web adapter searches a fixed endpoint and fetches only ap
     deadlineAtMs: Date.now() + 5_000,
   });
   assert.deepEqual(search, { urls: [detailUrl, secondDetailUrl] });
-  assert.equal(calls[0].hostHeader, "html.duckduckgo.com");
-  assert.match(calls[0].url, /^https:\/\/html\.duckduckgo\.com\/html\?q=/u);
+  assert.equal(calls[0].hostHeader, "search.yahoo.co.jp");
+  assert.match(calls[0].url, /^https:\/\/search\.yahoo\.co\.jp\/search\?p=/u);
   assert.match(decodeURIComponent(calls[0].url), /site:tabelog\.com/u);
-  assert.match(calls[0].url, /[?&]kp=-1(?:&|$)/u);
 
   const fetched = await adapters.transport.get(detailUrl, {
     timeoutMs: 3_000,

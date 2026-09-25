@@ -9,7 +9,7 @@ import {
 import type { ResearchUrlSearchPort } from "../../../apps/web/adapters/research-relay/research-relay-handler.ts";
 import type { ResearchSourcePolicy } from "../../../apps/web/adapters/research-relay/research-source-policy.ts";
 
-const duckDuckGoHost = "html.duckduckgo.com";
+const searchHost = "search.yahoo.co.jp";
 const maximumQueryCharacters = 500;
 const maximumSearchResults = 3;
 const maximumSearchLinks = 30;
@@ -29,7 +29,7 @@ export function createDirectWebResearchAdapters(dependencies: {
   const searchTransport = createHardenedResearchTransport({
     dns,
     connector,
-    sourcePolicy: createDuckDuckGoSearchPolicy(),
+    sourcePolicy: createYahooJapanSearchPolicy(),
     ...(dependencies.now ? { now: dependencies.now } : {}),
   });
   const rawPageTransport = createHardenedResearchTransport({
@@ -58,9 +58,8 @@ export function createDirectWebResearchAdapters(dependencies: {
         ) {
           throw new TypeError("Direct web search request is invalid.");
         }
-        const searchUrl = new URL(`https://${duckDuckGoHost}/html`);
-        searchUrl.searchParams.set("q", `${query} site:tabelog.com`);
-        searchUrl.searchParams.set("kp", "-1");
+        const searchUrl = new URL(`https://${searchHost}/search`);
+        searchUrl.searchParams.set("p", `${query} site:tabelog.com`);
         const result = await searchTransport.get(searchUrl.toString(), {
           timeoutMs: Math.min(10_000, input.deadlineAtMs - Date.now()),
           maxRedirects: 0,
@@ -156,7 +155,7 @@ export function createNodePinnedHttpsConnector(): PinnedHttpsConnectorPort {
   };
 }
 
-function createDuckDuckGoSearchPolicy(): ResearchSourcePolicy {
+function createYahooJapanSearchPolicy(): ResearchSourcePolicy {
   const canonicalize = (value: string) => {
     let url: URL;
     try {
@@ -166,15 +165,14 @@ function createDuckDuckGoSearchPolicy(): ResearchSourcePolicy {
     }
     if (
       url.protocol !== "https:" ||
-      url.hostname !== duckDuckGoHost ||
+      url.hostname !== searchHost ||
       url.username !== "" ||
       url.password !== "" ||
       url.port !== "" ||
-      url.pathname !== "/html" ||
+      url.pathname !== "/search" ||
       url.hash !== "" ||
-      [...url.searchParams.keys()].some((key) => key !== "q" && key !== "kp") ||
-      url.searchParams.get("kp") !== "-1" ||
-      !validSearchQuery(url.searchParams.get("q") ?? "")
+      [...url.searchParams.keys()].some((key) => key !== "p") ||
+      !validSearchQuery(url.searchParams.get("p") ?? "")
     ) {
       return undefined;
     }
@@ -194,18 +192,14 @@ function createDuckDuckGoSearchPolicy(): ResearchSourcePolicy {
 
 function extractTabelogDetailUrls(html: string, policy: ResearchSourcePolicy): readonly string[] {
   const candidates = new Map<string, string>();
-  const resultLink = /<a\b(?=[^>]*\bclass="[^"]*\bresult__a\b[^"]*")([^>]*)>/giu;
+  const resultLink = /\bhref=["'](https:\/\/(?:www\.)?tabelog\.com\/[^"']+)["']/giu;
   let inspectedLinks = 0;
   for (const match of html.matchAll(resultLink)) {
     inspectedLinks += 1;
     if (inspectedLinks > maximumSearchLinks) break;
-    const attributes = match[1];
-    if (!attributes) continue;
-    const rawUrl = /\bhref="([^"]*)"/iu.exec(attributes)?.[1];
+    const rawUrl = match[1];
     if (!rawUrl) continue;
-    const candidate = unwrapDuckDuckGoUrl(decodeHtmlAttribute(rawUrl));
-    if (!candidate) continue;
-    const canonical = policy.authorizeCandidate(candidate);
+    const canonical = policy.authorizeCandidate(decodeHtmlAttribute(rawUrl));
     if (!canonical) continue;
     const identity = tabelogRestaurantIdentity(canonical);
     if (!identity) continue;
@@ -302,22 +296,6 @@ function truncateUtf8(value: string, maximumBytes: number): string {
     bytes += width;
   }
   return result;
-}
-
-function unwrapDuckDuckGoUrl(value: string): string | undefined {
-  let url: URL;
-  try {
-    url = new URL(value, `https://${duckDuckGoHost}/`);
-  } catch {
-    return undefined;
-  }
-  if (
-    (url.hostname === "duckduckgo.com" || url.hostname === duckDuckGoHost) &&
-    url.pathname === "/l/"
-  ) {
-    return url.searchParams.get("uddg") ?? undefined;
-  }
-  return url.toString();
 }
 
 function decodeHtmlAttribute(value: string): string {

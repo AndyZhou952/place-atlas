@@ -26,7 +26,7 @@ reservation claims are checked against the policy again after extraction.
 1. Check out a reviewed repository commit on the Agent Service host.
 2. Install production dependencies in `apps/web` and
    `packages/research-relay` using their lockfiles.
-3. Keep `RESEARCH_WEB_PROVIDER=direct_duckduckgo` unless intentionally testing
+3. Keep `RESEARCH_WEB_PROVIDER=direct_yahoo_japan` unless intentionally testing
    the optional OpenClaw compatibility adapter.
 4. Create a service-account-owned directory for the replay SQLite file and a
    protected service environment file. Never place secret values in Git,

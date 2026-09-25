@@ -80,6 +80,70 @@ void test('owner PoC preflight accepts only a matching blue-green artifact with 
   );
 });
 
+void test('owner PoC preflight accepts guarded research only with the exact fixed endpoint vars and three extra secrets', async () => {
+  const template = JSON.parse(
+    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
+  );
+  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
+  Object.assign(template.vars, {
+    CATALOG_INTAKE_RESEARCH_RELAY_MODE: 'relay_enabled_guarded_v1',
+    RESEARCH_RELAY_ENDPOINT: 'https://research.example/v1/research',
+    RESEARCH_ALLOWANCE_KEY_VERSION: 'allowance-v1',
+    RESEARCH_RESULT_KEY_VERSION: 'result-v1',
+  });
+  const secrets = [
+    'AGENT_JPMAP_KEY_ID',
+    'AGENT_JPMAP_HMAC_SECRET',
+    'AGENT_OWNER_ACTOR_ID',
+    'AGENT_OWNER_CONVERSATION_ID',
+    'ATLAS_OWNER_PASSWORD',
+    'ATLAS_OWNER_SESSION_SECRET',
+    'GOOGLE_PLACES_API_KEY',
+    'RESEARCH_RELAY_INGRESS_BEARER_SECRET',
+    'RESEARCH_ALLOWANCE_HMAC_SECRET',
+    'RESEARCH_RESULT_HMAC_SECRET',
+  ].map((name) => ({ name, type: 'secret_text' }));
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: structuredClone(template),
+      remoteSecrets: secrets,
+    }),
+    { ready: true, blockers: [] },
+  );
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: structuredClone(template),
+      remoteSecrets: secrets.filter(
+        ({ name }) => name !== 'RESEARCH_RESULT_HMAC_SECRET',
+      ),
+    }),
+    {
+      ready: false,
+      blockers: ['missing_secret:RESEARCH_RESULT_HMAC_SECRET'],
+    },
+  );
+
+  const staleBuilt = structuredClone(template);
+  staleBuilt.vars.CATALOG_INTAKE_RESEARCH_RELAY_MODE =
+    'relay_disabled_manual_unknown';
+  delete staleBuilt.vars.RESEARCH_RELAY_ENDPOINT;
+  delete staleBuilt.vars.RESEARCH_ALLOWANCE_KEY_VERSION;
+  delete staleBuilt.vars.RESEARCH_RESULT_KEY_VERSION;
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: staleBuilt,
+      remoteSecrets: secrets,
+    }),
+    {
+      ready: false,
+      blockers: ['research_configuration_mismatch'],
+    },
+  );
+});
+
 void test('owner PoC preflight rejects placeholders, missing owner secrets, and forbidden runtime metadata', async () => {
   const template = JSON.parse(
     (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),

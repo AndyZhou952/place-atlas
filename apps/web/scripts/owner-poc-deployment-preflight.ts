@@ -14,6 +14,12 @@ const requiredSecretNames = [
   'GOOGLE_PLACES_API_KEY',
 ] as const;
 
+const guardedResearchSecretNames = [
+  'RESEARCH_RELAY_INGRESS_BEARER_SECRET',
+  'RESEARCH_ALLOWANCE_HMAC_SECRET',
+  'RESEARCH_RESULT_HMAC_SECRET',
+] as const;
+
 interface WranglerConfig {
   readonly name?: unknown;
   readonly vars?: unknown;
@@ -75,6 +81,14 @@ export function inspectOwnerPocDeployment(input: {
     blockers.push('built_observability_invalid');
   }
   if (
+    !researchConfigurationsMatch(
+      input.sourceConfig.vars,
+      input.builtConfig.vars,
+    )
+  ) {
+    blockers.push('research_configuration_mismatch');
+  }
+  if (
     containsForbiddenRuntimeMetadata(input.sourceConfig) ||
     containsForbiddenRuntimeMetadata(input.builtConfig)
   ) {
@@ -89,13 +103,17 @@ export function inspectOwnerPocDeployment(input: {
       )
       .map((secret) => secret.name),
   );
-  for (const name of requiredSecretNames) {
+  const researchEnabled = hasGuardedResearchMode(input.sourceConfig.vars);
+  const expectedSecretNames = researchEnabled
+    ? [...requiredSecretNames, ...guardedResearchSecretNames]
+    : [...requiredSecretNames];
+  for (const name of expectedSecretNames) {
     if (!availableSecrets.has(name)) blockers.push(`missing_secret:${name}`);
   }
   for (const name of availableSecrets) {
     if (/google.*maps|foursquare|transit/iu.test(name)) {
       blockers.push(`forbidden_secret:${name}`);
-    } else if (!(requiredSecretNames as readonly string[]).includes(name)) {
+    } else if (!(expectedSecretNames as readonly string[]).includes(name)) {
       blockers.push(`unexpected_secret:${name}`);
     }
   }
@@ -338,7 +356,70 @@ function hasOwnerPocGuard(value: unknown): boolean {
     value.ATLAS_DATASET === 'owner-poc' &&
     value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled' &&
     value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled' &&
+    readResearchConfiguration(value) !== undefined
+  );
+}
+
+function hasGuardedResearchMode(value: unknown): boolean {
+  return readResearchConfiguration(value)?.mode === 'relay_enabled_guarded_v1';
+}
+
+function readResearchConfiguration(value: unknown):
+  | { readonly mode: 'relay_disabled_manual_unknown' }
+  | {
+      readonly mode: 'relay_enabled_guarded_v1';
+      readonly endpoint: string;
+      readonly allowanceKeyVersion: string;
+      readonly resultKeyVersion: string;
+    }
+  | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
     value.CATALOG_INTAKE_RESEARCH_RELAY_MODE === 'relay_disabled_manual_unknown'
+  ) {
+    return { mode: 'relay_disabled_manual_unknown' };
+  }
+  if (
+    value.CATALOG_INTAKE_RESEARCH_RELAY_MODE !== 'relay_enabled_guarded_v1' ||
+    typeof value.RESEARCH_ALLOWANCE_KEY_VERSION !== 'string' ||
+    typeof value.RESEARCH_RESULT_KEY_VERSION !== 'string' ||
+    !/^[A-Za-z0-9._-]{1,64}$/u.test(value.RESEARCH_ALLOWANCE_KEY_VERSION) ||
+    !/^[A-Za-z0-9._-]{1,64}$/u.test(value.RESEARCH_RESULT_KEY_VERSION) ||
+    typeof value.RESEARCH_RELAY_ENDPOINT !== 'string'
+  ) {
+    return undefined;
+  }
+  try {
+    const endpoint = new URL(value.RESEARCH_RELAY_ENDPOINT);
+    if (
+      endpoint.protocol === 'https:' &&
+      endpoint.username === '' &&
+      endpoint.password === '' &&
+      endpoint.port === '' &&
+      endpoint.pathname === '/v1/research' &&
+      endpoint.search === '' &&
+      endpoint.hash === ''
+    ) {
+      return {
+        mode: 'relay_enabled_guarded_v1',
+        endpoint: endpoint.toString(),
+        allowanceKeyVersion: value.RESEARCH_ALLOWANCE_KEY_VERSION,
+        resultKeyVersion: value.RESEARCH_RESULT_KEY_VERSION,
+      };
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function researchConfigurationsMatch(source: unknown, built: unknown): boolean {
+  const sourceConfiguration = readResearchConfiguration(source);
+  const builtConfiguration = readResearchConfiguration(built);
+  return (
+    sourceConfiguration !== undefined &&
+    builtConfiguration !== undefined &&
+    JSON.stringify(sourceConfiguration) === JSON.stringify(builtConfiguration)
   );
 }
 

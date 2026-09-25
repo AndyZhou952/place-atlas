@@ -35,6 +35,12 @@ export interface OwnerPocAgentBindings extends AgentGatewayBindings {
   readonly CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;
   readonly CATALOG_INTAKE_DURABLE_GEOCODER_MODE?: string;
   readonly CATALOG_INTAKE_RESEARCH_RELAY_MODE?: string;
+  readonly RESEARCH_RELAY_ENDPOINT?: string;
+  readonly RESEARCH_RELAY_INGRESS_BEARER_SECRET?: string;
+  readonly RESEARCH_ALLOWANCE_KEY_VERSION?: string;
+  readonly RESEARCH_ALLOWANCE_HMAC_SECRET?: string;
+  readonly RESEARCH_RESULT_KEY_VERSION?: string;
+  readonly RESEARCH_RESULT_HMAC_SECRET?: string;
 }
 
 export interface IsolatedReadonlyAgentBindings extends AgentGatewayBindings {

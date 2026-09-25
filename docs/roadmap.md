@@ -17,7 +17,8 @@
 
 ## P2 — semantic agent backend
 
-- Connect a trusted, allowlisted search/fetch relay to the existing model-neutral extractor.
+- Deploy and live-evaluate the guarded Tabelog-only Research Relay, then enable
+  it for Owner canary traffic.
 - Extend the current scalar schema only through field-specific contracts for category, dishes, and regional ratings.
 - Run real pipeline predictions through the checked-in resolution and enrichment gates before enabling production research.
 - Add semantic Nearby over verified saved places and Owner preferences.

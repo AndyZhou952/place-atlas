@@ -9,11 +9,11 @@
 5. Confirm once, using idempotent mutation receipts.
 6. Publish a verified record when minimum evidence is present; otherwise keep an actionable review candidate.
 
-Browser and Agent API use this workflow. The selected provider identity and branch are carried through preview, research authorization, and model extraction; a subject-bound proposal must explicitly confirm a match. Production still needs an allowlisted source policy to prevent an unrelated search result from becoming evidence. Web research is not currently a production provider, so ratings, reservation rules, categories, and signature dishes may remain unknown.
+Browser and Agent API use this workflow. The selected provider identity and branch are carried through preview, research authorization, and model extraction; a subject-bound proposal must explicitly confirm a match. The guarded Relay implementation applies its source policy to search candidates, every redirect, and each known claim. Its first policy version accepts only canonical Tabelog restaurant-detail pages. The checked-in production deployment still keeps research disabled until live evaluation passes, so external facts may remain unknown.
 
 ## Semantic enrichment seam
 
-The repository includes a bounded OpenAI-compatible extractor for Tabelog and reservation scalars. The DeepSeek configuration is one implementation of that port. It receives one already-fetched page, treats the body as untrusted data, returns only a strict proposal/no-evidence/stop result, and never writes directly to D1. It does not provide web search; before production use, the separate relay must fetch policy-approved evidence and bind it to the selected branch.
+The repository includes a bounded OpenAI-compatible extractor for Tabelog and reservation scalars. The DeepSeek configuration is one implementation of that port. It receives one already-fetched page, treats the body as untrusted data, returns only a strict proposal/no-evidence/stop result, and never writes directly to D1. The separate loopback Relay calls OpenClaw's structured `web_search` and `web_fetch`, persists replay claims before egress, and returns only signed scalar proposals. OpenClaw and DeepSeek credentials remain on the Relay host rather than in Cloudflare.
 
 Category tags, signature dishes, Google ratings, full source collection, vague-language interpretation, and recommendations still require later typed contracts rather than a larger free-form prompt.
 

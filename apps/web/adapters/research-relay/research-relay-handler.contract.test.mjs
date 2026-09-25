@@ -6,7 +6,7 @@ import {
   signResearchAllowance,
   verifyResearchResult,
 } from './research-relay-envelope.ts';
-import { createResearchRelayHandler } from './research-relay-handler.ts';
+import { createResearchRelayHandler as createPolicyBoundedHandler } from './research-relay-handler.ts';
 
 const key = { keyVersion: 'relay-k1', secret: 's'.repeat(32) };
 const keys = { 'relay-k1': key.secret };
@@ -18,6 +18,33 @@ const confirmSubject = {
   transientName: 'Sushi Saito',
   transientAddress: 'Roppongi, Tokyo',
 };
+
+const fixtureSourcePolicy = {
+  canonicalize: canonicalHttps,
+  authorizeCandidate: canonicalHttps,
+  authorizeRedirect(_from, to) {
+    return canonicalHttps(to);
+  },
+  authorizeClaim(_kind, url) {
+    return canonicalHttps(url);
+  },
+};
+
+function createResearchRelayHandler(dependencies) {
+  return createPolicyBoundedHandler({
+    ...dependencies,
+    sourcePolicy: fixtureSourcePolicy,
+  });
+}
+
+function canonicalHttps(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 test('Relay claims before exact OpenClaw search/fetch and response-loss retry cannot egress twice', async () => {
   const events = [];
@@ -250,6 +277,71 @@ test('Relay confirm uses only exact sorted preview URLs and never calls search',
     ).usage.searchQueries,
     0,
   );
+});
+
+test('Relay rejects a known field whose source is not authorized for that claim', async () => {
+  const url = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  const allowance = await signedAllowance({
+    phase: 'confirm',
+    requestId: 'claim-policy-request',
+    queryOrUrlsDigest: await confirmInputDigest([url]),
+  });
+  const handler = createPolicyBoundedHandler({
+    allowanceKeys: keys,
+    resultKey: key,
+    now: () => initialNow,
+    replayGuard: claimOnce(),
+    searchTool: {
+      async invoke() {
+        throw new Error('confirm must not search');
+      },
+    },
+    transport: {
+      async get() {
+        return {
+          status: 'ok',
+          finalUrl: url,
+          body: 'ephemeral',
+          requestCount: 1,
+          redirectsFollowed: 0,
+        };
+      },
+    },
+    extractor: {
+      async extract() {
+        return {
+          status: 'proposal',
+          proposal: {
+            tabelog: { status: 'unknown' },
+            reservation: {
+              status: 'known',
+              mode: 'reservable',
+              label: 'Reservations accepted',
+              url,
+            },
+          },
+        };
+      },
+    },
+    sourcePolicy: {
+      canonicalize: canonicalHttps,
+      authorizeCandidate: canonicalHttps,
+      authorizeRedirect(_from, to) {
+        return canonicalHttps(to);
+      },
+      authorizeClaim(kind, source) {
+        return kind === 'tabelog' ? canonicalHttps(source) : undefined;
+      },
+    },
+  });
+  const result = await handler.handle(allowance, confirmPhaseInput([url]));
+  const verified = await verifyResearchResult(result.result, {
+    keys,
+    now: initialNow,
+    allowance: allowance.allowance,
+    allowanceDigest: allowance.allowanceDigest,
+  });
+  assert.deepEqual(verified.outcome, { kind: 'unavailable' });
 });
 
 test('Relay rejects phase payload substitution and signs unavailable for expanded or failed search but observed unknown for benign empty search', async () => {

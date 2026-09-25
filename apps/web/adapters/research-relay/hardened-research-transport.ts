@@ -1,6 +1,7 @@
 import ipaddr from 'ipaddr.js';
 
 import { publicUnicastAddressClassifier } from '../providers/public-unicast-address-classifier.ts';
+import type { ResearchSourcePolicy } from './research-source-policy.ts';
 
 export interface ResearchDnsPort {
   resolve(
@@ -69,12 +70,14 @@ const metadataHostnames = new Set([
 export function createHardenedResearchTransport(dependencies: {
   readonly dns: ResearchDnsPort;
   readonly connector: PinnedHttpsConnectorPort;
+  readonly sourcePolicy: ResearchSourcePolicy;
   readonly now?: () => number;
 }): HardenedResearchTransport {
   const now = dependencies.now ?? Date.now;
   return {
     async get(url, limits) {
       let currentUrl = url;
+      let previousUrl: string | undefined;
       let redirectsFollowed = 0;
       let requestCount = 0;
       const failed = (
@@ -106,7 +109,14 @@ export function createHardenedResearchTransport(dependencies: {
           if (remainingMs <= 0 || deadline.signal.aborted) {
             return failed('deadline');
           }
-          const parsed = validateHttpsUrl(currentUrl);
+          const policyUrl = previousUrl
+            ? dependencies.sourcePolicy.authorizeRedirect(
+                previousUrl,
+                currentUrl,
+              )
+            : dependencies.sourcePolicy.authorizeCandidate(currentUrl);
+          if (!policyUrl) return failed('security_blocked');
+          const parsed = validateHttpsUrl(policyUrl);
           if (!parsed) return failed('security_blocked');
           const resolved = await dependencies.dns.resolve(parsed.hostname, {
             signal: deadline.signal,
@@ -198,6 +208,7 @@ export function createHardenedResearchTransport(dependencies: {
                 : 'malformed',
             );
           }
+          previousUrl = parsed.toString();
           currentUrl = new URL(location, parsed).toString();
           redirectsFollowed += 1;
         }

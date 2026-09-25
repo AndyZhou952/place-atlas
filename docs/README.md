@@ -6,6 +6,8 @@
 - [Intake and evaluation](ingestion-and-evaluation.md): deterministic intake, benchmark contracts, and the guarded semantic-enrichment seam.
 - [Roadmap](roadmap.md): prioritized PoC work.
 - [Deployment](deployment/cloudflare.md): Cloudflare self-hosting and bring-your-own providers.
+- [Research Relay](deployment/research-relay.md): guarded OpenClaw search,
+  fetch, DeepSeek extraction, and rollout gates.
 - [Maintenance](maintenance.md): safe database and deployment operations.
 - [Decision log](decisions.md): current architectural decisions.
 

@@ -1,7 +1,35 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createHardenedResearchTransport } from './hardened-research-transport.ts';
+import { createHardenedResearchTransport as createPolicyBoundedTransport } from './hardened-research-transport.ts';
+import { createTabelogResearchSourcePolicy } from './research-source-policy.ts';
+
+const fixtureSourcePolicy = {
+  canonicalize: canonicalHttps,
+  authorizeCandidate: canonicalHttps,
+  authorizeRedirect(_from, to) {
+    return canonicalHttps(to);
+  },
+  authorizeClaim(_kind, url) {
+    return canonicalHttps(url);
+  },
+};
+
+function createHardenedResearchTransport(dependencies) {
+  return createPolicyBoundedTransport({
+    ...dependencies,
+    sourcePolicy: fixtureSourcePolicy,
+  });
+}
+
+function canonicalHttps(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 test('hardened research transport pins public dual-stack DNS and preserves hostname TLS across redirects', async () => {
   const calls = [];
@@ -69,6 +97,61 @@ test('hardened research transport pins public dual-stack DNS and preserves hostn
         timeoutMs: 15_000,
       },
     ],
+  );
+});
+
+test('source policy blocks a redirect before its hostname reaches DNS', async () => {
+  const dnsHosts = [];
+  const transport = createPolicyBoundedTransport({
+    sourcePolicy: createTabelogResearchSourcePolicy(),
+    dns: {
+      async resolve(hostname) {
+        dnsHosts.push(hostname);
+        return dnsAnswer(['93.184.216.34']);
+      },
+    },
+    connector: {
+      async request(input) {
+        return {
+          status: 302,
+          headers: { location: 'https://restaurant.example/reservations' },
+          connectedIp: input.pinnedIp,
+          body: bodyOf(''),
+        };
+      },
+    },
+  });
+  assert.deepEqual(
+    await transport.get('https://tabelog.com/tokyo/A1301/A130101/13000001/', {
+      timeoutMs: 15_000,
+      maxRedirects: 3,
+      deadlineAtMs: 4_000_000_000_000,
+    }),
+    {
+      status: 'failed',
+      reason: 'security_blocked',
+      requestCount: 1,
+      redirectsFollowed: 1,
+    },
+  );
+  assert.deepEqual(dnsHosts, ['tabelog.com']);
+});
+
+test('source policy rejects a redirect to a different Tabelog restaurant identity', () => {
+  const policy = createTabelogResearchSourcePolicy();
+  assert.equal(
+    policy.authorizeRedirect(
+      'https://tabelog.com/tokyo/A1301/A130101/13000001/',
+      'https://www.tabelog.com/tokyo/A1301/A130101/13000002/',
+    ),
+    undefined,
+  );
+  assert.equal(
+    policy.authorizeRedirect(
+      'https://tabelog.com/tokyo/A1301/A130101/13000001/',
+      'https://www.tabelog.com/tw/tokyo/A1301/A130101/13000001/',
+    ),
+    'https://www.tabelog.com/tw/tokyo/A1301/A130101/13000001/',
   );
 });
 

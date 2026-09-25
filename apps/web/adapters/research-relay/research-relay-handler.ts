@@ -8,6 +8,7 @@ import {
   type ResearchRelayProposal,
 } from './research-relay-envelope.ts';
 import type { RelayReplayGuardPort } from './research-relay-replay-guard.ts';
+import type { ResearchSourcePolicy } from './research-source-policy.ts';
 
 export interface OpenClawUrlSearchPort {
   invoke(input: {
@@ -71,6 +72,7 @@ export function createResearchRelayHandler(dependencies: {
   readonly searchTool: OpenClawUrlSearchPort;
   readonly transport: HardenedResearchTransport;
   readonly extractor: ResearchScalarExtractorPort;
+  readonly sourcePolicy: ResearchSourcePolicy;
 }) {
   return {
     async handle(signedAllowance: unknown, input: unknown) {
@@ -155,7 +157,13 @@ export function createResearchRelayHandler(dependencies: {
             });
             const validated = validateSearchResult(searchResult);
             unavailable = !validated;
-            urls = validated ?? [];
+            urls = validated
+              ? validated.flatMap((url) => {
+                  const allowed =
+                    dependencies.sourcePolicy.authorizeCandidate(url);
+                  return allowed ? [allowed] : [];
+                })
+              : [];
           } catch {
             if (abortController.signal.aborted) {
               return {
@@ -167,7 +175,10 @@ export function createResearchRelayHandler(dependencies: {
             urls = [];
           }
         } else {
-          urls = normalizedInput.canonicalUrls;
+          urls = normalizedInput.canonicalUrls.flatMap((url) => {
+            const allowed = dependencies.sourcePolicy.authorizeCandidate(url);
+            return allowed ? [allowed] : [];
+          });
         }
 
         let pageRequests = 0;
@@ -219,6 +230,12 @@ export function createResearchRelayHandler(dependencies: {
             unavailable = true;
             break;
           }
+          if (
+            !dependencies.sourcePolicy.authorizeRedirect(url, fetched.finalUrl)
+          ) {
+            unavailable = true;
+            break;
+          }
           let extraction: ResearchExtractionOutcome | undefined;
           try {
             extraction = normalizeExtractionOutcome(
@@ -252,6 +269,15 @@ export function createResearchRelayHandler(dependencies: {
           }
           if (extraction.status === 'no_evidence') continue;
           if (!proposalSourcesMatch(extraction.proposal, fetched.finalUrl)) {
+            unavailable = true;
+            break;
+          }
+          if (
+            !proposalClaimsAllowed(
+              extraction.proposal,
+              dependencies.sourcePolicy,
+            )
+          ) {
             unavailable = true;
             break;
           }
@@ -476,6 +502,20 @@ function proposalSourcesMatch(
       proposal.tabelog.url === sourceUrl) &&
     (proposal.reservation.status === 'unknown' ||
       proposal.reservation.url === sourceUrl)
+  );
+}
+
+function proposalClaimsAllowed(
+  proposal: ResearchRelayProposal,
+  policy: ResearchSourcePolicy,
+): boolean {
+  return (
+    (proposal.tabelog.status === 'unknown' ||
+      policy.authorizeClaim('tabelog', proposal.tabelog.url) ===
+        proposal.tabelog.url) &&
+    (proposal.reservation.status === 'unknown' ||
+      policy.authorizeClaim('reservation', proposal.reservation.url) ===
+        proposal.reservation.url)
   );
 }
 

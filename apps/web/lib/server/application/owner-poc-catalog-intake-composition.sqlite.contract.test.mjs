@@ -10,7 +10,42 @@ import { createOwnerPocComposition } from './owner-poc-composition.ts';
 
 const root = new URL('../../../migrations/owner-poc/', import.meta.url);
 
-test('production owner-poc composition discovers, durably locates, and atomically publishes without Relay', async () => {
+test('production composition recognizes guarded Relay only when every reviewed binding is present', () => {
+  const database = {
+    prepare() {
+      throw new Error('construction must not query D1');
+    },
+  };
+  const complete = {
+    providerModes: { researchRelay: 'relay_enabled_guarded_v1' },
+    researchRelayEndpoint: 'https://research.example/v1/research',
+    researchRelayIngressBearerSecret: 'i'.repeat(32),
+    researchAllowanceKeyVersion: 'allowance-v1',
+    researchAllowanceHmacSecret: 'a'.repeat(32),
+    researchResultKeyVersion: 'result-v1',
+    researchResultHmacSecret: 'r'.repeat(32),
+  };
+  assert.equal(
+    createOwnerPocComposition(database, undefined, complete).providerModes
+      .researchRelay,
+    'relay_enabled_guarded_v1',
+  );
+  for (const key of Object.keys(complete).filter(
+    (candidate) => candidate !== 'providerModes',
+  )) {
+    assert.throws(
+      () =>
+        createOwnerPocComposition(database, undefined, {
+          ...complete,
+          [key]: undefined,
+        }),
+      /Guarded Research Relay configuration is invalid/u,
+      key,
+    );
+  }
+});
+
+test('production owner-poc composition fails closed to manual unknown when guarded Relay configuration is incomplete', async () => {
   const sqlite = new DatabaseSync(':memory:');
   for (const migration of [
     '0001_owner_poc_schema.sql',

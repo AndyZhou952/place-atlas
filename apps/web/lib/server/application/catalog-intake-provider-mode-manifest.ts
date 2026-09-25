@@ -27,9 +27,10 @@ export const catalogIntakeProviderPolicy = {
     cacheTtlDays: 30,
   },
   researchRelay: {
-    policyVersion: 'dp06-proposed-disabled-v1',
+    policyVersion: 'tabelog-detail-guarded-v1',
     modeVariable: 'CATALOG_INTAKE_RESEARCH_RELAY_MODE',
-    requiredValue: 'relay_disabled_manual_unknown',
+    enabledValue: 'relay_enabled_guarded_v1',
+    disabledValue: 'relay_disabled_manual_unknown',
   },
 } as const;
 
@@ -44,6 +45,12 @@ export interface OwnerPocCatalogIntakeRuntimeBindings {
   readonly CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;
   readonly CATALOG_INTAKE_DURABLE_GEOCODER_MODE?: string;
   readonly CATALOG_INTAKE_RESEARCH_RELAY_MODE?: string;
+  readonly RESEARCH_RELAY_ENDPOINT?: string;
+  readonly RESEARCH_RELAY_INGRESS_BEARER_SECRET?: string;
+  readonly RESEARCH_ALLOWANCE_KEY_VERSION?: string;
+  readonly RESEARCH_ALLOWANCE_HMAC_SECRET?: string;
+  readonly RESEARCH_RESULT_KEY_VERSION?: string;
+  readonly RESEARCH_RESULT_HMAC_SECRET?: string;
 }
 
 export function projectOwnerPocCatalogIntakeRuntime(
@@ -51,6 +58,13 @@ export function projectOwnerPocCatalogIntakeRuntime(
 ) {
   return {
     googlePlacesApiKey: bindings.GOOGLE_PLACES_API_KEY,
+    researchRelayEndpoint: bindings.RESEARCH_RELAY_ENDPOINT,
+    researchRelayIngressBearerSecret:
+      bindings.RESEARCH_RELAY_INGRESS_BEARER_SECRET,
+    researchAllowanceKeyVersion: bindings.RESEARCH_ALLOWANCE_KEY_VERSION,
+    researchAllowanceHmacSecret: bindings.RESEARCH_ALLOWANCE_HMAC_SECRET,
+    researchResultKeyVersion: bindings.RESEARCH_RESULT_KEY_VERSION,
+    researchResultHmacSecret: bindings.RESEARCH_RESULT_HMAC_SECRET,
     providerModes: {
       googlePlaces: bindings.CATALOG_INTAKE_GOOGLE_PLACES_MODE,
       durableGeocoder: bindings.CATALOG_INTAKE_DURABLE_GEOCODER_MODE,
@@ -73,6 +87,10 @@ export function inspectCatalogIntakeProviderModes(
       catalogIntakeProviderPolicy.durableGeocoder.enabledValue
         ? ('enabled' as const)
         : ('disabled' as const),
-    researchRelay: 'relay_disabled_manual_unknown' as const,
+    researchRelay:
+      modes.researchRelay ===
+      catalogIntakeProviderPolicy.researchRelay.enabledValue
+        ? ('relay_enabled_guarded_v1' as const)
+        : ('relay_disabled_manual_unknown' as const),
   };
 }

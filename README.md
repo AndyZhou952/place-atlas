@@ -14,7 +14,7 @@ Available today:
 - Nearby over verified saved places through a private Google route sidecar;
 - signed `/jpmap add` and `/jpmap nearby` operations through the bundled OpenClaw plugin.
 
-The repository includes a bounded, model-neutral OpenAI-compatible scalar extractor and a DeepSeek configuration, plus offline place-resolution and enrichment benchmarks. Production research is still disabled until a trusted search/fetch relay is configured and the evaluation gate is run against that complete pipeline. Automatic category, signature-dish, Google-rating, and recommendation enrichment is not implemented yet. Conversational Record and screenshot-to-place intake are also not implemented.
+The repository includes a bounded, model-neutral OpenAI-compatible scalar extractor, a DeepSeek configuration, a loopback OpenClaw Research Relay, and offline place-resolution and enrichment benchmarks. The production feature flag remains disabled until the Relay is deployed and the evaluation gate is run against that complete pipeline. The first guarded policy accepts only canonical Tabelog restaurant-detail pages and can propose only Tabelog score and explicit reservation facts. Automatic category, signature-dish, Google-rating, and recommendation enrichment is not implemented yet. Conversational Record and screenshot-to-place intake are also not implemented.
 
 ## Local development
 
@@ -40,7 +40,7 @@ npm run build
 
 A self-hosted deployment supplies its own Cloudflare account, D1 database, R2 bucket, Google credentials, and Agent credentials. Google Places identifies Add candidates; a private sidecar handles geocoding and walking routes. A model API key alone does not provide web research: the current model adapter only extracts narrowly defined facts from evidence fetched by a separate trusted relay. Keep research disabled until that relay is configured and evaluated.
 
-Start with the [Cloudflare deployment guide](docs/deployment/cloudflare.md). Migrations live in `apps/web/migrations`, provider policies under `apps/web/adapters/providers/policies`, and the OpenClaw package in `packages/openclaw-jpmap`.
+Start with the [Cloudflare deployment guide](docs/deployment/cloudflare.md). The optional network enrichment path is documented in the [Research Relay guide](docs/deployment/research-relay.md). Migrations live in `apps/web/migrations`, provider policies under `apps/web/adapters/providers/policies`, and the OpenClaw packages under `packages`.
 
 ## Documentation
 

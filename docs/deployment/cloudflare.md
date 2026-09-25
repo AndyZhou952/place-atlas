@@ -9,10 +9,12 @@ This is a bring-your-own-account deployment using Cloudflare Workers, D1, R2, se
 - Owner R2: private media objects.
 - Route sidecar: private Google geocoding and walking-route calls.
 - Optional OpenClaw host: `packages/openclaw-jpmap` forwards exact `/jpmap` commands.
+- Optional Research Relay: `packages/research-relay` performs bounded search,
+  fetch, and scalar extraction outside the Owner Worker.
 
 Google Places identifies Add candidates. The sidecar uses Google Geocoding and Routes. These remain independent server-only bindings even if a PoC uses one Google project. Restrict credentials and set provider budgets.
 
-The repository includes an experimental OpenAI-compatible scalar extractor with a DeepSeek configuration, but it is intentionally not wired into the production composition. A model key alone does not enable enrichment or web search. A deployment must first provide an allowlisted search/fetch relay, keep credentials server-side, and pass the repository benchmarks with live pipeline predictions.
+The Owner composition contains an explicit guarded Relay mode, but the checked-in production template keeps it disabled. A model key alone does not enable enrichment or web search. Follow [research-relay.md](research-relay.md), keep search and model credentials off the Owner Worker, and pass the live evaluation gate before changing `CATALOG_INTAKE_RESEARCH_RELAY_MODE` to `relay_enabled_guarded_v1`.
 
 ## Deployment outline
 

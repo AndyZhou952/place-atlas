@@ -14,6 +14,8 @@ import { createGooglePlaceDiscoveryAdapter } from '../../../adapters/providers/g
 import { createGooglePlacesNewClient } from '../../../adapters/providers/google-places-new-client.ts';
 import { createNominatimDurableGeocoderAdapter } from '../../../adapters/providers/nominatim-durable-geocoder.ts';
 import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
+import { createHttpResearchRelayRpc } from '../../../adapters/research-relay/http-research-relay-rpc.ts';
+import { createResearchRelayWebResearchPort } from '../../../adapters/research-relay/research-relay-web-research-port.ts';
 import { createCatalogIntakeModule } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
@@ -29,6 +31,13 @@ export interface OwnerPocCatalogIntakeOptions {
   readonly fetch?: typeof fetch;
   readonly clock?: { now(): Date };
   readonly idSource?: { nextId(): string };
+  readonly researchRequestIds?: { nextId(): string };
+  readonly researchRelayEndpoint?: string;
+  readonly researchRelayIngressBearerSecret?: string;
+  readonly researchAllowanceKeyVersion?: string;
+  readonly researchAllowanceHmacSecret?: string;
+  readonly researchResultKeyVersion?: string;
+  readonly researchResultHmacSecret?: string;
 }
 
 export const ownerPocNominatimIdentity = {
@@ -110,10 +119,16 @@ export function createOwnerPocComposition(
   const idSource = intakeOptions.idSource ?? {
     nextId: () => crypto.randomUUID(),
   };
+  const webResearchPort = createOwnerPocWebResearchPort({
+    options: intakeOptions,
+    state,
+    clock,
+  });
   const catalogIntakeModule = createCatalogIntakeModule({
     discoveryPort: discovery,
     ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),
-    enrichmentPolicy: 'disabled',
+    ...(webResearchPort ? { webResearchPort } : {}),
+    enrichmentPolicy: webResearchPort ? 'enrich_if_available' : 'disabled',
     statePort: state,
     atlasCatalogIntakePort: new D1AtlasCatalogIntakePublisher(database, {
       now: () => clock.now(),
@@ -139,6 +154,72 @@ export function createOwnerPocComposition(
     visitItemProjection: createVisitTargetProjection([]),
     agentNearby,
     catalogIntakeModule,
-    providerModes,
+    providerModes: {
+      ...providerModes,
+      researchRelay: webResearchPort
+        ? ('relay_enabled_guarded_v1' as const)
+        : ('relay_disabled_manual_unknown' as const),
+    },
   };
+}
+
+function createOwnerPocWebResearchPort(input: {
+  readonly options: OwnerPocCatalogIntakeOptions;
+  readonly state: D1CatalogIntakeState;
+  readonly clock: { now(): Date };
+}) {
+  const { options } = input;
+  if (options.providerModes?.researchRelay !== 'relay_enabled_guarded_v1') {
+    return undefined;
+  }
+  if (
+    !validIdentifier(options.researchAllowanceKeyVersion) ||
+    !validIdentifier(options.researchResultKeyVersion) ||
+    !validSecret(options.researchAllowanceHmacSecret) ||
+    !validSecret(options.researchResultHmacSecret) ||
+    !validSecret(options.researchRelayIngressBearerSecret) ||
+    typeof options.researchRelayEndpoint !== 'string'
+  ) {
+    throw new TypeError('Guarded Research Relay configuration is invalid.');
+  }
+  return createResearchRelayWebResearchPort({
+    statePort: input.state,
+    allowanceKey: {
+      keyVersion: options.researchAllowanceKeyVersion,
+      secret: options.researchAllowanceHmacSecret,
+    },
+    resultKeys: {
+      [options.researchResultKeyVersion]: options.researchResultHmacSecret,
+    },
+    clock: input.clock,
+    requestIds: options.researchRequestIds ?? {
+      nextId: () => crypto.randomUUID(),
+    },
+    relay: createHttpResearchRelayRpc({
+      endpoint: options.researchRelayEndpoint,
+      bearerSecret: options.researchRelayIngressBearerSecret,
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    }),
+  });
+}
+
+function validIdentifier(value: string | undefined): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._-]{1,64}$/u.test(value);
+}
+
+function validSecret(value: string | undefined): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length >= 32 &&
+    value.length <= 4_096 &&
+    !hasAsciiControlCharacter(value)
+  );
+}
+
+function hasAsciiControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
 }

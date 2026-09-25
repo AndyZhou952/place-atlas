@@ -615,6 +615,27 @@ test(
       if (blockedStage === 'stream') assert.equal(streamClosed, true);
     }
 
+    const neverSettlingDns = createHardenedResearchTransport({
+      dns: {
+        async resolve() {
+          return new Promise(() => undefined);
+        },
+      },
+      connector: {
+        async request() {
+          throw new Error('connector must not be reached');
+        },
+      },
+    });
+    assertFailure(
+      await neverSettlingDns.get('https://restaurant.example/path', {
+        timeoutMs: 15_000,
+        maxRedirects: 3,
+        deadlineAtMs: Date.now() + 30,
+      }),
+      'deadline',
+    );
+
     let now = 10_000;
     let connectorTimeout;
     const recomputed = createHardenedResearchTransport({

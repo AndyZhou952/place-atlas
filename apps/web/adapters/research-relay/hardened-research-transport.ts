@@ -118,10 +118,13 @@ export function createHardenedResearchTransport(dependencies: {
           if (!policyUrl) return failed('security_blocked');
           const parsed = validateHttpsUrl(policyUrl);
           if (!parsed) return failed('security_blocked');
-          const resolved = await dependencies.dns.resolve(parsed.hostname, {
-            signal: deadline.signal,
-            deadlineAtMs: limits.deadlineAtMs,
-          });
+          const resolved = await raceWithAbort(
+            dependencies.dns.resolve(parsed.hostname, {
+              signal: deadline.signal,
+              deadlineAtMs: limits.deadlineAtMs,
+            }),
+            deadline.signal,
+          );
           const addresses = validateDnsAnswer(resolved);
           if (!addresses) return failed('security_blocked');
           const connectorRemainingMs = limits.deadlineAtMs - now();
@@ -129,6 +132,7 @@ export function createHardenedResearchTransport(dependencies: {
             return failed('deadline');
           }
           const pinnedIp = addresses[0];
+          if (!pinnedIp) return failed('security_blocked');
           const rawResponse = await dependencies.connector.request({
             url: parsed.toString(),
             pinnedIp,
@@ -223,6 +227,37 @@ export function createHardenedResearchTransport(dependencies: {
       }
     },
   };
+}
+
+function raceWithAbort<T>(
+  operation: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(
+      signal.reason ?? new DOMException('Request aborted.', 'AbortError'),
+    );
+  }
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      cleanup();
+      reject(
+        signal.reason ?? new DOMException('Request aborted.', 'AbortError'),
+      );
+    };
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    signal.addEventListener('abort', abort, { once: true });
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
 }
 
 function reasonForHttpStatus(

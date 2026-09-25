@@ -1,5 +1,5 @@
 import type { HardenedResearchTransport } from './hardened-research-transport.ts';
-import type { OpenClawUrlSearchPort } from './research-relay-handler.ts';
+import type { ResearchUrlSearchPort } from './research-relay-handler.ts';
 import type { ResearchSourcePolicy } from './research-source-policy.ts';
 
 const maximumGatewayResponseBytes = 96 * 1024;
@@ -20,18 +20,15 @@ export function createOpenClawGatewayResearchAdapters(dependencies: {
   readonly sourcePolicy: ResearchSourcePolicy;
   readonly fetch?: typeof fetch;
 }): {
-  readonly searchTool: OpenClawUrlSearchPort;
+  readonly searchTool: ResearchUrlSearchPort;
   readonly transport: HardenedResearchTransport;
 } {
   const gateway = createGatewayInvoker(dependencies);
   return {
     searchTool: {
-      async invoke(input) {
+      async search(input) {
         if (
-          input.toolId !== 'openclaw.web_search' ||
-          input.toolVersion !== 'v1' ||
-          input.arguments.maxResults !== 3 ||
-          input.arguments.output !== 'url_candidates_only' ||
+          input.maxResults !== 3 ||
           input.signal.aborted ||
           Date.now() >= input.deadlineAtMs
         ) {
@@ -40,7 +37,7 @@ export function createOpenClawGatewayResearchAdapters(dependencies: {
         const output = await gateway.invoke(
           'web_search',
           {
-            query: `${input.arguments.query} site:tabelog.com`,
+            query: `${input.query} site:tabelog.com`,
             count: 3,
           },
           input.signal,

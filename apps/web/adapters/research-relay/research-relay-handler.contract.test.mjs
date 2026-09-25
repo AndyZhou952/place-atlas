@@ -74,7 +74,7 @@ test('Relay claims before exact OpenClaw search/fetch and response-loss retry ca
       },
     },
     searchTool: {
-      async invoke(input) {
+      async search(input) {
         events.push('search');
         assert.equal(input.signal instanceof AbortSignal, true);
         assert.equal(
@@ -86,15 +86,7 @@ test('Relay claims before exact OpenClaw search/fetch and response-loss retry ca
           deadlineAtMs: _deadline,
           ...toolInput
         } = input;
-        assert.deepEqual(toolInput, {
-          toolId: 'openclaw.web_search',
-          toolVersion: 'v1',
-          arguments: {
-            query,
-            maxResults: 3,
-            output: 'url_candidates_only',
-          },
-        });
+        assert.deepEqual(toolInput, { query, maxResults: 3 });
         return {
           urls: [
             'https://tabelog.com/tokyo/A1307/A130701/13000001/',
@@ -191,7 +183,7 @@ test(
         now: () => new Date(),
         replayGuard: claimOnce(),
         searchTool: {
-          async invoke({ signal }) {
+          async search({ signal }) {
             if (blockedStage !== 'search') throw new Error('must not search');
             await rejectWhenAborted(signal, () => {
               aborted = true;
@@ -247,7 +239,7 @@ test('Relay confirm uses only exact sorted preview URLs and never calls search',
     now: () => initialNow,
     replayGuard: claimOnce(),
     searchTool: {
-      async invoke() {
+      async search() {
         searchCalls += 1;
         throw new Error('confirm must not search');
       },
@@ -292,7 +284,7 @@ test('Relay rejects a known field whose source is not authorized for that claim'
     now: () => initialNow,
     replayGuard: claimOnce(),
     searchTool: {
-      async invoke() {
+      async search() {
         throw new Error('confirm must not search');
       },
     },
@@ -370,7 +362,7 @@ test('Relay rejects phase payload substitution and signs unavailable for expande
       },
     },
     searchTool: {
-      async invoke() {
+      async search() {
         searches += 1;
         return { urls: [], snippets: ['forbidden raw result'] };
       },
@@ -420,7 +412,7 @@ test('Relay rejects phase payload substitution and signs unavailable for expande
       now: () => initialNow,
       replayGuard: claimOnce(),
       searchTool: {
-        async invoke() {
+        async search() {
           if (searchResult instanceof Error) throw searchResult;
           return searchResult;
         },
@@ -477,7 +469,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
       now: () => initialNow,
       replayGuard: claimOnce(),
       searchTool: {
-        async invoke() {
+        async search() {
           throw new Error('must not search');
         },
       },
@@ -523,7 +515,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
     now: () => initialNow,
     replayGuard: claimOnce(),
     searchTool: {
-      async invoke() {
+      async search() {
         throw new Error('must not search');
       },
     },
@@ -588,7 +580,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
     now: () => initialNow,
     replayGuard: claimOnce(),
     searchTool: {
-      async invoke() {
+      async search() {
         throw new Error('must not search');
       },
     },
@@ -654,7 +646,7 @@ test('Relay extractor stop is terminal while explicit no-evidence alone may cont
       now: () => initialNow,
       replayGuard: claimOnce(),
       searchTool: {
-        async invoke() {
+        async search() {
           throw new Error('must not search');
         },
       },
@@ -728,7 +720,7 @@ test('Relay discards partial evidence and signs unavailable when a later extract
     now: () => initialNow,
     replayGuard: claimOnce(),
     searchTool: {
-      async invoke() {
+      async search() {
         throw new Error('must not search');
       },
     },
@@ -799,7 +791,7 @@ test('Relay rejects replaying an allowance against a different selected branch',
       },
     },
     searchTool: {
-      async invoke() {
+      async search() {
         throw new Error('must not search');
       },
     },

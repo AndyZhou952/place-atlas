@@ -9,8 +9,8 @@ This is a bring-your-own-account deployment using Cloudflare Workers, D1, R2, se
 - Owner R2: private media objects.
 - Route sidecar: private Google geocoding and walking-route calls.
 - Optional OpenClaw host: `packages/openclaw-jpmap` forwards exact `/jpmap` commands.
-- Optional Research Relay: `packages/research-relay` performs bounded search,
-  fetch, and scalar extraction outside the Owner Worker.
+- Agent Service: `packages/research-relay` performs bounded search, fetch, and
+  scalar extraction outside the Owner Worker; it does not depend on OpenClaw.
 
 Google Places identifies Add candidates. The sidecar uses Google Geocoding and Routes. These remain independent server-only bindings even if a PoC uses one Google project. Restrict credentials and set provider budgets.
 

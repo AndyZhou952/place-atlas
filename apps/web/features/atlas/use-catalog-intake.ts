@@ -88,6 +88,7 @@ export function useCatalogIntake(
           }),
           tabelog: 'unknown',
           reservation: 'unknown',
+          requestResearch: true,
         },
       });
       dispatch({ type: 'select_succeeded', output });

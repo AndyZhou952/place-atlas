@@ -45,14 +45,9 @@ test('OpenClaw research adapter keeps Gateway access loopback-only and returns o
       },
     });
   });
-  const result = await adapters.searchTool.invoke({
-    toolId: 'openclaw.web_search',
-    toolVersion: 'v1',
-    arguments: {
-      query: 'Sushi Saito Roppongi',
-      maxResults: 3,
-      output: 'url_candidates_only',
-    },
+  const result = await adapters.searchTool.search({
+    query: 'Sushi Saito Roppongi',
+    maxResults: 3,
     signal: new AbortController().signal,
     deadlineAtMs: Date.now() + 5_000,
   });

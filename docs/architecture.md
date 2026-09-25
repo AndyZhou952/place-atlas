@@ -8,7 +8,8 @@ Browser UI ─┐
 Agent API ──┘                         └─ provider ports
                                                ├─ Google Places
                                                ├─ durable geocoder
-                                               └─ private route sidecar
+                                               ├─ private route sidecar
+                                               └─ signed Agent Service RPC
 ```
 
 An LLM is not the source of truth. A bounded OpenAI-compatible adapter can extract approved scalar facts from already-fetched evidence; it does not browse or write. Deterministic validation, identity, authorization, idempotency, and persistence remain in the application.
@@ -21,6 +22,8 @@ An LLM is not the source of truth. A bounded OpenAI-compatible adapter can extra
 - `apps/web/lib/server/application`: server composition and durable services.
 - `apps/web/adapters`: D1, provider, and Agent adapters.
 - `apps/web/route-sidecar`: private geocoding and route worker.
+- `packages/research-relay`: repository-owned Agent Service for bounded search,
+  fetch, and model-assisted evidence extraction.
 - `apps/web/migrations/owner-poc`: deployable D1 chain and seed manifest.
 - `apps/web/migrations/agent-poc`: isolated Agent fixtures.
 - `apps/web/adapters/providers/policies`: provider policy evidence.
@@ -39,4 +42,10 @@ Public reads need no Owner credentials. Browser writes require an Owner session.
 
 The model-neutral research extractor consumes one bounded, untrusted page plus its canonical source URL and returns a schema-validated proposal or an explicit stop/no-evidence result. The included DeepSeek configuration uses the same port as any other OpenAI-compatible provider. It has no direct D1 access and no built-in browsing role.
 
-The separate research relay already owns bounded fetching, deadlines, signed selected-branch binding, and provenance. A production implementation must also add an explicit source policy for search results and every redirect. Production enrichment remains disabled until that policy and a concrete relay/search implementation are configured and pass the checked-in resolution and enrichment benchmarks. Recommendation requires a separate, later contract; it is not implied by the scalar extractor.
+The separate Agent Service owns bounded search and fetching, deadlines, signed
+selected-branch binding, and provenance. Its default direct provider uses a
+fixed search endpoint and a Tabelog-only source/redirect policy. OpenClaw is an
+optional channel or compatibility adapter, never a required enrichment host.
+Production enrichment remains disabled until the live evaluation gate passes.
+Recommendation requires a separate, later contract; it is not implied by the
+scalar extractor.

@@ -14,7 +14,7 @@ Available today:
 - Nearby over verified saved places through a private Google route sidecar;
 - signed `/jpmap add` and `/jpmap nearby` operations through the bundled OpenClaw plugin.
 
-The repository includes a bounded, model-neutral OpenAI-compatible scalar extractor, a DeepSeek configuration, a loopback OpenClaw Research Relay, and offline place-resolution and enrichment benchmarks. The production feature flag remains disabled until the Relay is deployed and the evaluation gate is run against that complete pipeline. The first guarded policy accepts only canonical Tabelog restaurant-detail pages and can propose only Tabelog score and explicit reservation facts. Automatic category, signature-dish, Google-rating, and recommendation enrichment is not implemented yet. Conversational Record and screenshot-to-place intake are also not implemented.
+The repository includes a standalone Agent Service, a bounded model-neutral OpenAI-compatible scalar extractor, a DeepSeek configuration, and offline place-resolution and enrichment benchmarks. Its default search/fetch path is repository-owned and does not depend on OpenClaw; OpenClaw remains an optional WeChat channel adapter. The production feature flag remains disabled until the Agent Service is deployed and the evaluation gate is run against that complete pipeline. The first guarded policy accepts only canonical Tabelog restaurant-detail pages and can propose only Tabelog score and explicit reservation facts. Automatic category, signature-dish, Google-rating, and recommendation enrichment is not implemented yet. Conversational Record and screenshot-to-place intake are also not implemented.
 
 ## Local development
 

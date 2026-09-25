@@ -10,15 +10,10 @@ import {
 import type { RelayReplayGuardPort } from './research-relay-replay-guard.ts';
 import type { ResearchSourcePolicy } from './research-source-policy.ts';
 
-export interface OpenClawUrlSearchPort {
-  invoke(input: {
-    readonly toolId: 'openclaw.web_search';
-    readonly toolVersion: 'v1';
-    readonly arguments: {
-      readonly query: string;
-      readonly maxResults: 3;
-      readonly output: 'url_candidates_only';
-    };
+export interface ResearchUrlSearchPort {
+  search(input: {
+    readonly query: string;
+    readonly maxResults: 3;
     readonly signal: AbortSignal;
     readonly deadlineAtMs: number;
   }): Promise<unknown>;
@@ -69,7 +64,7 @@ export function createResearchRelayHandler(dependencies: {
   readonly resultKey: { readonly keyVersion: string; readonly secret: string };
   readonly now: () => Date;
   readonly replayGuard: RelayReplayGuardPort;
-  readonly searchTool: OpenClawUrlSearchPort;
+  readonly searchTool: ResearchUrlSearchPort;
   readonly transport: HardenedResearchTransport;
   readonly extractor: ResearchScalarExtractorPort;
   readonly sourcePolicy: ResearchSourcePolicy;
@@ -141,17 +136,12 @@ export function createResearchRelayHandler(dependencies: {
         if (normalizedInput.phase === 'initial') {
           searchQueries = 1;
           try {
-            const searchResult = await dependencies.searchTool.invoke({
-              toolId: 'openclaw.web_search',
-              toolVersion: 'v1',
-              arguments: {
-                query:
-                  'subject' in normalizedInput
-                    ? `${normalizedInput.subject.transientName} ${normalizedInput.subject.transientAddress}`
-                    : normalizedInput.query,
-                maxResults: 3,
-                output: 'url_candidates_only',
-              },
+            const searchResult = await dependencies.searchTool.search({
+              query:
+                'subject' in normalizedInput
+                  ? `${normalizedInput.subject.transientName} ${normalizedInput.subject.transientAddress}`
+                  : normalizedInput.query,
+              maxResults: 3,
               signal: abortController.signal,
               deadlineAtMs,
             });

@@ -14,7 +14,7 @@ Anyone can view published places. Only a logged-in Owner can Add or edit places,
 4. Review the Preview, including address, coordinates, warnings, and unknown fields.
 5. Confirm or cancel.
 
-A confirmed place with sufficient evidence enters the map. Otherwise it becomes a `needs-review` candidate and must remain visible to the Owner. Current production intake does not automatically research Tabelog, Google review, reservation timing, category, or signature dishes.
+A confirmed place with sufficient evidence enters the map. Otherwise it becomes a `needs-review` candidate and must remain visible to the Owner. When the repository-owned Agent Service is configured, it uses DeepSeek to extract supported Tabelog and reservation facts from bounded web evidence. Google review, category, and signature dishes are not yet automated.
 
 ## Record
 
@@ -61,4 +61,4 @@ These are invalid:
 
 ## Current limits
 
-The repository has an experimental model adapter, but the production search/fetch relay is not connected, so automatic Tabelog/reservation research is still disabled. Conversational Record, screenshot intake, and screenshot-based Nearby are not implemented. The current Review surface is not a full catalog editor. Unknown external facts remain unknown instead of being guessed.
+The repository includes the Agent Service, but each deployment must configure its protected DeepSeek key, HTTPS relay connection, and signed trust keys before automatic Tabelog/reservation research can be enabled. Conversational Record, screenshot intake, and screenshot-based Nearby are not implemented. The current Review surface is not a full catalog editor. Unknown external facts remain unknown instead of being guessed.

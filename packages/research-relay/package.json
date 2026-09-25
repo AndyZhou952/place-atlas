@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
+    "smoke:web": "node --experimental-strip-types src/direct-web-smoke.ts",
     "smoke:live": "node --experimental-strip-types src/live-smoke.ts",
     "test": "node --experimental-strip-types --test test/*.test.mjs",
     "lint": "oxlint src test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "format": "oxfmt src test",
     "format:check": "oxfmt --check src test"
+  },
+  "dependencies": {
+    "ipaddr.js": "2.5.0"
   },
   "devDependencies": {
     "@types/node": "22.19.19",

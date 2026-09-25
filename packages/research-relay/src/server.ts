@@ -15,6 +15,7 @@ import {
   SqliteResearchRelayReplayGuard,
 } from "../../../apps/web/adapters/research-relay/research-relay-replay-guard.ts";
 import { createTabelogResearchSourcePolicy } from "../../../apps/web/adapters/research-relay/research-source-policy.ts";
+import { createDirectWebResearchAdapters } from "./direct-web-research-adapter.ts";
 
 const maximumHttpRequestBytes = 32 * 1024;
 const requestTimeoutMs = 15_000;
@@ -31,12 +32,15 @@ export function createResearchRelayServer(
   const configuration = readConfiguration(environment);
   const now = overrides.now ?? (() => new Date());
   const sourcePolicy = createTabelogResearchSourcePolicy();
-  const researchAdapters = createOpenClawGatewayResearchAdapters({
-    endpoint: configuration.openClawEndpoint,
-    token: configuration.openClawToken,
-    sourcePolicy,
-    ...(overrides.fetch ? { fetch: overrides.fetch } : {}),
-  });
+  const researchAdapters =
+    configuration.webProvider === "direct_duckduckgo"
+      ? createDirectWebResearchAdapters({ sourcePolicy })
+      : createOpenClawGatewayResearchAdapters({
+          endpoint: configuration.openClawEndpoint,
+          token: configuration.openClawToken,
+          sourcePolicy,
+          ...(overrides.fetch ? { fetch: overrides.fetch } : {}),
+        });
   const extractor = createDeepSeekResearchScalarExtractor({
     apiKey: configuration.deepSeekApiKey,
     ...(overrides.fetch ? { fetch: overrides.fetch } : {}),
@@ -59,11 +63,11 @@ export function createResearchRelayServer(
       const statement = sqlite.prepare(sql);
       return {
         run(...values) {
-          const result = statement.run(...values);
+          const result = statement.run(...(values as Parameters<typeof statement.run>));
           return { changes: Number(result.changes) };
         },
         get(...values) {
-          return statement.get(...values);
+          return statement.get(...(values as Parameters<typeof statement.get>));
         },
       };
     },
@@ -167,11 +171,13 @@ async function handleHttpRequest(
   entry: ReturnType<typeof createResearchRelayHttpEntry>,
   bearerSecret: string,
 ) {
+  const authorization = readSingleHeader(request.headers.authorization);
+  const contentType = readContentType(request.headers["content-type"]);
   const headers = {
     method: request.method ?? "",
     path: request.url ?? "",
-    authorization: readSingleHeader(request.headers.authorization),
-    contentType: readContentType(request.headers["content-type"]),
+    ...(authorization ? { authorization } : {}),
+    ...(contentType ? { contentType } : {}),
   };
   const headerRejection = inspectResearchRelayRequestHeaders(headers, bearerSecret);
   if (headerRejection) {
@@ -294,12 +300,15 @@ function readConfiguration(environment: NodeJS.ProcessEnv) {
     resultKeyVersion: requiredIdentifier(environment.RESEARCH_RESULT_KEY_VERSION),
     resultSecret: requiredSecret(environment.RESEARCH_RESULT_HMAC_SECRET),
     deepSeekApiKey: requiredSecret(environment.DEEPSEEK_API_KEY),
+    webProvider: environment.RESEARCH_WEB_PROVIDER ?? "direct_duckduckgo",
     openClawEndpoint: environment.OPENCLAW_TOOLS_ENDPOINT ?? "http://127.0.0.1:18789/tools/invoke",
-    openClawToken: requiredSecret(environment.OPENCLAW_GATEWAY_TOKEN),
+    openClawToken: environment.OPENCLAW_GATEWAY_TOKEN,
     sqlitePath: environment.RESEARCH_RELAY_SQLITE_PATH,
     port: Number(environment.RESEARCH_RELAY_PORT ?? "18791"),
   };
   if (
+    !["direct_duckduckgo", "openclaw_gateway"].includes(values.webProvider) ||
+    (values.webProvider === "openclaw_gateway" && !validSecret(values.openClawToken)) ||
     typeof values.sqlitePath !== "string" ||
     !isAbsolute(values.sqlitePath) ||
     values.sqlitePath === "/" ||
@@ -309,19 +318,28 @@ function readConfiguration(environment: NodeJS.ProcessEnv) {
   ) {
     throw new TypeError("Research Relay configuration is invalid.");
   }
-  return { ...values, sqlitePath: values.sqlitePath };
+  return {
+    ...values,
+    webProvider: values.webProvider as "direct_duckduckgo" | "openclaw_gateway",
+    openClawToken: values.openClawToken ?? "",
+    sqlitePath: values.sqlitePath,
+  };
 }
 
 function requiredSecret(value: string | undefined): string {
-  if (
-    typeof value !== "string" ||
-    value.length < 32 ||
-    value.length > 4_096 ||
-    hasAsciiControlCharacter(value)
-  ) {
+  if (!validSecret(value)) {
     throw new TypeError("Research Relay configuration is invalid.");
   }
   return value;
+}
+
+function validSecret(value: string | undefined): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 32 &&
+    value.length <= 4_096 &&
+    !hasAsciiControlCharacter(value)
+  );
 }
 
 function requiredIdentifier(value: string | undefined): string {

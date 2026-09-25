@@ -45,8 +45,8 @@ export async function runResearchRelayLiveSmoke(
     queryOrUrlsDigest,
     maxCounts: { searchQueries: 1 as const, pageRequests: 3 as const },
     maxDurationMs: 35_000,
-    requestTimeoutMs: 15_000,
-    maxRedirects: 3,
+    requestTimeoutMs: 15_000 as const,
+    maxRedirects: 3 as const,
     deadline: new Date(now.getTime() + 35_000).toISOString(),
     requestId: (dependencies.requestId ?? randomUUID)(),
   };

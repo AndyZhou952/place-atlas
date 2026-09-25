@@ -202,9 +202,13 @@ function readSearchUrls(
   value: unknown,
   policy: ResearchSourcePolicy,
 ): readonly string[] | undefined {
-  if (!isRecord(value) || typeof value.kind !== 'string') return undefined;
+  if (!isRecord(value)) return undefined;
   const candidates: unknown[] = [];
-  if (value.kind === 'results') {
+  // OpenClaw 2026.7 returns provider + results directly. The tagged result
+  // shape remains accepted for compatibility with older Gateway fixtures.
+  if (value.provider === 'duckduckgo' && Array.isArray(value.results)) {
+    candidates.push(...value.results.map((result) => readUrl(result)));
+  } else if (value.kind === 'results') {
     if (!Array.isArray(value.results)) return undefined;
     candidates.push(...value.results.map((result) => readUrl(result)));
   } else if (value.kind === 'answer') {

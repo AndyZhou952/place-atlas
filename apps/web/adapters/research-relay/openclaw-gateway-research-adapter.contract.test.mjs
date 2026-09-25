@@ -23,7 +23,6 @@ test('OpenClaw research adapter keeps Gateway access loopback-only and returns o
       ok: true,
       result: {
         details: {
-          kind: 'results',
           provider: 'duckduckgo',
           query: 'fixture',
           count: 4,

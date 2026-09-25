@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createJpmapRouterClient } from '../../../../features/004-openclaw-atlas-poc/deployment/openclaw-poc/src/jpmap-client.mjs';
+import { createJpmapRouterClient } from '../../../../packages/openclaw-jpmap/src/jpmap-client.mjs';
 
 import { createAtlasApplication } from '../../product/application/atlas-application.ts';
 import { createNearbyRecommendationOperationGroup } from '../../product/application/decision/agent-nearby-operation.ts';

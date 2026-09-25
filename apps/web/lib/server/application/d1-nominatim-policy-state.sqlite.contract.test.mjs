@@ -6,7 +6,7 @@ import test from 'node:test';
 import { D1NominatimPolicyState } from './d1-nominatim-policy-state.ts';
 
 const migration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0007_nominatim_policy_state.sql',
+  '../../../migrations/owner-poc/0007_nominatim_policy_state.sql',
   import.meta.url,
 );
 

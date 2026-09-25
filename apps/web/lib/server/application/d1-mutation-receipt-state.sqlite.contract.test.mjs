@@ -15,7 +15,7 @@ import {
 } from './d1-mutation-receipt-state.ts';
 
 const migrationUrl = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0001_owner_poc_schema.sql',
+  '../../../migrations/owner-poc/0001_owner_poc_schema.sql',
   import.meta.url,
 );
 const invocation = {

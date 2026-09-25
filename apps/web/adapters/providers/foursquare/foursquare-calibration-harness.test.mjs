@@ -5,7 +5,7 @@ import test from 'node:test';
 import { runFoursquareOfflineCalibration } from './foursquare-calibration-harness.ts';
 
 const calibrationDirectory = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/evidence/foursquare-calibration/',
+  './fixtures/calibration/',
   import.meta.url,
 );
 

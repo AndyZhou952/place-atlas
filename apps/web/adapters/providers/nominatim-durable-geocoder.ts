@@ -45,12 +45,19 @@ export function createNominatimDurableGeocoderAdapter(options: {
   return {
     async propose(input) {
       if (
-        !hasExactKeys(input, [
+        (!hasExactKeys(input, [
           'trigger',
           'dataClassification',
           'ownerQuery',
           'ownerDraft',
-        ]) ||
+          'selectedSubject',
+        ]) &&
+          !hasExactKeys(input, [
+            'trigger',
+            'dataClassification',
+            'ownerQuery',
+            'ownerDraft',
+          ])) ||
         !hasAllowedKeys(input.ownerDraft, [
           'title',
           'address',
@@ -72,7 +79,14 @@ export function createNominatimDurableGeocoderAdapter(options: {
           'Durable location lookup is not configured.',
         );
       }
-      const query = buildQuery(input.ownerQuery, input.ownerDraft);
+      const query = buildQuery(
+        input.ownerQuery,
+        input.ownerDraft,
+        input.selectedSubject ?? {
+          transientName: input.ownerDraft.title ?? input.ownerQuery,
+          transientAddress: '',
+        },
+      );
       if (!query) {
         return failure('invalid_input', 'A public place query is required.');
       }
@@ -144,10 +158,14 @@ function buildQuery(
     readonly address?: string;
     readonly area?: string;
   },
+  selectedSubject: {
+    readonly transientName: string;
+    readonly transientAddress: string;
+  },
 ): string | undefined {
   const selected = [
-    ownerDraft.title ?? ownerQuery,
-    ownerDraft.address,
+    ownerDraft.title ?? selectedSubject.transientName ?? ownerQuery,
+    ownerDraft.address ?? selectedSubject.transientAddress,
     ownerDraft.area,
   ].filter((value): value is string => Boolean(value));
   return normalizeText(selected.join(' '), 1, 500);

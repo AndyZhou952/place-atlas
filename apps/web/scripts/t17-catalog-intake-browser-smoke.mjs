@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
 const baseUrl = process.env.T17_BASE_URL ?? 'http://127.0.0.1:4317/';
 const evidenceDirectory = fileURLToPath(
   new URL(
-    '../../../features/005-owner-poc-unified-api/evidence/ui/t17-browser/',
+    '../../../artifacts/evidence/catalog-intake-browser/',
     import.meta.url,
   ),
 );

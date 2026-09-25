@@ -8,10 +8,7 @@ import { createPlaceAssessmentOperationGroup } from '../../../product/applicatio
 import { createCatalogReadOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
 import { createOwnerPocComposition } from './owner-poc-composition.ts';
 
-const ownerRoot = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
-  import.meta.url,
-);
+const ownerRoot = new URL('../../../migrations/owner-poc/', import.meta.url);
 
 const cases = [
   {
@@ -66,7 +63,10 @@ const cases = [
 for (const scenario of cases) {
   void test(`owner-poc Web and Agent share ${scenario.name}`, async () => {
     const sqlite = new DatabaseSync(':memory:');
-    for (const migration of scenario.migrate) {
+    for (const migration of [
+      ...scenario.migrate,
+      '0008_catalog_intake_publication.sql',
+    ]) {
       sqlite.exec(await readFile(new URL(migration, ownerRoot), 'utf8'));
     }
     scenario.arrange(sqlite);
@@ -100,9 +100,12 @@ for (const scenario of cases) {
 
 void test('owner-poc mutation lookup does not fall back to a missing static seed row', async () => {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(
-    await readFile(new URL('0001_owner_poc_schema.sql', ownerRoot), 'utf8'),
-  );
+  for (const migration of [
+    '0001_owner_poc_schema.sql',
+    '0008_catalog_intake_publication.sql',
+  ]) {
+    sqlite.exec(await readFile(new URL(migration, ownerRoot), 'utf8'));
+  }
   const composition = createOwnerPocComposition(toD1(sqlite));
   let stateReads = 0;
   const application = createAtlasApplication(
@@ -136,9 +139,12 @@ void test('owner-poc mutation lookup does not fall back to a missing static seed
 
 void test('owner-poc composition uses canonical catalog and Personal Memory instead of poisoned legacy Agent fixtures', async () => {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(
-    await readFile(new URL('0001_owner_poc_schema.sql', ownerRoot), 'utf8'),
-  );
+  for (const migration of [
+    '0001_owner_poc_schema.sql',
+    '0008_catalog_intake_publication.sql',
+  ]) {
+    sqlite.exec(await readFile(new URL(migration, ownerRoot), 'utf8'));
+  }
   const canonical = {
     id: 'canonical-place',
     kind: 'food',

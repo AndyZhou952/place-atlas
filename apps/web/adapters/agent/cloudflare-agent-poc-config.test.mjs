@@ -10,7 +10,7 @@ const secretTemplateUrl = new URL(
   import.meta.url,
 );
 const deploymentRootUrl = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-poc/',
+  '../../migrations/agent-poc/',
   import.meta.url,
 );
 

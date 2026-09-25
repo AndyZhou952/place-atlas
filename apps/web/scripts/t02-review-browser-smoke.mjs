@@ -8,8 +8,7 @@ const playwrightRoot = process.env.T02_PLAYWRIGHT_ROOT;
 assert.ok(playwrightRoot, 'T02_PLAYWRIGHT_ROOT is required');
 const baseUrl = process.env.T02_BASE_URL ?? 'http://127.0.0.1:4318/';
 const outputDirectory = resolve(
-  process.env.T02_EVIDENCE_DIR ??
-    '../../features/006-agent-add-experience/evidence/ui',
+  process.env.T02_EVIDENCE_DIR ?? '../../artifacts/evidence/ui',
 );
 
 const require = createRequire(join(playwrightRoot, 'package.json'));

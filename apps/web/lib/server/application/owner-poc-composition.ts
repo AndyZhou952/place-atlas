@@ -113,6 +113,7 @@ export function createOwnerPocComposition(
   const catalogIntakeModule = createCatalogIntakeModule({
     discoveryPort: discovery,
     ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),
+    enrichmentPolicy: 'disabled',
     statePort: state,
     atlasCatalogIntakePort: new D1AtlasCatalogIntakePublisher(database, {
       now: () => clock.now(),

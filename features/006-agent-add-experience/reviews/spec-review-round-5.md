@@ -1,9 +1,0 @@
-# Agent Add 体验与旧 Creator Import 收缩规格评审 (第 5 轮)
-- 日期: 2026-09-24
-- 评审方式: subagent
-- 结论: 需修改
-## 发现项
-- [一般] `Acceptance Criteria` 20–22、`Implementation Decisions` 127 与上游 `CONTEXT.md` / `product/architecture.md`: 本规格以“旧 Creator Import”为删除目标，但 AC22 要求删除泛化命名的 `ImportJob` domain；已确认共享语言仍把 `ImportJob` 定义为一般来源采集请求，产品架构的 Acquisition & Review、“来源到地图”场景与演进路径也仍依赖该概念，`CONTEXT.md` 甚至明言 Import group 当前装配。如按当前文字实现，会在未更新已确认产品架构的情况下静默删除一个产品概念与 operation group。 → 将被删对象精确命名为 creator/profile 专用的旧实现，说明泛化 `ImportJob` 是仅保留为未来架构概念还是一并撤回；同步修订 `CONTEXT.md` 的当前 operation group 清单。若要撤回泛化 ImportJob / Acquisition 路径，则须以显式产品架构/ADR 更新承接，不应由本特性静默完成。
-- [一般] `Acceptance Criteria` 23、`Implementation Decisions` 128 与 `Testing Decisions`: “不 drop/truncate/清理数据/重写 migration”是本次删除的核心安全边界，但测试决策没有任何 migration/D1 保全缝；仅用架构测试证明运行时不再引用 adapter，不能证明发布包没有破坏性 SQL，也不能证明已有 `import_jobs` 行在升级后保持不变。 → 增加两个外部行为门：① migration manifest/checksum 与 SQL 负测，拒绝对已发布 migration 的修改及任何针对 `import_jobs` 的 `DROP/TRUNCATE/DELETE/UPDATE`；② 从含 sentinel 历史 `import_jobs` 行的升级前 D1 fixture 运行完整 migration/build/smoke，比对表 schema、行数与 payload 逐字节不变。
-- [一般] `Acceptance Criteria` 18–19、24、`Message Design` 135–136 与 `Testing Decisions`: 新范围明确修改顶部导航和 Review 页组件，但 Message Design 仍声称“本特性没有浏览器组件改动”，而测试决策只有微信消息截图门，没有真实浏览器验证 Creator 控件消失后 Review Candidates 仍可用。当前 AC 可在误删 Review Candidate 数据加载/权限路径、只留下空页的情况下被部分静态检查误判为通过。 → 删除“无浏览器组件改动”的矛盾表述；在真实生产 React/CSS 的浏览器门中以 Add `committed_needs_review` 产生一条 Review Candidate，验证 Owner-only Review list 读回同一条、匿名/Public Read/Map/Nearby 仍不可见，并在 desktop/390px 保存 list 与 empty/error/signed-out 中至少一个失败/空态的真实截图；同时负面断言废弃控件、文案、route 和 capability 均不存在。
-- [建议] `Further Notes` 166 与 `Out of Scope`: Screenshot-to-Add 已被正确降级为低优先级后续 issue，且明确不得恢复 Creator Import 或跳过 confirm；但本特性的 Out of Scope 未明示“只建 issue、不实现任何 screenshot ingestion”。 → 将 Screenshot-to-Add 同时列入 Out of Scope，并把本轮交付物限定为一条低优先级 backlog issue；不增加 operation/capability/route/schema/prompt 或图片处理代码。

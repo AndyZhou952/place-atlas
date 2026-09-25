@@ -1,4 +1,5 @@
 import type {
+  CatalogIntakeSelectedSubject,
   CatalogIntakeResearchPhase,
   CatalogIntakeStatePort,
   WebResearchInput,
@@ -9,8 +10,16 @@ import {
 } from './research-relay-envelope.ts';
 
 type RelayPayload =
+  | {
+      readonly phase: 'initial';
+      readonly subject: CatalogIntakeSelectedSubject;
+    }
   | { readonly phase: 'initial'; readonly query: string }
-  | { readonly phase: 'confirm'; readonly canonicalUrls: readonly string[] };
+  | {
+      readonly phase: 'confirm';
+      readonly canonicalUrls: readonly string[];
+      readonly subject: CatalogIntakeSelectedSubject;
+    };
 
 export interface ResearchRelayRpcPort {
   invoke(input: {
@@ -46,6 +55,9 @@ export function createResearchRelayWebResearchPort(dependencies: {
           phase: input.phase,
           queryOrUrlsDigest: input.queryOrUrlsDigest,
           requestId,
+          ...('selectedSubject' in input
+            ? { selectedIdentity: input.selectedSubject }
+            : {}),
         });
       } catch {
         return { kind: 'unavailable' as const };
@@ -81,8 +93,14 @@ export function createResearchRelayWebResearchPort(dependencies: {
 
       const payload: RelayPayload =
         input.phase === 'initial'
-          ? { phase: 'initial', query: input.normalizedOwnerQuery }
-          : { phase: 'confirm', canonicalUrls: input.canonicalUrls };
+          ? 'selectedSubject' in input
+            ? { phase: 'initial', subject: input.selectedSubject }
+            : { phase: 'initial', query: input.normalizedOwnerQuery }
+          : {
+              phase: 'confirm',
+              canonicalUrls: input.canonicalUrls,
+              subject: input.selectedSubject,
+            };
       let response: unknown;
       const deadlineAtMs = Date.parse(consumed.allowance.deadline);
       const abortController = new AbortController();

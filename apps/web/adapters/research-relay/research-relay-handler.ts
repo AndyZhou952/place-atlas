@@ -1,4 +1,5 @@
 import { deriveCatalogIntakeResearchInputDigest } from '../../product/application/catalog-intake/catalog-intake-coordinator.ts';
+import type { CatalogIntakeSelectedSubject } from '../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import type { HardenedResearchTransport } from './hardened-research-transport.ts';
 import {
   normalizeResearchRelayProposal,
@@ -28,6 +29,7 @@ export interface ResearchScalarExtractorPort {
     readonly body: string;
     readonly signal: AbortSignal;
     readonly deadlineAtMs: number;
+    readonly subject?: CatalogIntakeSelectedSubject;
   }): Promise<unknown>;
 }
 
@@ -45,8 +47,16 @@ type ResearchExtractionOutcome =
     };
 
 type RelayPhaseInput =
+  | {
+      readonly phase: 'initial';
+      readonly subject: CatalogIntakeSelectedSubject;
+    }
   | { readonly phase: 'initial'; readonly query: string }
-  | { readonly phase: 'confirm'; readonly canonicalUrls: readonly string[] };
+  | {
+      readonly phase: 'confirm';
+      readonly canonicalUrls: readonly string[];
+      readonly subject: CatalogIntakeSelectedSubject;
+    };
 
 const unknownProposal: ResearchRelayProposal = {
   tabelog: { status: 'unknown' },
@@ -133,7 +143,10 @@ export function createResearchRelayHandler(dependencies: {
               toolId: 'openclaw.web_search',
               toolVersion: 'v1',
               arguments: {
-                query: normalizedInput.query,
+                query:
+                  'subject' in normalizedInput
+                    ? `${normalizedInput.subject.transientName} ${normalizedInput.subject.transientAddress}`
+                    : normalizedInput.query,
                 maxResults: 3,
                 output: 'url_candidates_only',
               },
@@ -214,6 +227,9 @@ export function createResearchRelayHandler(dependencies: {
                 body: fetched.body,
                 signal: abortController.signal,
                 deadlineAtMs,
+                ...('subject' in normalizedInput
+                  ? { subject: normalizedInput.subject }
+                  : {}),
               }),
             );
           } catch {
@@ -326,6 +342,10 @@ function normalizeExtractionOutcome(
 }
 
 function validatePhaseInput(value: unknown): RelayPhaseInput | undefined {
+  if (hasExactKeys(value, ['phase', 'subject']) && value.phase === 'initial') {
+    const subject = validateSelectedSubject(value.subject);
+    return subject ? { phase: 'initial', subject } : undefined;
+  }
   if (hasExactKeys(value, ['phase', 'query']) && value.phase === 'initial') {
     if (
       typeof value.query !== 'string' ||
@@ -333,19 +353,20 @@ function validatePhaseInput(value: unknown): RelayPhaseInput | undefined {
       value.query.length > 500 ||
       value.query.normalize('NFC').trim() !== value.query ||
       /\p{Cc}/u.test(value.query)
-    ) {
+    )
       return undefined;
-    }
     return { phase: 'initial', query: value.query };
   }
   if (
-    hasExactKeys(value, ['phase', 'canonicalUrls']) &&
+    hasExactKeys(value, ['phase', 'canonicalUrls', 'subject']) &&
     value.phase === 'confirm' &&
     isCanonicalUrlArray(value.canonicalUrls) &&
     value.canonicalUrls.length >= 1 &&
     value.canonicalUrls.length <= 2 &&
     value.canonicalUrls.every(isCanonicalHttpsUrl)
   ) {
+    const subject = validateSelectedSubject(value.subject);
+    if (!subject) return undefined;
     const canonicalUrls = value.canonicalUrls;
     const sorted = [...new Set(canonicalUrls)].sort(codeUnitOrder);
     if (
@@ -354,7 +375,7 @@ function validatePhaseInput(value: unknown): RelayPhaseInput | undefined {
     ) {
       return undefined;
     }
-    return { phase: 'confirm', canonicalUrls: sorted };
+    return { phase: 'confirm', canonicalUrls: sorted, subject };
   }
   return undefined;
 }
@@ -364,15 +385,57 @@ function isCanonicalUrlArray(value: unknown): value is string[] {
 }
 
 function digestPhaseInput(input: RelayPhaseInput): Promise<string | undefined> {
-  return input.phase === 'initial'
-    ? deriveCatalogIntakeResearchInputDigest({
-        phase: 'initial',
-        normalizedOwnerQuery: input.query,
-      })
-    : deriveCatalogIntakeResearchInputDigest({
-        phase: 'confirm',
-        canonicalUrls: input.canonicalUrls,
-      });
+  if (input.phase === 'initial') {
+    return 'subject' in input
+      ? deriveCatalogIntakeResearchInputDigest({
+          phase: 'initial',
+          selectedSubject: input.subject,
+        })
+      : deriveCatalogIntakeResearchInputDigest({
+          phase: 'initial',
+          normalizedOwnerQuery: input.query,
+        });
+  }
+  return deriveCatalogIntakeResearchInputDigest({
+    phase: 'confirm',
+    canonicalUrls: input.canonicalUrls,
+    selectedSubject: input.subject,
+  });
+}
+
+function validateSelectedSubject(
+  value: unknown,
+): CatalogIntakeSelectedSubject | undefined {
+  if (
+    !hasExactKeys(value, [
+      'ownerQuery',
+      'providerNamespace',
+      'placeId',
+      'transientName',
+      'transientAddress',
+    ])
+  ) {
+    return undefined;
+  }
+  for (const key of [
+    'ownerQuery',
+    'providerNamespace',
+    'placeId',
+    'transientName',
+    'transientAddress',
+  ] as const) {
+    const field = value[key];
+    if (
+      typeof field !== 'string' ||
+      field.length < 1 ||
+      field.length > 500 ||
+      field.normalize('NFC').trim() !== field ||
+      /\p{Cc}/u.test(field)
+    ) {
+      return undefined;
+    }
+  }
+  return value as unknown as CatalogIntakeSelectedSubject;
 }
 
 function validateSearchResult(value: unknown): readonly string[] | undefined {

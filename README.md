@@ -1,16 +1,24 @@
 # Japan Personal Atlas
 
-一个私有、单用户、以地图和 Agent 为核心的日本地点助手。它把餐厅、咖啡店、活动、展览和建筑来源整理成附近推荐、预约提示与长期个人 Journal。
+Japan Personal Atlas is a private, single-owner map for saving places, recording visits, and finding saved places nearby. Browser and signed Agent clients reuse the same deterministic application workflows.
 
-## 当前状态
+Read the [Owner manual](docs/user-manual.md) before running the app.
 
-项目处于实验阶段。公开只读地图、Owner 写入、D1 持久数据、R2 照片、搜索、个人状态、Visit/Journal、Catalog Intake／Review，以及受限的微信／OpenClaw Nearby 与 Add PoC 已经可用；对话式 Record、自动外部研究和旅行级运维仍在开发。
+## Current scope
 
-第一次使用请先阅读 [Owner 使用手册](docs/user-manual.md)，其中包含网页操作、微信命令、Add 恢复方法和当前限制。
+Available today:
 
-## 快速开始
+- a public read-only map and authenticated Owner mode;
+- search, personal state, visits, notes, photos, and photo captions;
+- deterministic Add with Google Places matching and preview/confirm;
+- Nearby over verified saved places through a private Google route sidecar;
+- signed `/jpmap add` and `/jpmap nearby` operations through the bundled OpenClaw plugin.
 
-要求 Node.js 22.13 或更高版本。
+The repository includes a bounded, model-neutral OpenAI-compatible scalar extractor and a DeepSeek configuration, plus offline place-resolution and enrichment benchmarks. Production research is still disabled until a trusted search/fetch relay is configured and the evaluation gate is run against that complete pipeline. Automatic category, signature-dish, Google-rating, and recommendation enrichment is not implemented yet. Conversational Record and screenshot-to-place intake are also not implemented.
+
+## Local development
+
+Requires Node.js 22.13 or newer.
 
 ```bash
 cd apps/web
@@ -18,7 +26,7 @@ npm ci
 npm run dev
 ```
 
-提交前运行：
+Before opening a pull request:
 
 ```bash
 npm run format:check
@@ -28,23 +36,20 @@ npm test
 npm run build
 ```
 
-## 文档
+## Bring your own providers
 
-从 [文档导航](docs/README.md) 开始。核心文档包括：
+A self-hosted deployment supplies its own Cloudflare account, D1 database, R2 bucket, Google credentials, and Agent credentials. Google Places identifies Add candidates; a private sidecar handles geocoding and walking routes. A model API key alone does not provide web research: the current model adapter only extracts narrowly defined facts from evidence fetched by a separate trusted relay. Keep research disabled until that relay is configured and evaluated.
 
-- [产品基线](docs/product.md)
-- [系统架构与开发指南](docs/architecture.md)
-- [路线图与任务看板](docs/roadmap.md)
-- [数据采集、实体识别与评测](docs/ingestion-and-evaluation.md)
-- [决策登记册](docs/decisions.md)
+Start with the [Cloudflare deployment guide](docs/deployment/cloudflare.md). Migrations live in `apps/web/migrations`, provider policies under `apps/web/adapters/providers/policies`, and the OpenClaw package in `packages/openclaw-jpmap`.
 
-稳定原则和当前架构放在 `/docs`；详细实施记录、低优先级性能问题和实验验收由 GitHub Issues 跟踪。
+## Documentation
 
-## 核心方向
+- [Documentation index](docs/README.md)
+- [Product scope](docs/product.md)
+- [Architecture](docs/architecture.md)
+- [Intake and evaluation](docs/ingestion-and-evaluation.md)
+- [Roadmap](docs/roadmap.md)
+- [Maintenance](docs/maintenance.md)
+- [Decision log](docs/decisions.md)
 
-- 微信／Agent 是目标态的主要采集和操作入口；
-- 私有地图是主要浏览、空间整理和记忆入口；
-- 所有入口调用同一套应用操作和持久化数据；
-- Agent runtime、采集器、地图和存储通过 adapter 解耦；
-- 模糊地点允许放弃判断并进入人工审核，不用猜测污染可信集合；
-- 私有来源、照片和 Journal 不进入公开作品集数据。
+Historical implementation plans are kept in Git history and issues, not in the runtime source tree.

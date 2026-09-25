@@ -349,7 +349,6 @@ async function dispatchCatalogIntakeCommand(
           sessionId: current.sessionId,
           expectedSessionVersion: current.sessionVersion,
           ordinal: command.ordinal,
-          requestResearch: true,
         },
       },
       executionContext,

@@ -15,6 +15,13 @@ const scope = {
   channel: 'web',
   conversationId: 'conversation-1',
 };
+const selectedSubject = {
+  ownerQuery: '鮨 さいとう',
+  providerNamespace: 'google-places',
+  placeId: 'confirm-branch',
+  transientName: 'Sushi Saito',
+  transientAddress: 'Roppongi, Tokyo',
+};
 
 test('production WebResearchPort consumes initial allowance before one signed Relay RPC and maps scalar evidence with Worker time', async () => {
   const consumptionCalls = [];
@@ -224,6 +231,7 @@ test('production WebResearchPort uses the exact confirm URLs and zero-search all
         async consumeResearchPhase(input) {
           assert.equal(input.phase, 'confirm');
           assert.equal(input.queryOrUrlsDigest, 'b'.repeat(64));
+          assert.deepEqual(input.selectedIdentity, selectedSubject);
           return { kind: 'consumed', allowance };
         },
       },
@@ -245,6 +253,7 @@ test('production WebResearchPort uses the exact confirm URLs and zero-search all
           assert.deepEqual(input.payload, {
             phase: 'confirm',
             canonicalUrls,
+            subject: selectedSubject,
           });
           return resultKind === 'invalid'
             ? { status: 'ok', result: { expanded: 'raw relay output' } }
@@ -283,6 +292,7 @@ test('production WebResearchPort uses the exact confirm URLs and zero-search all
         expectedSessionVersion: 2,
         queryOrUrlsDigest: 'b'.repeat(64),
         canonicalUrls,
+        selectedSubject,
       }),
       { kind: 'unavailable' },
     );

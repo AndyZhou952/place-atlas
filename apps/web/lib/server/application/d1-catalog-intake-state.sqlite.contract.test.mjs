@@ -6,15 +6,15 @@ import test from 'node:test';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
 
 const migration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0006_catalog_intake_sessions.sql',
+  '../../../migrations/owner-poc/0006_catalog_intake_sessions.sql',
   import.meta.url,
 );
 const publicationMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0008_catalog_intake_publication.sql',
+  '../../../migrations/owner-poc/0008_catalog_intake_publication.sql',
   import.meta.url,
 );
 const researchAllowanceMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0009_catalog_intake_research_allowances.sql',
+  '../../../migrations/owner-poc/0009_catalog_intake_research_allowances.sql',
   import.meta.url,
 );
 const scope = {

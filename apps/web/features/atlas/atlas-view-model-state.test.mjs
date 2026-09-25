@@ -291,6 +291,84 @@ test('a completed media batch rejects an older media read', () => {
   assert.deepEqual(state.media, [stored]);
 });
 
+test('a saved Visit remains editable with captioned media and removes its media with the Visit', () => {
+  const optimisticVisit = {
+    id: 'optimistic-visit',
+    itemId: item.id,
+    itemTitle: item.title,
+    visitedAt: '2026-09-24',
+    note: 'First note',
+    createdAt: '2026-09-24T00:00:00.000Z',
+    updatedAt: '2026-09-24T00:00:00.000Z',
+  };
+  const savedVisit = {
+    ...optimisticVisit,
+    id: 'visit-saved',
+    note: 'Saved note',
+  };
+  const editedVisit = {
+    ...savedVisit,
+    visitedAt: '2026-09-25',
+    note: 'Edited note',
+    updatedAt: '2026-09-25T00:00:00.000Z',
+  };
+  const optimisticMedia = {
+    id: 'media-saved',
+    visitId: savedVisit.id,
+    itemId: item.id,
+    originalFilename: 'ramen.jpg',
+    contentUrl: '/api/media/media-saved/content',
+  };
+  const captionedMedia = {
+    ...optimisticMedia,
+    caption: 'Shoyu ramen',
+  };
+
+  let state = createAtlasViewModelState({ items: [item] });
+  state = reduceAtlasViewModelState(state, {
+    type: 'visit.prepended',
+    visit: optimisticVisit,
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'visit.received',
+    optimisticId: optimisticVisit.id,
+    visit: savedVisit,
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'visit.received',
+    optimisticId: savedVisit.id,
+    visit: editedVisit,
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.appended',
+    media: [optimisticMedia],
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.received',
+    media: captionedMedia,
+  });
+
+  assert.equal(state.visits[0].note, 'Edited note');
+  assert.equal(state.visits[0].visitedAt, '2026-09-25');
+  assert.equal(state.media[0].caption, 'Shoyu ramen');
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.removed',
+    mediaId: captionedMedia.id,
+  });
+  assert.deepEqual(state.media, []);
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.appended',
+    media: [captionedMedia],
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'visit.removed',
+    visitId: editedVisit.id,
+  });
+  assert.deepEqual(state.visits, []);
+  assert.deepEqual(state.media, []);
+});
+
 test('an item deletion rejects older Visit and media reads but later refreshes still converge', () => {
   const visit = {
     id: 'visit-deleted-item',

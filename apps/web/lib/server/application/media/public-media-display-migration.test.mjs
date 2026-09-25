@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 const migrationRoot = new URL(
-  '../../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
+  '../../../../migrations/owner-poc/',
   import.meta.url,
 );
 const gateTable = 'owner_poc_public_media_migration_gate_0005';

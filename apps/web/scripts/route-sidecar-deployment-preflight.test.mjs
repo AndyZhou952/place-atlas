@@ -9,7 +9,7 @@ import {
 
 const configUrl = new URL('../wrangler.route-sidecar.jsonc', import.meta.url);
 const runbookUrl = new URL(
-  '../../../features/005-owner-poc-unified-api/deployment/cloudflare-route-sidecar/README.md',
+  '../../../docs/deployment/route-sidecar.md',
   import.meta.url,
 );
 

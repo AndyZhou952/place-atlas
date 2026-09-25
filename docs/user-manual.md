@@ -1,78 +1,45 @@
-# Japan Atlas Owner 使用手册
+# Japan Atlas Owner manual
 
-Japan Atlas 是个人使用的地点地图。当前 PoC 支持网页公开浏览，也支持 Owner 在网页和已绑定的微信／OpenClaw 会话中执行受限操作。网页与 Agent 共用同一套应用操作和数据；Agent 不直接写数据库。
+Japan Atlas is a personal place map. The browser and Agent API share application operations; the Agent does not write the database directly.
 
-## 1. 公开浏览与 Owner 权限
+## Public view and Owner mode
 
-- **公开浏览**：任何访问者都可以查看已经核验并发布的地点，以及当前公开投影允许展示的个人状态、Visit 和照片。
-- **Owner 登录**：只有登录后的 Owner 可以写入。登录后可添加地点、切换喜欢／去过、填写个人评分和总体评论、创建或编辑 Visit、上传照片，以及查看 Review。
-- Review Candidate、内部证据、写入回执和维护信息不会进入公开地图。请勿在准备公开展示的评论或照片中保存敏感信息。
+Anyone can view published places. Only a logged-in Owner can Add or edit places, toggle liked/visited, set a personal rating, write an overall comment, create a dated Visit, and upload photos. Each Journal photo can have a caption. Avoid sensitive information in content intended for public display.
 
-## 2. 网页端怎么用
+## Browser Add
 
-### 地图与个人状态
+1. Log in and open **Add a place**.
+2. Enter a restaurant name and, when useful, a branch, station, neighborhood, or address.
+3. Choose the intended Google Places candidate.
+4. Review the Preview, including address, coordinates, warnings, and unknown fields.
+5. Confirm or cancel.
 
-在 Map 页面搜索或筛选已保存地点。选中地点后，Owner 可以直接更新喜欢、去过、个人评分和总体评论。保存较慢时请等待当前操作返回；不要连续重复点击，以免产生重复意图。
+A confirmed place with sufficient evidence enters the map. Otherwise it becomes a `needs-review` candidate and must remain visible to the Owner. Current production intake does not automatically research Tabelog, Google review, reservation timing, category, or signature dishes.
 
-### Add：添加一家店
+## Record
 
-1. 以 Owner 身份登录，在地图页面打开 **Add a place**。
-2. 输入餐厅名。若店名常见或有多家分店，同时输入街区、车站或完整地址，例如“店名 + 银座”。
-3. 从最多三个候选中选择正确分店。必要时补充确认名称、Area 或 Address，再生成 Preview。
-4. 核对名称、地址、经纬度、Tabelog、预约信息、潜在重复项和 unknown 字段。
-5. 确认后，证据充分的地点进入可信目录；证据不足或有冲突的记录会成为 **needs-review**，不会出现在公开地图或 Nearby 中。
+Use place detail for personal state, personal rating, and overall comment. Use Journal for dated Visit notes and photos. Photo captions are optional. A real Visit keeps the place in visited state.
 
-当前网页 Add 可由 Owner 补充名称、区域和地址。类别、推荐菜、Tabelog 评分及预约／排队规则仍可能需要后续人工核验；系统不会用猜测填充缺失事实。
+## Nearby
 
-### Review：处理待核验候选
+Enter a neighborhood or address. Nearby compares verified saved places only; it does not discover unrelated restaurants. If the route provider is unavailable, the result may fall back to straight-line distance.
 
-Review 是 Owner 专用的待核验列表。当前界面显示候选地点的名称、Area／地址、位置是否可用，以及仍未知的字段和警告。它不是“按 creator 导入”，也不会自动发布地点；坐标、Tabelog、预约信息和身份来源等底层证据目前不会在这个列表中逐项展示。
+## OpenClaw commands
 
-当前 Review 以查看证据为主。需要补全或纠正时，请使用更完整的店名、区域或地址重新走 Add；确认达到发布要求后，地点才会进入地图和 Nearby。
-
-### Visit、评论与照片
-
-在地点详情或 Journal 中创建 Visit，并填写到访日期和笔记；地点级个人评分与单次 Visit 分开保存。照片必须属于明确的 Visit，可追加说明并删除。真实 Visit 会使地点保持“去过”，不能被一次手动切换隐藏。
-
-## 3. 微信／OpenClaw 确定性命令
-
-命令必须使用小写、开头斜杠和完整参数。它们先由项目命令路由器解析，再调用与网页相同的应用操作；确定性命令不需要 DeepSeek 判断意图。
-
-### Nearby：只查已保存地点
-
-Nearby 接受手动输入的街区或地址，只比较 Atlas 中已经核验的地点，不会替你发现数据库之外的新餐厅，也不会请求浏览器定位。
-
-有效示例：
+Exact commands use the lowercase project prefix shown in the marked examples and call the same deterministic operations as the browser.
 
 ```jpmap-valid
 /jpmap nearby 银座
 /jpmap nearby 東京都中央区銀座4丁目
-```
-
-### Add：发现、选择、预览、确认
-
-开始时尽量同时提供店名和分店线索。只有店名也可以，但重名或连锁店更容易返回多个候选。
-
-```jpmap-valid
 /jpmap add 鮨青空 银座
 /jpmap add Recoco Record 渋谷
-```
-
-收到候选后选择编号；当前只接受 1–3：
-
-```jpmap-valid
 /jpmap add select 1
 /jpmap add select 2
-```
-
-核对简短 Preview 后，二选一完成当前会话：
-
-```jpmap-valid
 /jpmap add confirm
 /jpmap add cancel
 ```
 
-以下写法会被明确拒绝，属于无效示例：
+These are invalid:
 
 ```jpmap-invalid
 /jpmap nearby
@@ -80,34 +47,18 @@ Nearby 接受手动输入的街区或地址，只比较 Atlas 中已经核验的
 /jpmap add
 ```
 
-## 4. 常见结果与恢复方法
+## Recovery states
 
-| 结果 | 含义 | 怎么做 |
+| Result | Meaning | Action |
 |---|---|---|
-| 只有店名、唯一候选 | 系统找到了一个较明确的分店候选 | 仍要核对地址；正确再选择并确认 |
-| 多个候选 | 同名、连锁或线索不足 | 根据地址选择；都不对就取消，并用“店名 + 街区／地址”重试 |
-| `unknown` | 当前没有可持久保存的可靠证据 | 不要把 unknown 当成“否”；可补充地址，Tabelog 与预约事实稍后核验 |
-| `needs-review` | 已保存为 Owner 待审核候选 | 到 Review 查看证据；它暂不进入公开地图和 Nearby |
-| `expired` | Add 会话或 Preview 已过期 | 保留原线索，重新开始一次 Add 并生成新 Preview |
-| `conflict` | 确认前证据或版本发生变化，本次没有写入 | 阅读刷新后的 Preview；正确则再次确认，否则取消 |
-| 暂时不可用 | 地点供应商、网络或应用依赖失败，本次没有写入 | 稍后重试；急用时可改走网页 Add，并保留完整分店线索 |
-| 没有候选 | 查询不足或供应商没有匹配 | 增加城市、街区、车站、分店名或复制的完整地址 |
-| 选错候选 | Preview 中的店名或地址不对 | 取消，不要确认；用更明确的线索重新开始 |
+| one candidate from name only | A likely identity was found | Verify the address before selecting |
+| multiple candidates | The name is ambiguous | Choose by address, or cancel and retry with a branch/area |
+| `unknown` | No durable evidence is available | Do not interpret it as “no”; research later |
+| `needs-review` | Saved for Owner review | It is not yet on the public map or in Nearby |
+| `expired` | The Add session expired | Restart Add with the original clue |
+| `conflict` | Evidence changed before confirm | Review the refreshed Preview |
+| temporarily unavailable | A provider or dependency failed | Retry later; the operation did not write |
 
-## 5. Agent 与确定性流程的边界
+## Current limits
 
-- 当前稳定路径是确定性命令 → Catalog Intake → Preview → Confirm → Verified 或 Review Candidate。
-- DeepSeek 适合把模糊自然语言整理成候选店名、区域或命令参数，但不能代替确认、查重、发布门槛或距离计算。
-- 当固定流程无法补全事实时，Agent 可以协助研究网页并提出带来源的建议；最终仍要经过同一 Preview／Confirm 边界，不能绕过接口直接写 D1。
-- Tabelog、预约提前量、walk-in、排队、类别和推荐菜都属于外部或时效事实。没有可靠来源时保持 unknown，不能由模型编造。
-
-## 6. 当前限制
-
-- Nearby 只检索已保存且已核验的 Atlas 地点；路线供应商不可用时可能只返回直线距离候选。
-- Agent 端 Add 已支持确定性的发现、选择、确认、取消与失败恢复，但自动研究 Tabelog 和预约规则尚未形成稳定的全字段闭环。
-- Review 当前以证据查看为主，不是完整的在线字段编辑器。
-- Record 会话、连续多图、逐图评分和模糊评论推断仍是后续能力；现阶段请在网页 Journal 中记录 Visit 和照片。
-- 从截图识别餐厅再进入 Add 是低优先级未来事项，当前没有截图上传命令或自动识别链路。
-- 当前为单 Owner PoC；多人权限、朋友只读账号和长期旅行级稳定性尚未完成。
-
-如果结果不确定，最安全的做法是取消、补充更明确的分店线索后重试。系统宁可留下 unknown 或 needs-review，也不会猜测并污染可信地图。
+The repository has an experimental model adapter, but the production search/fetch relay is not connected, so automatic Tabelog/reservation research is still disabled. Conversational Record, screenshot intake, and screenshot-based Nearby are not implemented. The current Review surface is not a full catalog editor. Unknown external facts remain unknown instead of being guessed.

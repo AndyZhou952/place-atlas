@@ -4,5 +4,6 @@
 !.env.example
 coverage/
 tmp/
+artifacts/
 evals/runs/
 *.log

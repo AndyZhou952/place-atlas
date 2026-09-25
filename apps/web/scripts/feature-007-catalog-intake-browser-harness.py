@@ -13,7 +13,7 @@ BASE_URL = os.environ.get("FEATURE007_BASE_URL", "http://127.0.0.1:4317/")
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE_DIR = (
     REPO_ROOT
-    / "features/007-place-enrichment-and-nearby-diagnostics/evidence/ui/t02-browser"
+    / "artifacts/evidence/catalog-intake-browser"
 )
 CONVERSATION_ID = "7" * 32
 REPORT = {

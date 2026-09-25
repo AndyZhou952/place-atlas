@@ -3,10 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-const root = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
-  import.meta.url,
-);
+const root = new URL('../../../migrations/owner-poc/', import.meta.url);
 const migrations = [
   '0001_owner_poc_schema.sql',
   '0002_owner_poc_catalog_seed.sql',

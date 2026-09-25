@@ -9,7 +9,11 @@ import {
 } from './d1-owner-poc-catalog.ts';
 
 const schemaUrl = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0001_owner_poc_schema.sql',
+  '../../migrations/owner-poc/0001_owner_poc_schema.sql',
+  import.meta.url,
+);
+const catalogIntakePublicationUrl = new URL(
+  '../../migrations/owner-poc/0008_catalog_intake_publication.sql',
   import.meta.url,
 );
 
@@ -37,15 +41,50 @@ function item(id, overrides = {}) {
   };
 }
 
+function reviewCandidate(id) {
+  return {
+    recordType: 'review_candidate',
+    id,
+    kind: 'food',
+    title: 'Needs review restaurant',
+    description: 'Added through Atlas Catalog intake for owner review.',
+    verificationStatus: 'needs_review',
+    personalState: 'saved',
+    tags: [],
+    reviewEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google-places',
+        placeId: 'google-place-needs-review',
+      },
+      ownerFields: {},
+      titleProposal: {
+        provenance: 'owner_query',
+        value: 'Needs review restaurant',
+      },
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: ['address', 'coordinates', 'tabelog', 'reservation'],
+      warnings: [
+        {
+          code: 'needs_review',
+          message:
+            'Confirm or complete the durable place details before publishing.',
+        },
+      ],
+    },
+    updatedAt: '2026-09-25T05:47:09.577Z',
+  };
+}
+
 test('the owner-poc Agent CatalogRead projects canonical Web catalog and personal state without consulting the legacy Agent catalog', async () => {
   const database = new DatabaseSync(':memory:');
   database.exec(await readFile(schemaUrl, 'utf8'));
+  database.exec(await readFile(catalogIntakePublicationUrl, 'utf8'));
   const canonical = item('canonical-only');
-  const awaitingReview = item('awaiting-review', {
-    verificationStatus: 'needs_review',
-  });
+  const awaitingReview = reviewCandidate('awaiting-review');
   insertCanonical(database, canonical);
-  insertCanonical(database, awaitingReview);
+  insertReviewCandidate(database, awaitingReview);
   database
     .prepare(
       `INSERT INTO atlas_item_overrides (
@@ -97,6 +136,12 @@ test('the owner-poc Agent CatalogRead projects canonical Web catalog and persona
     ),
     true,
   );
+  assert.deepEqual(await catalog.get(awaitingReview.id), {
+    ...awaitingReview,
+    personalRating: undefined,
+    isFavorite: false,
+    hasVisited: false,
+  });
 });
 
 test('the owner-poc personal-facts reader returns manual status, visits, latest visit, and rating from the shared Web tables', async () => {
@@ -157,6 +202,21 @@ function insertCanonical(database, candidate) {
       candidate.verificationStatus,
       '2026-09-21T00:00:00.000Z',
       '2026-09-21T00:00:00.000Z',
+    );
+}
+
+function insertReviewCandidate(database, candidate) {
+  database
+    .prepare(
+      `INSERT INTO atlas_review_candidates (
+        id, payload_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?)`,
+    )
+    .run(
+      candidate.id,
+      JSON.stringify(candidate),
+      candidate.updatedAt,
+      candidate.updatedAt,
     );
 }
 

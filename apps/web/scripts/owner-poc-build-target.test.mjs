@@ -7,7 +7,7 @@ import { createWebViteConfig } from '../vite.config.ts';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const ownerRunbookUrl = new URL(
-  '../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/README.md',
+  '../migrations/owner-poc/README.md',
   import.meta.url,
 );
 
@@ -74,7 +74,7 @@ void test('owner-poc deploy cannot bypass its build and preflight', async () => 
   );
   assert.equal(
     packageJson.scripts['preflight:owner-poc'],
-    'node --experimental-strip-types scripts/owner-poc-deployment-preflight.ts --config wrangler.owner-poc.local.jsonc --built-config dist/server/wrangler.json --secret-list .wrangler/owner-poc-secret-names.json --seed-manifest ../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/owner-poc-seed-v1.json --seed-evidence .wrangler/owner-poc-seed-evidence.json',
+    'node --experimental-strip-types scripts/owner-poc-deployment-preflight.ts --config wrangler.owner-poc.local.jsonc --built-config dist/server/wrangler.json --secret-list .wrangler/owner-poc-secret-names.json --seed-manifest migrations/owner-poc/owner-poc-seed-v1.json --seed-evidence .wrangler/owner-poc-seed-evidence.json',
   );
   assert.equal(
     packageJson.scripts['deploy:owner-poc'],

@@ -11,7 +11,7 @@ import {
   createAgentToolCatalog,
   createProjectCommandRouter,
 } from './project-command-router.ts';
-import { createJpmapPlugin } from '../../../../../features/004-openclaw-atlas-poc/deployment/openclaw-poc/src/index.mjs';
+import { createJpmapPlugin } from '../../../../../packages/openclaw-jpmap/src/index.mjs';
 
 const nowMs = Date.parse('2026-09-22T12:00:00.000Z');
 const endpoint = 'https://atlas.test/api/agent/v1/tools';

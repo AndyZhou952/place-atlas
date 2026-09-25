@@ -1,129 +1,28 @@
-# Japan Atlas 产品基线
+# Product scope
 
-状态：有效产品基线
-最后更新：2026-09-24
+Japan Personal Atlas reduces the work required to remember places, record visits, and choose a saved place nearby. It is currently single-owner: anyone may view the public map, while only the authenticated Owner may change data.
 
-## 1. 产品定位
+## Add
 
-Japan Atlas 是一个私有、单用户、长期使用的日本餐饮、咖啡、活动、展览和建筑地图。它同时承担两项工作：
+The Owner enters a rough name, branch, neighborhood, or address. The application finds candidates, asks the Owner to resolve ambiguity, builds a structured preview, and confirms. A confirmed record must become visible on the map or in an actionable review queue; it must never disappear into an unreadable state.
 
-- 在现场快速回答“附近有什么值得去、尚未去过、现在条件合适的地方”；
-- 将来源、个人评价、到访记录和照片沉淀为长期个人记忆。
+Google Places currently supplies candidate identity. Durable address and coordinates are required for map and Nearby. Automated category, signature-dish, Tabelog/Google-rating, reservation, and source enrichment is the next increment, not a current production guarantee.
 
-它不是公共点评平台、通用旅行规划器，也不在 v1 追求多用户、社交或自动下单。未来可以抽取通用主干用于作品集或公开项目，但私有数据和高度个性化规则必须留在独立配置与存储中。
+## Record
 
-## 2. 产品界面与职责
+The Owner can mark a place liked or visited, set a personal score, write an overall note, and create dated visits with text and photos. Journal supports an optional caption per photo. The same data should eventually be editable from place detail without creating a second record model.
 
-### 微信／Agent：主要操作入口
+## Nearby
 
-负责低负担、高频动作：
+Nearby considers only verified places already saved in the Atlas. It resolves a typed location and ranks reachable saved places. The current implementation is deterministic; semantic interpretation of screenshots, vague intent, cuisine preferences, and reservation constraints is planned.
 
-- 接收明确地点名、街区／地址线索、文字和到访备注；后续可扩展语音、照片与外部链接；
-- 查询附近、没去过、喜欢、可直接到店或符合预约条件的地点；
-- 新增或修改 Visit、个人评分、说明和照片；
-- 发起 Catalog Intake、返回候选与简短 Preview，并在证据不足时提出澄清问题。
+## Agent boundary
 
-### 私有地图：主要浏览与记忆入口
+Exact `/jpmap` commands call deterministic application operations. A bounded model adapter can extract approved facts from trusted-relay evidence, but production research is not connected yet. Future semantic interpretation of vague input must return a validated structured proposal before any write. Browser and chat integrations must not fork business rules.
 
-负责需要空间和视觉上下文的动作：
+## PoC non-goals
 
-- 在地图上浏览可信集合并查看完整地点资料；
-- 搜索、筛选、喜欢、标记到访和偶尔修正信息；
-- 比较个人评分与外部评分；
-- 查看预约规则、活动日期、来源、新鲜度、Visit 时间线和照片；
-- 在 Owner Review 中查看需要大屏证据的地点身份候选。
-
-网页 Review／Journal 在 Agent 写入能力对等前保留为 Owner 入口；它们不是第二份状态。网页和 Agent 必须调用同一套应用操作与持久化数据。
-
-## 3. 核心用户流程
-
-### 地点建档
-
-1. 用户在网页或 Agent 提交餐厅名，并尽量附带街区、分店或地址线索。
-2. Catalog Intake 返回最多三个候选；用户选择后查看带来源的 Preview。
-3. 用户明确确认后，证据充足的地点进入可信集合；证据不足或冲突的地点进入 Owner-only Review Candidate。
-4. 地点身份、来源、Tabelog 与预约事实分别保存；unknown 保持未知，后续可以独立刷新。
-
-### 附近推荐
-
-1. Agent 读取用户位置和自然语言条件。
-2. 应用层先执行距离、类型、到访、时间与预约等硬筛选。
-3. 默认优先没去过的地点；只有明确要求时才优先重访或喜欢地点。
-4. 返回少量可选项，并解释命中的个人偏好与仍未知的条件。
-
-### 到访记录
-
-1. 用户明确选择地点，当前网页提交评分或笔记中的至少一项，并可在同一动作选择照片。
-2. 系统创建一次 Visit，并在需要时更新地点级个人评分。
-3. 后续独立收到的照片通过同一个 capture session 追加到该 Visit。
-4. 地图立即显示更新；持久化失败则回滚并提示。
-
-## 4. 产品数据语义
-
-### 地点与来源
-
-- `AtlasItem` 是地点、活动或建筑的唯一身份；重复来源不得产生重复地点。
-- 默认展示日文名称；日文、中文和英文原文均可保留，不强制翻译。
-- 精确分店必须有证据支持；不确定项保持待审核，不能静默猜测。
-- 外部评分、预约规则、营业信息与活动日期都必须保留来源和核验时间。
-
-### 个人评价与状态
-
-- 每个 `AtlasItem` 只有一个可空的 `PlaceAssessment.overallRating`。
-- 评分范围为 0–5；`0` 是有效评分，`null` 表示未评分。
-- 手动输入统一四舍五入到一位小数；上下按钮按 0.5 递增。
-- 单独编辑 `マイスコア` 只更新地点评价，不自动创建 Visit。
-- `isFavorite` 表达“喜欢”，与 `personalState` 的候选／保存／计划等工作流状态独立。
-- 有 Visit 的地点一定视为去过；没有 Visit 时也可以通过 `行った` 控件显式标记。
-
-### Visit 与照片
-
-- 一个地点可以拥有多次 Visit；次数和最近到访时间由 Visit 时间线推导。
-- Visit 自身保存日期与可选笔记，不拥有独立评分。
-- 当前网页／API 创建 Visit 时至少需要评分或笔记；评分可以单独存在，笔记可以为空。
-- 目标 Agent capture session 可以在地点上下文明确时支持纯照片 Visit，但该能力尚未实现。
-- 一次只修改地点总体评分的动作不应伪造到访。
-- 照片归属明确 Visit，保存稳定顺序、内容哈希和可选的一行说明。
-- 单个 Visit 不设固定照片总数；网页一次可选择 24 张并分批上传。
-
-## 5. 地图与交互基线
-
-- 默认采用已选定的分栏侧边栏布局；列表可折叠，地图保持主要空间。
-- 地点标题日文优先；被截断时可通过选中、悬停或聚焦查看完整内容。
-- 喜欢使用纯心形图标；到访固定显示 `行った`，用空心／实心圆表达状态。
-- 喜欢筛选与到访筛选彼此独立；同时启用时执行逻辑 AND，只显示同时满足的地点。
-- 个人评分与食べログ／Google 等来源评分并列展示，不用独立大卡片占用空间。
-- 详情底部统一显示一次整体来源核验时间。
-- 删除地点、Visit 或照片前必须明确确认；失败时恢复原状态。
-- 状态切换、评分和 Journal 修改使用乐观更新，正常网络等待不阻塞界面。
-- Visit 时间线先显示四张缩略图，完整图库通过单图弹窗浏览；支持按钮、键盘和触屏滑动。
-
-## 6. 搜索、推荐与 Agent 责任
-
-网页搜索使用确定性规则覆盖：
-
-- 日／中／英文标题、别名、区域、地址和描述的部分匹配；
-- 可见标签与多词查询；
-- 类型、到访、喜欢和时间敏感状态。
-
-Agent 将自然语言转换为结构化条件并负责排序和解释。它不得编造标签、营业、预约或来源事实；硬条件必须由应用层执行，以保证不同运行时得到一致结果。
-
-## 7. 信任、安全与非目标
-
-1. 生产集合不允许未标注的 demo 数据。
-2. 个人评分与外部评分严格分离。
-3. 预约和活动事实按滚动时间窗口维护；操作前刷新高影响的过期信息。
-4. 预约、付款、取消或对外发送消息必须再次得到明确确认。
-5. 所有写入需要类型校验、幂等键、授权边界、审计回执和可理解的结果。
-6. Agent、渠道和采集器不得直接写数据库或对象存储。
-7. 私有来源、照片、Journal 和账号标识不得进入公开作品集 fixture。
-8. v1 不自动完成餐厅预约或付款，不承诺识别所有模糊视频，也不依赖某一个 Agent harness。
-
-## 8. v1 完成标准
-
-- 明确店名／地址能够通过 Catalog Intake、审核并形成可信地点记录；
-- 微信能够完成日常采集、附近查询、Visit、评分、照片和修正；
-- 重复与重试不会产生重复地点、Visit 或照片；
-- 预约与活动事实有来源、新鲜度和必要提醒；
-- 私有数据可备份和恢复；
-- 连续七天稳定运行，并完成一次不依赖开发工具的纯手机旅行演练。
+- discovering arbitrary restaurants outside the saved collection during Nearby;
+- multi-user editing or social features;
+- unattended writes without an explicit confirmation policy;
+- storing private photos, journal text, or credentials in public datasets.

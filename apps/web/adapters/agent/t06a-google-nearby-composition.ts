@@ -1,6 +1,6 @@
 import { resolve4, resolve6 } from 'node:dns/promises';
 
-import googlePolicyEvidence from '../../../../features/004-openclaw-atlas-poc/evidence/provider-policies/google-2026-09-13.v1.json' with { type: 'json' };
+import googlePolicyEvidence from '../providers/policies/catalog/google-2026-09-13.v1.json' with { type: 'json' };
 import { createGoogleLocationResolver } from '../../adapters/providers/google-location-resolver.ts';
 import {
   createGoogleFixedEndpointTransport,

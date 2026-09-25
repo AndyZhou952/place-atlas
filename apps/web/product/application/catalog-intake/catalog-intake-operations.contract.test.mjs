@@ -210,12 +210,13 @@ test('research phase digests commit only normalized owner query and preview cano
   );
 });
 
-test('catalog.intake.select requests initial research only when explicitly enabled and builds the preview from closed evidence', async () => {
+test('catalog.intake.select follows server enrichment policy and binds research to the selected subject', async () => {
   const calls = [];
   const state = createInMemoryCatalogIntakeStatePort(fixedClock());
   const application = createFixtureApplication({
     discoveryPort: discoveryFixture(),
     statePort: state,
+    enrichmentPolicy: 'enrich_if_available',
     webResearchPort: {
       async research(input) {
         calls.push(input);
@@ -241,8 +242,6 @@ test('catalog.intake.select requests initial research only when explicitly enabl
     key: 'catalog.intake.discover',
     input: { query: '鮨 さいとう', requestToken: 'request-initial-research' },
   });
-  const candidates = await state.get(ownerConversation.invocation, 'session-1');
-
   const selected = await application.execute({
     key: 'catalog.intake.select',
     input: {
@@ -264,8 +263,23 @@ test('catalog.intake.select requests initial research only when explicitly enabl
       scope: ownerConversation.invocation,
       sessionId: 'session-1',
       expectedSessionVersion: 1,
-      queryOrUrlsDigest: candidates.researchPhaseDigests.initial,
-      normalizedOwnerQuery: '鮨 さいとう',
+      queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
+        phase: 'initial',
+        selectedSubject: {
+          ownerQuery: '鮨 さいとう',
+          providerNamespace: 'google-places',
+          placeId: 'place-1',
+          transientName: 'Transient Google name',
+          transientAddress: 'Transient Google address',
+        },
+      }),
+      selectedSubject: {
+        ownerQuery: '鮨 さいとう',
+        providerNamespace: 'google-places',
+        placeId: 'place-1',
+        transientName: 'Transient Google name',
+        transientAddress: 'Transient Google address',
+      },
     },
   ]);
   const initialEvidence = selected.value.preview.tabelog;
@@ -287,6 +301,7 @@ test('catalog.intake.select requests initial research only when explicitly enabl
   const disabledCalls = [];
   const disabled = createFixtureApplication({
     discoveryPort: discoveryFixture(),
+    enrichmentPolicy: 'disabled',
     webResearchPort: {
       async research(input) {
         disabledCalls.push(input);
@@ -369,7 +384,23 @@ test('catalog.intake.confirm researches only the authoritative canonical preview
     researchCalls[0].expectedSessionVersion,
     previewSession.sessionVersion,
   );
+  const expectedSelectedSubject = {
+    ownerQuery: '鮨 さいとう',
+    providerNamespace: 'google-places',
+    placeId: 'place-1',
+    transientName: 'Transient Google name',
+    transientAddress: 'Transient Google address',
+  };
+  assert.deepEqual(researchCalls[0].selectedSubject, expectedSelectedSubject);
   assert.equal(
+    researchCalls[0].queryOrUrlsDigest,
+    await deriveCatalogIntakeResearchInputDigest({
+      phase: 'confirm',
+      canonicalUrls: researchCalls[0].canonicalUrls,
+      selectedSubject: expectedSelectedSubject,
+    }),
+  );
+  assert.notEqual(
     researchCalls[0].queryOrUrlsDigest,
     previewSession.researchPhaseDigests.confirm,
   );
@@ -966,6 +997,13 @@ test('only-name select uses durable geocoder evidence to create a closed proposa
       dataClassification: 'public_place_query',
       ownerQuery: '銀座 鮨青空',
       ownerDraft: {},
+      selectedSubject: {
+        ownerQuery: '銀座 鮨青空',
+        providerNamespace: 'google-places',
+        placeId: 'place-1',
+        transientName: 'GOOGLE TRANSIENT MUST NOT BECOME DURABLE',
+        transientAddress: 'Transient Google address',
+      },
     },
   ]);
   assert.equal(result.ok, true);
@@ -2434,6 +2472,9 @@ function createFixtureApplication(options) {
       : {}),
     ...(normalized.webResearchPort
       ? { webResearchPort: normalized.webResearchPort }
+      : {}),
+    ...(normalized.enrichmentPolicy
+      ? { enrichmentPolicy: normalized.enrichmentPolicy }
       : {}),
   });
   const application = createAtlasApplication(

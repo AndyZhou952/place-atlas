@@ -7,10 +7,7 @@ import test from 'node:test';
 import { inspectOwnerPocSeed } from './owner-poc-deployment-preflight.ts';
 
 const repositoryRoot = new URL('../../../', import.meta.url);
-const ownerRoot = new URL(
-  'features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
-  repositoryRoot,
-);
+const ownerRoot = new URL('apps/web/migrations/owner-poc/', repositoryRoot);
 const manifestUrl = new URL('owner-poc-seed-v1.json', ownerRoot);
 const targetDatabaseId = '11111111-2222-4333-8444-555555555555';
 const capturedAt = '2026-09-21T12:04:00.000Z';

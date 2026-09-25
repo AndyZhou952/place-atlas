@@ -15,10 +15,7 @@ assert.ok(
 const require = createRequire(join(playwrightRoot, 'package.json'));
 const { chromium } = require('playwright');
 const evidenceDirectory = fileURLToPath(
-  new URL(
-    '../../../features/006-agent-add-experience/evidence/t01-wechat/',
-    import.meta.url,
-  ),
+  new URL('../../../artifacts/evidence/wechat-add/', import.meta.url),
 );
 const viewport = { width: 390, height: 844 };
 const report = {

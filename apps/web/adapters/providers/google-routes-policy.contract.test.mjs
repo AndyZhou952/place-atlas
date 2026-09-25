@@ -12,10 +12,7 @@ import { publicUnicastAddressClassifier as addressClassifier } from './public-un
 const policy = JSON.parse(
   readFileSync(
     fileURLToPath(
-      new URL(
-        '../../../../features/004-openclaw-atlas-poc/evidence/provider-policies/google-2026-09-13.v1.json',
-        import.meta.url,
-      ),
+      new URL('./policies/catalog/google-2026-09-13.v1.json', import.meta.url),
     ),
     'utf8',
   ),

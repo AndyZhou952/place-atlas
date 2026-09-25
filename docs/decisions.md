@@ -1,283 +1,29 @@
-# Japan Atlas 决策登记册
+# Decision log
 
-最后更新：2026-09-24
+## D-001 — Single-owner PoC
 
-本文件合并原 decision log 与 ADR。只保留会影响未来开发的决定；实施过程由 Git 与 GitHub Issues 保存。
+Public visitors may read. Mutations require the Owner session or scoped signed Agent identity. Multi-user editing is outside current scope.
 
-状态：
+## D-002 — One workflow per operation
 
-- `Accepted`：当前开发必须遵守；
-- `Proposed`：方向合理，但需实验后接受或拒绝；
-- `Superseded`：已被新决定替代；
-- `Pending`：尚未到决策时点。
+Every operation exposed to both browser and chat must share one application workflow. Add and Nearby already follow this rule. Conversational Record is not implemented yet; when added, chat may translate input but must not fork Record business rules.
 
-## 1. 已接受决策
+## D-003 — Deterministic core, semantic edge
 
-### D-001：私有单用户、Agent-first、map-first
+Authorization, validation, identity, idempotency, persistence, and ranking constraints remain deterministic. Models may interpret or research through typed tools and return validated proposals.
 
-**状态：Accepted（2026-09-05）**
+## D-004 — Saved collection only for Nearby
 
-产品首先服务一个人的长期使用。微信／Agent 是主要采集和指令入口，私有地图是主要浏览、空间整理与记忆入口。Web 写入在 Agent 对等前作为备用入口，两个入口共用同一产品核心。
+Nearby ranks verified places already saved by the Owner; provider search must not silently broaden the collection.
 
-### D-002：框架无关核心与 Ports & Adapters
+## D-005 — Durable evidence and explicit unknowns
 
-**状态：Accepted（2026-09-05）**
+Unknown fields remain unknown. External ratings and reservation claims require source and observation time. Model prose alone is not durable evidence.
 
-领域 API、数据和业务规则不得依赖 OpenClaw、Codex、Claude Code 或其他 harness。渠道、Agent runtime、采集器、地图和存储都通过 adapter 接入；未来通用化不应要求迁移私有数据。
+## D-006 — Cloudflare production shape
 
-### D-003：Web 使用 MVVM 边界
+The PoC uses a Worker, D1, R2, and private route sidecar. Adapters keep another host possible later.
 
-**状态：Accepted（2026-09-05）**
+## D-007 — Stable operational assets
 
-React View 不直接写数据库或维护第二份业务状态；ViewModel 负责操作、乐观更新、回滚和 API 编排。该模式不强行套用到 worker 或存储内部。
-
-### D-004：先建立持久 API，再接聊天渠道
-
-**状态：Accepted（2026-09-06，原 ADR 0003）**
-
-Web 与未来 Agent 必须先共享可测试的持久操作，不能把聊天层接到内存 fixture。当前 v1 以 D1 保存结构化数据、R2 保存私有媒体；存储仍放在 application port 后面。
-
-**重审条件：** D1 的规模、空间查询、区域延迟或服务限制出现可测量问题时，再评估 Postgres/PostGIS 或独立 API。
-
-### D-005：地点身份、个人评价、Visit 与媒体分离
-
-**状态：Accepted（2026-09-06，原 ADR 0004）**
-
-- `AtlasItem` 是唯一地点身份；
-- 每地点只有一个可空总体个人评分；
-- Visit 可重复并形成时间线，Visit 不拥有独立评分；
-- 媒体二进制在 R2，元数据、说明和 Visit 关系在 D1；
-- 个人评分与外部评分严格分离。
-
-这避免重复到访复制地点和产生多个互相冲突的长期评分。
-
-### D-006：可信来源与允许放弃判断
-
-**状态：Accepted（2026-09-05）**
-
-自动确认的精确分店 precision 目标至少 90%。低置信或证据冲突时给出最多三个候选并请求确认；模型自报 confidence 不是概率。外部事实必须保留来源和核验时间。
-
-### D-007：Web Access 是可替换采集器
-
-**状态：Superseded（2026-09-24，被 D-023 取代）**
-
-该决定曾把登录浏览器与批量 discovery 作为近期能力。当前不再提供 creator／ImportJob collector；若未来出现经确认的外部来源需求，只能在 D-023 的 proposal-only 边界重新立项。
-
-### D-008：外部动作需要确认
-
-**状态：Accepted（2026-09-05）**
-
-删除、预约、付款、取消和对外消息需要明确确认。所有写入需要类型校验、幂等、权限控制和审计 receipt；Agent 不获得任意 shell、文件或存储权限。
-
-### D-009：个人状态与筛选语义
-
-**状态：Accepted（2026-09-06，2026-09-07 补充）**
-
-- `isFavorite` 是独立喜欢状态，不等同于候选／保存／计划；
-- `有效行った = 存在 Visit OR manualVisited`；存在 Visit 一定意味着去过，不能被人工“没去过”覆盖；
-- 删除最后一条 Visit 后，仅当此前独立保存了 `manualVisited=true` 才继续显示 `行った`；
-- 喜欢与到访筛选可以同时启用，同时启用时为逻辑 AND；
-- 推荐默认优先没去过，除非用户明确要求重访或喜欢。
-
-### D-010：评分输入与展示
-
-**状态：Accepted（2026-09-07）**
-
-个人评分可空，范围 0–5，`0` 有效；手动输入四舍五入到一位小数，spinner 按 0.5。个人评分与来源评分并排显示，来源核验时间在详情底部统一展示一次。
-
-### D-011：分栏地图与稳定交互
-
-**状态：Accepted（2026-09-07）**
-
-分栏侧边栏 B 是默认布局。喜欢用纯心形；到访固定显示 `行った`。个人操作采用乐观更新。地图复用 marker，不使用整画布 filter／blur，并保持 provider-neutral adapter。
-
-### D-012：当前 Visit 的最低内容与评分副作用
-
-**状态：Accepted（2026-09-09，统一既有要求）**
-
-当前网页／API 显式记录一次 Visit 时，评分或笔记至少存在一项，照片可以在同一动作选择；只有评分、没有笔记也合法。Journal 可在创建 Visit 的同一动作更新地点评分。单独从详情修改长期评分只更新 `PlaceAssessment`，不得自动创建 Visit。纯照片 Visit 只有在未来 capture session 能提供明确地点与生命周期后才可实现。
-
-### D-013：批量图片与对话式关联
-
-**状态：Accepted（2026-09-08）**
-
-网页一次可选择 24 张，底层每请求四张，单 Visit 不设固定总数。未来聊天图片通过用户＋conversation＋明确地点范围的 `VisitCaptureSession` 关联；显式 session／回复优先，歧义必须询问，渠道 message ID 保证幂等。详细跟踪见 [#4](https://github.com/AndyZhou952/jp-food-event-map/issues/4)。
-
-### D-014：大图库使用弹窗
-
-**状态：Accepted（2026-09-09）**
-
-Visit 时间线最多先展示四张缩略图；完整集合在单图弹窗中浏览，支持按钮、键盘、触屏滑动和相邻预加载。图库交互不能改变底层媒体／ViewModel 契约。
-
-### D-015：性能依靠证据和后台对账
-
-**状态：Accepted（2026-09-07 至 2026-09-08）**
-
-Journal 前台不等待私有 Sites 约两秒的鉴权／运行时回包；ViewModel 乐观更新并在失败时恢复。Visit create/edit/delete 各限制为两次 D1 binding 往返且不全表读取。地图更换引擎前必须先取得托管 trace；见 [#1](https://github.com/AndyZhou952/jp-food-event-map/issues/1)。
-
-### D-016：模块化单体与首个 Agent-ready 切片
-
-**状态：Accepted（2026-09-12）**
-
-当前保持单仓库，Web 常驻核心采用单部署单元的模块化单体，在内部以 Application Operation、port 与 adapter 建立真实接缝，不立即拆微服务。高权限本地 connector 必须位于独立短时进程与信任区。首个切片完成地点、个人状态、Visit、媒体、搜索与 nearby 的行为保持式迁移；历史 ImportJob 部分已由 D-023 取代。推荐、身份确认和对话式采集分别立项。
-
-**2026-09-12 补充：** 旧 `/api/nearby` 会把缺失的 `lat` 或 `lon` 经 `Number(null)` 意外解释为 `0`。用户确认这是缺陷而非兼容契约；缺失、非数值或越界坐标必须统一映射为 HTTP 400 `invalid_input`。
-
-### D-017：30 天可恢复删除
-
-**状态：Accepted（2026-09-12）**
-
-普通删除进入 30 天回收站；显式永久删除需再次确认并立即清理主存储。R2 媒体在恢复窗口结束后清理，备份中的副本按备份淘汰周期删除。所有入口共享相同语义和审计 receipt。
-
-### D-018：数据保留与日志最小化
-
-**状态：Accepted（2026-09-12）**
-
-- 私人 Journal 笔记与媒体保留至用户删除；
-- 未分配聊天附件或草稿保留 24 小时；
-- 第三方原始媒体在处理完成后最多保留 72 小时；
-- 必要的来源 URL、hash、时间戳、短摘录及低分辨率证据帧可长期私有保存；
-- 原始聊天正文在 capture session 关闭后最多保留 7 天；
-- 结构化审计事件保留 180 天，不记录 Cookie、token、图片二进制或私人笔记全文。
-
-### D-019：受限云模型处理边界
-
-**状态：Accepted（2026-09-12）**
-
-允许使用明确不用于训练且提供受限保留配置的云模型处理批准的第三方材料与私人内容。提交前剥离 EXIF、Cookie、token 和无关凭证；应用日志只保留结构化结果。未来如私人媒体需要更强隔离，可在同一模型处理 port 后增加本地 adapter，而不改变产品核心。
-
-### D-020：未部署 reset migration 的一次性安全重排
-
-**状态：Accepted（2026-09-12）**
-
-原 `0003_reset_test_place_assessments.sql` 从未在生产执行。为先建立完整生产快照与恢复能力，允许一次性把其 SQL 按字节与 SHA-256 原样转为 non-runnable pending artifact；新的 active 0003 只建立持久化 maintenance fence、write lease 与 snapshot 控制结构。完整 before evidence 和全 D1 恢复演练通过后，原 reset SQL 才以 active 0004 发布，CI 必须证明 0004 与 pending artifact 逐字节一致。
-
-这不是修改已部署 migration 的先例。任何已经部署的 migration 继续不可修改；已保存但未部署且带原 reset 0003 的 Site version 16 永不发布。详细门禁见 `features/003-production-snapshot/spec.md`。
-
-### D-021：确定性项目命令路由与微信入站门
-
-**状态：Accepted（2026-09-13）**
-
-单一微信前门使用显式项目注册表。规范入口 `/jpmap` 必须在模型参与前通过 OpenClaw 原生 plugin command 进入受信任路由，且不得注册模型可选择的 Atlas tool；平台 auth 后仍精确绑定 sender、channel、direct from/to 与无 thread 上下文。无斜杠 `jpmap` 与连续 capture 只有在代码自有的 `PreModelIngressRouter` 位于 agent loop 之前且通过真实渠道零模型探针后才启用。路由逐项目绑定独立凭证、scope 和状态命名空间；普通助手模型以及任何其他项目均不能取得 Atlas 凭证。
-
-**重审条件：** OpenClaw/runtime/plugin/channel 版本或入站执行顺序改变，native command 或 ingress probe 失败，或者新增项目需要共享写权限时，关闭相关 capability gate 并重新评审。OpenClaw 2026.7.1 已证明 skill direct-dispatch 会把 optional tool 受普通 allowlist 约束，因此不得用全局 allowlist 作为回退。
-
-### D-022：Owner PoC 公开读取投影与 Owner 写门
-
-**状态：Accepted（2026-09-21）**
-
-用户已明确确认非敏感 PoC 展示内容可公开。Public Read v1 只开放 feature 005 规格定义的闭合 `PublicCatalogItemV1`、`PublicAssessmentV1`、`PublicVisitV1`、`PublicVisitMediaV1` 与照片二进制；授权必须先于 Application/R2，投影禁止领域对象直出。不得公开或由公开标识推导 object key、原文件名、hash、内部存储 ID、审计、receipt 或维护字段；未知读取默认要求 Owner session。所有浏览器写入仍要求 Owner session，Agent 使用独立 HMAC/scope。
-
-这是对 D-018 默认私人语义的有意 PoC 例外，不改变保留期限，也不承诺永久公开。录入真实敏感评论、Visit 或图片，或改变公开 DTO 前，必须收窄投影并重新安全评审。
-
-**重审条件：** 出现真实敏感内容、新读取 operation／字段、朋友分享之外的公开传播、多用户身份或匿名写入需求。
-
-### D-023：Catalog Intake 是当前唯一建档路径
-
-**状态：Accepted（2026-09-24）**
-
-网页与 Agent 都通过 `Catalog Intake → Preview/Confirm → Verified Item 或 Review Candidate` 建档。证据不足或冲突的候选只对 Owner Review 可见，不得进入公开地图或 Nearby。creator ImportJob 的 UI、route、application operation 和 runtime adapter 已退役，不再视为当前 capability。
-
-Acquisition & Review 仅保留为未来 proposal 边界：任何新来源 adapter 都必须产出 Evidence Manifest／Review Candidate，并重新经过独立规格、权限、评测和确认门；不得恢复旧队列或绕过 Catalog Intake 直接发布。已部署的 `import_jobs` 表与数据只为 migration 兼容保留，后续只能以新增安全 migration 处理。
-
-## 2. 提议中决策
-
-### D-P01：OpenClaw 作为首个微信 runtime
-
-**状态：Proposed（原 ADR 0001）**
-
-OpenClaw 是当前首选，因为它提供接近目标的微信 gateway/plugin 能力。它必须位于 `ChannelAdapter` 与 `AgentRuntime` 后，只能调用 scoped tools。
-
-**接受条件：** 主账号私聊 PoC、工具正确性、安全门禁、重连与七天 soak 通过。
-
-**重审条件：** 插件维护、追踪／回放、权限或稳定性不满足要求；此时比较 Hermes/Pi 或 code-owned SDK adapter。
-
-### D-P02：云端常驻核心＋本地按需采集
-
-**状态：Proposed（原 ADR 0002）**
-
-消息 gateway、API、轻量 worker 和提醒常驻云端；若未来批准高权限来源 adapter，其登录浏览器留在本机按需运行，只上传规范化 manifest。当前没有此类 collector runtime。
-
-**接受条件：** 微信 PoC 证明 24/7 需求，且本地 connector 同步协议可恢复。
-
-**重审条件：** 出现稳定官方 API、安全隔离的云浏览器，或本地可用性妨碍真实需求。
-
-### D-P03：Japan Atlas 云端核心与地点／路线供应商组合
-
-**状态：Proposed（2026-09-13）**
-
-PoC 将静态前端、Worker API、D1 与 R2 放在一个隔离 Cloudflare 环境。Nearby 的唯一候选全集来自 Japan Atlas Catalog；Google Geocoding/Routes 只提供请求内的位置与路线证据，DeepSeek 不参与距离或路线判断。地点发现仅属于 Catalog intake，Foursquare 已验证实验保留为未启用的可替换 adapter，最终供应商需在 Google Places、开放数据与用户确认数据之间按持久化许可、地图兼容、价格和日本分店质量另行决定。外部评分在许可证据完成前只瞬时显示或返回未知；walk-in／排队没有明确现时来源时一律 unknown。Lightsail 只承载 OpenClaw 与微信入口，因此未来可独立迁移到 Hetzner/OCI。
-
-**接受条件：** 完成条款/字段矩阵、固定日本样本校准、attribution/缓存合规检查、供应商 contract tests、配额与成本告警，并跑通隔离环境端到端测试。
-
-**重审条件：** 供应商条款、价格、覆盖或质量改变，出现可靠的 walk-in/queue 数据源，或真实流量超出 PoC 预算。
-
-### D-P04：Google 固定 origin 的 Cloudflare PoC 受限 egress 例外
-
-**状态：Proposed（2026-09-15；用户已于 2026-09-17 确认，仍待其余接受条件）**
-
-**用户确认：** 2026-09-17，同意隔离只读 PoC 采用本方案；其余接受条件仍须完成后才可转为 Accepted 或启用真实调用。
-
-**背景：** feature 004 规格要求 provider egress 在每次 DNS 解析和每一跳 redirect 上校验公网地址。`ProviderPolicyGateway` 因而把已校验的 `resolvedAddresses` 交给 transport；但 Cloudflare Workers 的标准 HTTPS `fetch` 只能按 URL 发起请求，不能把连接固定到这些地址，`resolveOverride` 对外部 Google 域名也不适用。显式校验与实际连接之间仍有 DNS TOCTOU 缝，不能把当前实现描述为满足逐 DNS／IP pin 保证。依据见 [Workers known issues](https://developers.cloudflare.com/workers/platform/known-issues/)、[Request `resolveOverride`](https://developers.cloudflare.com/workers/runtime-apis/request/#resolveoverride) 与 [Node DNS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/)。
-
-**提议：** 只在隔离的只读 Nearby PoC 中建立代码拥有的 Google 专用 transport adapter；构建时闭合的 endpoint tuple 仅为 `GET https://maps.googleapis.com:443/maps/api/geocode/json`、`POST https://routes.googleapis.com:443/distanceMatrix/v2:computeRouteMatrix`、`POST https://routes.googleapis.com:443/directions/v2:computeRoutes`，任何其他 host、port、path 或 method 组合都在发起网络请求前 fail closed。它的小接口只接受经过 schema 校验的 geocoding query、route matrix body 或 transit route body，不接受 URL；用户、模型和 provider 响应只能影响允许的 query/body 字段。Worker 使用平台 HTTPS/TLS 直接请求，设置 manual redirect，并把所有 3xx 当作 `dependency_failure`，不跟随任何跳转。
-
-这是相对现规格逐 DNS 校验并绑定已验证 IP 的**受限偏离**，不是等价实现。偏离只缩小固定 Google adapter 的网络威胁模型，不放宽通用 provider URL：任何其他 provider、payload 中返回的 URL 或未来任意 URL 抓取仍须经过原 `ProviderPolicyGateway` 的 origin/DNS/IP/redirect 契约；Cloudflare 无法兑现该契约时继续 fail closed。
-
-Google 调用仍必须经过已批准的 provider policy、字段许可与 warn/hard quota。secret 只在最终 transport 注入，缺失即 fail closed，且不得进入日志、D1/R2、prompt 或回执；Google 原始 JSON 只进入 adapter 内 mapper，只有批准的规范字段可离开 adapter；所有 Google 内容保持 request-only，不跨请求缓存或持久化。本提议不激活当前 `pending_review` policy，也不授权部署或使用真实凭证。
-
-**未选方案：** B 是增加能固定已验证 IP 并校验原 hostname TLS 的 egress proxy，可保留原保证，但会新增网络信任区、鉴权、证书、可用性、成本和部署运维，超出当前只读 PoC。C 是把 Google egress 放到 Lightsail/Node，以 custom DNS lookup 与 TLS `servername` 保留原保证；它会把 Google secret 和 Atlas 路线可用性绑定到目前只承载 OpenClaw 的 VM，增加跨区一跳和未来迁移耦合。两者在固定官方 origin、低流量、月预算 60 美元的 PoC 中收益不足，但仍是需要更强网络保证时的回退方案。
-
-**接受条件：** 用户明确接受上述受限偏离；独立架构／安全评审通过；contract tests 对三个允许 tuple 分别提供正测，并对 host、port、path、method 的每类变体提供负测，同时证明输入不能影响 endpoint、所有 redirect 拒绝、字段与 quota 失败关闭、缺 secret 失败关闭，以及 secret／原始响应不被记录、持久化或返回。供应商 policy 仍须在条款、credential scope、attribution 与预算证据通过后另行批准，之后才可启用真实调用。
-
-**重审条件：** 超出隔离只读 PoC；新增或改变 Google origin/path/method；需要跟随 redirect；任何用户、模型或 provider 数据开始影响目标 URL；复用本例外到其他 provider 或主动抓取返回 URL；Cloudflare 的 DNS/fetch/TLS 行为变化；发生 DNS、证书或 egress 安全异常。命中任一条件即关闭该 transport 并重新比较通用 gateway、B 或 C。
-
-### D-P05：独立只读 Google Route Sidecar
-
-**状态：Proposed（2026-09-21；上线前须独立评审）**
-
-Owner 写 Worker 不继承 D-P04 的隔离只读 egress 结论。Google Geocoding/walking Route Matrix 放入独立 Cloudflare Route Sidecar：Sidecar 配置 `workers_dev=false` 且无 routes，只持 Google key，不绑定 Owner 密码、owner D1/R2 或 Agent HMAC；owner-poc 通过窄结构化 service binding 发送本次位置线索与 Catalog shortlist 坐标。D-P04 的固定 endpoint、禁 redirect、字段许可仅在 Sidecar 内继续适用。
-
-owner-poc 在 service binding 调用前按 provider + SKU + UTC period 原子预留用量：Geocoding 8,000 requests/月、walking Route Matrix 8,000 billable elements/月，provider 失败不退款；Google Cloud quota 是第二道门。Transit Routes 暂不启用，启用前另定 cap、费用映射和 fixtures。Sidecar 只返回带 attribution/source/checkedAt 的闭合 evidence；原始 JSON、解析地址/坐标与路线 payload不写 D1/R2、日志、prompt 或 Leaflet。
-
-**接受条件：** 独立威胁模型与安全评审通过；preflight 证明配置无公网 route、直接公网 URL 不可达、未绑定 Worker 无法调用；固定 endpoint/redirect/secret、两个 hard cap、Matrix elements、并发、失败不退款、request-only、attribution 与公开 ToS/Privacy contract tests 全绿。
-
-**重审条件：** Sidecar 获得 Owner/Agent 凭证或业务存储、出现公共 route、启用 Transit/其他 provider、改变 Google endpoint，或任何请求数据能影响目标 URL。
-
-### D-P06：OpenClaw 同机的受限 Research Relay 信任区
-
-**状态：Proposed（2026-09-22；T-15 preflight 与独立威胁评审前不得启用）**
-
-Add 的 `CatalogIntakeModule` 与 D1 保持 research 预算权威，production `WebResearchPort` 暂提议由与 OpenClaw 同机的无状态 Research Relay 实现，以复用其 search/browser capability，而不把联网编排或写权限交给 Agent。每个 phase 外呼前，D1 transaction 必须原子标记整个 phase spent（失败不退款、无自动 retry），再签发短时 allowance，闭合包含 session、phase、Owner query 或 preview canonical URLs digest、max counts、deadline 与 requestId。Relay 只经 protected Cloudflare Tunnel/auth endpoint 接收 allowance，校验签名、期限、URL/redirect/count，关闭 transport retry，只返回签名的闭合 scalar evidence + usage 并立即丢弃 raw；response loss 视为 spent，回退 unknown/manual，绝不再次 egress。
-
-Relay 不持 D1、Owner Cookie/HMAC、Catalog 写凭证或产品数据；可为 transport replay defense 保留短时 requestId，但不能持久化 intake 内容。core 仍独占 session、phase reserve、preview digest、confirm refresh、provenance assignment、幂等与 Catalog publication 调用；Relay/OpenClaw 不执行 confirm。独立 relay secret 只在 Worker Secret 与 root-only host store；实现可在不改变 port 的情况下替换为批准的 Cloudflare search adapter。
-
-Relay-owned transport 只允许 HTTPS:443，拒绝 URL credentials、IP literal、非批准 scheme/port 与云 metadata hostname。初始 host 与每次 redirect 均解析 A+AAAA，拒绝 loopback、private、link-local、multicast、unspecified、CGNAT、ULA 及云 metadata ranges/hostnames；连接固定到验证后的 IP，同时保留原 hostname 的 TLS SNI/Host，每跳重新验证且最多 3 跳。OpenClaw search tool 只能提供 URL candidates；canonical page content 必须经该 hardened transport 抓取，不能由通用 browser fetch 旁路。
-
-**接受条件：** T-15 preflight 证明 exact OpenClaw tool binding、Tunnel/relay 身份、无公网旁路、allowance tamper/expiry/replay 拒绝、每阶段单次消费、response-loss 不重试、签名 scalar/usage、raw 丢弃与零产品存储；SSRF tests 覆盖 A+AAAA、禁止地址/metadata、TLS SNI/Host pin、逐跳 redirect 与 DNS rebinding fixtures；独立架构与安全评审通过。
-
-**重审／拒绝条件：** OpenClaw/transport 无法兑现上述闭合 binding 或 DNS/IP pin；Relay 需要 Owner/Catalog/D1 凭证或持久产品数据；存在公网/通用 browser fetch 旁路、自动 retry、未签名结果或 phase 二次 egress；Tunnel/host、DNS 或工具行为改变。命中任一条件即关闭 Relay并回退 unknown/manual，重新比较同 port 的替代 adapter。
-
-## 3. 已替代决策
-
-| 旧方向 | 状态 | 当前方向 |
-|---|---|---|
-| 旧 `food-map` 代码／数据作为基线 | Superseded | 只借鉴个别体验，从零构建，不迁移旧代码、依赖或样例数据 |
-| 静态 JSON／Git 作为数据库 | Superseded | D1/R2 与唯一应用 API 写边界 |
-| 每条 Journal 记录拥有评分 | Superseded | 每地点一个 PlaceAssessment，Visit 独立可重复 |
-| 大图库在时间线内全部展开 | Superseded | 四缩略图＋单图弹窗 |
-| 媒体只能保存 Visit 后追加 | Superseded | Journal 创建时可同步选择图片，同时保留后续追加 |
-| creator 历史／ImportJob 队列 | Superseded | 当前只走 Catalog Intake + Review；Acquisition 仅保留未来 proposal 边界 |
-| Postgres/PostGIS 是近期既定迁移 | Superseded | D1/R2 为 v1 基线，达到明确触发条件再评估 |
-
-## 4. 待决策
-
-| 问题 | 最晚决策时点 | 所需证据／建议 |
-|---|---|---|
-| OpenClaw 是否最终采用 | 微信 adapter 开发前 | 统一 runtime 场景、主账号 PoC 和安全评审 |
-| 24/7 API/gateway 的 host、region 与预算 | 微信 PoC 通过后 | APAC/EU 实测延迟、月成本、备份与运维可靠性 |
-| Bot 服务鉴权的长期加固边界 | 扩大 Agent 写入范围前 | 现有 scoped API、签名、权限和审计负面测试 |
-| 是否更换地图引擎／瓦片供应商 | #1 trace 后 | 当前 Leaflet/OSM 与合规矢量方案的移动端数据 |
-| 每月基础设施与模型预算 | 采购云资源前 | 实际消息量、媒体、模型与日志成本 |
-
-这些事项尚未阻塞当前 application layer 和采集器开发。到达决策点时，应在 Issue 中附证据，再将结果更新为 `Accepted` 或 `Rejected/Superseded`。
+Migrations, fixtures, policies, integration packages, and runbooks live beside operated code. Historical plans live in Git history and issues, not `/features`.

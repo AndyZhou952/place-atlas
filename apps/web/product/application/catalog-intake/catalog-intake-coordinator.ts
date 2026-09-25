@@ -87,6 +87,7 @@ export interface DurableGeocoderPort {
     readonly dataClassification: 'public_place_query';
     readonly ownerQuery: string;
     readonly ownerDraft: CatalogIntakeOwnerFields;
+    readonly selectedSubject: CatalogIntakeSelectedSubject;
   }): Promise<Result<DurableGeocoderProposal>>;
 }
 
@@ -118,15 +119,29 @@ type WebResearchInputBase = {
   readonly queryOrUrlsDigest: string;
 };
 
+export interface CatalogIntakeSelectedSubject {
+  readonly ownerQuery: string;
+  readonly providerNamespace: string;
+  readonly placeId: string;
+  readonly transientName: string;
+  readonly transientAddress: string;
+}
+
 export type WebResearchInput =
   | (WebResearchInputBase & {
       readonly phase: 'initial';
+      readonly selectedSubject: CatalogIntakeSelectedSubject;
+    })
+  | (WebResearchInputBase & {
+      readonly phase: 'initial';
+      /** Compatibility for already-issued query allowances. */
       readonly normalizedOwnerQuery: string;
     })
   | (WebResearchInputBase & {
       readonly phase: 'confirm';
       readonly canonicalUrls: readonly string[];
       readonly preview: CatalogIntakePreview;
+      readonly selectedSubject: CatalogIntakeSelectedSubject;
     });
 
 export type CatalogIntakeResearchPhase = 'initial' | 'confirm';
@@ -219,7 +234,8 @@ export interface CatalogIntakeSelectInput {
   readonly ownerFields?: CatalogIntakeOwnerFields;
   readonly tabelog?: OwnerTabelogAssertion | 'unknown';
   readonly reservation?: OwnerReservationAssertion | 'unknown';
-  readonly requestResearch: boolean;
+  /** Compatibility input; explicit server policy takes precedence. */
+  readonly requestResearch?: boolean;
 }
 
 export interface CatalogIntakeClarification {
@@ -566,6 +582,7 @@ export interface CatalogIntakeStatePort {
     readonly phase: CatalogIntakeResearchPhase;
     readonly queryOrUrlsDigest: string;
     readonly requestId: string;
+    readonly selectedIdentity?: CatalogIntakeSelectedSubject;
   }): Promise<
     | {
         readonly kind: 'consumed';
@@ -613,6 +630,7 @@ export function createCatalogIntakeModule(options: {
   readonly discoveryPort: GooglePlaceDiscoveryPort;
   readonly durableGeocoderPort?: DurableGeocoderPort;
   readonly webResearchPort?: WebResearchPort;
+  readonly enrichmentPolicy?: 'disabled' | 'enrich_if_available';
   readonly atlasCatalogIntakePort?: AtlasCatalogIntakePort;
   readonly statePort: CatalogIntakeStatePort;
   readonly clock: { now(): Date };
@@ -888,6 +906,13 @@ export function createCatalogIntakeModule(options: {
         }
 
         const ownerFields = input.ownerFields ?? {};
+        const selectedSubject: CatalogIntakeSelectedSubject = {
+          ownerQuery: session.ownerQuery,
+          providerNamespace: candidate.providerNamespace,
+          placeId: candidate.placeId,
+          transientName: refreshedCandidate.transientPresentation.name,
+          transientAddress: refreshedCandidate.transientPresentation.address,
+        };
         const acceptedAt = options.clock.now();
         const nextVersion = session.sessionVersion + 1;
         let geocoderOutcome: DurableGeocoderProposal | undefined;
@@ -902,6 +927,7 @@ export function createCatalogIntakeModule(options: {
             dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
             ownerDraft: ownerFields,
+            selectedSubject,
           });
           if (proposed.ok) {
             geocoderOutcome = validateDurableGeocoderProposal(proposed.value);
@@ -1041,7 +1067,9 @@ export function createCatalogIntakeModule(options: {
         };
         let researchUnavailable = false;
         if (
-          input.requestResearch &&
+          (options.enrichmentPolicy === 'enrich_if_available' ||
+            (options.enrichmentPolicy === undefined &&
+              input.requestResearch === true)) &&
           session.state === 'candidates_ready' &&
           options.webResearchPort
         ) {
@@ -1050,8 +1078,11 @@ export function createCatalogIntakeModule(options: {
             scope,
             sessionId: session.sessionId,
             expectedSessionVersion: session.sessionVersion,
-            queryOrUrlsDigest: session.researchPhaseDigests.initial,
-            normalizedOwnerQuery: session.normalizedOwnerQuery,
+            queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
+              phase: 'initial',
+              selectedSubject,
+            }),
+            selectedSubject,
           });
           if (research.kind === 'expired') {
             return addFailure(
@@ -1365,6 +1396,15 @@ export function createCatalogIntakeModule(options: {
             dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
             ownerDraft: session.preview.ownerFields,
+            selectedSubject: {
+              ownerQuery: session.ownerQuery,
+              providerNamespace:
+                refreshedCandidate.durableIdentity.providerNamespace,
+              placeId: refreshedCandidate.durableIdentity.placeId,
+              transientName: refreshedCandidate.transientPresentation.name,
+              transientAddress:
+                refreshedCandidate.transientPresentation.address,
+            },
           });
           if (!geocoderRefresh.ok) {
             return success({
@@ -1437,6 +1477,20 @@ export function createCatalogIntakeModule(options: {
           session.preview,
         );
         const confirmResearchDigest = session.researchPhaseDigests.confirm;
+        const confirmSelectedSubject: CatalogIntakeSelectedSubject = {
+          ownerQuery: session.ownerQuery,
+          providerNamespace:
+            refreshedCandidate.durableIdentity.providerNamespace,
+          placeId: refreshedCandidate.durableIdentity.placeId,
+          transientName: refreshedCandidate.transientPresentation.name,
+          transientAddress: refreshedCandidate.transientPresentation.address,
+        };
+        const confirmResearchPayloadDigest =
+          await deriveCatalogIntakeResearchInputDigest({
+            phase: 'confirm',
+            canonicalUrls: canonicalResearchUrls,
+            selectedSubject: confirmSelectedSubject,
+          });
         const appliedConfirm = session.researchPhaseApplications?.confirm;
         const confirmResearchAlreadyApplied = Boolean(
           confirmResearchDigest &&
@@ -1447,8 +1501,10 @@ export function createCatalogIntakeModule(options: {
         let confirmResearchAttempted = false;
         let confirmResearchApplied = false;
         if (
+          options.enrichmentPolicy !== 'disabled' &&
           options.webResearchPort &&
           confirmResearchDigest &&
+          confirmResearchPayloadDigest &&
           canonicalResearchUrls.length > 0 &&
           !confirmResearchAlreadyApplied
         ) {
@@ -1458,9 +1514,10 @@ export function createCatalogIntakeModule(options: {
             scope,
             sessionId: session.sessionId,
             expectedSessionVersion: session.sessionVersion,
-            queryOrUrlsDigest: confirmResearchDigest,
+            queryOrUrlsDigest: confirmResearchPayloadDigest,
             canonicalUrls: canonicalResearchUrls,
             preview: session.preview,
+            selectedSubject: confirmSelectedSubject,
           });
           if (research.kind === 'expired') {
             return addFailure(
@@ -2028,7 +2085,25 @@ export function createInMemoryCatalogIntakeStatePort(
       ) {
         return { kind: 'conflict' as const };
       }
+      const selectedIdentityMatches =
+        input.selectedIdentity !== undefined &&
+        (input.phase === 'initial'
+          ? session.candidates.some(
+              (candidate) =>
+                candidate.providerNamespace ===
+                  input.selectedIdentity?.providerNamespace &&
+                candidate.placeId === input.selectedIdentity.placeId,
+            )
+          : session.state === 'preview_ready' &&
+            session.preview.candidateIdentity.providerNamespace ===
+              input.selectedIdentity.providerNamespace &&
+            session.preview.candidateIdentity.placeId ===
+              input.selectedIdentity.placeId);
+      if (input.selectedIdentity !== undefined && !selectedIdentityMatches) {
+        return { kind: 'conflict' as const };
+      }
       if (
+        input.selectedIdentity === undefined &&
         session.researchPhaseDigests[input.phase] !== input.queryOrUrlsDigest
       ) {
         return { kind: 'conflict' as const };
@@ -2546,7 +2621,7 @@ function validateSelectInput(
         'reservation',
         'requestResearch',
       ],
-      ['sessionId', 'expectedSessionVersion', 'ordinal', 'requestResearch'],
+      ['sessionId', 'expectedSessionVersion', 'ordinal'],
     )
   ) {
     return addFailure('invalid_input', 'A valid intake selection is required.');
@@ -2556,7 +2631,8 @@ function validateSelectInput(
     !sessionId ||
     !isPositiveInteger(input.expectedSessionVersion) ||
     !isPositiveInteger(input.ordinal) ||
-    typeof input.requestResearch !== 'boolean'
+    (input.requestResearch !== undefined &&
+      typeof input.requestResearch !== 'boolean')
   ) {
     return addFailure('invalid_input', 'A valid intake selection is required.');
   }
@@ -2579,7 +2655,9 @@ function validateSelectInput(
     ...(ownerFields ? { ownerFields } : {}),
     ...(tabelog ? { tabelog } : {}),
     ...(reservation ? { reservation } : {}),
-    requestResearch: input.requestResearch,
+    ...(input.requestResearch !== undefined
+      ? { requestResearch: input.requestResearch }
+      : {}),
   });
 }
 
@@ -3182,8 +3260,19 @@ async function digestCanonical(value: unknown): Promise<string> {
 
 export function deriveCatalogIntakeResearchInputDigest(input: {
   readonly phase: 'initial';
+  readonly selectedSubject: CatalogIntakeSelectedSubject;
+}): Promise<string>;
+/** Compatibility session marker; new relay requests use selectedSubject. */
+export function deriveCatalogIntakeResearchInputDigest(input: {
+  readonly phase: 'initial';
   readonly normalizedOwnerQuery: string;
 }): Promise<string>;
+export function deriveCatalogIntakeResearchInputDigest(input: {
+  readonly phase: 'confirm';
+  readonly canonicalUrls: readonly string[];
+  readonly selectedSubject: CatalogIntakeSelectedSubject;
+}): Promise<string | undefined>;
+/** Compatibility session marker; relay allowances add selectedSubject. */
 export function deriveCatalogIntakeResearchInputDigest(input: {
   readonly phase: 'confirm';
   readonly canonicalUrls: readonly string[];
@@ -3192,20 +3281,31 @@ export async function deriveCatalogIntakeResearchInputDigest(
   input:
     | {
         readonly phase: 'initial';
-        readonly normalizedOwnerQuery: string;
+        readonly selectedSubject: CatalogIntakeSelectedSubject;
       }
-    | { readonly phase: 'confirm'; readonly canonicalUrls: readonly string[] },
+    | { readonly phase: 'initial'; readonly normalizedOwnerQuery: string }
+    | {
+        readonly phase: 'confirm';
+        readonly canonicalUrls: readonly string[];
+        readonly selectedSubject?: CatalogIntakeSelectedSubject;
+      },
 ): Promise<string | undefined> {
   if (input.phase === 'initial') {
     return digestCanonical({
       phase: 'initial',
-      query: input.normalizedOwnerQuery,
+      ...('selectedSubject' in input
+        ? { subject: input.selectedSubject }
+        : { query: input.normalizedOwnerQuery }),
     });
   }
   const canonicalUrls = [...new Set(input.canonicalUrls)].sort(codeUnitOrder);
   return canonicalUrls.length === 0
     ? undefined
-    : digestCanonical({ phase: 'confirm', canonicalUrls });
+    : digestCanonical({
+        phase: 'confirm',
+        canonicalUrls,
+        ...(input.selectedSubject ? { subject: input.selectedSubject } : {}),
+      });
 }
 
 async function researchPhaseDigestsForPreview(

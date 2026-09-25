@@ -68,6 +68,44 @@ test('Nominatim maps one user-triggered public place query to licensed durable e
   });
 });
 
+test('Nominatim uses the selected Google candidate address without persisting it', async () => {
+  const requests = [];
+  const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };
+  const adapter = createNominatimDurableGeocoderAdapter({
+    endpoint: 'https://nominatim.openstreetmap.org/search',
+    identifyingUserAgent: 'JapanAtlasOwnerPoC/1.0 (owner@example.test)',
+    referer: 'https://japan-atlas.example.test/',
+    transport: {
+      async search(request) {
+        requests.push(request);
+        return { ok: true, value: [] };
+      },
+    },
+    cache: createInMemoryDurableGeocoderCache(),
+    rateGate: createNominatimApplicationRateGate(clock),
+    clock,
+  });
+
+  await adapter.propose({
+    trigger: 'owner_intake_select',
+    dataClassification: 'public_place_query',
+    ownerQuery: '東京麺通団',
+    ownerDraft: {},
+    selectedSubject: {
+      ownerQuery: '東京麺通団',
+      providerNamespace: 'google-places',
+      placeId: 'selected-branch',
+      transientName: 'Tōkyō Mentsūdan',
+      transientAddress: '7-9-15 Nishishinjuku, Shinjuku City, Tokyo',
+    },
+  });
+
+  assert.match(
+    requests[0].url,
+    /q=T%C5%8Dky%C5%8D%20Ments%C5%ABdan%207-9-15%20Nishishinjuku/,
+  );
+});
+
 test('Nominatim rejects non-owner, non-public, or expanded input before cache, rate, or transport', async () => {
   let transportCalls = 0;
   const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };

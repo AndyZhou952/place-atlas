@@ -1,6 +1,7 @@
 import type {
   CatalogIntakeCandidatesSession,
   CatalogIntakeResearchAllowance,
+  CatalogIntakeSelectedSubject,
   CatalogIntakeScope,
   CatalogIntakeStatePort,
   CatalogIntakeStoredSession,
@@ -241,6 +242,7 @@ export class D1CatalogIntakeState
     readonly phase: 'initial' | 'confirm';
     readonly queryOrUrlsDigest: string;
     readonly requestId: string;
+    readonly selectedIdentity?: CatalogIntakeSelectedSubject;
   }) {
     if (
       !/^[0-9a-f]{64}$/u.test(input.queryOrUrlsDigest) ||
@@ -254,6 +256,35 @@ export class D1CatalogIntakeState
     const phaseState =
       input.phase === 'confirm' ? 'preview_ready' : 'candidates_ready';
     const digestPath = `$.researchPhaseDigests.${input.phase}`;
+    let eligibilityDigest = input.queryOrUrlsDigest;
+    if (input.selectedIdentity !== undefined) {
+      const session = await this.get(input.scope, input.sessionId);
+      const selectedIdentityMatches =
+        input.phase === 'initial'
+          ? session?.state === 'candidates_ready' &&
+            session.candidates.some(
+              (candidate) =>
+                candidate.providerNamespace ===
+                  input.selectedIdentity?.providerNamespace &&
+                candidate.placeId === input.selectedIdentity.placeId,
+            )
+          : session?.state === 'preview_ready' &&
+            session.preview.candidateIdentity.providerNamespace ===
+              input.selectedIdentity.providerNamespace &&
+            session.preview.candidateIdentity.placeId ===
+              input.selectedIdentity.placeId;
+      if (!selectedIdentityMatches) {
+        return { kind: 'conflict' as const };
+      }
+      if (
+        !session ||
+        (session.state !== 'candidates_ready' &&
+          session.state !== 'preview_ready')
+      ) {
+        return { kind: 'conflict' as const };
+      }
+      eligibilityDigest = session.researchPhaseDigests[input.phase] ?? '';
+    }
     const result = await this.#database
       .prepare(consumeResearchPhaseSql)
       .bind(
@@ -275,7 +306,7 @@ export class D1CatalogIntakeState
         nowMs,
         phaseState,
         digestPath,
-        input.queryOrUrlsDigest,
+        eligibilityDigest,
       )
       .run();
     if (changes(result) === 1) {
@@ -320,7 +351,7 @@ export class D1CatalogIntakeState
       return { kind: 'expired' as const };
     }
     if (eligible.state !== phaseState) return { kind: 'conflict' as const };
-    if (eligible.research_digest !== input.queryOrUrlsDigest) {
+    if (eligible.research_digest !== eligibilityDigest) {
       return { kind: 'conflict' as const };
     }
     const spent = await this.#database

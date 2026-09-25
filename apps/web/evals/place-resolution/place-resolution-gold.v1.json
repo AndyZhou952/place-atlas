@@ -1,0 +1,731 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "place-resolution-v1",
+  "description": "Curated place-identity and branch-resolution cases for Japan Atlas Add. Ratings and other volatile enrichment fields are intentionally out of scope.",
+  "checkedAt": "2026-09-25",
+  "entities": {
+    "tokyo-mentsudan-shinjuku": {
+      "canonicalName": "讃岐うどん大使 東京麺通団",
+      "branchId": "shinjuku-west-exit",
+      "branchName": "Shinjuku West Exit",
+      "countryCode": "JP",
+      "locality": "Shinjuku City, Tokyo",
+      "address": "東京都新宿区西新宿7-9-15 ダイカンプラザ ビジネス清田ビル1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13004352/",
+      "checkedAt": "2026-09-25"
+    },
+    "koffee-mameya-kakeru-koto": {
+      "canonicalName": "KOFFEE MAMEYA Kakeru",
+      "branchId": "hirano",
+      "branchName": "Hirano",
+      "countryCode": "JP",
+      "locality": "Koto City, Tokyo",
+      "address": "東京都江東区平野2-16-14",
+      "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+      "checkedAt": "2026-09-25"
+    },
+    "katsuretsu-yotsuya-takeda": {
+      "canonicalName": "かつれつ四谷たけだ",
+      "branchId": "yotsuya",
+      "branchName": "Yotsuya",
+      "countryCode": "JP",
+      "locality": "Shinjuku City, Tokyo",
+      "address": "東京都新宿区四谷1-4-2 峯村ビル1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
+      "checkedAt": "2026-09-25"
+    },
+    "ebimaru-jimbocho": {
+      "canonicalName": "海老丸らーめん",
+      "branchId": "jimbocho",
+      "branchName": "Jimbocho",
+      "countryCode": "JP",
+      "locality": "Chiyoda City, Tokyo",
+      "address": "東京都千代田区西神田2-1-13 十勝ビル1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+      "checkedAt": "2026-09-25"
+    },
+    "spicy-curry-roka-okubo": {
+      "canonicalName": "SPICY CURRY 魯珈",
+      "branchId": "okubo",
+      "branchName": "Okubo",
+      "countryCode": "JP",
+      "locality": "Shinjuku City, Tokyo",
+      "address": "東京都新宿区百人町1-24-8 新宿タウンプラザBF-J",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+      "checkedAt": "2026-09-25"
+    },
+    "gancon-noodle-komagome": {
+      "canonicalName": "ガンコンヌードル",
+      "branchId": "komagome",
+      "branchName": "Komagome",
+      "countryCode": "JP",
+      "locality": "Kita City, Tokyo",
+      "address": "東京都北区中里1-3-3 板橋ビル1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1323/A132301/13147756/",
+      "checkedAt": "2026-09-25"
+    },
+    "aldebaran-azabu-juban": {
+      "canonicalName": "アルデバラン",
+      "branchId": "azabu-juban",
+      "branchName": "Azabu-Juban",
+      "countryCode": "JP",
+      "locality": "Minato City, Tokyo",
+      "address": "東京都港区麻布十番3-3-1 三喜ビル3F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1307/A130702/13278678/",
+      "checkedAt": "2026-09-25"
+    },
+    "kabuto-ikebukuro": {
+      "canonicalName": "かぶと",
+      "branchId": "ikebukuro",
+      "branchName": "Ikebukuro",
+      "countryCode": "JP",
+      "locality": "Toshima City, Tokyo",
+      "address": "東京都豊島区池袋2-53-2 池袋ESビル1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+      "checkedAt": "2026-09-25"
+    },
+    "yardbird-sheung-wan": {
+      "canonicalName": "Yardbird",
+      "branchId": "sheung-wan",
+      "branchName": "Sheung Wan",
+      "countryCode": "HK",
+      "locality": "Hong Kong",
+      "address": "G/F, 154-158 Wing Lok Street, Sheung Wan, Hong Kong",
+      "sourceUrl": "https://yardbirdrestaurant.com/terms-of-use",
+      "checkedAt": "2026-09-25"
+    },
+    "dishoom-covent-garden": {
+      "canonicalName": "Dishoom",
+      "branchId": "covent-garden",
+      "branchName": "Covent Garden",
+      "countryCode": "GB",
+      "locality": "London",
+      "address": "12 Upper St. Martin's Lane, London WC2H 9FB",
+      "sourceUrl": "https://www.dishoom.com/covent-garden/",
+      "checkedAt": "2026-09-25"
+    },
+    "superiority-burger-east-village": {
+      "canonicalName": "Superiority Burger",
+      "branchId": "east-village",
+      "branchName": "East Village",
+      "countryCode": "US",
+      "locality": "New York, NY",
+      "address": "119 Avenue A, New York, NY 10009",
+      "sourceUrl": "https://www.superiorityburger.com/contact",
+      "checkedAt": "2026-09-25"
+    },
+    "ho-lee-fook-central": {
+      "canonicalName": "Ho Lee Fook",
+      "branchId": "central",
+      "branchName": "Central",
+      "countryCode": "HK",
+      "locality": "Hong Kong",
+      "address": "3-5 Elgin Street, Central, Hong Kong",
+      "sourceUrl": "https://guide.michelin.com/en/hong-kong-region/hong-kong/restaurant/ho-lee-fook",
+      "checkedAt": "2026-09-25"
+    }
+  },
+  "cases": [
+    {
+      "caseId": "jp-exact-tokyo-mentsudan",
+      "query": "讃岐うどん大使 東京麺通団",
+      "tags": ["japanese", "full-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "tokyo-mentsudan-shinjuku",
+        "branchId": "shinjuku-west-exit",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1304/A130401/13004352/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-mixed-tokyo-mentsudan",
+      "query": "东京麺通団 新宿",
+      "tags": ["chinese", "mixed-script", "branch-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "tokyo-mentsudan-shinjuku",
+        "branchId": "shinjuku-west-exit",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1304/A130401/13004352/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "romaji-tokyo-mentsudan",
+      "query": "Tokyo Mentsudan Shinjuku",
+      "tags": ["romanized", "english", "branch-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "tokyo-mentsudan-shinjuku",
+        "branchId": "shinjuku-west-exit",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1304/A130401/13004352/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "en-full-koffee-mameya-kakeru",
+      "query": "KOFFEE MAMEYA Kakeru",
+      "tags": ["english", "full-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "koffee-mameya-kakeru-koto",
+        "branchId": "hirano",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1313/A131303/13255632/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-katakana-koffee-mameya",
+      "query": "コーヒー マメヤ カケル 清澄白河",
+      "tags": ["japanese", "alternate-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "koffee-mameya-kakeru-koto",
+        "branchId": "hirano",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1313/A131303/13255632/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-koffee-mameya-area",
+      "query": "清澄白河那家 Koffee Mameya Kakeru",
+      "tags": ["chinese", "mixed-script", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "koffee-mameya-kakeru-koto",
+        "branchId": "hirano",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1313/A131303/13255632/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-partial-yotsuya-takeda",
+      "query": "四谷たけだ",
+      "tags": ["japanese", "incomplete-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "katsuretsu-yotsuya-takeda",
+        "branchId": "yotsuya",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1309/A130902/13131643/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "romaji-yotsuya-takeda",
+      "query": "Katsuretsu Yotsuya Takeda",
+      "tags": ["romanized", "full-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "katsuretsu-yotsuya-takeda",
+        "branchId": "yotsuya",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1309/A130902/13131643/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-full-ebimaru",
+      "query": "海老丸らーめん 神保町",
+      "tags": ["japanese", "full-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "ebimaru-jimbocho",
+        "branchId": "jimbocho",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1310/A131003/13212911/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-incomplete-ebimaru",
+      "query": "神保町海老丸",
+      "tags": ["chinese", "japanese", "incomplete-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "ebimaru-jimbocho",
+        "branchId": "jimbocho",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1310/A131003/13212911/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-full-spicy-curry-roka",
+      "query": "SPICY CURRY 魯珈 大久保",
+      "tags": ["japanese", "english", "full-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "spicy-curry-roka-okubo",
+        "branchId": "okubo",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1304/A130404/13286023/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-simplified-roka",
+      "query": "鲁珈咖喱 大久保",
+      "tags": ["chinese", "incomplete-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "spicy-curry-roka-okubo",
+        "branchId": "okubo",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1304/A130404/13286023/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "en-full-gancon-noodle",
+      "query": "GANCON NOODLE Komagome",
+      "tags": ["english", "romanized", "full-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "gancon-noodle-komagome",
+        "branchId": "komagome",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1323/A132301/13147756/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-gancon-katakana",
+      "query": "ガンコンヌードル 駒込",
+      "tags": ["japanese", "full-name", "area-hint", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "gancon-noodle-komagome",
+        "branchId": "komagome",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1323/A132301/13147756/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "romaji-aldebaran-current-area",
+      "query": "Aldebaran Azabu Juban",
+      "tags": ["romanized", "english", "area-hint", "moved-venue", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "aldebaran-azabu-juban",
+        "branchId": "azabu-juban",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1307/A130702/13278678/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-aldebaran-current-area",
+      "query": "アルデバラン 麻布十番",
+      "tags": ["japanese", "area-hint", "moved-venue", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "aldebaran-azabu-juban",
+        "branchId": "azabu-juban",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1307/A130702/13278678/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-kabuto-ikebukuro",
+      "query": "かぶと 池袋 うなぎ",
+      "tags": [
+        "japanese",
+        "ambiguous-name",
+        "area-hint",
+        "category-hint",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "kabuto-ikebukuro",
+        "branchId": "ikebukuro",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1305/A130501/13016660/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-kabuto-ikebukuro",
+      "query": "池袋那家叫かぶと的鳗鱼店",
+      "tags": [
+        "chinese",
+        "japanese",
+        "ambiguous-name",
+        "area-hint",
+        "category-hint",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "kabuto-ikebukuro",
+        "branchId": "ikebukuro",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1305/A130501/13016660/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "en-yardbird-hong-kong",
+      "query": "Yardbird Sheung Wan Hong Kong",
+      "tags": ["english", "full-name", "branch-hint", "international"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "yardbird-sheung-wan",
+        "branchId": "sheung-wan",
+        "sourceUrls": ["https://yardbirdrestaurant.com/terms-of-use"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "en-dishoom-covent-garden",
+      "query": "Dishoom Covent Garden London",
+      "tags": ["english", "full-name", "branch-hint", "international"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "dishoom-covent-garden",
+        "branchId": "covent-garden",
+        "sourceUrls": ["https://www.dishoom.com/covent-garden/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "en-superiority-burger-nyc",
+      "query": "Superiority Burger 119 Avenue A NYC",
+      "tags": ["english", "address-hint", "international"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "superiority-burger-east-village",
+        "branchId": "east-village",
+        "sourceUrls": ["https://www.superiorityburger.com/contact"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "zh-ho-lee-fook-hong-kong",
+      "query": "香港中环 Ho Lee Fook",
+      "tags": ["chinese", "english", "area-hint", "international"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "ho-lee-fook-central",
+        "branchId": "central",
+        "sourceUrls": [
+          "https://guide.michelin.com/en/hong-kong-region/hong-kong/restaurant/ho-lee-fook"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "ambiguous-brand-torikizoku",
+      "query": "鳥貴族",
+      "tags": ["japanese", "chain", "brand-only", "ambiguous", "japan"],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The query names a nationwide chain without a branch or area. Ask for an area or show two to three nearby branch candidates; never auto-select an arbitrary store.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_location"],
+          "requiredHint": "area_or_station"
+        },
+        "sourceUrls": ["https://map.torikizoku.co.jp/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "ambiguous-afuri-roppongi",
+      "query": "AFURI 六本木",
+      "tags": ["japanese", "english", "chain", "ambiguous-branch", "japan"],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "AFURI lists both Roppongi Crossing and Roppongi Hills branches. Present both or ask which venue the user means.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_branch", "offer_candidates"],
+          "requiredHint": "branch_or_landmark",
+          "allowedCandidates": [
+            {
+              "candidateId": "afuri-roppongi-crossing",
+              "label": "AFURI Roppongi Crossing — 4-9-4 Roppongi"
+            },
+            {
+              "candidateId": "afuri-roppongi-hills",
+              "label": "AFURI Roppongi Hills — 6-4-1 Roppongi"
+            }
+          ]
+        },
+        "sourceUrls": ["https://afuri.com/findus/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "ambiguous-starbucks-shibuya",
+      "query": "Starbucks Shibuya",
+      "tags": ["english", "chain", "ambiguous-branch", "japan"],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The official store locator lists multiple Shibuya stores. Ask for a landmark or present two to three candidates.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_branch"],
+          "requiredHint": "branch_or_landmark"
+        },
+        "sourceUrls": ["https://store.starbucks.co.jp/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "ambiguous-ichiran-shinjuku",
+      "query": "一蘭 新宿",
+      "tags": ["japanese", "chain", "ambiguous-branch", "japan"],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The official Tokyo list includes Shinjuku Central East Exit, Shinjuku Kabukicho, and Nishi-Shinjuku. Present two to three candidates or ask for a landmark.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_branch", "offer_candidates"],
+          "requiredHint": "branch_or_landmark",
+          "allowedCandidates": [
+            {
+              "candidateId": "ichiran-shinjuku-central-east-exit",
+              "label": "Ichiran Shinjuku Central East Exit"
+            },
+            {
+              "candidateId": "ichiran-shinjuku-kabukicho",
+              "label": "Ichiran Shinjuku Kabukicho"
+            },
+            {
+              "candidateId": "ichiran-nishi-shinjuku",
+              "label": "Ichiran Nishi-Shinjuku"
+            }
+          ]
+        },
+        "sourceUrls": ["https://ichiran.com/shop/tokyo/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "underspecified-ramen-shinjuku",
+      "query": "新宿 ramen",
+      "tags": [
+        "japanese",
+        "english",
+        "category-only",
+        "underspecified",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "A cuisine and broad neighborhood do not identify one restaurant. Ask for a name, screenshot, address, or distinguishing detail.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_identity"],
+          "requiredHint": "restaurant_identity"
+        },
+        "sourceUrls": [
+          "https://www.google.com/maps/search/?api=1&query=ramen%20Shinjuku"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "no-match-blue-lantern-mars",
+      "query": "Blue Lantern Sushi Mars Colony",
+      "tags": ["english", "synthetic-negative", "no-match"],
+      "gold": {
+        "expectedAction": "no_match",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "Curated synthetic negative. Do not invent a restaurant identity.",
+        "sourceUrls": [
+          "https://www.google.com/maps/search/?api=1&query=Blue%20Lantern%20Sushi%20Mars%20Colony"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "no-match-tsukikage-ramen",
+      "query": "月影ラーメン 月見町999",
+      "tags": ["japanese", "synthetic-negative", "no-match"],
+      "gold": {
+        "expectedAction": "no_match",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "Curated synthetic negative. Do not fabricate an address, rating, or place identifier.",
+        "sourceUrls": [
+          "https://www.google.com/maps/search/?api=1&query=%E6%9C%88%E5%BD%B1%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3%20%E6%9C%88%E8%A6%8B%E7%94%BA999"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "no-match-cloud-dumplings-antarctica",
+      "query": "云端饺子馆 Antarctica",
+      "tags": ["chinese", "english", "synthetic-negative", "no-match"],
+      "gold": {
+        "expectedAction": "no_match",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "Curated synthetic negative. Return no match without inventing a branch.",
+        "sourceUrls": [
+          "https://www.google.com/maps/search/?api=1&query=%E4%BA%91%E7%AB%AF%E9%A5%BA%E5%AD%90%E9%A6%86%20Antarctica"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-jp-tokyo-mentsudan",
+      "query": "東京麺通団",
+      "tags": ["japanese", "short-message", "exact-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "tokyo-mentsudan-shinjuku",
+        "branchId": "shinjuku-west-exit",
+        "curationNote": "The bare message is the distinctive name used by the restaurant's own site, which lists one Shinjuku address rather than multiple branches.",
+        "sourceUrls": ["https://tokyo-mentsudan.com/?page_id=134"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-jp-ebimaru-ramen",
+      "query": "海老丸らーめん",
+      "tags": ["japanese", "short-message", "exact-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "ebimaru-jimbocho",
+        "branchId": "jimbocho",
+        "curationNote": "The message is the complete distinctive name used by the restaurant's own site, which lists one Jimbocho venue.",
+        "sourceUrls": ["https://ebimaru.com/about.html"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-jp-roka",
+      "query": "魯珈",
+      "tags": ["japanese", "short-message", "distinctive-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "spicy-curry-roka-okubo",
+        "branchId": "okubo",
+        "curationNote": "Roka uses the uncommon two-character proper name 魯珈; the current listing and the linked official account identify SPICY CURRY 魯珈 in Okubo.",
+        "sourceUrls": [
+          "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+          "https://x.com/spicycurryroka"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-romaji-gancon-noodle",
+      "query": "GANCON NOODLE",
+      "tags": ["english", "romanized", "short-message", "exact-name", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "gancon-noodle-komagome",
+        "branchId": "komagome",
+        "curationNote": "GANCON NOODLE is the full distinctive restaurant name, and the restaurant's own site identifies one Komagome venue under that name.",
+        "sourceUrls": ["https://ganconnoodle.shopinfo.jp/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-en-superiority-burger",
+      "query": "Superiority Burger",
+      "tags": ["english", "short-message", "exact-name", "international"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "superiority-burger-east-village",
+        "branchId": "east-village",
+        "curationNote": "The restaurant-owned site presents Superiority Burger with one current public location, 119 Avenue A, so the bare exact name is sufficient at the checked date.",
+        "sourceUrls": ["https://www.superiorityburger.com/contact"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-ambiguous-afuri",
+      "query": "AFURI",
+      "tags": [
+        "english",
+        "short-message",
+        "chain",
+        "brand-only",
+        "ambiguous",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The official location list contains many AFURI branches in Japan and overseas. A brand-only message does not identify one branch.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_location"],
+          "requiredHint": "area_or_station"
+        },
+        "sourceUrls": ["https://afuri.com/findus/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-ambiguous-ichiran",
+      "query": "一蘭",
+      "tags": [
+        "japanese",
+        "short-message",
+        "chain",
+        "brand-only",
+        "ambiguous",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The official store directory contains many Ichiran branches. Ask for an area or station before offering branch candidates.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_location"],
+          "requiredHint": "area_or_station"
+        },
+        "sourceUrls": ["https://ichiran.com/shop/"],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-ambiguous-kabuto",
+      "query": "かぶと",
+      "tags": ["japanese", "short-message", "ambiguous-name", "japan"],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The short name matches the Ikebukuro eel restaurant and other unrelated restaurants, including a seafood izakaya in Ikebukuro. Do not use the user's existing catalog to guess the intended place.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_location"],
+          "requiredHint": "area_or_station"
+        },
+        "sourceUrls": [
+          "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+          "https://tabelog.com/tokyo/A1305/A130501/13227551/"
+        ],
+        "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "short-ambiguous-starbucks",
+      "query": "Starbucks",
+      "tags": [
+        "english",
+        "short-message",
+        "chain",
+        "brand-only",
+        "ambiguous",
+        "japan"
+      ],
+      "gold": {
+        "expectedAction": "clarify",
+        "identityId": null,
+        "branchId": null,
+        "clarificationReason": "The official Japan store locator contains many branches. A brand-only message needs an area, station, or branch hint.",
+        "clarificationPolicy": {
+          "acceptedModes": ["ask_location"],
+          "requiredHint": "area_or_station"
+        },
+        "sourceUrls": ["https://store.starbucks.co.jp/"],
+        "checkedAt": "2026-09-25"
+      }
+    }
+  ]
+}

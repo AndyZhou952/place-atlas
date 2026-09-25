@@ -8,8 +8,7 @@ const playwrightRoot = process.env.T07_PLAYWRIGHT_ROOT;
 assert.ok(playwrightRoot, 'T07_PLAYWRIGHT_ROOT is required');
 const baseUrl = process.env.T07_BASE_URL ?? 'http://127.0.0.1:4319/';
 const outputDirectory = resolve(
-  process.env.T07_EVIDENCE_DIR ??
-    '../../features/006-agent-add-experience/evidence/ui',
+  process.env.T07_EVIDENCE_DIR ?? '../../artifacts/evidence/ui',
 );
 const require = createRequire(join(playwrightRoot, 'package.json'));
 const { chromium } = require('playwright');

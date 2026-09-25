@@ -11,6 +11,13 @@ import { createResearchRelayHandler } from './research-relay-handler.ts';
 const key = { keyVersion: 'relay-k1', secret: 's'.repeat(32) };
 const keys = { 'relay-k1': key.secret };
 const initialNow = new Date('2026-09-23T10:00:00.000Z');
+const confirmSubject = {
+  ownerQuery: '鮨 さいとう',
+  providerNamespace: 'google-places',
+  placeId: 'confirm-branch',
+  transientName: 'Sushi Saito',
+  transientAddress: 'Roppongi, Tokyo',
+};
 
 test('Relay claims before exact OpenClaw search/fetch and response-loss retry cannot egress twice', async () => {
   const events = [];
@@ -123,19 +130,14 @@ test(
       const url = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
       const phase = blockedStage === 'search' ? 'initial' : 'confirm';
       const phaseInput =
-        phase === 'initial'
-          ? { phase, query }
-          : { phase, canonicalUrls: [url] };
+        phase === 'initial' ? { phase, query } : confirmPhaseInput([url]);
       const queryOrUrlsDigest =
         phase === 'initial'
           ? await deriveCatalogIntakeResearchInputDigest({
               phase,
               normalizedOwnerQuery: query,
             })
-          : await deriveCatalogIntakeResearchInputDigest({
-              phase,
-              canonicalUrls: [url],
-            });
+          : await confirmInputDigest([url]);
       const allowance = await signResearchAllowance({
         allowance: {
           sessionId: 'deadline-session',
@@ -209,10 +211,7 @@ test('Relay confirm uses only exact sorted preview URLs and never calls search',
   const allowance = await signedAllowance({
     phase: 'confirm',
     requestId: 'confirm-request',
-    queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-      phase: 'confirm',
-      canonicalUrls: urls,
-    }),
+    queryOrUrlsDigest: await confirmInputDigest(urls),
   });
   let searchCalls = 0;
   const handler = createResearchRelayHandler({
@@ -227,12 +226,16 @@ test('Relay confirm uses only exact sorted preview URLs and never calls search',
       },
     },
     transport: fixtureTransport([]),
-    extractor: fixtureExtractor([]),
+    extractor: fixtureExtractor([], confirmSubject),
   });
-  const result = await handler.handle(allowance, {
-    phase: 'confirm',
-    canonicalUrls: urls,
-  });
+  assert.deepEqual(
+    await handler.handle(allowance, {
+      ...confirmPhaseInput(urls),
+      subject: { ...confirmSubject, placeId: 'other-branch' },
+    }),
+    { status: 'rejected', reason: 'payload_mismatch' },
+  );
+  const result = await handler.handle(allowance, confirmPhaseInput(urls));
 
   assert.equal(result.status, 'ok');
   assert.equal(searchCalls, 0);
@@ -373,10 +376,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
     const allowance = await signedAllowance({
       phase: 'confirm',
       requestId: `stop-${reason}`,
-      queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-        phase: 'confirm',
-        canonicalUrls: urls,
-      }),
+      queryOrUrlsDigest: await confirmInputDigest(urls),
     });
     let fetches = 0;
     const handler = createResearchRelayHandler({
@@ -402,10 +402,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
       },
       extractor: fixtureExtractor([]),
     });
-    const result = await handler.handle(allowance, {
-      phase: 'confirm',
-      canonicalUrls: urls,
-    });
+    const result = await handler.handle(allowance, confirmPhaseInput(urls));
     assert.equal(fetches, 1, reason);
     const verified = await verifyResearchResult(result.result, {
       keys,
@@ -425,10 +422,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
   const allowance = await signedAllowance({
     phase: 'confirm',
     requestId: 'benign-no-evidence',
-    queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-      phase: 'confirm',
-      canonicalUrls: urls,
-    }),
+    queryOrUrlsDigest: await confirmInputDigest(urls),
   });
   let fetches = 0;
   const handler = createResearchRelayHandler({
@@ -477,10 +471,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
       },
     },
   });
-  const result = await handler.handle(allowance, {
-    phase: 'confirm',
-    canonicalUrls: urls,
-  });
+  const result = await handler.handle(allowance, confirmPhaseInput(urls));
   assert.equal(fetches, 2);
   assert.equal(
     (
@@ -497,10 +488,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
   const allNoEvidenceAllowance = await signedAllowance({
     phase: 'confirm',
     requestId: 'all-benign-no-evidence',
-    queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-      phase: 'confirm',
-      canonicalUrls: urls,
-    }),
+    queryOrUrlsDigest: await confirmInputDigest(urls),
   });
   const allNoEvidenceHandler = createResearchRelayHandler({
     allowanceKeys: keys,
@@ -526,7 +514,7 @@ test('Relay stops the phase on blocked providers but continues only explicit ben
   });
   const allNoEvidence = await allNoEvidenceHandler.handle(
     allNoEvidenceAllowance,
-    { phase: 'confirm', canonicalUrls: urls },
+    confirmPhaseInput(urls),
   );
   assert.deepEqual(
     (
@@ -565,10 +553,7 @@ test('Relay extractor stop is terminal while explicit no-evidence alone may cont
     const allowance = await signedAllowance({
       phase: 'confirm',
       requestId: `extract-${firstExtraction.reason ?? firstExtraction.status}`,
-      queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-        phase: 'confirm',
-        canonicalUrls: urls,
-      }),
+      queryOrUrlsDigest: await confirmInputDigest(urls),
     });
     let extractions = 0;
     const handler = createResearchRelayHandler({
@@ -602,10 +587,7 @@ test('Relay extractor stop is terminal while explicit no-evidence alone may cont
         },
       },
     });
-    const result = await handler.handle(allowance, {
-      phase: 'confirm',
-      canonicalUrls: urls,
-    });
+    const result = await handler.handle(allowance, confirmPhaseInput(urls));
     assert.equal(
       extractions,
       firstExtraction.status === 'stop' ? 1 : 2,
@@ -645,10 +627,7 @@ test('Relay discards partial evidence and signs unavailable when a later extract
   const allowance = await signedAllowance({
     phase: 'confirm',
     requestId: 'partial-then-failure',
-    queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
-      phase: 'confirm',
-      canonicalUrls: urls,
-    }),
+    queryOrUrlsDigest: await confirmInputDigest(urls),
   });
   let extractions = 0;
   const handler = createResearchRelayHandler({
@@ -682,10 +661,7 @@ test('Relay discards partial evidence and signs unavailable when a later extract
     },
   });
 
-  const result = await handler.handle(allowance, {
-    phase: 'confirm',
-    canonicalUrls: urls,
-  });
+  const result = await handler.handle(allowance, confirmPhaseInput(urls));
   const verified = await verifyResearchResult(result.result, {
     keys,
     now: initialNow,
@@ -699,6 +675,75 @@ test('Relay discards partial evidence and signs unavailable when a later extract
     /Reservations available|private/u,
   );
 });
+
+test('Relay rejects replaying an allowance against a different selected branch', async () => {
+  const selected = {
+    ownerQuery: '東京麺通団',
+    providerNamespace: 'google-places',
+    placeId: 'branch-a',
+    transientName: 'Tōkyō Mentsūdan',
+    transientAddress: 'Shinjuku, Tokyo',
+  };
+  const allowance = await signedAllowance({
+    phase: 'initial',
+    requestId: 'selected-branch-request',
+    queryOrUrlsDigest: await deriveCatalogIntakeResearchInputDigest({
+      phase: 'initial',
+      selectedSubject: selected,
+    }),
+  });
+  let claims = 0;
+  const handler = createResearchRelayHandler({
+    allowanceKeys: keys,
+    resultKey: key,
+    now: () => initialNow,
+    replayGuard: {
+      async claim() {
+        claims += 1;
+        return { kind: 'claimed' };
+      },
+      async cleanup() {
+        return 0;
+      },
+    },
+    searchTool: {
+      async invoke() {
+        throw new Error('must not search');
+      },
+    },
+    transport: {
+      async get() {
+        throw new Error('must not fetch');
+      },
+    },
+    extractor: {
+      async extract() {
+        throw new Error('must not extract');
+      },
+    },
+  });
+
+  assert.deepEqual(
+    await handler.handle(allowance, {
+      phase: 'initial',
+      subject: { ...selected, placeId: 'branch-b' },
+    }),
+    { status: 'rejected', reason: 'payload_mismatch' },
+  );
+  assert.equal(claims, 0);
+});
+
+function confirmPhaseInput(canonicalUrls) {
+  return { phase: 'confirm', canonicalUrls, subject: confirmSubject };
+}
+
+function confirmInputDigest(canonicalUrls) {
+  return deriveCatalogIntakeResearchInputDigest({
+    phase: 'confirm',
+    canonicalUrls,
+    selectedSubject: confirmSubject,
+  });
+}
 
 async function signedAllowance({ phase, requestId, queryOrUrlsDigest }) {
   const maxDurationMs = phase === 'initial' ? 35_000 : 25_000;
@@ -749,9 +794,10 @@ function fixtureTransport(events) {
   };
 }
 
-function fixtureExtractor(events) {
+function fixtureExtractor(events, expectedSubject) {
   return {
-    async extract({ canonicalUrl }) {
+    async extract({ canonicalUrl, subject }) {
+      if (expectedSubject) assert.deepEqual(subject, expectedSubject);
       const hostname = new URL(canonicalUrl).hostname;
       events.push(`extract:${hostname}`);
       return {

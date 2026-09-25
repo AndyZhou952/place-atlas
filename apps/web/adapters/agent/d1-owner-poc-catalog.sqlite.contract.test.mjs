@@ -3,14 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-const legacyRoot = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-poc/',
-  import.meta.url,
-);
-const ownerRoot = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
-  import.meta.url,
-);
+const legacyRoot = new URL('../../migrations/agent-poc/', import.meta.url);
+const ownerRoot = new URL('../../migrations/owner-poc/', import.meta.url);
 
 void test('the owner-poc migration chain seeds five canonical records from an empty blue-green database', async () => {
   const database = new DatabaseSync(':memory:');

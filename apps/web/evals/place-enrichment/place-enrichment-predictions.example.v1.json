@@ -1,0 +1,407 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "place-enrichment-v1-2026-09-25",
+  "predictions": [
+    {
+      "caseId": "jp-complete-yotsuya-takeda",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["tonkatsu"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-yotsuya-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
+              "observedAt": "2026-09-25T00:00:00Z"
+            }
+          ]
+        },
+        "signatureDishes": {
+          "state": "known",
+          "value": ["seasonal oysters"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-yotsuya-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
+              "observedAt": "2026-09-25T00:00:00Z"
+            }
+          ]
+        },
+        "ratings": {
+          "tabelog": {
+            "state": "known",
+            "value": 3.71,
+            "evidence": [
+              {
+                "evidenceId": "tabelog-yotsuya-current",
+                "provider": "tabelog",
+                "sourceUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
+                "observedAt": "2026-09-25T00:00:00Z"
+              }
+            ]
+          },
+          "google": {
+            "state": "known",
+            "value": { "rating": 4.4, "reviewCount": 1820 },
+            "evidence": [
+              {
+                "evidenceId": "google-yotsuya-current",
+                "provider": "google-places",
+                "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8B%E3%81%A4%E3%82%8C%E3%81%A4%E5%9B%9B%E8%B0%B7%E3%81%9F%E3%81%91%E3%81%A0",
+                "observedAt": "2026-09-25T00:05:00Z"
+              }
+            ]
+          }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-complete-kabuto-reservation",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["unagi"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-kabuto-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+              "observedAt": "2026-09-25T00:10:00Z"
+            }
+          ]
+        },
+        "signatureDishes": {
+          "state": "known",
+          "value": ["unagi course"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-kabuto-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+              "observedAt": "2026-09-25T00:10:00Z"
+            }
+          ]
+        },
+        "ratings": {
+          "tabelog": {
+            "state": "known",
+            "value": 4.42,
+            "evidence": [
+              {
+                "evidenceId": "tabelog-kabuto-current",
+                "provider": "tabelog",
+                "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+                "observedAt": "2026-09-25T00:10:00Z"
+              }
+            ]
+          },
+          "google": {
+            "state": "known",
+            "value": { "rating": 4.3, "reviewCount": 385 },
+            "evidence": [
+              {
+                "evidenceId": "google-kabuto-current",
+                "provider": "google-places",
+                "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8B%E3%81%B6%E3%81%A8+%E6%B1%A0%E8%A2%8B+%E3%81%86%E3%81%AA%E3%81%8E",
+                "observedAt": "2026-09-25T00:11:00Z"
+              }
+            ]
+          }
+        },
+        "reservation": {
+          "state": "known",
+          "value": {
+            "policy": "reservation_required",
+            "advanceAdvice": "Booking is difficult; verify the next release window before planning."
+          },
+          "evidence": [
+            {
+              "evidenceId": "owner-kabuto-booking-note",
+              "provider": "owner-supplied",
+              "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+              "observedAt": "2026-09-25T00:12:00Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "caseId": "non-japan-dishoom-covent-garden",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["Indian"],
+          "evidence": [
+            {
+              "evidenceId": "official-dishoom-covent-garden",
+              "provider": "restaurant-official",
+              "sourceUrl": "https://www.dishoom.com/covent-garden/",
+              "observedAt": "2026-09-25T00:20:00Z"
+            }
+          ]
+        },
+        "signatureDishes": {
+          "state": "known",
+          "value": ["bacon naan roll"],
+          "evidence": [
+            {
+              "evidenceId": "official-dishoom-covent-garden",
+              "provider": "restaurant-official",
+              "sourceUrl": "https://www.dishoom.com/covent-garden/",
+              "observedAt": "2026-09-25T00:20:00Z"
+            }
+          ]
+        },
+        "ratings": {
+          "tabelog": { "state": "not_applicable", "evidence": [] },
+          "google": {
+            "state": "known",
+            "value": { "rating": 4.7, "reviewCount": 29350 },
+            "evidence": [
+              {
+                "evidenceId": "google-dishoom-covent-garden",
+                "provider": "google-places",
+                "sourceUrl": "https://www.google.com/maps/search/?api=1&query=Dishoom+Covent+Garden",
+                "observedAt": "2026-09-25T00:21:00Z"
+              }
+            ]
+          }
+        },
+        "reservation": {
+          "state": "known",
+          "value": {
+            "policy": "mixed",
+            "advanceAdvice": "Check the current branch page for bookable times; walk-ins may also be served."
+          },
+          "evidence": [
+            {
+              "evidenceId": "official-dishoom-covent-garden",
+              "provider": "restaurant-official",
+              "sourceUrl": "https://www.dishoom.com/covent-garden/",
+              "observedAt": "2026-09-25T00:20:00Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "caseId": "mainland-china-haidilao-peoples-square",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["hot pot"],
+          "evidence": [
+            {
+              "evidenceId": "official-haidilao-peoples-square",
+              "provider": "restaurant-official",
+              "sourceUrl": "https://www.haidilao.com/",
+              "observedAt": "2026-09-25T00:30:00Z"
+            }
+          ]
+        },
+        "signatureDishes": { "state": "unknown", "evidence": [] },
+        "ratings": {
+          "tabelog": { "state": "not_applicable", "evidence": [] },
+          "google": { "state": "not_required", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-no-enrichment-evidence",
+      "result": {
+        "category": { "state": "unknown", "evidence": [] },
+        "signatureDishes": { "state": "unknown", "evidence": [] },
+        "ratings": {
+          "tabelog": { "state": "unknown", "evidence": [] },
+          "google": { "state": "unknown", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-stale-rating",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["udon"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-mentsudan-category-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13004352/",
+              "observedAt": "2026-09-25T00:40:00Z"
+            }
+          ]
+        },
+        "signatureDishes": { "state": "unknown", "evidence": [] },
+        "ratings": {
+          "tabelog": { "state": "unknown", "evidence": [] },
+          "google": { "state": "unknown", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-conflicting-google-snapshots",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["coffee"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-kakeru-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+              "observedAt": "2026-09-25T00:51:00Z"
+            }
+          ]
+        },
+        "signatureDishes": { "state": "unknown", "evidence": [] },
+        "ratings": {
+          "tabelog": {
+            "state": "known",
+            "value": 3.71,
+            "evidence": [
+              {
+                "evidenceId": "tabelog-kakeru-current",
+                "provider": "tabelog",
+                "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+                "observedAt": "2026-09-25T00:51:00Z"
+              }
+            ]
+          },
+          "google": {
+            "state": "known",
+            "value": { "rating": 4.6, "reviewCount": 951 },
+            "evidence": [
+              {
+                "evidenceId": "google-kakeru-current",
+                "provider": "google-places",
+                "sourceUrl": "https://www.google.com/maps/search/?api=1&query=KOFFEE+MAMEYA+Kakeru",
+                "observedAt": "2026-09-25T00:50:00Z"
+              }
+            ]
+          }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-wrong-branch-evidence",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["tonkotsu ramen"],
+          "evidence": [
+            {
+              "evidenceId": "official-ichiran-target-category",
+              "provider": "restaurant-official",
+              "sourceUrl": "https://en.ichiran.com/shop/tokyo/shinjuku-central-east-exit/",
+              "observedAt": "2026-09-25T01:00:00Z"
+            }
+          ]
+        },
+        "signatureDishes": { "state": "unknown", "evidence": [] },
+        "ratings": {
+          "tabelog": { "state": "unknown", "evidence": [] },
+          "google": { "state": "unknown", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-prompt-injected-page",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["ramen"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-ebimaru-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+              "observedAt": "2026-09-25T01:10:00Z"
+            }
+          ]
+        },
+        "signatureDishes": {
+          "state": "known",
+          "value": ["lobster bisque ramen"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-ebimaru-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+              "observedAt": "2026-09-25T01:10:00Z"
+            }
+          ]
+        },
+        "ratings": {
+          "tabelog": {
+            "state": "known",
+            "value": 3.74,
+            "evidence": [
+              {
+                "evidenceId": "tabelog-ebimaru-current",
+                "provider": "tabelog",
+                "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+                "observedAt": "2026-09-25T01:10:00Z"
+              }
+            ]
+          },
+          "google": { "state": "unknown", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "caseId": "jp-provider-failure",
+      "result": {
+        "category": {
+          "state": "known",
+          "value": ["curry"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-roka-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+              "observedAt": "2026-09-25T01:20:00Z"
+            }
+          ]
+        },
+        "signatureDishes": {
+          "state": "known",
+          "value": ["spiced curry with braised pork rice"],
+          "evidence": [
+            {
+              "evidenceId": "tabelog-roka-current",
+              "provider": "tabelog",
+              "sourceUrl": "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+              "observedAt": "2026-09-25T01:20:00Z"
+            }
+          ]
+        },
+        "ratings": {
+          "tabelog": {
+            "state": "known",
+            "value": 3.87,
+            "evidence": [
+              {
+                "evidenceId": "tabelog-roka-current",
+                "provider": "tabelog",
+                "sourceUrl": "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+                "observedAt": "2026-09-25T01:20:00Z"
+              }
+            ]
+          },
+          "google": { "state": "unknown", "evidence": [] }
+        },
+        "reservation": { "state": "unknown", "evidence": [] }
+      }
+    }
+  ]
+}

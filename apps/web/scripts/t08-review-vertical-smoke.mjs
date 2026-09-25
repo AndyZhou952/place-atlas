@@ -8,8 +8,7 @@ const temporaryDirectory = await mkdtemp(join(tmpdir(), 'jpmap-t08-review-'));
 const routeFixture = join(temporaryDirectory, 'owner-review-route.json');
 const publicFixture = join(temporaryDirectory, 'public-items-route.json');
 const reportPath = join(
-  process.env.T02_EVIDENCE_DIR ??
-    '../../features/006-agent-add-experience/evidence/ui',
+  process.env.T02_EVIDENCE_DIR ?? '../../artifacts/evidence/ui',
   't09-review-persisted-report.json',
 );
 

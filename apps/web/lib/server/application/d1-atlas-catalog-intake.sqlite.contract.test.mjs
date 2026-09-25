@@ -18,19 +18,19 @@ import { D1CatalogState } from './d1-catalog-state.ts';
 import { D1DestructiveState } from './d1-destructive-state.ts';
 
 const baseMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0001_owner_poc_schema.sql',
+  '../../../migrations/owner-poc/0001_owner_poc_schema.sql',
   import.meta.url,
 );
 const sessionMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0006_catalog_intake_sessions.sql',
+  '../../../migrations/owner-poc/0006_catalog_intake_sessions.sql',
   import.meta.url,
 );
 const publicationMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0008_catalog_intake_publication.sql',
+  '../../../migrations/owner-poc/0008_catalog_intake_publication.sql',
   import.meta.url,
 );
 const researchAllowanceMigration = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0009_catalog_intake_research_allowances.sql',
+  '../../../migrations/owner-poc/0009_catalog_intake_research_allowances.sql',
   import.meta.url,
 );
 

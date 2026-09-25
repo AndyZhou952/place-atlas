@@ -38,29 +38,29 @@ test('Owner manual marks every jpmap example and production parser accepts exact
 test('manual covers current Owner paths, recovery states, and explicit limitations', async () => {
   const manual = await readFile(manualUrl, 'utf8');
   for (const required of [
-    '公开浏览',
-    'Owner 登录',
-    '喜欢',
-    '去过',
-    '个人评分',
-    '总体评论',
+    'Public view',
+    'Owner mode',
+    'liked',
+    'visited',
+    'personal rating',
+    'overall comment',
     'Visit',
-    '照片',
+    'photos',
     'Add',
     'Review',
     'Nearby',
-    '只有店名',
-    '多个候选',
+    'name only',
+    'multiple candidates',
     'unknown',
     'needs-review',
     'expired',
     'conflict',
-    '暂时不可用',
+    'temporarily unavailable',
     'DeepSeek',
     'Tabelog',
-    '预约',
-    '类别',
-    '推荐菜',
+    'reservation',
+    'category',
+    'signature dishes',
     'Record',
   ]) {
     assert.match(manual, new RegExp(required, 'u'), required);
@@ -72,9 +72,12 @@ test('README links the Owner manual before quick start and documentation contain
     readFile(manualUrl, 'utf8'),
     readFile(readmeUrl, 'utf8'),
   ]);
-  const link = '[Owner 使用手册](docs/user-manual.md)';
+  const link = '[Owner manual](docs/user-manual.md)';
   assert.equal(readme.includes(link), true);
-  assert.equal(readme.indexOf(link) < readme.indexOf('## 快速开始'), true);
+  assert.equal(
+    readme.indexOf(link) < readme.indexOf('## Local development'),
+    true,
+  );
 
   const docNames = (await readdir(docsUrl, { recursive: true })).filter(
     (name) => name.endsWith('.md'),

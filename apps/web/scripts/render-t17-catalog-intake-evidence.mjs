@@ -19,10 +19,7 @@ const palette = {
 };
 
 const outputDirectory = fileURLToPath(
-  new URL(
-    '../../../features/005-owner-poc-unified-api/evidence/ui/t17/',
-    import.meta.url,
-  ),
+  new URL('../../../artifacts/evidence/catalog-intake/', import.meta.url),
 );
 const regular = await readFile(
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',

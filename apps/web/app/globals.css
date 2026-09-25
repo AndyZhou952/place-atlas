@@ -1536,13 +1536,23 @@
 
 .detail-visit-history ol {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.7rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.detail-visit-history li > span {
+.detail-visit-history .journal-visit {
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.detail-visit-history .journal-visit:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.detail-visit-history .journal-visit-copy > span {
   color: var(--moss);
   font-size: 0.7rem;
   font-weight: 700;
@@ -1553,6 +1563,41 @@
   color: var(--ink-soft);
   font-size: 0.76rem;
   line-height: 1.45;
+}
+
+.detail-visit-empty {
+  color: var(--ink-soft);
+}
+
+.detail-visit-recorder {
+  margin: 0.8rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-visit-recorder summary {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.detail-visit-recorder summary::marker {
+  color: var(--vermilion);
+}
+
+.detail-visit-recorder summary svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--vermilion-dark);
+}
+
+.detail-visit-recorder .visit-composer {
+  padding: 0.25rem 0 0.9rem;
 }
 
 .visit-media-gallery {
@@ -1629,8 +1674,8 @@
 
 .media-caption-row button {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 0.45rem;
@@ -1654,6 +1699,7 @@
 .media-upload-control {
   display: inline-flex;
   width: fit-content;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.35rem;
   padding: 0.38rem 0.62rem;
@@ -2471,6 +2517,17 @@ button.personal-rating-inline:focus-visible {
   line-height: 1.4;
 }
 
+.form-success {
+  color: var(--moss);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.visit-composer.is-compact {
+  gap: 0.7rem;
+}
+
 .single-workspace {
   min-height: calc(100svh - 8rem);
   padding: 2.3rem 2.2rem 4rem;
@@ -2770,8 +2827,8 @@ button.personal-rating-inline:focus-visible {
 
 .journal-visit-actions button {
   display: grid;
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 0;
   border-radius: 50%;

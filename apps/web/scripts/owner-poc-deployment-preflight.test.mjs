@@ -34,8 +34,7 @@ void test('the owner PoC template selects only blue-green D1 and R2 resources', 
       binding: 'DB',
       database_name: 'japan-atlas-owner-poc',
       database_id: '00000000-0000-4000-8000-000000000000',
-      migrations_dir:
-        '../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc',
+      migrations_dir: 'migrations/owner-poc',
     },
   ]);
   assert.deepEqual(config.r2_buckets, [

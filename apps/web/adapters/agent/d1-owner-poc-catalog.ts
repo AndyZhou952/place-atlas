@@ -1,6 +1,16 @@
-import type { AtlasItem } from '../../product/application/catalog/atlas-item.ts';
-import type { CatalogRead } from '../../product/application/catalog/catalog-read.ts';
-import { isAtlasItem } from '../../product/application/catalog/catalog-projection.ts';
+import type {
+  AtlasCatalogEntry,
+  AtlasItem,
+  CatalogProfile,
+} from '../../product/application/catalog/atlas-item.ts';
+import type {
+  CatalogEntryForProfile,
+  CatalogRead,
+} from '../../product/application/catalog/catalog-read.ts';
+import {
+  isAtlasItem,
+  isAtlasReviewCandidate,
+} from '../../product/application/catalog/catalog-projection.ts';
 import type { NearbyPersonalFactsRead } from '../../product/application/decision/agent-nearby-operation.ts';
 
 interface OwnerCatalogRow {
@@ -46,25 +56,65 @@ const selectCatalog = `
     ON tombstones.item_id = items.id
   WHERE tombstones.item_id IS NULL`;
 
+const selectReviewCandidates = `
+  SELECT candidates.id,
+         candidates.payload_json,
+         'needs_review' AS verification_status,
+         overrides.title AS override_title,
+         overrides.description AS override_description,
+         overrides.personal_state AS override_personal_state,
+         overrides.updated_at AS override_updated_at,
+         assessments.overall_rating,
+         assessments.is_favorite,
+         assessments.has_visited AS manual_visited,
+         (SELECT COUNT(*) FROM visits WHERE visits.item_id = candidates.id)
+           AS visit_count
+  FROM atlas_review_candidates AS candidates
+  LEFT JOIN atlas_item_overrides AS overrides
+    ON overrides.item_id = candidates.id
+  LEFT JOIN place_assessments AS assessments
+    ON assessments.item_id = candidates.id
+  LEFT JOIN atlas_item_tombstones AS tombstones
+    ON tombstones.item_id = candidates.id
+  WHERE tombstones.item_id IS NULL`;
+
 export function createD1OwnerPocCatalogRead(database: D1Database): CatalogRead {
   return {
-    async list(profile) {
+    async list<Profile extends CatalogProfile>(profile: Profile) {
       const { results } = await database
         .prepare(
           `${selectCatalog} ORDER BY items.created_at DESC, items.id ASC`,
         )
         .all<OwnerCatalogRow>();
       const items = results.flatMap(projectRow);
-      return profile === 'verified_catalog'
-        ? items.filter((item) => item.verificationStatus === 'verified')
-        : items;
+      if (profile === 'verified_catalog') {
+        return items.filter(
+          (item): item is AtlasItem =>
+            isAtlasItem(item) && item.verificationStatus === 'verified',
+        ) as readonly CatalogEntryForProfile<Profile>[];
+      }
+      const { results: candidateResults } = await database
+        .prepare(
+          `${selectReviewCandidates} ORDER BY candidates.created_at DESC, candidates.id ASC`,
+        )
+        .all<OwnerCatalogRow>();
+      return [
+        ...items,
+        ...candidateResults.flatMap(projectRow),
+      ] as readonly CatalogEntryForProfile<Profile>[];
     },
     async get(id) {
       const { results } = await database
         .prepare(`${selectCatalog} AND items.id = ?`)
         .bind(id)
         .all<OwnerCatalogRow>();
-      return results.flatMap(projectRow)[0];
+      const item = results.flatMap(projectRow)[0];
+      if (item) return item;
+      const { results: candidateResults } = await database
+        .prepare(`${selectReviewCandidates} AND candidates.id = ?`)
+        .bind(id)
+        .all<OwnerCatalogRow>();
+      return candidateResults.flatMap(projectRow)[0];
     },
   };
 }
@@ -116,18 +166,18 @@ export function createD1OwnerPocPersonalFactsRead(
   };
 }
 
-function projectRow(row: OwnerCatalogRow): readonly AtlasItem[] {
+function projectRow(row: OwnerCatalogRow): readonly AtlasCatalogEntry[] {
   try {
     const payload: unknown = JSON.parse(row.payload_json);
     if (
-      !isAtlasItem(payload) ||
+      (!isAtlasItem(payload) && !isAtlasReviewCandidate(payload)) ||
       payload.id !== row.id ||
       payload.verificationStatus !== row.verification_status
     ) {
       return [];
     }
     const override = readOverride(row);
-    const projected: AtlasItem = {
+    const projected: AtlasCatalogEntry = {
       ...payload,
       ...(override
         ? {
@@ -142,7 +192,9 @@ function projectRow(row: OwnerCatalogRow): readonly AtlasItem[] {
       isFavorite: row.is_favorite === 1,
       hasVisited: row.manual_visited === 1 || row.visit_count > 0,
     };
-    return isAtlasItem(projected) ? [projected] : [];
+    return isAtlasItem(projected) || isAtlasReviewCandidate(projected)
+      ? [projected]
+      : [];
   } catch {
     return [];
   }

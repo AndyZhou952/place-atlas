@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const evidenceRoot = new URL(
-  '../../../../features/004-openclaw-atlas-poc/evidence/provider-policies/',
+  '../../adapters/providers/policies/catalog/',
   import.meta.url,
 );
 const decisions = new Set(['allow', 'deny', 'pending']);

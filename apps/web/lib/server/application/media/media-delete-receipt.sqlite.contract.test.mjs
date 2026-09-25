@@ -10,7 +10,7 @@ import { D1MutationReceiptState } from '../d1-mutation-receipt-state.ts';
 import { D1VisitMediaState } from './d1-visit-media-state.ts';
 
 const migrationRoot = new URL(
-  '../../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
+  '../../../../migrations/owner-poc/',
   import.meta.url,
 );
 

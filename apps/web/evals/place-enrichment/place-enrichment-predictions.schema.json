@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://japan-atlas.example/schemas/place-enrichment-predictions.v1.json",
+  "title": "Place enrichment predictions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "datasetId", "predictions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "predictions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/prediction" }
+    }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "provider", "sourceUrl", "observedAt"],
+      "properties": {
+        "evidenceId": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence"],
+      "properties": {
+        "state": {
+          "enum": ["known", "unknown", "not_applicable", "not_required"]
+        },
+        "value": {},
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/provenance" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": {
+            "required": ["value"],
+            "properties": { "evidence": { "minItems": 1 } }
+          },
+          "else": {
+            "properties": { "evidence": { "maxItems": 0 } },
+            "not": { "required": ["value"] }
+          }
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "signatureDishes", "ratings", "reservation"],
+      "properties": {
+        "category": { "$ref": "#/$defs/claim" },
+        "signatureDishes": { "$ref": "#/$defs/claim" },
+        "ratings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tabelog", "google"],
+          "properties": {
+            "tabelog": { "$ref": "#/$defs/claim" },
+            "google": { "$ref": "#/$defs/claim" }
+          }
+        },
+        "reservation": { "$ref": "#/$defs/claim" }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "result"],
+      "properties": {
+        "caseId": { "type": "string", "minLength": 1 },
+        "result": { "$ref": "#/$defs/result" }
+      }
+    }
+  }
+}

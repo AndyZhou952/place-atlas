@@ -6,11 +6,11 @@ import test from 'node:test';
 import { D1ProviderUsage } from './d1-provider-usage.ts';
 
 const legacyMigrationUrl = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-poc/0003_agent_provider_usage.sql',
+  '../../migrations/agent-poc/0003_agent_provider_usage.sql',
   import.meta.url,
 );
 const skuMigrationUrl = new URL(
-  '../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/0004_provider_usage_skus.sql',
+  '../../migrations/owner-poc/0004_provider_usage_skus.sql',
   import.meta.url,
 );
 

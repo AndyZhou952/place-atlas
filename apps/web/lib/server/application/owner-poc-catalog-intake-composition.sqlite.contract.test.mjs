@@ -3,12 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
+import { createOwnerReviewCandidateListGet } from '../../../app/api/owner/catalog/review-candidates/owner-review-candidate-route.ts';
+import { createAtlasApplication } from '../../../product/application/atlas-application.ts';
+import { createCatalogReadOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
 import { createOwnerPocComposition } from './owner-poc-composition.ts';
 
-const root = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
-  import.meta.url,
-);
+const root = new URL('../../../migrations/owner-poc/', import.meta.url);
 
 test('production owner-poc composition discovers, durably locates, and atomically publishes without Relay', async () => {
   const sqlite = new DatabaseSync(':memory:');
@@ -145,6 +145,131 @@ test('production owner-poc composition discovers, durably locates, and atomicall
   );
   const published = await composition.catalogRead.list('verified_catalog');
   assert.ok(published.some(({ id }) => id === 'item-production'));
+});
+
+test('production owner-poc composition exposes a confirmed needs-review publication through the Owner Review API', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  for (const migration of [
+    '0001_owner_poc_schema.sql',
+    '0002_owner_poc_catalog_seed.sql',
+    '0003_copy_legacy_catalog.sql',
+    '0004_provider_usage_skus.sql',
+    '0005_public_media_display_id.sql',
+    '0006_catalog_intake_sessions.sql',
+    '0007_nominatim_policy_state.sql',
+    '0008_catalog_intake_publication.sql',
+    '0009_catalog_intake_research_allowances.sql',
+  ]) {
+    sqlite.exec(await readFile(new URL(migration, root), 'utf8'));
+  }
+  const ids = ['session-needs-review', 'item-needs-review'];
+  const composition = createOwnerPocComposition(toD1(sqlite), undefined, {
+    googlePlacesApiKey: 'fixture-google-key',
+    providerModes: {
+      googlePlaces: 'enabled',
+      durableGeocoder: 'enabled',
+    },
+    clock: { now: () => new Date('2026-09-25T05:47:09.577Z') },
+    idSource: { nextId: () => ids.shift() },
+    fetch: async (url) => {
+      const requestUrl =
+        url instanceof Request ? url.url : url instanceof URL ? url.href : url;
+      if (requestUrl === 'https://places.googleapis.com/v1/places:searchText') {
+        return Response.json({
+          places: [
+            {
+              id: 'google-place-needs-review',
+              displayName: { text: 'Needs review restaurant' },
+              formattedAddress: 'TRANSIENT GOOGLE ADDRESS',
+            },
+          ],
+        });
+      }
+      if (
+        requestUrl ===
+        'https://places.googleapis.com/v1/places/google-place-needs-review'
+      ) {
+        return Response.json({
+          id: 'google-place-needs-review',
+          displayName: { text: 'Needs review restaurant' },
+          formattedAddress: 'TRANSIENT GOOGLE ADDRESS',
+        });
+      }
+      if (
+        requestUrl.startsWith('https://nominatim.openstreetmap.org/search?')
+      ) {
+        return Response.json([]);
+      }
+      throw new Error(`unexpected endpoint ${requestUrl}`);
+    },
+  });
+  const scope = {
+    ownerId: 'owner',
+    channel: 'web',
+    conversationId: 'conversation-needs-review',
+  };
+
+  const discovered = await composition.catalogIntakeModule.discover(
+    { query: 'Needs review restaurant', requestToken: 'request-needs-review' },
+    scope,
+  );
+  assert.equal(discovered.ok, true);
+  const selected = await composition.catalogIntakeModule.select(
+    {
+      sessionId: discovered.value.sessionId,
+      expectedSessionVersion: discovered.value.sessionVersion,
+      ordinal: 1,
+      ownerFields: {},
+      tabelog: 'unknown',
+      reservation: 'unknown',
+      requestResearch: false,
+    },
+    scope,
+  );
+  assert.equal(selected.ok, true);
+  assert.equal(selected.value.status, 'preview_ready');
+  assert.equal(selected.value.preview.locationEvidence.status, 'unknown');
+  const confirmed = await composition.catalogIntakeModule.confirm(
+    {
+      sessionId: selected.value.sessionId,
+      expectedPreviewVersion: selected.value.preview.previewVersion,
+    },
+    scope,
+  );
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.value.status, 'committed_needs_review');
+
+  const ownerReviewGet = createOwnerReviewCandidateListGet({
+    async authorizeOwnerRead() {
+      return undefined;
+    },
+    getApplication() {
+      return createAtlasApplication(
+        createCatalogReadOperationGroup(composition.catalogRead),
+      );
+    },
+  });
+  const response = await ownerReviewGet(
+    new Request('https://atlas.example/api/owner/catalog/review-candidates'),
+  );
+  assert.equal(response.status, 200);
+  const candidates = await response.json();
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].id, confirmed.value.itemId);
+  assert.equal(candidates[0].title, 'Needs review restaurant');
+  assert.equal(candidates[0].location.status, 'unknown');
+  assert.deepEqual(candidates[0].unknownFields, [
+    'address',
+    'coordinates',
+    'tabelog',
+    'reservation',
+  ]);
+  assert.equal(
+    (await composition.catalogRead.list('verified_catalog')).some(
+      ({ id }) => id === confirmed.value.itemId,
+    ),
+    false,
+  );
 });
 
 function toD1(database) {

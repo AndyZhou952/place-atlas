@@ -1126,6 +1126,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const [personalState, setPersonalState] = useState<PersonalState>(
     item.personalState,
   );
+  const [pendingVisitDelete, setPendingVisitDelete] = useState<VisitRecord>();
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1289,6 +1290,18 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
 
             <OverallCommentEditor key={item.id} item={item} vm={vm} />
 
+            <details className="detail-visit-recorder">
+              <summary>
+                <NotebookPen aria-hidden="true" /> Add a visit
+              </summary>
+              <VisitComposer
+                vm={vm}
+                itemId={item.id}
+                idPrefix={`detail-${item.id}`}
+                compact
+              />
+            </details>
+
             <div className="fact-grid">
               <div className="fact-card">
                 <span>Visit / booking</span>
@@ -1314,26 +1327,35 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               </p>
             ) : null}
 
-            {itemVisits.length ? (
-              <section className="detail-visit-history">
-                <h3>訪問記録</h3>
+            <section className="detail-visit-history">
+              <h3>訪問記録</h3>
+              {itemVisits.length ? (
                 <ol>
-                  {itemVisits.slice(0, 3).map((visit, index) => (
-                    <li key={visit.id}>
-                      <span>
-                        Visit {itemVisits.length - index} · {visit.visitedAt}
-                      </span>
-                      {visit.note ? <p>{visit.note}</p> : null}
-                      <VisitMediaGallery
-                        media={vm.media.filter(
-                          (entry) => entry.visitId === visit.id,
-                        )}
-                      />
-                    </li>
+                  {itemVisits.map((visit, index) => (
+                    <JournalVisitRow
+                      key={visit.id}
+                      item={item}
+                      visit={visit}
+                      visitNumber={itemVisits.length - index}
+                      busy={vm.journalBusy}
+                      media={vm.media.filter(
+                        (entry) => entry.visitId === visit.id,
+                      )}
+                      mediaBusy={vm.isMediaVisitPending(visit.id)}
+                      onSave={vm.editVisit}
+                      onUpload={vm.addVisitMedia}
+                      onSaveCaption={vm.saveMediaCaption}
+                      onDeleteMedia={vm.removeMedia}
+                      onDelete={() => setPendingVisitDelete(visit)}
+                    />
                   ))}
                 </ol>
-              </section>
-            ) : null}
+              ) : (
+                <p className="detail-visit-empty">
+                  No visits yet. Add the first one above.
+                </p>
+              )}
+            </section>
 
             <div className="source-links">
               {item.sources.map((source) => (
@@ -1350,6 +1372,21 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             {overallCheckedAt ? (
               <p className="source-checked-at">最終確認：{overallCheckedAt}</p>
             ) : null}
+            <DeleteVisitDialog
+              visit={pendingVisitDelete}
+              busy={vm.journalBusy}
+              onCancel={() => setPendingVisitDelete(undefined)}
+              onConfirm={async () => {
+                if (!pendingVisitDelete) return;
+                const visit = pendingVisitDelete;
+                setPendingVisitDelete(undefined);
+                try {
+                  await vm.removeVisit(visit.id);
+                } catch {
+                  setPendingVisitDelete(visit);
+                }
+              }}
+            />
           </>
         )}
       </CardContent>
@@ -1489,16 +1526,6 @@ function ReviewWorkspace({
 }
 
 function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
-  const [itemId, setItemId] = useState(
-    vm.selectedItem?.id ?? vm.items[0]?.id ?? '',
-  );
-  const [visitedAt, setVisitedAt] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
-  const [rating, setRating] = useState('3');
-  const [note, setNote] = useState('');
-  const [visitPhotos, setVisitPhotos] = useState<File[]>([]);
-  const [formError, setFormError] = useState('');
   const [placeFilter, setPlaceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -1519,43 +1546,6 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
     vm.visits.some((visit) => visit.itemId === item.id),
   );
 
-  async function submit(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const submittedRating = rating;
-    const submittedNote = note;
-    const submittedPhotos = visitPhotos;
-    let normalizedRating: number | undefined;
-    try {
-      normalizedRating = parseOptionalRating(submittedRating);
-      setFormError('');
-    } catch {
-      setFormError('Enter any number from 0 to 5. It will be saved to 0.1.');
-      return;
-    }
-    try {
-      const result = await vm.addVisit({
-        itemId,
-        visitedAt,
-        ...(normalizedRating === undefined ? {} : { rating: normalizedRating }),
-        ...(submittedNote.trim() ? { note: submittedNote.trim() } : {}),
-      });
-      setRating('3');
-      setNote('');
-      setVisitPhotos([]);
-      if (submittedPhotos.length) {
-        try {
-          await vm.addVisitMedia(result.visit.id, submittedPhotos);
-        } catch {
-          setFormError(
-            'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
-          );
-        }
-      }
-    } catch {
-      // The view model presents the error in the notice bar.
-    }
-  }
-
   return (
     <section className="single-workspace" id="journal">
       <div className="workspace-intro">
@@ -1572,100 +1562,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
             <CardTitle>Add a visit</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="stacked-form" onSubmit={submit} noValidate>
-              <label htmlFor="journal-place">
-                Place
-                <select
-                  id="journal-place"
-                  value={itemId}
-                  onChange={(event) => setItemId(event.target.value)}
-                >
-                  {vm.items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="form-pair">
-                <label htmlFor="visited-at">
-                  Visited
-                  <Input
-                    id="visited-at"
-                    type="date"
-                    value={visitedAt}
-                    onChange={(event) => setVisitedAt(event.target.value)}
-                    required
-                  />
-                </label>
-                <label htmlFor="journal-rating">
-                  マイスコア / 5
-                  <Input
-                    id="journal-rating"
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.5"
-                    value={rating}
-                    onChange={(event) => setRating(event.target.value)}
-                  />
-                </label>
-              </div>
-              <label htmlFor="journal-note">
-                Note
-                <textarea
-                  id="journal-note"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  rows={5}
-                  placeholder="What stood out? What would you order next time?"
-                />
-              </label>
-              <label className="journal-media-picker">
-                <span>Photos (optional)</span>
-                <span className="media-upload-control">
-                  <ImagePlus aria-hidden="true" />
-                  {visitPhotos.length
-                    ? `${visitPhotos.length} selected`
-                    : 'Choose photos'}
-                  <input
-                    key={visitPhotos.length ? 'selected' : 'empty'}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    multiple
-                    onChange={(event) => {
-                      const files = [...(event.target.files ?? [])];
-                      if (files.length > maxMediaFilesPerSelection) {
-                        setFormError(
-                          `Choose up to ${maxMediaFilesPerSelection} photos per batch. You can add another batch afterward.`,
-                        );
-                        event.target.value = '';
-                        return;
-                      }
-                      setVisitPhotos(files);
-                      setFormError('');
-                    }}
-                  />
-                </span>
-                <small>
-                  Up to {maxMediaFilesPerSelection} per selection; additional
-                  batches can be added to the same visit.
-                </small>
-              </label>
-              {formError ? (
-                <small className="form-error" role="alert">
-                  {formError}
-                </small>
-              ) : null}
-              <Button
-                type="submit"
-                disabled={
-                  vm.journalBusy || !itemId || (!rating && !note.trim())
-                }
-              >
-                <NotebookPen data-icon="inline-start" /> Save visit
-              </Button>
-            </form>
+            <VisitComposer vm={vm} idPrefix="journal" />
           </CardContent>
         </Card>
         <div className="journal-browser">
@@ -1791,6 +1688,211 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         }}
       />
     </section>
+  );
+}
+
+function VisitComposer({
+  vm,
+  itemId: fixedItemId,
+  idPrefix,
+  compact = false,
+}: {
+  readonly vm: AtlasViewModel;
+  readonly itemId?: string;
+  readonly idPrefix: string;
+  readonly compact?: boolean;
+}) {
+  const [selectedItemId, setSelectedItemId] = useState(
+    fixedItemId ?? vm.selectedItem?.id ?? vm.items[0]?.id ?? '',
+  );
+  const effectiveItemId =
+    fixedItemId ||
+    selectedItemId ||
+    vm.selectedItem?.id ||
+    vm.items[0]?.id ||
+    '';
+  const selectedItem = vm.items.find((item) => item.id === effectiveItemId);
+  const [visitedAt, setVisitedAt] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [rating, setRating] = useState(
+    selectedItem?.personalRating?.toString() ?? '',
+  );
+  const [note, setNote] = useState('');
+  const [visitPhotos, setVisitPhotos] = useState<File[]>([]);
+  const [formError, setFormError] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    let normalizedRating: number | undefined;
+    try {
+      normalizedRating = parseOptionalRating(rating);
+      setFormError('');
+    } catch {
+      setFormError('Enter any number from 0 to 5. It will be saved to 0.1.');
+      return;
+    }
+
+    setStatus('saving');
+    try {
+      const result = await vm.addVisit({
+        itemId: effectiveItemId,
+        visitedAt,
+        ...(normalizedRating === undefined ? {} : { rating: normalizedRating }),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      const submittedPhotos = visitPhotos;
+      setNote('');
+      setVisitPhotos([]);
+      if (submittedPhotos.length) {
+        try {
+          await vm.addVisitMedia(result.visit.id, submittedPhotos);
+        } catch {
+          setFormError(
+            'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
+          );
+          setStatus('idle');
+          return;
+        }
+      }
+      setStatus('success');
+    } catch {
+      setStatus('idle');
+      // The view model presents the request error in the notice bar.
+    }
+  }
+
+  const feedbackId = `${idPrefix}-visit-feedback`;
+  const busy = status === 'saving' || vm.journalBusy;
+
+  return (
+    <form
+      className={cn('stacked-form visit-composer', compact && 'is-compact')}
+      onSubmit={submit}
+      noValidate
+      aria-describedby={
+        formError || status === 'success' ? feedbackId : undefined
+      }
+    >
+      {!fixedItemId ? (
+        <label htmlFor={`${idPrefix}-visit-place`}>
+          Place
+          <select
+            id={`${idPrefix}-visit-place`}
+            value={effectiveItemId}
+            disabled={busy}
+            onChange={(event) => {
+              const nextItemId = event.target.value;
+              const nextItem = vm.items.find((item) => item.id === nextItemId);
+              setSelectedItemId(nextItemId);
+              setRating(nextItem?.personalRating?.toString() ?? '');
+              setStatus('idle');
+            }}
+          >
+            {vm.items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <div className="form-pair">
+        <label htmlFor={`${idPrefix}-visited-at`}>
+          Visited
+          <Input
+            id={`${idPrefix}-visited-at`}
+            type="date"
+            value={visitedAt}
+            disabled={busy}
+            onChange={(event) => {
+              setVisitedAt(event.target.value);
+              setStatus('idle');
+            }}
+            required
+          />
+        </label>
+        <label htmlFor={`${idPrefix}-visit-rating`}>
+          マイスコア / 5
+          <Input
+            id={`${idPrefix}-visit-rating`}
+            type="number"
+            min="0"
+            max="5"
+            step="0.1"
+            value={rating}
+            placeholder="Optional"
+            disabled={busy}
+            onChange={(event) => {
+              setRating(event.target.value);
+              setStatus('idle');
+            }}
+          />
+        </label>
+      </div>
+      <label htmlFor={`${idPrefix}-visit-note`}>
+        Note (optional)
+        <textarea
+          id={`${idPrefix}-visit-note`}
+          value={note}
+          disabled={busy}
+          onChange={(event) => {
+            setNote(event.target.value);
+            setStatus('idle');
+          }}
+          rows={compact ? 3 : 5}
+          placeholder="What stood out? What would you order next time?"
+        />
+      </label>
+      <label className="journal-media-picker">
+        <span>Photos (optional)</span>
+        <span className="media-upload-control">
+          <ImagePlus aria-hidden="true" />
+          {visitPhotos.length
+            ? `${visitPhotos.length} selected`
+            : 'Choose photos'}
+          <input
+            key={visitPhotos.length ? 'selected' : 'empty'}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            disabled={busy}
+            onChange={(event) => {
+              const files = [...(event.target.files ?? [])];
+              if (files.length > maxMediaFilesPerSelection) {
+                setFormError(
+                  `Choose up to ${maxMediaFilesPerSelection} photos per batch. You can add another batch afterward.`,
+                );
+                event.target.value = '';
+                return;
+              }
+              setVisitPhotos(files);
+              setFormError('');
+              setStatus('idle');
+            }}
+          />
+        </span>
+        <small>
+          Up to {maxMediaFilesPerSelection} per selection; add more from the
+          saved visit.
+        </small>
+      </label>
+      {formError ? (
+        <small id={feedbackId} className="form-error" role="alert">
+          {formError}
+        </small>
+      ) : null}
+      {status === 'success' && !formError ? (
+        <output id={feedbackId} className="form-success" aria-live="polite">
+          Visit saved. You can edit it in the history below.
+        </output>
+      ) : null}
+      <Button type="submit" disabled={busy || !effectiveItemId || !visitedAt}>
+        <NotebookPen data-icon="inline-start" />
+        {status === 'saving' ? 'Saving…' : 'Save visit'}
+      </Button>
+    </form>
   );
 }
 
@@ -1966,54 +2068,6 @@ function JournalVisitRow({
         </button>
       </div>
     </li>
-  );
-}
-
-function VisitMediaGallery({
-  media,
-}: {
-  readonly media: readonly VisitMediaRecord[];
-}) {
-  const [lightboxIndex, setLightboxIndex] = useState<number>();
-  if (!media.length) return null;
-  const visibleMedia = media.slice(0, 4);
-  return (
-    <div className="visit-media-collection">
-      <div className="visit-media-gallery">
-        {visibleMedia.map((entry, index) => (
-          <figure key={entry.id}>
-            <button
-              className="media-thumbnail-button"
-              type="button"
-              aria-label={`Open ${entry.caption || entry.originalFilename}`}
-              onClick={() => setLightboxIndex(index)}
-            >
-              <Image
-                src={entry.contentUrl}
-                alt={entry.caption || entry.originalFilename}
-                width={640}
-                height={480}
-                sizes="(max-width: 600px) 50vw, 180px"
-                unoptimized
-                loading="lazy"
-              />
-            </button>
-            {entry.caption ? <figcaption>{entry.caption}</figcaption> : null}
-          </figure>
-        ))}
-      </div>
-      <MediaBrowseButton
-        count={media.length}
-        onOpen={() => setLightboxIndex(0)}
-      />
-      {lightboxIndex !== undefined ? (
-        <PhotoLightbox
-          media={media}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(undefined)}
-        />
-      ) : null}
-    </div>
   );
 }
 

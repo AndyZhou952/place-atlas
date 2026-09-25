@@ -37,7 +37,7 @@ import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
 import { D1CatalogState } from './d1-catalog-state.ts';
 
 const migrationRoot = new URL(
-  '../../../../../features/004-openclaw-atlas-poc/deployment/cloudflare-owner-poc/',
+  '../../../migrations/owner-poc/',
   import.meta.url,
 );
 const now = new Date('2026-09-23T12:00:00.000Z');

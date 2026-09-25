@@ -7,6 +7,7 @@ import {
   type RouteSidecarWalkingMatrixResult,
 } from './route-sidecar-contract.ts';
 import { createGoogleRouteSidecarService } from './route-sidecar-service.ts';
+import { createOperationalNearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
 
 // The raw secret is deliberately absent from Wrangler config. Keep its runtime
 // surface narrow here instead of committing a path-sensitive generated Env.
@@ -36,6 +37,7 @@ export default class RouteSidecarWorker extends WorkerEntrypoint<RouteSidecarEnv
       apiKey: this.env.GOOGLE_MAPS_API_KEY,
       clock: () => new Date(),
       fetch: (url, init) => fetch(url, init),
+      diagnosticRecorder: createOperationalNearbyDiagnosticRecorder(),
     });
   }
 }

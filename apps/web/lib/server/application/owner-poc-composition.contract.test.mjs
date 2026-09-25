@@ -275,7 +275,7 @@ void test('owner-poc RouteEvidencePort fails closed without a binding and reserv
   assert.deepEqual(await missing.agentNearby.locationResolver.resolve('銀座'), {
     status: 'unresolved',
     reason: 'dependency_failure',
-    warning: 'Walking route service is not configured.',
+    warning: 'Address lookup is temporarily unavailable.',
   });
   assert.equal(
     sqlite

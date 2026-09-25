@@ -124,12 +124,14 @@ export type AgentServiceErrorKind =
   | 'forbidden'
   | 'not_found'
   | 'conflict'
+  | 'expired'
   | 'dependency_failure'
   | 'unexpected_failure';
 
 interface AgentServiceError {
   readonly kind: AgentServiceErrorKind;
   readonly message: string;
+  readonly retryable?: boolean;
 }
 
 type AgentAuditResultKind = 'success' | AgentServiceErrorKind;
@@ -147,9 +149,11 @@ interface ProjectCommandRouter {
             | 'invalid_input'
             | 'not_found'
             | 'conflict'
+            | 'expired'
             | 'dependency_failure'
             | 'unexpected_failure';
           readonly message: string;
+          readonly retryable?: boolean;
         };
       }
   >;
@@ -323,7 +327,10 @@ export function createAgentServiceGateway(
 
         const routed = await dependencies.router.dispatch(command);
         if (!routed.ok) {
-          const response = errorResponse(routed.error.kind);
+          const response = errorResponse(
+            routed.error.kind,
+            routed.error.retryable,
+          );
           await recordAudit(
             dependencies,
             body,
@@ -435,7 +442,7 @@ async function handleWriteCommand(input: {
     if (!routed.ok) {
       await input.dependencies.state.releaseMutation(identity);
       claimOpen = false;
-      const response = errorResponse(routed.error.kind);
+      const response = errorResponse(routed.error.kind, routed.error.retryable);
       await recordAudit(
         input.dependencies,
         input.body,
@@ -852,13 +859,17 @@ function hasOnlyKeys(
   );
 }
 
-function errorResponse(kind: AgentServiceErrorKind): AgentServiceResponse {
+function errorResponse(
+  kind: AgentServiceErrorKind,
+  retryable?: boolean,
+): AgentServiceResponse {
   const messages: Record<AgentServiceErrorKind, string> = {
     invalid_input: 'The agent request is invalid.',
     unauthorized: 'The agent request could not be authenticated.',
     forbidden: 'The requested agent operation is not allowed.',
     not_found: 'The requested Atlas resource was not found.',
     conflict: 'The agent request conflicts with an earlier request.',
+    expired: 'Japan Atlas｜本次 Add 已过期，请重新发送 /jpmap add <餐厅名>。',
     dependency_failure: 'Japan Atlas is temporarily unavailable.',
     unexpected_failure: 'The agent request could not be completed.',
   };
@@ -868,12 +879,20 @@ function errorResponse(kind: AgentServiceErrorKind): AgentServiceResponse {
     forbidden: 403,
     not_found: 404,
     conflict: 409,
+    expired: 410,
     dependency_failure: 503,
     unexpected_failure: 500,
   };
   return {
     status: statuses[kind],
-    body: { ok: false, error: { kind, message: messages[kind] } },
+    body: {
+      ok: false,
+      error: {
+        kind,
+        message: messages[kind],
+        ...(typeof retryable === 'boolean' ? { retryable } : {}),
+      },
+    },
   };
 }
 

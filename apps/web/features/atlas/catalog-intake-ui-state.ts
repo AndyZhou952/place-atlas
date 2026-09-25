@@ -82,6 +82,56 @@ export type CatalogIntakeUiAction =
   | { readonly type: 'cancelled' }
   | { readonly type: 'restart' };
 
+export function catalogIntakePendingMessage(
+  operation: CatalogIntakeUiState['lastOperation'],
+): string {
+  const messages = {
+    discover: 'Finding matches…',
+    select: 'Building the review preview…',
+    confirm: 'Confirming and saving…',
+    cancel: 'Cancelling this Add session…',
+  } as const;
+  return operation
+    ? messages[operation]
+    : 'Preparing the next step in Add a place…';
+}
+
+export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
+  switch (state.stage) {
+    case 'idle':
+      return '';
+    case 'loading':
+      return catalogIntakePendingMessage(state.lastOperation);
+    case 'empty':
+      return 'No matches found. Refine the restaurant name, neighborhood, or address.';
+    case 'candidates':
+      return `${state.candidates.length} possible ${state.candidates.length === 1 ? 'match' : 'matches'} found. Choose the intended place.`;
+    case 'error':
+      return (
+        state.error?.message ?? 'The Add request failed. Nothing was saved.'
+      );
+    case 'clarification':
+      return (
+        state.clarification?.prompt ??
+        'Clarification is required before the preview can be built.'
+      );
+    case 'preview':
+      return 'Preview ready. Review the place facts before saving.';
+    case 'expired':
+      return state.error?.message ?? 'The preview expired.';
+    case 'conflict':
+      return 'Evidence changed. Review the refreshed preview before confirming again.';
+    case 'success':
+      if (state.success?.status === 'committed_verified') {
+        return 'Place saved and available on the verified map and Nearby.';
+      }
+      if (state.success?.status === 'committed_needs_review') {
+        return 'Place saved to Owner review.';
+      }
+      return 'Existing place reused; no duplicate was created.';
+  }
+}
+
 export function catalogIntakeInitialState(): CatalogIntakeUiState {
   return {
     stage: 'idle',

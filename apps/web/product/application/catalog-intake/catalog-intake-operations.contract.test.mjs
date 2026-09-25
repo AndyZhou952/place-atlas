@@ -1522,11 +1522,13 @@ test('catalog.intake.confirm refreshes durable geocoder evidence and conflicts i
   assert.equal(publishCalls, 1);
 });
 
-test('catalog.intake.confirm retries enabled geocoding for unknown evidence and turns provider failure into one stable conflict preview', async () => {
+test('catalog.intake.confirm fails closed without writing when enabled geocoding becomes unavailable', async () => {
   let geocoderCalls = 0;
   let publishCalls = 0;
+  const state = recordingStatePort();
   const application = createFixtureApplication({
     discoveryPort: discoveryFixture(),
+    statePort: state.port,
     durableGeocoderPort: {
       async propose() {
         geocoderCalls += 1;
@@ -1568,39 +1570,19 @@ test('catalog.intake.confirm retries enabled geocoding for unknown evidence and 
       requestResearch: false,
     },
   });
+  const before = structuredClone(state.sessions.get('session-1'));
 
   const failedRefresh = await application.execute({
     key: 'catalog.intake.confirm',
     input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
   });
-  assert.equal(failedRefresh.ok, true);
-  assert.equal(failedRefresh.value.status, 'conflict');
-  assert.equal(failedRefresh.value.newPreview.previewVersion, 2);
-  assert.deepEqual(failedRefresh.value.newPreview.locationEvidence, {
-    status: 'unknown',
+  assert.deepEqual(failedRefresh, {
+    ok: true,
+    value: { status: 'failed_no_write', reason: 'dependency' },
   });
-  assert.deepEqual(failedRefresh.value.newPreview.warnings, [
-    {
-      code: 'provider_unavailable',
-      message:
-        'One or more enabled evidence providers could not be refreshed; retained evidence is stale or unknown.',
-    },
-    {
-      code: 'needs_review',
-      message:
-        'Confirm or complete the durable place details before publishing.',
-    },
-  ]);
+  assert.equal(geocoderCalls, 2);
   assert.equal(publishCalls, 0);
-
-  const stableRetry = await application.execute({
-    key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
-  });
-  assert.equal(stableRetry.ok, true);
-  assert.equal(stableRetry.value.status, 'committed_needs_review');
-  assert.equal(geocoderCalls, 3);
-  assert.equal(publishCalls, 1);
+  assert.deepEqual(state.sessions.get('session-1'), before);
   assert.doesNotMatch(
     JSON.stringify(failedRefresh),
     /private geocoder outage/u,
@@ -1611,8 +1593,10 @@ test('catalog.intake.confirm terminates when geocoding fails while Web research 
   let geocoderCalls = 0;
   let researchCalls = 0;
   let publishCalls = 0;
+  const state = recordingStatePort();
   const application = createFixtureApplication({
     discoveryPort: discoveryFixture(),
+    statePort: state.port,
     durableGeocoderPort: {
       async propose() {
         geocoderCalls += 1;
@@ -1663,24 +1647,21 @@ test('catalog.intake.confirm terminates when geocoding fails while Web research 
       requestResearch: false,
     },
   });
+  const before = structuredClone(state.sessions.get('session-1'));
 
-  const refreshed = await application.execute({
+  const failedRefresh = await application.execute({
     key: 'catalog.intake.confirm',
     input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
   });
-  assert.equal(refreshed.ok && refreshed.value.status, 'conflict');
-  const committed = await application.execute({
-    key: 'catalog.intake.confirm',
-    input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+  assert.deepEqual(failedRefresh, {
+    ok: true,
+    value: { status: 'failed_no_write', reason: 'dependency' },
   });
-
-  assert.equal(
-    committed.ok && committed.value.status,
-    'committed_needs_review',
-  );
-  assert.equal(geocoderCalls, 3);
-  assert.equal(researchCalls, 1);
-  assert.equal(publishCalls, 1);
+  assert.equal(geocoderCalls, 2);
+  assert.equal(researchCalls, 0);
+  assert.equal(publishCalls, 0);
+  assert.deepEqual(state.sessions.get('session-1'), before);
+  assert.doesNotMatch(JSON.stringify(failedRefresh), /private outage/u);
 });
 
 test('catalog.intake.confirm terminates when geocoding succeeds while Web research fails without changing observation time', async () => {

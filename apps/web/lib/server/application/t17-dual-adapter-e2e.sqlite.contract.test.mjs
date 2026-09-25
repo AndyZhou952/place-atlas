@@ -84,13 +84,7 @@ test('real Owner-cookie Web and signed Agent adapters share D1 intake, recovery,
     durableGeocoderPort: {
       async propose({ ownerQuery }) {
         if (ownerQuery.includes('Needs Review')) {
-          return {
-            ok: false,
-            error: {
-              kind: 'dependency_failure',
-              message: 'Durable geocoder unavailable.',
-            },
-          };
+          return { ok: true, value: { status: 'no_match' } };
         }
         const agent = ownerQuery.includes('Agent');
         return {
@@ -224,16 +218,7 @@ test('real Owner-cookie Web and signed Agent adapters share D1 intake, recovery,
     },
     { conversationId: reviewConversation },
   );
-  assert.equal(reviewConfirm.body.status, 'conflict');
-  const reviewReconfirm = await web.send(
-    'catalog.intake.confirm',
-    {
-      sessionId: reviewConfirm.body.newPreview.sessionId,
-      expectedPreviewVersion: reviewConfirm.body.newPreview.previewVersion,
-    },
-    { conversationId: reviewConversation },
-  );
-  assert.equal(reviewReconfirm.body.status, 'committed_needs_review');
+  assert.equal(reviewConfirm.body.status, 'committed_needs_review');
 
   // Exercise the Owner-only HTTP read seam against the same persisted D1 row
   // produced by Catalog Intake. This is deliberately not a hand-built DTO.
@@ -336,28 +321,14 @@ test('real Owner-cookie Web and signed Agent adapters share D1 intake, recovery,
     'agent-review-confirm-1',
     'agent-review-nonce-3',
   );
-  assert.equal(agentReviewConfirm.body.receipt.result.step, 'preview');
+  assert.equal(agentReviewConfirm.body.receipt.result.step, 'committed');
   assert.equal(
     agentReviewConfirm.body.receipt.result.intake.status,
-    'conflict',
-  );
-  assert.match(
-    agentReviewConfirm.body.receipt.result.replyText,
-    /^资料有变化，本次尚未写入。/u,
-  );
-  assert.match(
-    agentReviewConfirm.body.receipt.result.replyText,
-    /同意新版：\/jpmap add confirm/u,
-  );
-  const agentReviewReconfirm = await agent.send(
-    'jpmap_add_confirm',
-    {},
-    'agent-review-reconfirm-1',
-    'agent-review-nonce-4',
-  );
-  assert.equal(
-    agentReviewReconfirm.body.receipt.result.intake.status,
     'committed_needs_review',
+  );
+  assert.match(
+    agentReviewConfirm.body.receipt.result.replyText,
+    /Owner 待审核/u,
   );
 
   const transportReplay = await agent.sendSigned(agentConfirm.request);

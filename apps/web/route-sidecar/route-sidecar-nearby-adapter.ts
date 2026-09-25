@@ -19,9 +19,9 @@ export function createRouteSidecarNearbyAdapter(
         try {
           result = await sidecar.geocode({ locationHint });
         } catch {
-          return unresolvedLocation('dependency_failure');
+          return unresolvedLocation();
         }
-        if (!result.ok) return unresolvedLocation(result.error);
+        if (!result.ok) return unresolvedLocation();
         const { evidence } = result;
         const candidates = evidence.candidates.map((candidate) => ({
           canonicalAddress: candidate.formattedAddress,
@@ -66,9 +66,9 @@ export function createRouteSidecarNearbyAdapter(
             destinations: [destination],
           });
         } catch {
-          return unavailableWalkingRoute('dependency_failure');
+          return unavailableWalkingRoute();
         }
-        if (!result.ok) return unavailableWalkingRoute(result.error);
+        if (!result.ok) return unavailableWalkingRoute();
         const route = result.evidence.routes.find(
           ({ destinationIndex }) => destinationIndex === 0,
         );
@@ -94,23 +94,17 @@ export function createRouteSidecarNearbyAdapter(
   };
 }
 
-function unresolvedLocation(error: string) {
+function unresolvedLocation() {
   return {
     status: 'unresolved' as const,
     reason: 'dependency_failure' as const,
-    warning:
-      error === 'not_configured'
-        ? 'Walking route service is not configured.'
-        : 'Address lookup is temporarily unavailable.',
+    warning: 'Address lookup is temporarily unavailable.',
   };
 }
 
-function unavailableWalkingRoute(error: string) {
+function unavailableWalkingRoute() {
   return {
     status: 'unavailable' as const,
-    warning:
-      error === 'not_configured'
-        ? 'Walking route service is not configured.'
-        : 'Walking route is temporarily unavailable.',
+    warning: 'Walking route is temporarily unavailable.',
   };
 }

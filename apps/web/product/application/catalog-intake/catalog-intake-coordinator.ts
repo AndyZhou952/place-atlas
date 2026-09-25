@@ -464,6 +464,7 @@ interface CatalogIntakeActiveSessionBase extends CatalogIntakeScope {
     readonly operation: 'select';
     readonly fromVersion: number;
     readonly inputJson: string;
+    readonly clarification?: CatalogIntakeClarification;
   };
 }
 
@@ -869,7 +870,7 @@ export function createCatalogIntakeModule(options: {
           return addFailure(
             'dependency_failure',
             'Place discovery is temporarily unavailable.',
-            true,
+            refreshed.error.kind !== 'not_found',
           );
         }
         const refreshedCandidate = validateDiscoveryCandidate(refreshed.value);
@@ -918,17 +919,7 @@ export function createCatalogIntakeModule(options: {
                 prompt: 'Add an area or address to identify the right place.',
                 fields: ['area', 'address'] as const,
               } satisfies CatalogIntakeClarification)
-            : !ownerFields.title &&
-                !ownerFields.address &&
-                !geocoderProposal &&
-                !geocoderUnavailable
-              ? ({
-                  code: 'missing_area_or_address' as const,
-                  prompt:
-                    'Add a restaurant name, area, or address to continue.',
-                  fields: ['title', 'area', 'address'] as const,
-                } satisfies CatalogIntakeClarification)
-              : undefined;
+            : undefined;
         if (clarification) {
           const next: CatalogIntakeCandidatesSession = {
             ...session,
@@ -940,6 +931,7 @@ export function createCatalogIntakeModule(options: {
               operation: 'select',
               fromVersion: input.expectedSessionVersion,
               inputJson,
+              clarification,
             },
           };
           const transitioned = await options.statePort.compareAndSwap({
@@ -1374,12 +1366,28 @@ export function createCatalogIntakeModule(options: {
             ownerQuery: session.ownerQuery,
             ownerDraft: session.preview.ownerFields,
           });
-          const proposal = geocoderRefresh.ok
-            ? validateDurableGeocoderProposal(geocoderRefresh.value)
-            : undefined;
+          if (!geocoderRefresh.ok) {
+            return success({
+              status: 'failed_no_write',
+              reason: 'dependency',
+            });
+          }
+          const proposal = validateDurableGeocoderProposal(
+            geocoderRefresh.value,
+          );
+          if (!proposal) {
+            return success({
+              status: 'failed_no_write',
+              reason: 'dependency',
+            });
+          }
           const resolved =
             proposal?.status === 'resolved' ? proposal : undefined;
           const priorLocation = session.preview.locationEvidence;
+          const lostDurableGeocoderMatch =
+            proposal.status === 'no_match' &&
+            priorLocation.status === 'known' &&
+            priorLocation.provenance === 'durable_geocoder_observed';
           const canUseGeocoder =
             priorLocation.status === 'unknown' ||
             priorLocation.provenance === 'durable_geocoder_observed';
@@ -1393,8 +1401,9 @@ export function createCatalogIntakeModule(options: {
             priorLocation.provider === resolved.provider &&
             priorLocation.sourceUrl === resolved.sourceUrl &&
             priorLocation.license === resolved.license;
-          refreshedAddress =
-            resolved && canUseGeocoder
+          refreshedAddress = lostDurableGeocoderMatch
+            ? undefined
+            : resolved && canUseGeocoder
               ? sameResolvedFacts
                 ? session.preview.addressProposal
                 : {
@@ -1405,8 +1414,9 @@ export function createCatalogIntakeModule(options: {
                     checkedAt: resolved.checkedAt,
                   }
               : session.preview.addressProposal;
-          refreshedLocation =
-            resolved && canUseGeocoder
+          refreshedLocation = lostDurableGeocoderMatch
+            ? { status: 'unknown' as const }
+            : resolved && canUseGeocoder
               ? sameResolvedFacts
                 ? priorLocation
                 : {
@@ -1421,7 +1431,7 @@ export function createCatalogIntakeModule(options: {
                     checkedAt: resolved.checkedAt,
                   }
               : priorLocation;
-          providerRefreshFailed ||= !resolved;
+          providerRefreshFailed ||= proposal.status === 'ambiguous';
         }
         const canonicalResearchUrls = catalogIntakeCanonicalResearchUrls(
           session.preview,
@@ -1516,8 +1526,11 @@ export function createCatalogIntakeModule(options: {
             canonicalJson(session.preview.warnings)
         ) {
           const acceptedAt = options.clock.now();
-          const { evidenceDigest: _priorDigest, ...priorWithoutDigest } =
-            session.preview;
+          const {
+            evidenceDigest: _priorDigest,
+            addressProposal: _priorAddress,
+            ...priorWithoutDigest
+          } = session.preview;
           const previewWithoutDigest = {
             ...priorWithoutDigest,
             previewVersion: session.preview.previewVersion + 1,
@@ -1525,6 +1538,20 @@ export function createCatalogIntakeModule(options: {
             locationEvidence: refreshedLocation,
             tabelog: refreshedTabelog,
             reservation: refreshedReservation,
+            unknownFields: [
+              ...(!session.preview.ownerFields.address && !refreshedAddress
+                ? (['address'] as const)
+                : []),
+              ...(refreshedLocation.status === 'unknown'
+                ? (['coordinates'] as const)
+                : []),
+              ...(refreshedTabelog.status === 'unknown'
+                ? (['tabelog'] as const)
+                : []),
+              ...(refreshedReservation.status === 'unknown'
+                ? (['reservation'] as const)
+                : []),
+            ],
             warnings: refreshedWarnings,
             expiresAt: acceptedExpiry(acceptedAt),
           };
@@ -2157,10 +2184,10 @@ function replaySelect(
     status: 'clarification_required',
     sessionId: session.sessionId,
     sessionVersion: session.sessionVersion,
-    clarification: {
-      code: 'missing_area_or_address',
-      prompt: 'Add a restaurant name, area, or address to continue.',
-      fields: ['title', 'area', 'address'],
+    clarification: session.lastTransition?.clarification ?? {
+      code: 'ambiguous_location',
+      prompt: 'Add an area or address to identify the right place.',
+      fields: ['area', 'address'],
     },
     expiresAt: session.expiresAt,
   });

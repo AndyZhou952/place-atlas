@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input';
 import { presentCatalogIntakePreview } from '@/product/application/catalog-intake/catalog-intake-preview-presenter';
 
 import { useCatalogIntake } from './use-catalog-intake';
+import {
+  catalogIntakeLiveMessage,
+  catalogIntakePendingMessage,
+} from './catalog-intake-ui-state';
+import './catalog-intake-panel.css';
 
 export function CatalogIntakePanel({
   onCommitted,
@@ -19,7 +24,13 @@ export function CatalogIntakePanel({
   const [submitted, setSubmitted] = useState(false);
   const queryRef = useRef<HTMLInputElement>(null);
   const stageHeadingRef = useRef<HTMLHeadingElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
   const busy = state.stage === 'loading';
+  const selectInProgress =
+    busy &&
+    state.lastOperation === 'select' &&
+    (state.previousStage === 'candidates' ||
+      state.previousStage === 'clarification');
   const confirmInProgress =
     busy &&
     state.lastOperation === 'confirm' &&
@@ -27,8 +38,13 @@ export function CatalogIntakePanel({
   const queryInvalid = submitted && !state.query.trim();
 
   useEffect(() => {
-    if (state.focusRevision > 0) stageHeadingRef.current?.focus();
-  }, [state.focusRevision]);
+    if (state.focusRevision === 0) return;
+    if (state.stage === 'error') {
+      retryRef.current?.focus();
+      return;
+    }
+    stageHeadingRef.current?.focus();
+  }, [state.focusRevision, state.stage]);
 
   function submitDiscover(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,7 +89,9 @@ export function CatalogIntakePanel({
           />
           <Button type="submit" disabled={busy}>
             <Search data-icon="inline-start" />
-            Find matches
+            {busy && state.lastOperation === 'discover'
+              ? catalogIntakePendingMessage('discover')
+              : 'Find matches'}
           </Button>
         </div>
         <small id="catalog-intake-query-help">
@@ -89,8 +107,12 @@ export function CatalogIntakePanel({
         ) : null}
       </form>
 
-      <div className="catalog-intake-live" aria-live="polite">
-        {busy ? <p>{loadingMessage(state.lastOperation)}</p> : null}
+      <div
+        className="catalog-intake-live"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <p>{catalogIntakeLiveMessage(state)}</p>
       </div>
 
       {state.stage !== 'idle' && state.stage !== 'loading' ? (
@@ -129,6 +151,7 @@ export function CatalogIntakePanel({
             Your input is still here. Sign in as Owner if prompted, then retry.
           </p>
           <Button
+            ref={retryRef}
             type="button"
             variant="outline"
             onClick={() => void intake.retry()}
@@ -138,10 +161,18 @@ export function CatalogIntakePanel({
         </div>
       ) : null}
 
-      {state.stage === 'candidates' ? <CandidateStep intake={intake} /> : null}
+      {state.stage === 'candidates' ||
+      (selectInProgress && state.previousStage === 'candidates') ? (
+        <CandidateStep intake={intake} busy={selectInProgress} />
+      ) : null}
 
-      {state.stage === 'clarification' ? (
-        <CandidateStep intake={intake} showClarification />
+      {state.stage === 'clarification' ||
+      (selectInProgress && state.previousStage === 'clarification') ? (
+        <CandidateStep
+          intake={intake}
+          showClarification
+          busy={selectInProgress}
+        />
       ) : null}
 
       {(state.stage === 'preview' || confirmInProgress) && state.preview ? (
@@ -208,14 +239,20 @@ type IntakeController = ReturnType<typeof useCatalogIntake>;
 function CandidateStep({
   intake,
   showClarification = false,
+  busy = false,
 }: {
   readonly intake: IntakeController;
   readonly showClarification?: boolean;
+  readonly busy?: boolean;
 }) {
   const { state } = intake;
+  const [correctionsOpen, setCorrectionsOpen] = useState(showClarification);
   const clarificationId = showClarification
     ? 'catalog-intake-clarification'
     : undefined;
+  const correctionDescription = clarificationId
+    ? `catalog-intake-corrections-help ${clarificationId}`
+    : 'catalog-intake-corrections-help';
   return (
     <div className="catalog-intake-step">
       {state.candidates.length ? (
@@ -231,6 +268,7 @@ function CandidateStep({
                   aria-label={`Select ${candidate.transientName}`}
                   checked={state.selectedOrdinal === candidate.ordinal}
                   onChange={() => intake.selectCandidate(candidate.ordinal)}
+                  disabled={busy}
                 />
                 <span>
                   <strong>{candidate.transientName}</strong>
@@ -264,58 +302,85 @@ function CandidateStep({
           {state.clarification.prompt}
         </p>
       ) : null}
-      <div className="catalog-intake-owner-fields">
-        <label htmlFor="catalog-intake-title-field">Confirmed name</label>
-        <Input
-          id="catalog-intake-title-field"
-          value={state.title}
-          onChange={(event) => intake.setField('title', event.target.value)}
-          placeholder="Optional — the original query remains the proposal"
-          aria-describedby={clarificationId}
-          aria-invalid={
-            showClarification && state.clarification?.fields.includes('title')
-          }
-        />
-        <label htmlFor="catalog-intake-area-field">Area</label>
-        <Input
-          id="catalog-intake-area-field"
-          value={state.area}
-          onChange={(event) => intake.setField('area', event.target.value)}
-          placeholder="e.g. Ginza"
-          aria-describedby={clarificationId}
-          aria-invalid={
-            showClarification && state.clarification?.fields.includes('area')
-          }
-        />
-        <label htmlFor="catalog-intake-address-field">Address</label>
-        <Input
-          id="catalog-intake-address-field"
-          value={state.address}
-          onChange={(event) => intake.setField('address', event.target.value)}
-          placeholder="Optional full address"
-          aria-describedby={clarificationId}
-          aria-invalid={
-            showClarification && state.clarification?.fields.includes('address')
-          }
-        />
-      </div>
       <div className="catalog-intake-actions">
         <Button
           type="button"
           onClick={() => void intake.select()}
-          disabled={state.selectedOrdinal === undefined}
+          disabled={busy || state.selectedOrdinal === undefined}
         >
           <Plus data-icon="inline-start" />
-          Build preview
+          {busy
+            ? catalogIntakePendingMessage('select')
+            : 'Review selected place'}
         </Button>
         <Button
           type="button"
           variant="ghost"
           onClick={() => void intake.cancel()}
+          disabled={busy}
         >
           Cancel
         </Button>
       </div>
+      <details
+        className="catalog-intake-corrections"
+        open={correctionsOpen}
+        onToggle={(event) => setCorrectionsOpen(event.currentTarget.open)}
+      >
+        <summary
+          aria-expanded={correctionsOpen}
+          aria-controls="catalog-intake-correction-fields"
+          aria-describedby={clarificationId}
+        >
+          Correct details
+          <span>Optional</span>
+        </summary>
+        <p id="catalog-intake-corrections-help">
+          Only add a correction when the selected place needs one.
+        </p>
+        <div
+          id="catalog-intake-correction-fields"
+          className="catalog-intake-owner-fields"
+        >
+          <label htmlFor="catalog-intake-title-field">Confirmed name</label>
+          <Input
+            id="catalog-intake-title-field"
+            value={state.title}
+            onChange={(event) => intake.setField('title', event.target.value)}
+            placeholder="Optional — the original query remains the proposal"
+            aria-describedby={correctionDescription}
+            disabled={busy}
+            aria-invalid={
+              showClarification && state.clarification?.fields.includes('title')
+            }
+          />
+          <label htmlFor="catalog-intake-area-field">Area</label>
+          <Input
+            id="catalog-intake-area-field"
+            value={state.area}
+            onChange={(event) => intake.setField('area', event.target.value)}
+            placeholder="e.g. Ginza"
+            aria-describedby={correctionDescription}
+            disabled={busy}
+            aria-invalid={
+              showClarification && state.clarification?.fields.includes('area')
+            }
+          />
+          <label htmlFor="catalog-intake-address-field">Address</label>
+          <Input
+            id="catalog-intake-address-field"
+            value={state.address}
+            onChange={(event) => intake.setField('address', event.target.value)}
+            placeholder="Optional full address"
+            aria-describedby={correctionDescription}
+            disabled={busy}
+            aria-invalid={
+              showClarification &&
+              state.clarification?.fields.includes('address')
+            }
+          />
+        </div>
+      </details>
     </div>
   );
 }
@@ -334,56 +399,106 @@ function PreviewStep({
   readonly busy?: boolean;
 }) {
   const presentation = presentCatalogIntakePreview(preview);
+  const groups = [
+    {
+      id: 'catalog-intake-preview-place',
+      heading: 'Place',
+      keys: ['identity', 'title'],
+    },
+    {
+      id: 'catalog-intake-preview-location',
+      heading: 'Location',
+      keys: ['area', 'address', 'coordinates'],
+    },
+    {
+      id: 'catalog-intake-preview-restaurant-facts',
+      heading: 'Restaurant facts',
+      keys: ['tabelog', 'reservation'],
+    },
+  ] as const;
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
-      <dl>
-        {presentation.fields.map((item) => (
-          <div key={item.key}>
-            <dt>{item.label}</dt>
-            <dd>{item.value}</dd>
-            <dd className="catalog-intake-source">
-              {item.evidence}
-              {item.evidenceAt ? ` · ${formatTimestamp(item.evidenceAt)}` : ''}
-              {item.license ? ` · ${item.license}` : ''}
-              {item.sourceUrl ? (
-                <>
-                  {' · '}
-                  <a href={item.sourceUrl} target="_blank" rel="noreferrer">
-                    Source
-                  </a>
-                </>
-              ) : null}
-            </dd>
+      {groups.map((group) => (
+        <section
+          key={group.id}
+          className="catalog-intake-preview-group"
+          aria-labelledby={group.id}
+        >
+          <h5 id={group.id}>{group.heading}</h5>
+          <dl>
+            {presentation.fields.map((item) =>
+              group.keys.some((groupKey) => groupKey === item.key) ? (
+                <div key={item.key}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.value}</dd>
+                  <dd className="catalog-intake-source">
+                    <details>
+                      <summary>Evidence</summary>
+                      <span>
+                        {item.evidence}
+                        {item.evidenceAt
+                          ? ` · ${formatTimestamp(item.evidenceAt)}`
+                          : ''}
+                        {item.license ? ` · ${item.license}` : ''}
+                        {item.sourceUrl ? (
+                          <>
+                            {' · '}
+                            <a
+                              href={item.sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Source
+                            </a>
+                          </>
+                        ) : null}
+                      </span>
+                    </details>
+                  </dd>
+                </div>
+              ) : null,
+            )}
+          </dl>
+        </section>
+      ))}
+      <section
+        className="catalog-intake-preview-group catalog-intake-preview-warnings"
+        aria-labelledby="catalog-intake-preview-warnings"
+      >
+        <h5 id="catalog-intake-preview-warnings">Warnings</h5>
+        {presentation.duplicates.length ? (
+          <div className="catalog-intake-state is-attention">
+            <strong>Possible duplicates</strong>
+            <ul>
+              {presentation.duplicates.map((duplicate) => (
+                <li key={duplicate.itemId}>
+                  {duplicate.title}
+                  {duplicate.address ? ` · ${duplicate.address}` : ''} ·{' '}
+                  {duplicate.match} match
+                </li>
+              ))}
+            </ul>
           </div>
-        ))}
-      </dl>
-      {presentation.duplicates.length ? (
-        <div className="catalog-intake-state is-attention">
-          <strong>Possible duplicates</strong>
-          <ul>
-            {presentation.duplicates.map((duplicate) => (
-              <li key={duplicate.itemId}>
-                {duplicate.title}
-                {duplicate.address ? ` · ${duplicate.address}` : ''} ·{' '}
-                {duplicate.match} match
-              </li>
+        ) : null}
+        {presentation.unknownFields.length ? (
+          <p className="catalog-intake-note">
+            Still unknown: {presentation.unknownFields.join(', ')}.
+          </p>
+        ) : null}
+        {presentation.warnings.length ? (
+          <ul className="catalog-intake-warning-list">
+            {presentation.warnings.map((warning) => (
+              <li key={warning.code}>{warning.message}</li>
             ))}
           </ul>
-        </div>
-      ) : null}
-      {presentation.unknownFields.length ? (
-        <p className="catalog-intake-note">
-          Still unknown: {presentation.unknownFields.join(', ')}.
-        </p>
-      ) : null}
-      {presentation.warnings.length ? (
-        <ul className="catalog-intake-warning-list">
-          {presentation.warnings.map((warning) => (
-            <li key={warning.code}>{warning.message}</li>
-          ))}
-        </ul>
-      ) : null}
+        ) : null}
+        {!presentation.duplicates.length &&
+        !presentation.unknownFields.length &&
+        !presentation.warnings.length ? (
+          <p className="catalog-intake-note">No warnings in this preview.</p>
+        ) : null}
+      </section>
       <div className="catalog-intake-actions">
         <Button type="button" onClick={() => void onConfirm()} disabled={busy}>
           {confirmLabel}
@@ -422,18 +537,6 @@ function formatTimestamp(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
-}
-
-function loadingMessage(
-  operation: IntakeController['state']['lastOperation'],
-): string {
-  const messages = {
-    discover: 'Finding possible matches…',
-    select: 'Building the review preview…',
-    confirm: 'Confirming and saving…',
-    cancel: 'Cancelling this Add session…',
-  } as const;
-  return operation ? messages[operation] : 'Building the next Add step…';
 }
 
 function successMessage(

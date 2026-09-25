@@ -1,0 +1,123 @@
+.catalog-intake-corrections {
+  min-width: 0;
+  border-block: 1px solid var(--line);
+}
+
+.catalog-intake-corrections > summary {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.catalog-intake-corrections > summary > span {
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  font-weight: 650;
+}
+
+.catalog-intake-corrections > summary:focus-visible,
+.catalog-intake-source summary:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.catalog-intake-corrections > p {
+  margin: 0 0 0.65rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.catalog-intake-corrections .catalog-intake-owner-fields {
+  padding-bottom: 0.75rem;
+}
+
+.catalog-intake-preview-group {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.catalog-intake-preview-group > h5 {
+  margin: 0.4rem 0 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 680;
+}
+
+.catalog-intake-preview-group dl {
+  min-width: 0;
+}
+
+.catalog-intake-preview-group dl > div,
+.catalog-intake-preview-group dd {
+  min-width: 0;
+}
+
+.catalog-intake-source details {
+  min-width: 0;
+}
+
+.catalog-intake-source summary {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--moss);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.catalog-intake-source details > span {
+  display: block;
+  padding-bottom: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.catalog-intake-preview-warnings {
+  gap: 0.55rem;
+  padding-top: 0.15rem;
+}
+
+.catalog-intake-candidates > div,
+.catalog-intake-candidates > div > label,
+.catalog-intake-candidates label > span,
+.catalog-intake-candidates strong,
+.catalog-intake-candidates small {
+  min-width: 0;
+}
+
+.catalog-intake-candidates strong,
+.catalog-intake-candidates small {
+  overflow-wrap: anywhere;
+}
+
+.catalog-intake-actions [data-slot='button'] {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 480px) {
+  .catalog-intake-candidates > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-intake-candidates > div > a {
+    justify-content: flex-start;
+    padding-inline: 0.6rem;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .catalog-intake-preview dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+}

@@ -15,19 +15,26 @@ import {
   type RouteSidecarWalkingMatrixEvidence,
   type RouteSidecarWalkingMatrixResult,
 } from './route-sidecar-contract.ts';
+import type { NearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
 
 export interface GoogleRouteSidecarServiceOptions {
   readonly apiKey: string | undefined;
   readonly clock: () => Date;
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
+  readonly diagnosticRecorder?: NearbyDiagnosticRecorder;
 }
 
 export function createGoogleRouteSidecarService({
   apiKey,
   clock,
   fetch,
+  diagnosticRecorder,
 }: GoogleRouteSidecarServiceOptions): GoogleRouteSidecarPort {
-  const transport = createGoogleRouteSidecarTransport({ apiKey, fetch });
+  const transport = createGoogleRouteSidecarTransport({
+    apiKey,
+    fetch,
+    diagnosticRecorder,
+  });
   return {
     async geocode(request): Promise<RouteSidecarGeocodeResult> {
       if (!isRouteSidecarGeocodeRequest(request)) {

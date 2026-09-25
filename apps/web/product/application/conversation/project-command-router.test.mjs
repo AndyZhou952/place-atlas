@@ -565,7 +565,7 @@ test('router covers no-candidate, clarification, expiry, failed-no-write, and al
   assert.deepEqual(expired, {
     ok: false,
     error: {
-      kind: 'conflict',
+      kind: 'expired',
       message:
         'Japan Atlas｜本次 Add 已过期，没有写入。请重新发送 /jpmap add <餐厅名>。',
     },

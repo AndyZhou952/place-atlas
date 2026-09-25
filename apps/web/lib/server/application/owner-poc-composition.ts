@@ -7,6 +7,7 @@ import {
 } from '../../../adapters/agent/d1-owner-poc-catalog.ts';
 import { createD1MeteredRouteSidecarClient } from '../../../route-sidecar/d1-metered-route-sidecar-client.ts';
 import type { RouteSidecarServiceBinding } from '../../../route-sidecar/metered-route-sidecar-client.ts';
+import { createOperationalNearbyDiagnosticRecorder } from '../../../route-sidecar/nearby-diagnostic-recorder.ts';
 import { createRouteSidecarNearbyAdapter } from '../../../route-sidecar/route-sidecar-nearby-adapter.ts';
 import { D1ProviderUsage } from '../../../adapters/agent/d1-provider-usage.ts';
 import { createGooglePlaceDiscoveryAdapter } from '../../../adapters/providers/google-place-discovery.ts';
@@ -49,6 +50,7 @@ export function createOwnerPocComposition(
       database,
       service: routeSidecarService,
       clock: () => clock.now(),
+      diagnosticRecorder: createOperationalNearbyDiagnosticRecorder(),
     }),
   );
   const agentNearby: Omit<NearbyRecommendOperationDependencies, 'catalog'> = {

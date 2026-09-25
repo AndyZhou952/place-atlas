@@ -499,6 +499,7 @@ function NearbySearch({ vm }: { readonly vm: AtlasViewModel }) {
         <NearbyResult
           result={vm.nearbyResult}
           onSelect={vm.selectItem}
+          onRetry={() => void vm.locateNearby()}
           onChooseLocation={(locationHint) => {
             vm.setNearbyLocationHint(locationHint);
             void vm.locateNearby(locationHint);
@@ -512,19 +513,40 @@ function NearbySearch({ vm }: { readonly vm: AtlasViewModel }) {
 function NearbyResult({
   result,
   onSelect,
+  onRetry,
   onChooseLocation,
 }: {
   readonly result: NearbyRecommendResult;
   readonly onSelect: (itemId: string) => void;
+  readonly onRetry: () => void;
   readonly onChooseLocation: (locationHint: string) => void;
 }) {
+  if (
+    result.status === 'unresolved' &&
+    result.reason === 'dependency_failure'
+  ) {
+    return (
+      <div className="nearby-state" role="alert">
+        <strong>Location service is temporarily unavailable.</strong>
+        <span>
+          No saved places were checked. Your location entry is unchanged.
+        </span>
+        <Button
+          type="button"
+          className="min-h-11 justify-self-start"
+          onClick={onRetry}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   if (result.status === 'unresolved') {
     return (
       <div className="nearby-state" role="alert">
-        <strong>Location could not be resolved.</strong>
-        <span>
-          {result.warning} Try a neighborhood plus city or a full address.
-        </span>
+        <strong>Location could not be found.</strong>
+        <span>Add a city or full address and check again.</span>
       </div>
     );
   }

@@ -13,7 +13,12 @@ import type {
   NearbyRecommendApplicationDefinitions,
   NearbyRecommendResult,
 } from '../decision/agent-nearby-operation.ts';
-import { failure, success, type Result } from '../result.ts';
+import {
+  failure,
+  success,
+  type ApplicationErrorKind,
+  type Result,
+} from '../result.ts';
 import { presentNearbyWechatResult } from './nearby-wechat-presenter.ts';
 import {
   presentWechatCatalogIntake,
@@ -247,7 +252,15 @@ export interface ProjectCommandReply {
     | CatalogIntakeCancelOutput;
 }
 
-export type ProjectCommandResult = Result<ProjectCommandReply>;
+export interface ProjectCommandError {
+  readonly kind: ApplicationErrorKind | 'expired';
+  readonly message: string;
+  readonly retryable?: boolean;
+}
+
+export type ProjectCommandResult =
+  | { readonly ok: true; readonly value: ProjectCommandReply }
+  | { readonly ok: false; readonly error: ProjectCommandError };
 
 type ParsedProjectCommand =
   | { readonly kind: 'nearby'; readonly locationHint: string }
@@ -417,16 +430,23 @@ async function dispatchCatalogIntakeCommand(
 function catalogIntakeFailure(error: {
   readonly kind: string;
   readonly code?: string;
+  readonly retryable?: boolean;
 }): ProjectCommandResult {
   const kind = catalogIntakeFailureCode(error);
   const presentation: WechatCatalogIntakePresentation =
     kind === 'expired'
       ? { state: 'expired' }
       : { state: 'operation_failure', kind };
-  return failure(
-    mapFailureKind(kind),
-    presentWechatCatalogIntake(presentation),
-  );
+  return {
+    ok: false,
+    error: {
+      kind: mapFailureKind(kind),
+      message: presentWechatCatalogIntake(presentation),
+      ...(typeof error.retryable === 'boolean'
+        ? { retryable: error.retryable }
+        : {}),
+    },
+  };
 }
 
 function catalogIntakeFailureCode(error: {
@@ -456,6 +476,7 @@ function mapFailureKind(
   | 'invalid_input'
   | 'not_found'
   | 'conflict'
+  | 'expired'
   | 'dependency_failure'
   | 'unexpected_failure' {
   if (kind === 'dependency_failure' || kind === 'rate_limited') {
@@ -465,7 +486,7 @@ function mapFailureKind(
   if (kind === 'invalid_input' || kind === 'not_found' || kind === 'conflict') {
     return kind;
   }
-  if (kind === 'expired') return 'conflict';
+  if (kind === 'expired') return 'expired';
   return 'unexpected_failure';
 }
 

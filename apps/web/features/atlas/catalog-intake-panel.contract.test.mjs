@@ -59,6 +59,22 @@ test('Owner Add confirm exposes loading and retries the same confirm operation',
   assert.match(panel, /disabled=\{busy\}/u);
 });
 
+test('research progress explains the longer wait, stops its timer, and supports reduced motion', async () => {
+  const panel = await readFile(
+    new URL('./catalog-intake-panel.tsx', import.meta.url),
+    'utf8',
+  );
+  const css = await readFile(
+    new URL('./catalog-intake-panel.css', import.meta.url),
+    'utf8',
+  );
+  assert.match(panel, /Agent is gathering info/);
+  assert.match(panel, /<output className="catalog-intake-research-progress"/);
+  assert.match(panel, /clearInterval\(timer\)/);
+  assert.match(panel, /Retry restaurant lookup/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+});
+
 test('Google candidate attribution keeps the official text treatment legible and unbroken', async () => {
   const [panel, styles] = await Promise.all([
     readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),

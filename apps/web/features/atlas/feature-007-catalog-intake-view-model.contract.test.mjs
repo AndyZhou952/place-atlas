@@ -8,11 +8,41 @@ import {
   reduceCatalogIntakeUi,
 } from './catalog-intake-ui-state.ts';
 
+test('ambiguous candidates require a choice; area refinement invalidates stale results but retains name', () => {
+  let state = {
+    ...catalogIntakeInitialState(),
+    query: '鳥貴族',
+    requestToken: 'old',
+  };
+  state = reduceCatalogIntakeUi(state, {
+    type: 'discover_succeeded',
+    output: discoverOutput([candidate(), { ...candidate(), ordinal: 2 }]),
+  });
+  assert.equal(state.selectedOrdinal, undefined);
+  state = reduceCatalogIntakeUi(state, {
+    type: 'candidate_selected',
+    ordinal: 2,
+  });
+  assert.equal(state.selectedOrdinal, 2);
+  state = reduceCatalogIntakeUi(state, {
+    type: 'field_changed',
+    field: 'searchArea',
+    value: '新宿西口',
+  });
+  assert.equal(state.query, '鳥貴族');
+  assert.equal(state.searchArea, '新宿西口');
+  assert.equal(state.stage, 'idle');
+  assert.equal(state.requestToken, undefined);
+  assert.equal(state.preview, undefined);
+  assert.equal(state.selectedOrdinal, undefined);
+  assert.deepEqual(state.candidates, []);
+});
+
 test('Feature 007 ViewModel announces each Add outcome and names pending work', () => {
   assert.equal(catalogIntakePendingMessage('discover'), 'Finding matches…');
   assert.equal(
     catalogIntakePendingMessage('select'),
-    'Building the review preview…',
+    'Agent is gathering restaurant information…',
   );
   assert.equal(
     catalogIntakePendingMessage('confirm'),
@@ -37,7 +67,7 @@ test('Feature 007 ViewModel announces each Add outcome and names pending work', 
   assert.equal(candidates.previousStage, 'candidates');
   assert.equal(
     catalogIntakeLiveMessage(candidates),
-    'Building the review preview…',
+    'Agent is gathering restaurant information…',
   );
 
   const clarification = reduceCatalogIntakeUi(candidates, {
@@ -63,7 +93,14 @@ test('Feature 007 ViewModel announces each Add outcome and names pending work', 
     type: 'select_succeeded',
     output: previewOutput(),
   });
-  assert.match(catalogIntakeLiveMessage(preview), /Preview ready/u);
+  assert.match(catalogIntakeLiveMessage(preview), /Research incomplete/u);
+  assert.match(
+    catalogIntakeLiveMessage({
+      ...preview,
+      preview: { ...preview.preview, locationEvidence: { status: 'known' } },
+    }),
+    /Preview ready/u,
+  );
 
   const dependencyError = reduceCatalogIntakeUi(preview, {
     type: 'confirm_succeeded',

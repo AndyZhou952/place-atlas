@@ -1,5 +1,7 @@
 # Place-enrichment benchmark v2 (Complete Add)
 
+Production incident regressions are also tracked in `selected-place-regressions.v1.json`, consumed by `agent/place-research.test.mjs`. The six Keita controls test selected-name search anchoring and branch isolation through the production research function with mock tools/model. They are not live name-resolution or full-profile success measurements. See `docs/add-keita-regression.md` at the repository root for the failure analysis and separate live preview result.
+
 This package evaluates the complete Add profile after one concrete restaurant branch has already been resolved. It asks whether an enrichment worker can turn captured evidence into a source-backed restaurant profile without inventing missing facts.
 
 This is a benchmark contract only. It does not mean the production application currently supports every field or provider represented here.

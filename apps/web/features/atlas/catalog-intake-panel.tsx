@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { CheckCircle2, CircleAlert, Plus, Search } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleAlert,
+  LoaderCircle,
+  Plus,
+  Search,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,8 +101,22 @@ export function CatalogIntakePanel({
           </Button>
         </div>
         <small id="catalog-intake-query-help">
-          Try a neighborhood or full copied address when the name is ambiguous.
+          For chains or similar names, add an area below and search again. Keep
+          the restaurant name; a full address is not required.
         </small>
+        <label htmlFor="catalog-intake-search-area">
+          Area, station or branch (optional)
+        </label>
+        <Input
+          id="catalog-intake-search-area"
+          value={state.searchArea}
+          onChange={(event) =>
+            intake.setField('searchArea', event.target.value)
+          }
+          placeholder="e.g. Shinjuku, Ikebukuro west exit"
+          disabled={busy}
+          aria-describedby="catalog-intake-query-help"
+        />
         {queryInvalid ? (
           <small
             id="catalog-intake-query-error"
@@ -114,6 +134,25 @@ export function CatalogIntakePanel({
       >
         <p>{catalogIntakeLiveMessage(state)}</p>
       </div>
+
+      {busy && state.lastOperation === 'select' ? <ResearchProgress /> : null}
+
+      {state.stage === 'preview' &&
+      state.preview?.locationEvidence.status === 'unknown' ? (
+        <div className="catalog-intake-state is-attention" role="alert">
+          <p>
+            The research did not produce a verified address and coordinates. You
+            do not need to fill these in yourself; retry the lookup.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void intake.startFresh()}
+          >
+            Retry restaurant lookup
+          </Button>
+        </div>
+      ) : null}
 
       {state.stage !== 'idle' && state.stage !== 'loading' ? (
         <h4
@@ -585,6 +624,39 @@ function stageTitle(stage: IntakeController['state']['stage']): string {
     success: 'Place saved',
   } as const;
   return titles[stage];
+}
+
+function ResearchProgress() {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <output className="catalog-intake-research-progress" aria-live="polite">
+      <LoaderCircle
+        aria-hidden="true"
+        className="catalog-intake-research-spinner"
+      />
+      <span>
+        <strong>Agent is gathering info…</strong>
+        <span className="catalog-intake-research-explanation">
+          Checking the selected restaurant’s address, rating, specialties and
+          reservation sources. This takes longer than finding a name.
+        </span>
+        <small aria-live="off">
+          {elapsedSeconds}s elapsed ·{' '}
+          {elapsedSeconds >= 20
+            ? 'Still researching — please keep this page open.'
+            : 'Nothing is saved until you confirm.'}
+        </small>
+      </span>
+    </output>
+  );
 }
 
 function formatTimestamp(value: string): string {

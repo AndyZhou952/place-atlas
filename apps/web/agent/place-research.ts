@@ -137,6 +137,36 @@ export function createPlaceResearchAgent(
             });
           }
         }
+        // Anchor discovery in the provider's selected name before the model can
+        // mistranslate a neighborhood or spend both searches on irrelevant pages.
+        // This consumes the same two-search budget, never an extra hidden retry.
+        if (!selectedListing && config.readSourcePages !== false) {
+          searches++;
+          const query = `${input.selectedSubject.transientName.slice(0, 450)} site:tabelog.com`;
+          const result = await searchProvider.search(query, signal);
+          if (result.kind === 'results') {
+            successfulSearches++;
+            const listing = result.sources.find((source) =>
+              isTabelogRestaurantListing(source.url),
+            );
+            if (listing) {
+              readUrls.add(listing.url);
+              const page = await readListing(listing.url);
+              if (page) result.sources.unshift(page);
+            }
+            evidence.push(...result.sources);
+          }
+          messages.push({
+            role: 'user',
+            content: JSON.stringify({
+              applicationSearch: query,
+              sources: result.kind === 'results' ? result.sources : result,
+              remainingSearchCalls: 1,
+              instruction:
+                'Use these source facts only if their branch matches the selected address. One search remains for missing details or a corrected branch. Do not invent translations of the selected name or address.',
+            }),
+          });
+        }
         for (let step = 0; step < 3; step++) {
           const response = await fetcher(endpoint, {
             method: 'POST',
@@ -161,7 +191,7 @@ export function createPlaceResearchAgent(
                         type: 'function',
                         function: {
                           name: 'search_web',
-                          description: restaurantSearchDescription,
+                          description: `${restaurantSearchDescription} Remaining calls in this run: ${2 - searches}.`,
                           parameters: {
                             type: 'object',
                             properties: { query: { type: 'string' } },

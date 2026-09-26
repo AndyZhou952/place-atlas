@@ -81,7 +81,13 @@ test('Feature 007 dedicated CSS protects focus, touch size, and 390px overflow',
     /\.catalog-intake-candidates > div[\s\S]*grid-template-columns: minmax\(0, 1fr\)/u,
   );
   assert.match(styles, /overflow-wrap: anywhere/u);
-  assert.doesNotMatch(styles, /gradient|animation|transition/u);
+  assert.doesNotMatch(styles, /gradient|transition/u);
+  assert.match(styles, /prefers-reduced-motion: reduce/u);
+  assert.equal(
+    (styles.match(/@keyframes/gu) ?? []).length,
+    1,
+    'only the research spinner animates',
+  );
   assert.doesNotMatch(styles, /#[0-9a-f]{3,8}|(?:rgb|hsl|oklch)\(/iu);
 });
 

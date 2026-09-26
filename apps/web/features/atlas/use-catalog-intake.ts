@@ -29,8 +29,11 @@ export function useCatalogIntake(
 
   const performDiscover = useCallback(
     async (requestToken: string) => {
-      const query = state.query.normalize('NFC').trim();
-      if (!query) {
+      const name = state.query.normalize('NFC').trim();
+      const query = [name, state.searchArea.normalize('NFC').trim()]
+        .filter(Boolean)
+        .join(' ');
+      if (!name) {
         dispatch({
           type: 'request_failed',
           error: {
@@ -52,7 +55,7 @@ export function useCatalogIntake(
         dispatch({ type: 'request_failed', error: toUiError(error) });
       }
     },
-    [state.query],
+    [state.query, state.searchArea],
   );
 
   const discover = useCallback(
@@ -153,8 +156,10 @@ export function useCatalogIntake(
     retry,
     startFresh,
     restart: () => dispatch({ type: 'restart' }),
-    setField: (field: 'query' | 'title' | 'area' | 'address', value: string) =>
-      dispatch({ type: 'field_changed', field, value }),
+    setField: (
+      field: 'query' | 'searchArea' | 'title' | 'area' | 'address',
+      value: string,
+    ) => dispatch({ type: 'field_changed', field, value }),
     selectCandidate: (ordinal: number) =>
       dispatch({ type: 'candidate_selected', ordinal }),
   };

@@ -8,6 +8,10 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 
 ## 1. Add — research a restaurant, confirm, and see it on the map
 
+- [x] **Keita failure regression:** selected-name source discovery, six controlled post-selection cases, research progress and truthful incomplete status. Deployed preview verified location, category, rating and reservation; cancelled without saving. See [incident and boundaries](add-keita-regression.md).
+- [x] **Frontend ambiguity refinement:** mobile browser tests passed for Torikizoku + Shinjuku west exit, AFURI + Roppongi (two branches), and Tokyo Mentsudan + Shinjuku. Name retained, new query/session token used, stale results cleared, multi-match choice required. Six search sessions cancelled without restaurant writes; this is discovery/selection acceptance, not six full Add completions.
+- [ ] **Full profile and broad acceptance:** richer grounded overview/dishes and repeated live reliability. Basic preview success does not close these gates.
+
 **Current production status (2026-09-26):** the Tokyo Mentsudan live Add journey passed: Cloudflare + DeepSeek research, confirmed publication, duplicate-safe replay, and refreshed browser list/detail/map display with Tabelog 3.54 and its sourced profile. Source access, candidate promotion and catalog validation fixes are deployed. This is one real journey, not full restaurant coverage; broader live resolution/coverage benchmarks and reader quota reliability remain open.
 
 - [x] **Core flow in code:** discover → branch selection/clarification → preview → version-bound confirmation; shared publication and duplicate-prevention tests.

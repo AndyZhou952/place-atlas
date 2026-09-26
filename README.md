@@ -150,7 +150,7 @@ Start here only after completing configuration and deployment above. Visitors ca
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
-2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. If multiple branches fit, choose the intended branch.
+2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. For a chain or an ambiguous name, keep the name and fill **Area, station or branch (optional)**, then select **Find matches** again. Choose the intended candidate; multiple matches are never preselected. Research shows a waiting indicator while checking sources. Incomplete research is not a saved restaurant: retry rather than inventing missing facts.
 3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
 4. Use the heart to mark a favorite and the visited control to mark a visit. Edit and Journal provide personal ratings, notes, visits, and photos. Personal scores are separate from external ratings.
 5. Enter a neighborhood or address in Nearby to search your saved places. Straight-line distance is not a verified walking time.

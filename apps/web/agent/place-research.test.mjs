@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   createPlaceResearchAgent,
   createConfiguredPlaceResearchAgent,
@@ -359,10 +360,12 @@ test('discovered main listing supplies aggregate evidence missing from search sn
         return Response.json({
           choices: [{ message: { tool_calls: [tool] } }],
         });
-      const replies = JSON.parse(init.body).messages.filter(
-        (m) => m.role === 'tool',
+      const replies = JSON.parse(init.body).messages;
+      assert.ok(
+        replies.some((m) =>
+          /aggregate restaurant rating: 3.97/u.test(m.content ?? ''),
+        ),
       );
-      assert.match(replies[0].content, /aggregate restaurant rating: 3.97/u);
       return Response.json({
         choices: [{ message: { content: JSON.stringify(observed) } }],
       });
@@ -377,6 +380,101 @@ test('discovered main listing supplies aggregate evidence missing from search sn
   });
   assert.deepEqual(result.value.profile.categories.value, ['ハンバーガー']);
   assert.equal(reads, 1);
+});
+
+test('selected-name lookup precedes the model and keeps relocated branches separate', async () => {
+  const dataset = JSON.parse(
+    readFileSync(
+      new URL(
+        '../evals/place-enrichment/selected-place-regressions.v1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const listingUrl = dataset.independentSourceCapture.sourceUrl;
+  for (const entry of dataset.cases) {
+    const wrongBranch = !entry.expectedKnown;
+    const calls = [];
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async (target) => {
+        calls.push('listing');
+        assert.equal(target, listingUrl);
+        return {
+          kind: 'read',
+          evidence: {
+            url: listingUrl,
+            title: 'TONKATSU KEITA',
+            content: 'Synthetic test evidence, not a live rating.',
+            restaurant: {
+              name: 'TONKATSU KEITA',
+              address: entry.sourceAddress,
+              area: '杉並区松庵',
+              score: 3.7,
+              categories: ['とんかつ'],
+              coordinates: { latitude: 35.7, longitude: 139.59 },
+              reservation: '完全予約制',
+            },
+          },
+        };
+      },
+      fetch: async (endpoint, init) => {
+        if (endpoint === 'https://api.tavily.com/search') {
+          calls.push('search');
+          assert.equal(
+            JSON.parse(init.body).query,
+            'TONKATSU KEITA site:tabelog.com',
+          );
+          return Response.json({
+            results: [{ url: listingUrl, content: 'Restaurant listing' }],
+          });
+        }
+        calls.push('model');
+        assert.equal(
+          JSON.parse(JSON.parse(init.body).messages[2].content)
+            .remainingSearchCalls,
+          1,
+        );
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  subjectMatch: 'matched',
+                  tabelog: { status: 'unknown' },
+                  reservation: { status: 'unknown' },
+                  evidence: {},
+                }),
+              },
+            },
+          ],
+        });
+      },
+    });
+    const result = await agent.research({
+      ...input,
+      selectedSubject: {
+        ...dataset.selectedSubject,
+        ownerQuery: entry.ownerQuery,
+      },
+    });
+    assert.deepEqual(calls, ['search', 'listing', 'model']);
+    assert.equal(result.kind, 'observed');
+    assert.equal(
+      result.value.tabelog.status,
+      wrongBranch ? 'unknown' : 'known',
+      entry.caseId,
+    );
+    if (!wrongBranch) {
+      assert.equal(
+        result.value.profile.address.value,
+        '東京都杉並区松庵3-41-1 西荻高架下',
+      );
+      assert.equal(result.value.reservation.mode, 'reservation_required');
+    }
+  }
 });
 
 test('failed search can recover within budget but all-failed searches cannot accept a model claim', async () => {

@@ -97,6 +97,19 @@ test('structured listing exposes aggregate and branch identity, never reviews', 
   );
 });
 
+test('restaurant introduction supports the current pr-comment markup without reading reviews', () => {
+  const result = parseTabelogListing(
+    html(restaurant) +
+      '<p class="pr-comment"><span class="pr-comment__first">六白黒豚のとんかつ、ヒレカツ。</span><button>続きを読む</button></p><div class="review">Unsupported review dish</div>',
+    url,
+  );
+  assert.equal(
+    result.restaurant.introduction,
+    '六白黒豚のとんかつ、ヒレカツ。',
+  );
+  assert.doesNotMatch(result.content, /Unsupported review dish/);
+});
+
 test('listing exposes sourced location, cuisine, official link and explicit reservation refusal', () => {
   const result = parseTabelogListing(
     html({

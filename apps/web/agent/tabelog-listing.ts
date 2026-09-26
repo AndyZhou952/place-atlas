@@ -146,8 +146,15 @@ export function parseTabelogListing(
       'iu',
     ).exec(html)?.[1];
   const reservation = clean(row('予約可否') ?? '').slice(0, 1000);
-  const introduction = clean(row('お店のPR') ?? '')
+  const introduction = clean(
+    row('お店のPR') ??
+      /<p\b[^>]*class=["'][^"']*\bpr-comment\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/iu.exec(
+        html,
+      )?.[1] ??
+      '',
+  )
     .replace(/続きを読む/gu, '')
+    .trim()
     .slice(0, 1200);
   const officialRow = row('ホームページ');
   const website =

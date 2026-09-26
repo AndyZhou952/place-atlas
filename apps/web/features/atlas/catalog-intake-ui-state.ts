@@ -31,6 +31,7 @@ export interface CatalogIntakeUiState {
   readonly previousStage?: CatalogIntakeUiStage;
   readonly lastOperation?: 'discover' | 'select' | 'confirm' | 'cancel';
   readonly query: string;
+  readonly searchArea: string;
   readonly title: string;
   readonly area: string;
   readonly address: string;
@@ -58,7 +59,7 @@ export interface CatalogIntakeUiState {
 export type CatalogIntakeUiAction =
   | {
       readonly type: 'field_changed';
-      readonly field: 'query' | 'title' | 'area' | 'address';
+      readonly field: 'query' | 'searchArea' | 'title' | 'area' | 'address';
       readonly value: string;
     }
   | { readonly type: 'candidate_selected'; readonly ordinal: number }
@@ -87,7 +88,7 @@ export function catalogIntakePendingMessage(
 ): string {
   const messages = {
     discover: 'Finding matches…',
-    select: 'Building the review preview…',
+    select: 'Agent is gathering restaurant information…',
     confirm: 'Confirming and saving…',
     cancel: 'Cancelling this Add session…',
   } as const;
@@ -116,6 +117,9 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
         'Clarification is required before the preview can be built.'
       );
     case 'preview':
+      if (state.preview?.locationEvidence.status === 'unknown') {
+        return 'Research incomplete. We could not verify this restaurant’s location. Nothing has been saved.';
+      }
       return 'Preview ready. Review the place facts before saving.';
     case 'expired':
       return state.error?.message ?? 'The preview expired.';
@@ -136,6 +140,7 @@ export function catalogIntakeInitialState(): CatalogIntakeUiState {
   return {
     stage: 'idle',
     query: '',
+    searchArea: '',
     title: '',
     area: '',
     address: '',
@@ -154,8 +159,18 @@ export function reduceCatalogIntakeUi(
       return {
         ...state,
         [action.field]: action.value,
-        ...(action.field === 'query' && action.value !== state.query
-          ? { requestToken: undefined }
+        ...((action.field === 'query' || action.field === 'searchArea') &&
+        action.value !== state[action.field]
+          ? {
+              requestToken: undefined,
+              stage: 'idle' as const,
+              preview: undefined,
+              candidates: [],
+              selectedOrdinal: undefined,
+              title: '',
+              area: '',
+              address: '',
+            }
           : {}),
       };
     case 'candidate_selected':
@@ -192,7 +207,8 @@ export function reduceCatalogIntakeUi(
         sessionVersion: action.output.sessionVersion,
         candidates,
         hasMore: action.output.hasMore,
-        selectedOrdinal: candidates[0]?.ordinal,
+        selectedOrdinal:
+          candidates.length === 1 ? candidates[0]?.ordinal : undefined,
         clarification: undefined,
         preview: undefined,
         error: undefined,

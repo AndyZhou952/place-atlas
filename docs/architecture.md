@@ -6,7 +6,7 @@ The browser calls authenticated application APIs. The application owns restauran
 
 1. Accept a short restaurant hint and optional neighborhood.
 2. Search for real identities and resolve the branch. Ask a focused question when multiple branches remain plausible.
-3. Collect search evidence and deterministic location evidence. Let the model extract structured facts from those sources. The current search adapter reads search-result excerpts, not full source pages.
+3. Collect search evidence and deterministic location evidence. Let the model extract structured facts from those sources. Search excerpts may be augmented with structured branch identity and aggregate rating from a discovered Tabelog main listing.
 4. Validate the proposal and display a concise preview. Missing optional facts remain unknown; research failure does not erase the session.
 5. On confirmation, persist through the application write service. Return the saved item ID and refresh the map/list.
 
@@ -40,7 +40,7 @@ The runtime loads `apps/web/agent/research-instructions.ts`, a versioned prompt 
 
 The application resolves identity and owns confirmation/persistence. The model plans targeted searches, interprets source evidence, and proposes structured facts. Tabelog's exact restaurant listing supplies the aggregate rating; individual reviews and ranking pages are not rating sources. Branch-specific official sites or their linked booking pages are preferred for reservation rules, with Tabelog as fallback. Booking availability, queues, and required lead times are separate facts, not deductions from popularity or a booking button.
 
-Only `search_web` is currently exposed to the research model. Its description specifies when to use it, query examples, result shape, budget, and the limitation that results are snippets. A source-reading tool is planned but not implemented; the prompt must not pretend the model has browsed full pages. The model cannot confirm or write a restaurant. Existing authenticated application APIs perform writes only after owner confirmation.
+Only `search_web` is currently exposed to the research model. Its description specifies query examples, result shape and budget. The application can augment each search with one discovered Tabelog main listing: fixed HTTPS host/path, no redirects, five-second read timeout within the shared deadline, one MiB body cap, and only the matching Restaurant JSON-LD aggregate rating and address. Individual reviews are discarded. A general official-site reading tool is not implemented; the model does not receive full pages. Search failures are returned as tool outcomes so other supported facts survive; all searches failing remains unavailable. The model cannot confirm or write a restaurant. Existing authenticated application APIs perform writes only after owner confirmation.
 
 Source priority is currently a prompt instruction, not a deterministic proof of official-domain ownership. Code separately checks quoted evidence, branch anchors, score tokens, main-listing URLs, and the output schema. Live evaluation must establish the quality of the combined system. Track incomplete implementation and validation in `docs/status.md`.
 

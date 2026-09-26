@@ -20,7 +20,7 @@
     "format:check": "oxfmt --check adapters agent app components db features lib evals product route-sidecar scripts",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test",
-    "test:evals": "node --experimental-strip-types --test evals/place-resolution/score-place-resolution.test.mjs evals/place-enrichment/score-place-enrichment.test.mjs evals/nearby/score-nearby.test.mjs",
+    "test:evals": "node --experimental-strip-types --test evals/place-resolution/score-place-resolution.test.mjs evals/place-enrichment/score-place-enrichment.test.mjs evals/place-enrichment/score-rating-completion.test.mjs evals/nearby/score-nearby.test.mjs",
     "eval:place-resolution": "node evals/place-resolution/score-place-resolution.mjs evals/place-resolution/place-resolution-gold.v1.json evals/place-resolution/place-resolution-predictions.example.v1.json",
     "eval:place-enrichment": "node evals/place-enrichment/score-place-enrichment.mjs evals/place-enrichment/place-enrichment-gold.v1.json evals/place-enrichment/place-enrichment-predictions.example.v1.json",
     "migration:check": "node --experimental-strip-types scripts/migration-packaging.ts --candidate-site-version 17",

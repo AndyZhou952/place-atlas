@@ -70,7 +70,7 @@ Add these model settings to the local Wrangler configuration's `vars`:
 
 This is an example endpoint/model pair. Replace both with your provider's documented values. The model must support chat completions with function/tool calls. Enter the API base URL, not a consumer chat website URL. Set all three model settings (`AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL`) together: incomplete configuration returns research unavailable. Test your chosen combination before relying on automatic enrichment.
 
-Search works without a separate key by requesting DuckDuckGo's HTML results. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or turn a failed search into invented facts. Search results supply snippets; this is not a full-page browsing service.
+Search works without a separate key by requesting DuckDuckGo's HTML results. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or turn a failed search into invented facts. Search results supply snippets. For the first discovered Tabelog restaurant listing in each search, the backend also tries a bounded page read and extracts only structured branch identity and aggregate rating, never individual review scores. This is not a general full-page browsing service; official-site reservation reading remains incomplete. A failed source does not discard facts supported by another successful source.
 
 To use Tavily instead, optionally set its key:
 

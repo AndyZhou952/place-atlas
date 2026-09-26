@@ -6,6 +6,8 @@ Add succeeds when the correct restaurant becomes visible after confirmation. A p
 
 `apps/web/evals/place-enrichment` tests categories, dishes, ratings, reservations, and provenance. Some fields describe target behavior rather than current production support. Missing, stale, conflicting, wrong-branch, or unavailable evidence must not become invented facts.
 
+Its lightweight `rating-completion-benchmark.v1.json` narrows rating acceptance to eight cases, with a separate scorer and explicit live-capture versus synthetic-control metadata. Three listing observations have been checked directly; real model predictions remain pending. The runtime must not receive gold values or curation notes. Recheck current scores before each later live run.
+
 From `apps/web`, run `npm run test:evals`, `npm run eval:place-resolution`, and `npm run eval:place-enrichment`. Example prediction files test the scorers, not live model quality. Generate separate predictions through the actual pipeline for live evaluation; record model configuration, latency, source failures, and available cost information without committing secrets.
 
 Unsafe branch selection and unsupported claims must remain zero. Dataset READMEs define other numerical gates. Integration checks additionally prove idempotent confirmation, visibility after refresh, independent rating persistence, and retry without repeating supplied details.
@@ -19,6 +21,8 @@ The current research Agent accepts an already selected restaurant. Its output ca
 ## Latest limited live observation
 
 On 2026-09-26, development-host DeepSeek (`deepseek-chat`) completed two DuckDuckGo searches for Aldebaran in about 4 seconds. Both Tabelog and reservation fields remained unknown. The tool loop and no-key transport worked; enrichment did not pass, no database write occurred, and Cloudflare was not tested. This predates the source-aware prompt revision. The redundant one-off JSON trace was removed; this summary preserves its conclusion without treating it as a benchmark result.
+
+At 00:50 UTC on the same date, the bounded direct Tabelog listing reader retrieved branch identity and aggregate scores for Yotsuya Takeda (3.71), Kabuto (4.42), and Tokyo Mentsudan (3.54) in approximately 0.7–1.1 seconds per page from the development host. Cached browser research showed 3.55 for Mentsudan, illustrating why live evaluation must use a freshly adjudicated capture rather than a permanent expected score. These checks bypassed search/model calls, performed no writes, and do not establish full Add quality or Cloudflare availability. The current process has no configured model credentials; a fresh DeepSeek benchmark run remains pending.
 
 ## Nearby evaluation
 

@@ -10,9 +10,11 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 
 - [x] **Core flow in code:** discover → branch selection/clarification → preview → version-bound confirmation; shared publication and duplicate-prevention tests.
 - [x] **Repository-owned research foundation:** configurable OpenAI-compatible model, no-key search, bounded tool calls, evidence validation; model has no direct database-write permission.
+- [x] **Targeted rating source reader:** discovered Tabelog main-listing JSON-LD supplies branch identity and aggregate score; review scores are excluded. Three direct development-host page checks returned scores; this is not a DeepSeek or Cloudflare acceptance result.
 - [x] **Structured API discovery:** expose discover/select/confirm/cancel with required inputs and owner-session requirements.
 - [ ] **Resolve rough hints reliably:** run the actual resolution pipeline against `place-resolution-gold.v1.json`; include short names, romanization, ambiguous chains and no-match cases. The selected-place enrichment smoke is not this benchmark.
 - [x] **Enrichment benchmark foundation:** captured-evidence dataset and scorers, source-safety regressions, and a lightweight live rating protocol; always-unknown output cannot pass completion quality.
+- [x] **Rating acceptance set:** eight cases (three directly checked restaurant listings, one controlled review-score distractor and four synthetic safety controls), executable scorer and regression tests. No real model success rate has been claimed.
 - [ ] **Live rating benchmark:** independently verify a small set of current aggregate scores and report completion, exact branch/score accuracy, provenance, unavailable sources and latency. Frozen old scores are not live truth.
 - [ ] **Complete source research:** read useful restaurant sources beyond snippets; preserve the selected branch and explain source failures without asking for already supplied details.
 - [ ] **Complete the data path:** research → structured preview → validation → D1 → list/detail card for all fields below.

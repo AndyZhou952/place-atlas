@@ -3,6 +3,7 @@ import {
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
+import { readTabelogListing } from './tabelog-listing.ts';
 import {
   restaurantResearchPrompt,
   restaurantSearchDescription,
@@ -15,6 +16,7 @@ export interface AgentConfiguration {
   model: string;
   searchApiKey?: string;
   fetch?: typeof fetch;
+  readSourcePages?: boolean;
 }
 
 type Evidence = SearchEvidence;
@@ -87,6 +89,8 @@ export function createPlaceResearchAgent(
         { role: 'user', content: JSON.stringify(input.selectedSubject) },
       ];
       let searches = 0;
+      let successfulSearches = 0;
+      const readUrls = new Set<string>();
       const usedCallIds = new Set<string>();
       try {
         for (let step = 0; step < 3; step++) {
@@ -161,17 +165,35 @@ export function createPlaceResearchAgent(
               usedCallIds.add(call.id);
               searches++;
               const result = await searchProvider.search(call.query, signal);
-              if (result.kind !== 'results') return { kind: 'unavailable' };
-              evidence.push(...result.sources);
+              if (result.kind === 'results') {
+                successfulSearches++;
+                const listing = result.sources.find(
+                  (source) =>
+                    isTabelogRestaurantListing(source.url) &&
+                    !readUrls.has(source.url),
+                );
+                if (listing && config.readSourcePages !== false) {
+                  readUrls.add(listing.url);
+                  const page = await readTabelogListing(
+                    listing.url,
+                    fetcher,
+                    signal,
+                  );
+                  if (page) result.sources.unshift(page);
+                }
+                evidence.push(...result.sources);
+              }
               messages.push({
                 role: 'tool',
                 tool_call_id: call.id,
-                content: JSON.stringify(result.sources),
+                content: JSON.stringify(
+                  result.kind === 'results' ? result.sources : result,
+                ),
               });
             }
             continue;
           }
-          if (typeof message.content !== 'string' || searches === 0)
+          if (typeof message.content !== 'string' || successfulSearches === 0)
             return { kind: 'unavailable' };
           const proposal = JSON.parse(message.content);
           const unknown = { status: 'unknown' as const };
@@ -261,10 +283,13 @@ function matchesSelectedBranch(
   const text = normalize(quote);
   const selectedName = normalize(name);
   const selectedAddress = normalize(address);
-  const aliases = [selectedName, ...ownerQuery.split(/\s+/u).map(normalize)];
-  const nameMatches = aliases.some(
-    (alias) => alias.length >= 4 && text.includes(alias),
-  );
+  const aliases = ownerQuery.split(/\s+/u).map(normalize);
+  const nameMatches =
+    (selectedName.length >= 2 && text.includes(selectedName)) ||
+    aliases.some(
+      (alias) =>
+        alias.length >= 4 && !/\d/u.test(alias) && text.includes(alias),
+    );
   if (!nameMatches) return false;
   if (selectedAddress.length >= 8 && text.includes(selectedAddress))
     return true;

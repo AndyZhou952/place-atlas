@@ -26,6 +26,7 @@ const config = {
   baseUrl: 'https://model.example/v1',
   model: 'test-model',
   searchApiKey: 'search-test',
+  readSourcePages: false,
 };
 const content = 'アルデバラン 東京都港区麻布十番 食べログ 3.97 予約可';
 const proposal = {
@@ -231,6 +232,130 @@ test('invalid multi-call batches do not execute a partial search', async () => {
   }
 });
 
+test('one failed search preserves independently supported facts in either batch order', async () => {
+  for (const failedSearch of [1, 2]) {
+    let searches = 0;
+    let turns = 0;
+    const agent = createPlaceResearchAgent({
+      ...config,
+      fetch: async (endpoint, init) => {
+        if (endpoint === 'https://api.tavily.com/search') {
+          if (++searches === failedSearch)
+            return new Response('', { status: 503 });
+          return Response.json({ results: [{ url, content }] });
+        }
+        if (turns++ === 0)
+          return Response.json({
+            choices: [
+              { message: { tool_calls: [tool, { ...tool, id: 'search2' }] } },
+            ],
+          });
+        const replies = JSON.parse(init.body).messages.filter(
+          (m) => m.role === 'tool',
+        );
+        assert.equal(replies.length, 2);
+        assert.equal(
+          JSON.parse(replies[failedSearch - 1].content).kind,
+          'unavailable',
+        );
+        return Response.json({
+          choices: [{ message: { content: JSON.stringify(proposal) } }],
+        });
+      },
+    });
+    const result = await agent.research(input);
+    assert.equal(result.kind, 'observed');
+    assert.equal(result.value.tabelog.score, 3.97);
+    assert.equal(result.value.reservation.status, 'unknown');
+    assert.equal(searches, 2);
+  }
+});
+
+test('discovered main listing supplies aggregate evidence missing from search snippets', async () => {
+  let turns = 0;
+  let reads = 0;
+  const observed = structuredClone(proposal);
+  observed.evidence.tabelog.quote = 'Tabelog aggregate restaurant rating: 3.97';
+  const agent = createPlaceResearchAgent({
+    ...config,
+    readSourcePages: true,
+    fetch: async (endpoint, init) => {
+      if (endpoint === 'https://api.tavily.com/search')
+        return Response.json({
+          results: [{ url, content: 'Find this restaurant on Tabelog.' }],
+        });
+      if (endpoint === url) {
+        reads++;
+        return new Response(
+          `<script type="application/ld+json">${JSON.stringify({
+            '@type': 'Restaurant',
+            '@id': url,
+            name: 'アルデバラン',
+            address: {
+              addressRegion: '東京都',
+              addressLocality: '港区',
+              streetAddress: '麻布十番',
+            },
+            aggregateRating: {
+              '@type': 'AggregateRating',
+              ratingValue: '3.97',
+            },
+          })}</script>`,
+          { headers: { 'content-type': 'text/html' } },
+        );
+      }
+      if (turns++ === 0)
+        return Response.json({
+          choices: [{ message: { tool_calls: [tool] } }],
+        });
+      const replies = JSON.parse(init.body).messages.filter(
+        (m) => m.role === 'tool',
+      );
+      assert.match(replies[0].content, /aggregate restaurant rating: 3.97/u);
+      return Response.json({
+        choices: [{ message: { content: JSON.stringify(observed) } }],
+      });
+    },
+  });
+  const result = await agent.research(input);
+  assert.equal(result.value.tabelog.score, 3.97);
+  assert.equal(reads, 1);
+});
+
+test('failed search can recover within budget but all-failed searches cannot accept a model claim', async () => {
+  for (const recover of [true, false]) {
+    let searches = 0;
+    let turns = 0;
+    const agent = createPlaceResearchAgent({
+      ...config,
+      fetch: async (endpoint) => {
+        if (endpoint === 'https://api.tavily.com/search') {
+          searches++;
+          return recover && searches === 2
+            ? Response.json({ results: [{ url, content }] })
+            : new Response('', { status: 503 });
+        }
+        turns++;
+        return Response.json({
+          choices: [
+            {
+              message:
+                turns < 3
+                  ? { tool_calls: [{ ...tool, id: `search${turns}` }] }
+                  : { content: JSON.stringify(proposal) },
+            },
+          ],
+        });
+      },
+    });
+    const result = await agent.research(input);
+    if (recover) assert.equal(result.value.tabelog.score, 3.97);
+    else assert.deepEqual(result, { kind: 'unavailable' });
+    assert.equal(searches, 2);
+    assert.equal(turns, 3);
+  }
+});
+
 test('missing model configuration is explicit unavailable; empty config is disabled', async () => {
   assert.equal(createConfiguredPlaceResearchAgent({}), undefined);
   for (const options of [
@@ -255,6 +380,8 @@ test('three model settings enable keyless search and challenge remains unavailab
       agentModel: config.model,
       fetch: async (endpoint) => {
         endpoints.push(endpoint);
+        if (endpoint.startsWith('https://tabelog.com/'))
+          return new Response('', { status: 403 });
         if (endpoint.startsWith('https://html.duckduckgo.com/html'))
           return blocked
             ? new Response('', { status: 202 })
@@ -323,6 +450,62 @@ test('model self-reported match cannot authorize another branch or numeric subst
   };
   assert.equal(
     (await harness(otherSource).agent.research(input)).value.reservation.status,
+    'unknown',
+  );
+});
+
+test('short selected Japanese names still require matching branch address', async () => {
+  const source = 'かぶと 東京都豊島区池袋2-53-2 食べログ 4.42';
+  const final = {
+    subjectMatch: 'matched',
+    tabelog: { status: 'known', score: 4.42, url },
+    reservation: { status: 'unknown' },
+    evidence: {
+      tabelog: {
+        url,
+        quote: '食べログ 4.42',
+        identityQuote: 'かぶと 東京都豊島区池袋2-53-2',
+      },
+    },
+  };
+  let turn = 0;
+  const agent = createPlaceResearchAgent({
+    ...config,
+    fetch: async (endpoint) => {
+      if (endpoint === 'https://api.tavily.com/search')
+        return Response.json({ results: [{ url, content: source }] });
+      return Response.json({
+        choices: [
+          {
+            message:
+              turn++ % 2 === 0
+                ? { tool_calls: [tool] }
+                : { content: JSON.stringify(final) },
+          },
+        ],
+      });
+    },
+  });
+  const selectedSubject = {
+    ...subject,
+    transientName: 'かぶと',
+    ownerQuery: 'かぶと',
+    transientAddress: 'Tokyo Ikebukuro 2-53-2',
+  };
+  assert.equal(
+    (await agent.research({ ...input, selectedSubject })).value.tabelog.score,
+    4.42,
+  );
+  assert.equal(
+    (
+      await agent.research({
+        ...input,
+        selectedSubject: {
+          ...selectedSubject,
+          transientAddress: 'Tokyo Ikebukuro 2-53-3',
+        },
+      })
+    ).value.tabelog.status,
     'unknown',
   );
 });

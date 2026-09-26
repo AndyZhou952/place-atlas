@@ -33,6 +33,10 @@ try {
   await captureLoading();
   await captureErrorAndRetry();
   await captureSuccess('verified-success', 'committed_verified');
+  await captureSuccess('mobile-long-receipt', 'committed_verified', {
+    width: 320,
+    height: 900,
+  });
   await captureSuccess('needs-review-success', 'committed_needs_review');
   await captureConflictAndReconfirm();
 } finally {
@@ -147,13 +151,14 @@ async function captureErrorAndRetry() {
   }
 }
 
-async function captureSuccess(name, status) {
-  const fixture = await openFixture(
-    { width: 1440, height: 900 },
-    {
-      confirm: [status === 'committed_verified' ? 'verified' : 'needs-review'],
-    },
-  );
+async function captureSuccess(
+  name,
+  status,
+  viewport = { width: 1440, height: 900 },
+) {
+  const fixture = await openFixture(viewport, {
+    confirm: [status === 'committed_verified' ? 'verified' : 'needs-review'],
+  });
   try {
     await buildPreviewWithKeyboard(fixture.page, fixture.panel);
     await fixture.panel
@@ -175,6 +180,11 @@ async function captureSuccess(name, status) {
     report.scenarios[name] = await inspectPanel(fixture.page, fixture.panel, {
       expectedFocus: 'Place saved',
     });
+    await output.getByText('Save details', { exact: true }).click();
+    report.scenarios[`${name}-expanded-receipt`] = await inspectPanel(
+      fixture.page,
+      fixture.panel,
+    );
     await captureCollectionViewport(fixture.page, `t17-${name}.png`, output);
   } finally {
     await fixture.context.close();
@@ -285,7 +295,7 @@ async function openFixture(viewport, scenario) {
           ? 'committed_needs_review'
           : 'committed_verified',
       itemId: `item-${responseKind}`,
-      receiptRef: `receipt-${responseKind}`,
+      receiptRef: `receipt-${responseKind}-${'abcdef0123456789'.repeat(20)}`,
       replayed: false,
     });
   });

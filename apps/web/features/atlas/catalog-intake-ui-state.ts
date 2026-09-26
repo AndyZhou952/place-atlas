@@ -130,7 +130,7 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
         return 'Place saved and available on the verified map and Nearby.';
       }
       if (state.success?.status === 'committed_needs_review') {
-        return 'Place saved to Owner review.';
+        return 'This legacy save is not map-ready. Retry Add.';
       }
       return 'Existing place reused; no duplicate was created.';
   }

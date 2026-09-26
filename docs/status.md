@@ -53,8 +53,12 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 
 ## 2. Record — deterministic personal history, no Agent required
 
+Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-plan.md).
+
 - [x] **Data/API foundation:** personal rating, favorite/visited state, Visit date/note, photo upload and caption-update operations exist.
 - [x] **Journal editing in code:** edit Visit date/rating/note and update photo captions; local state/API tests exist.
+- [x] **Photo viewer editing in code:** thumbnail and opened-photo views expose caption editing. Persistence and failure recovery still need live acceptance.
+- [ ] **Per-photo scores:** not implemented; separate from optional captions and restaurant-level personal rating.
 - [ ] **Unify card and Journal entry points:** the card Edit currently edits basic item fields, not the full Visit form. Both entry points must operate on the same restaurant/Visit records without duplicate writes.
 - [ ] **Photo interaction acceptance:** click/open an uploaded photo, edit its optional description, save, reopen, and verify persistence.
 - [ ] **Rating independence:** changing personal score must preserve Tabelog/Google scores and historical Visit records; verify in the deployed browser.

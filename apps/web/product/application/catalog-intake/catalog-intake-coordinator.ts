@@ -479,6 +479,16 @@ export interface CatalogIntakeCancelInput {
   readonly expectedSessionVersion: number;
 }
 
+function hasPublishableLocation(preview: CatalogIntakePreview): boolean {
+  return Boolean(
+    (preview.ownerFields.title ?? preview.titleProposal?.value) &&
+    (preview.ownerFields.address ?? preview.addressProposal?.value) &&
+    preview.locationEvidence.status === 'known' &&
+    !preview.clarification &&
+    !preview.warnings.some(({ code }) => code === 'source_conflict'),
+  );
+}
+
 export interface CatalogIntakeCancelOutput {
   readonly status: 'cancelled';
   readonly sessionId: string;
@@ -1790,6 +1800,10 @@ export function createCatalogIntakeModule(options: {
           session = markedSession;
         }
         if (options.atlasCatalogIntakePort) {
+          // Incomplete research stays in Add, never a hidden review queue.
+          if (!hasPublishableLocation(session.preview)) {
+            return success({ status: 'failed_no_write', reason: 'validation' });
+          }
           const mutationKey = await deriveAddConfirmMutationKey(
             scope,
             session.preview,

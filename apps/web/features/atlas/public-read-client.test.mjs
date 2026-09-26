@@ -6,85 +6,9 @@ import {
   executePublicJsonRead,
 } from '../../lib/server/public-read/public-read-manifest.ts';
 import {
-  loadOwnerReviewCandidates,
   loadPublicCatalog,
   loadPublicMedia,
 } from './public-read-client.ts';
-import { subscribeOwnerLoginRequired } from './owner-session-client.ts';
-
-void test('Owner Review Candidate reads use a closed unknown-aware browser model', async () => {
-  const result = await loadOwnerReviewCandidates({
-    async request(url) {
-      assert.equal(url, '/api/owner/catalog/review-candidates');
-      return Response.json([
-        {
-          recordType: 'review_candidate',
-          id: 'candidate-1',
-          kind: 'food',
-          title: 'Unresolved cafe',
-          description: 'Owner review required',
-          verificationStatus: 'needs_review',
-          area: { status: 'unknown' },
-          location: { status: 'unknown' },
-          tabelog: { status: 'unknown' },
-          reservation: { status: 'unknown' },
-          unknownFields: ['address', 'coordinates'],
-          warnings: [
-            { code: 'needs_review', message: 'Owner review is required.' },
-          ],
-          personalState: 'candidate',
-          isFavorite: false,
-          hasVisited: false,
-          tags: [],
-          updatedAt: '2026-09-23T12:00:00.000Z',
-        },
-      ]);
-    },
-  });
-
-  assert.deepEqual(result, [
-    {
-      id: 'candidate-1',
-      title: 'Unresolved cafe',
-      description: 'Owner review required',
-      area: { status: 'unknown' },
-      location: { status: 'unknown' },
-      tabelog: { status: 'unknown' },
-      reservation: { status: 'unknown' },
-      unknownFields: ['address', 'coordinates'],
-      warnings: [
-        { code: 'needs_review', message: 'Owner review is required.' },
-      ],
-      personalState: 'candidate',
-      isFavorite: false,
-      hasVisited: false,
-      tags: [],
-      updatedAt: '2026-09-23T12:00:00.000Z',
-    },
-  ]);
-});
-
-void test('an expired Owner cookie requests login and returns typed auth_required instead of an empty candidate list', async () => {
-  let loginRequests = 0;
-  const unsubscribe = subscribeOwnerLoginRequired(() => {
-    loginRequests += 1;
-  });
-  await assert.rejects(
-    loadOwnerReviewCandidates({
-      async request() {
-        return new Response('Owner login is required.', { status: 401 });
-      },
-    }),
-    (error) => {
-      assert.equal(error?.code, 'auth_required');
-      assert.equal(error?.message, 'Owner login is required.');
-      return true;
-    },
-  );
-  unsubscribe();
-
-  assert.equal(loginRequests, 1);
-});
 
 void test('public assessment overallComment enters the browser catalog model', async () => {
   const result = await loadPublicCatalog({

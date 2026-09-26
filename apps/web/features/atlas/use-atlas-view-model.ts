@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
-import {
-  browserAtlasApplication,
-  OwnerAuthenticationRequiredError,
-} from './atlas-api-client';
+import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
 import { matchesAtlasQuery } from './search';
 import type {
@@ -19,7 +16,6 @@ import type {
   VisitRecord,
   VisitUpdate,
 } from './model';
-import type { OwnerReviewCandidateView } from './owner-review-candidate-view';
 import { useAtlasWebMcp } from './use-atlas-webmcp';
 import {
   createAtlasViewModelState,
@@ -30,9 +26,8 @@ import type { NearbyRecommendResult } from '../../product/application/decision/a
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
-type ReviewCandidateLoadState = 'signed_out' | 'loading' | 'ready' | 'error';
 
-export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
+export function useAtlasViewModel() {
   const [view, setView] = useState<AtlasView>('map');
   const [state, dispatch] = useReducer(
     reduceAtlasViewModelState,
@@ -58,14 +53,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     ReadonlySet<string>
   >(new Set());
   const [notice, setNotice] = useState('');
-  const [reviewCandidates, setReviewCandidates] = useState<
-    readonly OwnerReviewCandidateView[]
-  >([]);
-  const [reviewCandidateLoadState, setReviewCandidateLoadState] =
-    useState<ReviewCandidateLoadState>('loading');
-  const [reviewCandidateLoadRevision, setReviewCandidateLoadRevision] =
-    useState(0);
-
   const setItemPending = useCallback((id: string, pending: boolean) => {
     setPendingItemIds((current) => {
       const next = new Set(current);
@@ -122,39 +109,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     });
   }, []);
 
-  useEffect(() => {
-    if (ownerAuthenticated !== true) return;
-    let active = true;
-    queueMicrotask(() => {
-      if (!active) return;
-      setReviewCandidates([]);
-      setReviewCandidateLoadState('loading');
-    });
-    void browserAtlasApplication
-      .execute({ key: 'catalog.review_candidates.list', input: {} })
-      .then((candidates) => {
-        if (!active) return;
-        setReviewCandidates(candidates);
-        setReviewCandidateLoadState('ready');
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setReviewCandidates([]);
-        setReviewCandidateLoadState(
-          error instanceof OwnerAuthenticationRequiredError
-            ? 'signed_out'
-            : 'error',
-        );
-      });
-    return () => {
-      active = false;
-    };
-  }, [ownerAuthenticated, reviewCandidateLoadRevision]);
-
-  const reloadReviewCandidates = useCallback(() => {
-    setReviewCandidateLoadRevision((revision) => revision + 1);
-  }, []);
-
   const reloadCatalogViews = useCallback(() => {
     const loadId = crypto.randomUUID();
     dispatch({ type: 'items.load.started', loadId });
@@ -169,7 +123,6 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
       .catch(() => {
         setNotice('The place was saved, but the map could not refresh yet.');
       });
-    setReviewCandidateLoadRevision((revision) => revision + 1);
   }, []);
 
   const setMediaVisitPending = useCallback(
@@ -209,18 +162,8 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
   const selectedItem =
     visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0];
 
-  const visibleReviewCandidates =
-    ownerAuthenticated === true ? reviewCandidates : [];
-  const visibleReviewCandidateLoadState: ReviewCandidateLoadState =
-    ownerAuthenticated === true
-      ? reviewCandidateLoadState
-      : ownerAuthenticated === null
-        ? 'loading'
-        : 'signed_out';
-
   const summary: AtlasSummary = {
     saved: items.filter((item) => item.personalState !== 'candidate').length,
-    needsReview: visibleReviewCandidates.length,
     timeSensitive: items.filter(
       (item) => item.kind === 'event' || item.reservation.mode === 'advance',
     ).length,
@@ -731,10 +674,7 @@ export function useAtlasViewModel(ownerAuthenticated: boolean | null = null) {
     notice,
     personalFilter,
     query,
-    reloadReviewCandidates,
     reloadCatalogViews,
-    reviewCandidates: visibleReviewCandidates,
-    reviewCandidateLoadState: visibleReviewCandidateLoadState,
     removeItem,
     removeMedia,
     removeVisit,

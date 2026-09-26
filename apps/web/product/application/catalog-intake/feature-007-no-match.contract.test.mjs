@@ -16,7 +16,7 @@ const executionContext = {
   },
 };
 
-test('a selected restaurant with a durable geocoder no-match reaches preview and commits needs-review once', async () => {
+test('an unresolved restaurant remains in Add and repeated confirmation never publishes a review candidate', async () => {
   const clock = { now: () => new Date('2026-09-24T10:00:00.000Z') };
   const state = createInMemoryCatalogIntakeStatePort(clock);
   const publishCalls = [];
@@ -120,7 +120,6 @@ test('a selected restaurant with a durable geocoder no-match reaches preview and
     false,
   );
 
-  const previewDigest = selected.value.preview.evidenceDigest;
   const confirmed = await application.execute(
     {
       key: 'catalog.intake.confirm',
@@ -135,14 +134,11 @@ test('a selected restaurant with a durable geocoder no-match reaches preview and
   assert.deepEqual(confirmed, {
     ok: true,
     value: {
-      status: 'committed_needs_review',
-      itemId: 'candidate-1',
-      receiptRef: 'receipt-1',
-      replayed: false,
+      status: 'failed_no_write',
+      reason: 'validation',
     },
   });
-  assert.equal(publishCalls.length, 1);
-  assert.equal(publishCalls[0].preview.evidenceDigest, previewDigest);
+  assert.equal(publishCalls.length, 0);
 
   const replayed = await application.execute(
     {
@@ -157,13 +153,11 @@ test('a selected restaurant with a durable geocoder no-match reaches preview and
   assert.deepEqual(replayed, {
     ok: true,
     value: {
-      status: 'committed_needs_review',
-      itemId: 'candidate-1',
-      receiptRef: 'receipt-1',
-      replayed: true,
+      status: 'failed_no_write',
+      reason: 'validation',
     },
   });
-  assert.equal(publishCalls.length, 1);
+  assert.equal(publishCalls.length, 0);
 });
 
 test('confirm returns a changed durable-location preview without publishing', async () => {

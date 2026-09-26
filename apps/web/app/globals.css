@@ -2604,40 +2604,11 @@ button.personal-rating-inline:focus-visible {
   font-size: 1.05rem;
 }
 
-.review-section {
-  margin-top: 1.5rem;
-}
-
-.review-section h3 {
-  font-family: var(--font-display);
-  font-size: 1rem;
-}
-
-@media (width <= 640px) {
-  .review-section .empty-panel button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  .review-section summary,
-  .review-section a {
-    display: inline-flex;
-    min-width: 44px;
-    min-height: 44px;
-    align-items: center;
-  }
-}
-
-.review-list,
 .journal-list {
   display: grid;
   gap: 0.65rem;
 }
 
-.review-list {
-  padding: 0;
-  list-style: none;
-}
 
 .journal-browser {
   display: grid;
@@ -2682,92 +2653,11 @@ button.personal-rating-inline:focus-visible {
   padding: 0;
 }
 
-.review-card,
 .journal-entry,
 .empty-panel {
   border: 1px solid var(--line);
   border-radius: 0.65rem;
   background: var(--paper-raised);
-}
-
-.review-card > header {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.75rem;
-}
-
-.review-card > header > svg {
-  width: 1rem;
-  color: var(--vermilion);
-}
-
-.review-card > header > div {
-  display: grid;
-  gap: 0.12rem;
-  min-width: 0;
-}
-
-.review-card > header strong {
-  font-size: 0.82rem;
-}
-
-.review-card > header div span {
-  overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 0.68rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.review-status {
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  background: #eee3c7;
-  color: #5d4613;
-  font-size: 0.66rem;
-  font-weight: 750;
-  text-transform: capitalize;
-}
-
-.review-evidence {
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
-  font-size: 0.72rem;
-}
-
-.review-evidence summary {
-  padding: 0.65rem 0.75rem;
-  color: var(--ink);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.review-evidence dl,
-.review-evidence > ul {
-  margin: 0;
-  padding: 0 0.75rem 0.75rem 2rem;
-}
-
-.review-evidence dl {
-  display: grid;
-  gap: 0.35rem;
-  padding-left: 0.75rem;
-}
-
-.review-evidence dl > div {
-  display: grid;
-  grid-template-columns: 6rem 1fr;
-  gap: 0.6rem;
-}
-
-.review-evidence dt {
-  font-weight: 700;
-}
-
-.review-evidence dd {
-  margin: 0;
 }
 
 .empty-panel {
@@ -3100,14 +2990,7 @@ button.personal-rating-inline:focus-visible {
     padding: 1.6rem 1rem 3rem;
   }
 
-  .review-card > header {
-    grid-template-columns: auto 1fr;
-  }
 
-  .review-status {
-    grid-column: 2;
-    justify-self: start;
-  }
 
   .fact-grid {
     grid-template-columns: 1fr;

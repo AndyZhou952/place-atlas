@@ -3,9 +3,6 @@ import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { createOwnerReviewCandidateListGet } from '../../../app/api/owner/catalog/review-candidates/owner-review-candidate-route.ts';
-import { createAtlasApplication } from '../../../product/application/atlas-application.ts';
-import { createCatalogReadOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
 import { createOwnerPocComposition } from './owner-poc-composition.ts';
 
 const root = new URL('../../../migrations/owner-poc/', import.meta.url);
@@ -174,7 +171,7 @@ test('production owner-poc composition supports manual fields when research is d
   assert.ok(published.some(({ id }) => id === 'item-production'));
 });
 
-test('production owner-poc composition exposes a confirmed needs-review publication through the Owner Review API', async () => {
+test('production refuses incomplete Add without creating a hidden review candidate', async () => {
   const sqlite = new DatabaseSync(':memory:');
   for (const migration of [
     '0001_owner_poc_schema.sql',
@@ -264,39 +261,9 @@ test('production owner-poc composition exposes a confirmed needs-review publicat
     scope,
   );
   assert.equal(confirmed.ok, true);
-  assert.equal(confirmed.value.status, 'committed_needs_review');
-
-  const ownerReviewGet = createOwnerReviewCandidateListGet({
-    async authorizeOwnerRead() {
-      return undefined;
-    },
-    getApplication() {
-      return createAtlasApplication(
-        createCatalogReadOperationGroup(composition.catalogRead),
-      );
-    },
-  });
-  const response = await ownerReviewGet(
-    new Request('https://atlas.example/api/owner/catalog/review-candidates'),
-  );
-  assert.equal(response.status, 200);
-  const candidates = await response.json();
-  assert.equal(candidates.length, 1);
-  assert.equal(candidates[0].id, confirmed.value.itemId);
-  assert.equal(candidates[0].title, 'Needs review restaurant');
-  assert.equal(candidates[0].location.status, 'unknown');
-  assert.deepEqual(candidates[0].unknownFields, [
-    'address',
-    'coordinates',
-    'tabelog',
-    'reservation',
-  ]);
-  assert.equal(
-    (await composition.catalogRead.list('verified_catalog')).some(
-      ({ id }) => id === confirmed.value.itemId,
-    ),
-    false,
-  );
+  assert.equal(confirmed.value.status, 'failed_no_write');
+  assert.equal(confirmed.value.reason, 'validation');
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_review_candidates').get().n, 0);
 });
 
 function toD1(database) {

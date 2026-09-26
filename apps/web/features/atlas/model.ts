@@ -23,7 +23,7 @@ import type {
 } from '@/product/application/visits/visit';
 
 export type AtlasItemKind = CoreAtlasItemKind;
-export type AtlasView = 'map' | 'review' | 'journal';
+export type AtlasView = 'map' | 'journal';
 export type AtlasKindFilter = 'all' | AtlasItemKind;
 export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited';
 export type PersonalState = CorePersonalState;
@@ -74,6 +74,5 @@ export type VisitMutationResult = Omit<CoreVisitMutationResult, 'visit'> &
 
 export interface AtlasSummary {
   readonly saved: number;
-  readonly needsReview: number;
   readonly timeSensitive: number;
 }

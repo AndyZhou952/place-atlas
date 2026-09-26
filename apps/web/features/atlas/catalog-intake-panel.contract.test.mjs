@@ -140,7 +140,7 @@ test('Web preview and confirm-refresh conflict use the shared closed evidence pr
   assert.match(styles, /\.catalog-intake-conflict \.catalog-intake-preview/u);
 });
 
-test('a committed Add refreshes both verified and Owner-review catalog views', async () => {
+test('a committed Add refreshes the saved catalog', async () => {
   const [panel, screen, hook, viewModel] = await Promise.all([
     readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./atlas-screen.tsx', import.meta.url), 'utf8'),
@@ -156,16 +156,16 @@ test('a committed Add refreshes both verified and Owner-review catalog views', a
   );
   assert.match(viewModel, /key: 'catalog\.list'/u);
   assert.match(viewModel, /reloadCatalogViews/u);
-  assert.match(viewModel, /setReviewCandidateLoadRevision/u);
+  assert.doesNotMatch(viewModel, /setReviewCandidateLoadRevision/u);
 });
 
-test('success copy distinguishes verified map visibility from Owner review', async () => {
+test('legacy success does not direct users to the removed Review page', async () => {
   const panel = await readFile(
     new URL('./catalog-intake-panel.tsx', import.meta.url),
     'utf8',
   );
 
   assert.match(panel, /available on the verified map and Nearby/u);
-  assert.match(panel, /saved to Owner review/u);
+  assert.doesNotMatch(panel, /saved to Owner review/u);
   assert.match(panel, /not visible on the public map or Nearby yet/u);
 });

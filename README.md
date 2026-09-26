@@ -161,7 +161,7 @@ Start here only after completing configuration and deployment above. Visitors ca
 
 1. `POST /api/catalog-intake/discover`: send `query` and a retry-stable `requestToken`; receive candidates and a session/version.
 2. `POST /api/catalog-intake/select`: send the session ID, expected session version and chosen `ordinal`; receive clarification or a preview.
-3. `POST /api/catalog-intake/confirm`: only after explicit owner approval, send the session ID and expected preview version. Inspect the returned status and item ID; `committed_needs_review` is not a map-ready success. Handle conflicts rather than silently confirming a changed preview.
+3. `POST /api/catalog-intake/confirm`: only after explicit owner approval, send the session ID and expected preview version. A preview without usable location evidence returns `failed_no_write`; retry research instead of creating a hidden candidate. Handle conflicts rather than silently confirming a changed preview. Historical `committed_needs_review` receipts may still replay, but there is no Review tab or candidate-list API.
 4. `POST /api/catalog-intake/cancel`: cancel with the session ID and expected session version.
 
 These endpoints require the existing owner session cookie and same-origin checks. Read the `x-atlas-web-conversation-id` response header from discovery and echo it on later requests using the same session. A model API key is not an application login credential. There is no dedicated external-agent bearer-token interface yet. The built-in model proposes research facts; application code validates them, and confirmation authorizes persistence. Do not send inferred facts as owner assertions or write directly to the database.

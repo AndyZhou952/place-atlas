@@ -231,7 +231,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       });
       const isList =
         (url === '/api/journal' ||
-          url === '/api/owner/catalog/review-candidates' ||
           url.startsWith('/api/media?') ||
           url.startsWith('/api/nearby?')) &&
         (init?.method === undefined || init.method === 'GET');
@@ -257,10 +256,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     input: { id: 'place / 1' },
   });
   await application.execute({ key: 'visit.list', input: {} });
-  await application.execute({
-    key: 'catalog.review_candidates.list',
-    input: {},
-  });
   await application.execute({
     key: 'visit.create',
     input: {
@@ -322,11 +317,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       body: undefined,
     },
     { url: '/api/journal', method: 'GET', body: undefined },
-    {
-      url: '/api/owner/catalog/review-candidates',
-      method: 'GET',
-      body: undefined,
-    },
     {
       url: '/api/journal',
       method: 'POST',

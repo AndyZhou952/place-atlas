@@ -260,8 +260,8 @@ export function CatalogIntakePanel({
           <strong>{successMessage(state.success?.status)}</strong>
           {state.success?.status === 'committed_needs_review' ? (
             <p>
-              It is not visible on the public map or Nearby yet. Complete the
-              missing evidence from Owner review.
+              It is not visible on the public map or Nearby yet. Retry Add to complete the
+              missing information.
             </p>
           ) : null}
           <details className="catalog-intake-note">
@@ -678,7 +678,7 @@ function successMessage(
     return 'Place saved and available on the verified map and Nearby.';
   }
   if (status === 'committed_needs_review') {
-    return 'Place saved to Owner review.';
+    return 'This legacy save is not map-ready. Retry Add.';
   }
   return 'Existing place reused; no duplicate was created.';
 }

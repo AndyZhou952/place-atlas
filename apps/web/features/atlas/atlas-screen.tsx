@@ -16,7 +16,6 @@ import {
   Bot,
   Building2,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -83,13 +82,12 @@ const kindLabel: Record<AtlasItemKind, string> = {
 
 const navItems: readonly { value: AtlasView; label: string }[] = [
   { value: 'map', label: 'Map' },
-  { value: 'review', label: 'Review' },
   { value: 'journal', label: 'Journal' },
 ];
 
 export function AtlasScreen() {
   const owner = useOwnerSession();
-  const vm = useAtlasViewModel(owner.state.authenticated);
+  const vm = useAtlasViewModel();
   const [nearbyFocusRequest, setNearbyFocusRequest] = useState(0);
 
   return (
@@ -150,9 +148,6 @@ export function AtlasScreen() {
 
       {vm.view === 'map' ? (
         <MapWorkspace vm={vm} nearbyFocusRequest={nearbyFocusRequest} />
-      ) : null}
-      {vm.view === 'review' ? (
-        <ReviewWorkspace vm={vm} onRequestOwnerLogin={owner.toggle} />
       ) : null}
       {vm.view === 'journal' ? <JournalWorkspace vm={vm} /> : null}
       <footer className="site-footer">
@@ -278,11 +273,6 @@ function MapWorkspace({
 
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
-            <Summary
-              label="Review"
-              value={vm.summary.needsReview}
-              tone="review"
-            />
             <Summary label="Time-sensitive" value={vm.summary.timeSensitive} />
           </div>
 
@@ -1406,137 +1396,6 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
-function ReviewWorkspace({
-  vm,
-  onRequestOwnerLogin,
-}: {
-  readonly vm: AtlasViewModel;
-  readonly onRequestOwnerLogin: () => void;
-}) {
-  return (
-    <section className="single-workspace review-workspace" id="review">
-      <div className="workspace-intro">
-        <p className="eyebrow">Owner review</p>
-        <h2>Review places before they join your map.</h2>
-        <p>
-          Candidates stay private until their identity and location have enough
-          evidence. Verified places remain available while you review.
-        </p>
-      </div>
-
-      <section
-        className="review-section"
-        aria-labelledby="review-candidates-title"
-        aria-busy={vm.reviewCandidateLoadState === 'loading'}
-      >
-        <h3 id="review-candidates-title">Review candidates</h3>
-        {vm.reviewCandidateLoadState === 'loading' ? (
-          <output className="empty-panel" aria-live="polite">
-            <Clock3 aria-hidden="true" />
-            <strong>Checking the Owner review desk…</strong>
-            <span>Verified places remain available while this loads.</span>
-          </output>
-        ) : null}
-        {vm.reviewCandidateLoadState === 'signed_out' ? (
-          <div className="empty-panel">
-            <CircleHelp aria-hidden="true" />
-            <strong>Sign in as Owner to see review candidates.</strong>
-            <span>Unverified records stay private and off the map.</span>
-            <Button type="button" onClick={onRequestOwnerLogin}>
-              Owner login
-            </Button>
-          </div>
-        ) : null}
-        {vm.reviewCandidateLoadState === 'error' ? (
-          <div className="empty-panel" role="alert">
-            <CircleHelp aria-hidden="true" />
-            <strong>Review candidates could not be loaded.</strong>
-            <span>
-              Verified places are unaffected. Try this private read again.
-            </span>
-            <Button type="button" onClick={vm.reloadReviewCandidates}>
-              Try again
-            </Button>
-          </div>
-        ) : null}
-        {vm.reviewCandidateLoadState === 'ready' &&
-        !vm.reviewCandidates.length ? (
-          <div className="empty-panel">
-            <CheckCircle2 aria-hidden="true" />
-            <strong>No places need review.</strong>
-            <span>Add another place or continue with the verified map.</span>
-            <Button type="button" onClick={() => vm.setView('map')}>
-              Open Add
-            </Button>
-          </div>
-        ) : null}
-        {vm.reviewCandidateLoadState === 'ready' &&
-        vm.reviewCandidates.length ? (
-          <ul
-            className="review-list"
-            aria-label="Places requiring Owner review"
-          >
-            {vm.reviewCandidates.map((candidate) => (
-              <li
-                key={candidate.id}
-                className="review-card"
-                data-review-candidate-id={candidate.id}
-              >
-                <header>
-                  <CircleHelp aria-hidden="true" />
-                  <div>
-                    <strong>{candidate.title}</strong>
-                    <span>
-                      {candidate.location.status === 'known'
-                        ? candidate.location.address
-                        : 'Address unknown'}
-                      {' · '}
-                      {candidate.area.status === 'known'
-                        ? candidate.area.value
-                        : 'Area unknown'}
-                    </span>
-                  </div>
-                  <span className="review-status">Needs review</span>
-                </header>
-                <details className="review-evidence">
-                  <summary>Evidence details</summary>
-                  <dl>
-                    <div>
-                      <dt>Map location</dt>
-                      <dd>
-                        {candidate.location.status === 'known'
-                          ? 'Available'
-                          : 'Missing'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Still needed</dt>
-                      <dd>
-                        {candidate.unknownFields.length
-                          ? candidate.unknownFields.join(', ')
-                          : 'Owner verification'}
-                      </dd>
-                    </div>
-                  </dl>
-                  {candidate.warnings.length ? (
-                    <ul aria-label="Review warnings">
-                      {candidate.warnings.map((warning) => (
-                        <li key={`${candidate.id}-${warning.code}`}>
-                          {warning.message}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </details>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-    </section>
-  );
-}
-
 function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   const [placeFilter, setPlaceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
@@ -2500,14 +2359,12 @@ function DeleteVisitDialog({
 function Summary({
   label,
   value,
-  tone,
 }: {
   readonly label: string;
   readonly value: number;
-  readonly tone?: 'review';
 }) {
   return (
-    <div className={cn('summary-item', tone === 'review' && 'summary-review')}>
+    <div className="summary-item">
       <strong>{value}</strong>
       <span>{label}</span>
     </div>

@@ -1,67 +1,72 @@
-# Implementation and verification status
+# PoC delivery checklist
 
-Updated: 2026-09-26. This tracks repository implementation separately from deployment and product acceptance. "Implemented" does not mean "verified live". No production deployment is part of this update.
+Updated: 2026-09-26. This checklist tracks the usable product, not repository housekeeping.
 
-## Completed in the repository
+- [x] means the stated implementation or verification is complete.
+- [ ] means implementation, integration, or acceptance is still pending; the note identifies which.
+- Local tests are not production acceptance. All three user journeys must pass on the deployed website before the PoC is ready.
 
-| Area | Implemented | Evidence / boundary |
-| --- | --- | --- |
-| Standalone setup | Inline README instructions for credentials, Cloudflare resources, owner secrets, deployment, then website usage | Owner password is a server secret, not a first-run website registration flow |
-| Repository cleanup | Removed obsolete root planning directories, channel-specific integrations, and external relay packages | Live domain code remains under `apps/web/product` |
-| Agent ownership | Research runs in `apps/web/agent` with a configurable OpenAI-compatible endpoint | No external agent platform required |
-| Search | Default no-key DuckDuckGo snippets; optional Tavily | Live search worked on the development host; HTML access is best effort |
-| Bounded tool loop | Two searches, three model turns, timeout, multiple tool calls, validated evidence, no direct writes | Offline tests cover failure and unsupported-tool cases |
-| Research instructions | Versioned prompt and tool description with Tabelog aggregate-score and official-reservation source rules | Main-listing URL guard rejects individual review pages; official-source precedence still relies on model reasoning |
-| Structured Add | Browser discover/select/preview/confirm APIs, scoped sessions, duplicate prevention, shared publication path | Local integration tests cover confirmation and catalog visibility; discovery still needs Google Places |
-| API discovery | `/api/agent/capabilities` exposes Add operations, required fields, owner-session authentication, conversation header, and confirmation boundary | This documents existing authenticated APIs; it does not add an unauthenticated write path or external-agent bearer tokens |
-| Existing personal records | Owner authorization, personal scores, visits, notes and media APIs | Do not interpret this as fresh acceptance of every editing interaction |
-| Evaluation assets | Resolution/enrichment datasets, scorers, mocked regressions, live smoke runner | Example predictions validate scoring code, not model accuracy |
+## 1. Add — research a restaurant, confirm, and see it on the map
 
-## Implemented but pending verification
+- [x] **Core flow in code:** discover → branch selection/clarification → preview → version-bound confirmation; shared publication and duplicate-prevention tests.
+- [x] **Repository-owned research foundation:** configurable OpenAI-compatible model, no-key search, bounded tool calls, evidence validation; model has no direct database-write permission.
+- [x] **Structured API discovery:** expose discover/select/confirm/cancel with required inputs and owner-session requirements.
+- [ ] **Resolve rough hints reliably:** run the actual resolution pipeline against `place-resolution-gold.v1.json`; include short names, romanization, ambiguous chains and no-match cases. The selected-place enrichment smoke is not this benchmark.
+- [x] **Enrichment benchmark foundation:** captured-evidence dataset and scorers, source-safety regressions, and a lightweight live rating protocol; always-unknown output cannot pass completion quality.
+- [ ] **Live rating benchmark:** independently verify a small set of current aggregate scores and report completion, exact branch/score accuracy, provenance, unavailable sources and latency. Frozen old scores are not live truth.
+- [ ] **Complete source research:** read useful restaurant sources beyond snippets; preserve the selected branch and explain source failures without asking for already supplied details.
+- [ ] **Complete the data path:** research → structured preview → validation → D1 → list/detail card for all fields below.
+  - [x] Name, area, address and coordinates have application fields and an intake path; coordinates remain internal to map/distance calculations.
+  - [ ] Categories and signature dishes: populate visible keywords. Existing `tags` is currently empty on Add publication.
+  - [ ] One-sentence source-grounded description: replace the generic intake message.
+  - [ ] Japan: reliably obtain the aggregate Tabelog rating; Google rating is optional. Other overseas places: support Google rating. Mainland China: no external rating required.
+  - [ ] Official and booking links: propagate the existing `officialUrl`/`sources` fields through research and Add.
+  - [ ] Reservation policy and explicit lead time: prefer the correct branch's official source, use Tabelog as fallback. Existing advance-days/release-window fields still need automated population.
+- [ ] **Independent external-Agent access:** authenticated structured-proposal integration using the same validation and confirmation services; dedicated agent-token authentication is not implemented.
+- [ ] **Live Add acceptance:** useful sourced preview → owner confirms → same restaurant visible in list/map after refresh → retry creates no duplicate. An unknown-only preview or review-only candidate is not success.
 
-- Run the revised prompt on real restaurant cases. Prompt wording and mocked tests do not prove source selection accuracy.
-- Verify DuckDuckGo access from the deployed Cloudflare runtime, not only the development host.
-- Measure actual Tabelog aggregate-score coverage and accuracy. Never count individual-review scores as restaurant scores.
-- Verify official-site identity, reservation precedence, conflicting policies, and explicit booking lead times.
-- Run the complete browser flow: short hint → correct branch → useful preview → confirmation → visible list/map after refresh; repeat confirmation without duplication.
-- Recheck personal and external rating independence and photo editing in the deployed browser.
+## 2. Record — deterministic personal history, no Agent required
 
-Latest live evidence: `apps/web/evals/place-enrichment/live-smoke-2026-09-26.json`. DeepSeek and two no-key searches completed in about four seconds, but both enrichment fields stayed unknown. Transport passed; restaurant enrichment did **not** pass. This predates the revised source-aware prompt. No database write occurred.
+- [x] **Data/API foundation:** personal rating, favorite/visited state, Visit date/note, photo upload and caption-update operations exist.
+- [x] **Journal editing in code:** edit Visit date/rating/note and update photo captions; local state/API tests exist.
+- [ ] **Unify card and Journal entry points:** the card Edit currently edits basic item fields, not the full Visit form. Both entry points must operate on the same restaurant/Visit records without duplicate writes.
+- [ ] **Photo interaction acceptance:** click/open an uploaded photo, edit its optional description, save, reopen, and verify persistence.
+- [ ] **Rating independence:** changing personal score must preserve Tabelog/Google scores and historical Visit records; verify in the deployed browser.
+- [ ] **Live Record acceptance:** create and edit a dated Visit with notes and multiple captioned photos, refresh, and verify D1/R2 state and both views. No LLM dependency on this path.
 
-## Pending implementation, in priority order
+## 3. Nearby — Agent understanding and recommendations over saved restaurants
 
-1. **Read useful source content.** Add a bounded source-reading tool restricted to discovered public URLs, with redirect/address checks, content limits, clear truncation, and explicit blocked/timeout results. Do not bypass challenges. Search snippets alone often omit ratings or booking rules.
-2. **Make failures actionable.** Preserve the selected restaurant/session, expose missing evidence and provider errors, and allow a bounded focused retry instead of requesting already supplied details again.
-3. **Complete Add enrichment.** Connect categories, signature dishes, official links, and Google ratings where appropriate through research, preview, persistence, and UI together. Reservation lead-time fields already exist in the application model; the narrow research prompt does not populate them yet. Do not silently output fields the application cannot store.
-4. **Remove discovery's Google dependency.** Add and evaluate another identity-discovery path before advertising Google-free Add.
-5. **Improve frontend records and Nearby.** Finish visit/photo editing consistency, then saved-place-only agent recommendations with verified route times and clear uncertainty. Keep these separate from Add acceptance.
-6. **Later:** screenshot input, wider provider compatibility, performance work, and deployment-quality monitoring.
+- [x] **Deterministic foundation:** saved-catalog lookup, straight-line distance, location resolution/route adapters, fallback policies and local tests.
+- [x] **Offline policy benchmark seed:** 14 synthetic cases plus a scorer cover saved-only choices, walk/transit/distance rules, visited preference, clarification and source failures; this is not live Agent acceptance.
+- [ ] **Agent benchmark first:** curate multilingual short-location, intent, ambiguity, visited preference, walk/transit fallback and provider-failure cases. An initial synthetic policy suite is not a live quality result.
+- [ ] **Screenshot benchmark:** add labelled map screenshots with ground-truth location/ambiguity before enabling image-based location recognition.
+- [ ] **Connect the Agent:** interpret the location and constraints, ask only necessary clarification, call catalog/location/route tools, and explain recommendations.
+- [ ] **Preserve recommendation rules:** recommend only saved restaurants; default to unvisited, walking within 10–15 minutes; if none, broaden to a clearly labelled 2 km distance fallback or direct transit within 20 minutes door-to-door. Never present straight-line distance as verified walking time.
+- [ ] **Entry feasibility:** source walk-in/reservation information; unknown availability or queues remain explicitly unknown. Do not claim an unsourced wait time.
+- [ ] **Live Nearby acceptance:** score real Agent predictions against the approved benchmark, then verify a browser query yields useful saved-place recommendations and truthful route/entry caveats.
 
-## Acceptance before deployment
+## 4. Map, storage and authorization — shared deterministic foundation
 
-- Regression tests, typecheck, lint, and build pass.
-- Live predictions are evaluated against independently checked branch identities and source facts, including short names, chains, romanization, wrong-branch pages, individual reviews, source conflicts, and provider failure.
-- No invented facts or automatic branch choice for genuinely ambiguous inputs.
-- Unknown enrichment is reported as incomplete, not counted as success.
-- At least one real owner-confirmed Add is visible after refresh and remains duplicate-free on retry. Public readers still cannot write.
+- [x] **Storage/runtime code:** Cloudflare application, D1 catalog/personal records/Visit/session data, R2 media, and shared write coordination exist.
+- [x] **Owner authorization code:** owner-session protection for writes and private reads; public catalog/display responses remain separate.
+- [x] **Map and personal controls in code:** map rendering, favorite, visited and edit controls exist.
+- [ ] **Data boundary audit:** verify intended public fields versus private notes/media/session/audit data and that anonymous callers cannot access private records or write.
+- [ ] **Real deployment validation:** verify the intended writable personal D1/R2 bindings, migrations, retained data, map markers and media persistence; fixture-only tests do not establish this.
+- [ ] **Session and audit coverage:** verify Add/Agent session retention and audit coverage for all accepted write paths.
+- [ ] **Regression acceptance:** Add, Record and Nearby read the same saved catalog and personal state; updates are visible consistently after refresh.
 
-Do not mark a pending item complete from a successful HTTP response, a plausible preview, or a model's own success claim.
+## 5. PoC release gate
 
-## Confirmed Add field and display requirements
+- [ ] All three live user journeys above pass on Cloudflare; implementation-only checks do not close these gates.
+- [ ] Real DeepSeek resolution predictions pass the existing resolution gates; enrichment and Nearby have separate factual-quality reports.
+- [ ] No invented identity, score, route time or booking rule; failed providers are not reported as empty search results or successful completion.
+- [ ] Owner auth, confirmation, retries, photo persistence and map visibility pass integration/browser checks.
+- [ ] A new user can follow the root README from API configuration and owner secrets through deployment and first successful use.
 
-| Information | Required behavior | Current gap |
-| --- | --- | --- |
-| Identity and location | Resolve a rough hint to the correct branch; save name, area, address and coordinates; keep coordinates out of the main card | Google discovery and durable geocoding exist; full live acceptance remains pending |
-| Food categories and signature dishes | Prominent short keywords on the list card and detail header | `tags` exists, but Add publication currently writes an empty array; research and preview need wiring |
-| One-sentence description | Source-grounded summary of cuisine or signature dishes, replacing boilerplate | `description` exists; Add currently writes a generic intake message |
-| Ratings | Japan: Tabelog primary, Google optional. Other countries: Google preferred. Mainland China: no external rating required. Personal score remains separate | Tabelog and personal scores exist; Google rating schema and aligned UI presentation remain pending |
-| Reservation rules | Prefer verified official branch/booking sources, use Tabelog as fallback; include explicit lead time, release schedule and booking method when available | Existing optional fields: `advanceDays`, `bookingWindowLabel`, `releaseNote`, `channel`; automated population and live evidence still incomplete |
-| Links | Show official site, Tabelog, and applicable map/booking links | `officialUrl` and `sources` exist; research-to-Add propagation must be completed |
-| Personal controls | Preserve favorite, visited, edit, personal notes, and visit records independently from external facts | Existing controls must be regression-tested as Add expands |
-| Confirmation and visibility | Show a concise preview; only owner confirmation writes; successful map-ready records appear after refresh | Do not label `committed_needs_review` as visible-map success |
+## Immediate execution order
 
-## Agent API integration boundary
+1. Make Add research and its field-to-database path useful; evaluate resolution against the existing gold dataset and enrichment separately.
+2. Prepare the Nearby benchmark before wiring its Agent. In parallel-capable work, finish deterministic Record integration and browser tests.
+3. Validate all three paths on the deployment, then close the release gates.
 
-Existing POST endpoints: `/api/catalog-intake/discover`, `/select`, `/confirm`, and `/cancel` under the same prefix. The public capabilities document exposes their required input fields. A caller needs an authenticated owner session and same-origin request headers; after discovery it must echo `x-atlas-web-conversation-id`. Model API keys do not authorize application writes.
-
-The in-repository research agent can return evidence through `WebResearchPort`; it cannot directly write arbitrary JSON to D1. External agents do not yet have a dedicated token-authenticated structured-proposal API. That adapter, expanded proposal schema, field provenance, and confirm-version binding are pending work. Reuse the existing application validation/publication services rather than creating a second write implementation. Do not pass inferred values off as `ownerFields` or owner-asserted ratings.
+Detailed evaluation protocol and the latest limited live observation are in `docs/ingestion-and-evaluation.md`. Keep raw runs in ignored `evals/runs/`; retain curated gold data, schemas, test fixtures and concise accepted reports. Repository cleanup is not a product milestone.

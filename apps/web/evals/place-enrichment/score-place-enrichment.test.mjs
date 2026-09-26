@@ -61,6 +61,20 @@ test('a hallucinated rating fails the unsupported-claim gate', async () => {
   assert.ok(report.metrics.unsupportedClaimRate > 0);
 });
 
+test('returning unknown everywhere cannot pass completion quality even without invented scores', async () => {
+  const gold = await fixture('place-enrichment-gold.v1.json');
+  const predictions = await fixture(
+    'place-enrichment-predictions.example.v1.json',
+  );
+  for (const prediction of predictions.predictions) {
+    prediction.result.ratings.tabelog = { state: 'unknown', evidence: [] };
+    prediction.result.ratings.google = { state: 'unknown', evidence: [] };
+  }
+  const report = scorePlaceEnrichment(gold, predictions);
+  assert.equal(report.passes, false);
+  assert.ok(report.metrics.knownValueAccuracy < 1);
+});
+
 test('wrong-branch evidence fails the source/branch gate', async () => {
   const gold = await fixture('place-enrichment-gold.v1.json');
   const predictions = await fixture(

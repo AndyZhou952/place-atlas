@@ -6,4 +6,5 @@ coverage/
 tmp/
 artifacts/
 evals/runs/
+apps/web/evals/runs/
 *.log

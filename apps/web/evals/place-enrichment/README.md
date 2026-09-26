@@ -81,3 +81,21 @@ The scorer exits with status `0` when every gate passes, `1` when valid predicti
 ## Updating captures
 
 Ratings and reservation rules are volatile. Update a capture only after checking the named branch, then update `capturedAt`, the minimal fact payload, the gold value, and the perfect fixture together. Do not silently treat an old checked-in value as current production truth. Keep excerpts short and factual; store links and normalized facts, not copied reviews or page text.
+
+## Rating completion: lightweight live acceptance
+
+Use this benchmark rather than adding another duplicate rating dataset. First run a transport smoke test, then evaluate the actual research pipeline. Keep frozen-evidence extraction tests separate from live retrieval tests: checked-in numeric scores are snapshot facts, not permanent expected live values.
+
+Start with 5–8 cases spanning a main Tabelog listing with an obtainable aggregate score, another branch with a similar name, an individual-review result carrying a personal score, stale/conflicting evidence, a blocked provider, and a branch with no verifiable score. Reuse the identities and safety scenarios above; curate any missing source captures before claiming coverage. The individual-review URL rejection currently also has a runtime regression in `agent/place-research.test.mjs`.
+
+For each live run, independently verify the exact branch and the current aggregate score from the cited listing in the same evaluation window. Record source URL and observation time. If a source changes during the run, flag it for adjudication instead of forcing agreement with an old score or rewriting gold to match the model. Do not let the model judge its own output.
+
+Report separately:
+
+- **Completion coverage:** correctly populated scores divided by cases with an independently verifiable, accessible aggregate score. Always-unknown output fails this measure.
+- **Claim accuracy:** correct branch and exact aggregate score among all emitted known scores. Target 100% in this small PoC set.
+- **Provenance:** every known score links to supporting evidence and the observation time; require 100%.
+- **Safe failure:** blocked, missing, stale or wrong-branch evidence must not create a score. Report these cases separately; never silently drop them from case coverage.
+- **Retrieval availability and latency:** distinguish unavailable sources from extraction errors, and report elapsed time per case.
+
+Initial acceptance: all safety cases pass, every accessible positive in the small curated set is completed correctly, and no fabricated or reviewer-specific score is accepted. This is a product readiness check, not a broad accuracy claim. The current unknown-only live smoke does not pass it.

@@ -407,7 +407,8 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
           evidence: {
             url: listingUrl,
             title: 'TONKATSU KEITA',
-            content: 'Synthetic test evidence, not a live rating.',
+            content:
+              'Synthetic test evidence: 「六白黒豚」のとんかつやシャトーブリアンのヒレカツ。',
             restaurant: {
               name: 'TONKATSU KEITA',
               address: entry.sourceAddress,
@@ -445,7 +446,20 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
                   subjectMatch: 'matched',
                   tabelog: { status: 'unknown' },
                   reservation: { status: 'unknown' },
-                  evidence: {},
+                  profile: {
+                    signatureDishes: [
+                      '六白黒豚のとんかつ',
+                      'シャトーブリアンのヒレカツ',
+                      'invented curry',
+                    ],
+                  },
+                  evidence: {
+                    signatureDishes: {
+                      url: listingUrl,
+                      quote:
+                        '「六白黒豚」のとんかつやシャトーブリアンのヒレカツ。',
+                    },
+                  },
                 }),
               },
             },
@@ -473,6 +487,17 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
         '東京都杉並区松庵3-41-1 西荻高架下',
       );
       assert.equal(result.value.reservation.mode, 'reservation_required');
+      assert.deepEqual(result.value.profile.signatureDishes.value, [
+        '六白黒豚のとんかつ',
+        'シャトーブリアンのヒレカツ',
+      ]);
+      assert.match(
+        result.value.profile.summary.value,
+        /Featured dishes: 六白黒豚のとんかつ/,
+      );
+      assert.doesNotMatch(result.value.profile.summary.value, /invented curry/);
+    } else {
+      assert.equal(result.value.profile?.signatureDishes, undefined);
     }
   }
 });

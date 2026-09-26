@@ -1,3 +1,25 @@
+.catalog-intake,
+.catalog-intake > *,
+.catalog-intake-state > *,
+.catalog-intake-search > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.catalog-intake {
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
+}
+
+.catalog-intake-state {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.catalog-intake-receipt {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .catalog-intake-research-progress {
   display: flex;
   align-items: flex-start;

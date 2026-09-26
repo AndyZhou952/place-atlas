@@ -50,8 +50,12 @@ tests do not prove an unselected short name uniquely resolves to this restaurant
   is not a general success rate.
 - Recovery when the first listing is a wrong/relocated branch: rejection is
   tested, but recovery using the remaining search is not guaranteed.
-- The live overview remained generic and recommended dishes were missing.
-  Keep full-profile acceptance open even when location/rating passes.
+- Follow-up: dish extraction now tolerates Japanese quote typography and
+  validates each dish separately. A later live Cloudflare/DeepSeek preview
+  returned two sourced dishes and included them with reservation policy in the
+  summary. The model had previously produced one punctuation-different dish,
+  causing the entire array to be rejected. Synthetic wrong-branch and invented
+  dish checks still reject unsupported facts. General menu coverage remains open.
 - Independently check official links and booking lead times. Directory links
   or high scores do not alone prove site ownership or booking difficulty.
 - Reader quota/outage behavior.

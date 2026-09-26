@@ -370,23 +370,54 @@ export function createPlaceResearchAgent(
             const claim = proposal.profile?.[field];
             const proof =
               proposal.evidence?.[field] ?? proposal.profile?.evidence?.[field];
+            // A parsed listing already passed the selected-branch check. Do not
+            // discard a quoted dish merely because the model omitted a redundant
+            // identity quote; this exemption never applies to another source.
+            const verifiedListingProof =
+              matchedListing && proof?.url === matchedListing.url;
             if (
               claim === undefined ||
               !supported(proof, evidence) ||
-              typeof proof?.identityQuote !== 'string' ||
-              !supported(
-                { url: proof.url, quote: proof.identityQuote },
-                evidence,
-              ) ||
-              !matchesSelectedBranch(
-                proof.identityQuote,
-                input.selectedSubject.transientName,
-                input.selectedSubject.transientAddress,
-                input.selectedSubject.ownerQuery,
-              )
+              (!verifiedListingProof &&
+                (typeof proof?.identityQuote !== 'string' ||
+                  !supported(
+                    { url: proof.url, quote: proof.identityQuote },
+                    evidence,
+                  ) ||
+                  !matchesSelectedBranch(
+                    proof.identityQuote,
+                    input.selectedSubject.transientName,
+                    input.selectedSubject.transientAddress,
+                    input.selectedSubject.ownerQuery,
+                  )))
             )
               continue;
             // Exact factual values must occur in evidence; only a description may paraphrase.
+            if (field === 'signatureDishes' && Array.isArray(claim)) {
+              // Japanese source typography often quotes just the ingredient name:
+              // 「六白黒豚」のとんかつ. Ignore typography, not words, and retain
+              // supported entries even when a different proposed dish is invented.
+              const normalizeDish = (value: string) =>
+                value.normalize('NFKC').replace(/[「」『』“”"\s]/gu, '');
+              const quote = normalizeDish(proof.quote);
+              const dishes = [
+                ...new Set(
+                  claim.filter(
+                    (dish: unknown): dish is string =>
+                      typeof dish === 'string' &&
+                      normalizeDish(dish).length >= 2 &&
+                      quote.includes(normalizeDish(dish)),
+                  ),
+                ),
+              ].slice(0, 5);
+              if (dishes.length)
+                profile[field] = {
+                  value: dishes,
+                  sourceUrl: proof.url,
+                  observedAt,
+                };
+              continue;
+            }
             const tokens = Array.isArray(claim)
               ? claim
               : field === 'googleRating' && claim && typeof claim === 'object'
@@ -470,7 +501,7 @@ export function createPlaceResearchAgent(
             const dishes = checkedProfile.signatureDishes?.value.join(', ');
             const area = checkedProfile.area?.value;
             profile.summary = {
-              value: `${categories}${area ? ` in ${area}` : ''}.${dishes ? ` Featured dishes: ${dishes}.` : ''}`,
+              value: `${categories}${area ? ` in ${area}` : ''}.${dishes ? ` Featured dishes: ${dishes}.` : ''}${reservation.status === 'known' && typeof reservation.label === 'string' ? ` Reservations: ${reservation.label}.` : ''}`,
               sourceUrl: checkedProfile.categories.sourceUrl,
               observedAt,
             };

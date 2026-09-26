@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+test('save receipts are collapsed and long tokens cannot grow the Add grid', async () => {
+  const panel = await readFile(
+    new URL('./catalog-intake-panel.tsx', import.meta.url),
+    'utf8',
+  );
+  const css = await readFile(
+    new URL('./catalog-intake-panel.css', import.meta.url),
+    'utf8',
+  );
+  assert.match(panel, /<summary>Save details<\/summary>/);
+  assert.match(
+    css,
+    /\.catalog-intake\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/,
+  );
+  assert.match(
+    css,
+    /\.catalog-intake-receipt\s*\{[^}]*overflow-wrap: anywhere/,
+  );
+});
+
 test('Owner Add panel is a separate accessible intake surface before collection search', async () => {
   const [panel, screen, hook] = await Promise.all([
     readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),

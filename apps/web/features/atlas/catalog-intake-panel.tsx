@@ -264,9 +264,12 @@ export function CatalogIntakePanel({
               missing evidence from Owner review.
             </p>
           ) : null}
-          <span className="catalog-intake-note">
-            Receipt {state.success?.receiptRef}
-          </span>
+          <details className="catalog-intake-note">
+            <summary>Save details</summary>
+            <span className="catalog-intake-receipt">
+              Receipt {state.success?.receiptRef}
+            </span>
+          </details>
         </output>
       ) : null}
     </section>

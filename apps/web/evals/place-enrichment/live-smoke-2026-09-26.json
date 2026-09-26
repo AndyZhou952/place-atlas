@@ -1,0 +1,33 @@
+{
+  "kind": "research-smoke-not-end-to-end-benchmark",
+  "date": "2026-09-26",
+  "runtime": "development-host-not-cloudflare",
+  "model": "deepseek-chat",
+  "search": "duckduckgo-html-no-key",
+  "case": {
+    "name": "アルデバラン",
+    "address": "東京都港区麻布十番3-3-1 三喜ビル 3F",
+    "identitySource": "https://tabelog.com/tokyo/A1307/A130702/13278678/dtlmap/"
+  },
+  "durationMs": 4008,
+  "modelCalls": 2,
+  "searchCalls": 2,
+  "httpStatuses": [200, 200, 200, 200],
+  "result": {
+    "kind": "observed",
+    "tabelog": "unknown",
+    "reservation": "unknown"
+  },
+  "acceptance": {
+    "modelToolLoop": "passed",
+    "keylessSearchTransport": "passed",
+    "restaurantEnrichment": "not-passed",
+    "databaseWrite": "not-attempted",
+    "cloudflareRuntime": "not-tested"
+  },
+  "notes": [
+    "Live testing exposed and fixed support for multiple tool calls in one DeepSeek response.",
+    "A completed tool loop with unknown fields is not an enrichment success.",
+    "Search snippets and branch-evidence validation still need quality evaluation before deployment."
+  ]
+}

@@ -31,7 +31,7 @@ test('owner-poc scheduled runtime owns CatalogIntake cleanup and uses scheduled 
   assert.deepEqual(calls, ['2026-09-23T03:00:00.000Z']);
 });
 
-test('only owner-poc uses the daily cleanup wrapper while Agent keeps its existing entrypoint', async () => {
+test('application worker uses the daily cleanup wrapper', async () => {
   const ownerConfig = JSON.parse(
     stripJsonComments(
       await readFile(
@@ -40,17 +40,8 @@ test('only owner-poc uses the daily cleanup wrapper while Agent keeps its existi
       ),
     ),
   );
-  const agentConfig = JSON.parse(
-    stripJsonComments(
-      await readFile(
-        new URL('../../../wrangler.agent-poc.jsonc', import.meta.url),
-        'utf8',
-      ),
-    ),
-  );
   assert.equal(ownerConfig.main, 'owner-poc-worker.ts');
   assert.deepEqual(ownerConfig.triggers.crons, ['0 3 * * *']);
-  assert.equal(agentConfig.main, 'vinext/server/fetch-handler');
 
   const entrypoint = await readFile(
     new URL('../../../owner-poc-worker.ts', import.meta.url),

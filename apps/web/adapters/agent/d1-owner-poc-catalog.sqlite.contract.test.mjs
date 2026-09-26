@@ -49,7 +49,7 @@ void test('owner-poc migrations preserve legacy Agent state, create the writable
     `INSERT INTO agent_gateway_audit (
       project_id, key_id, actor_id, channel, conversation_id, operation,
       mutation_id, result_kind, replayed, duration_ms, created_at_ms
-    ) VALUES ('jpmap', 'key-v1', 'owner', 'wechat', 'dm', 'agent.nearby',
+    ) VALUES ('jpmap', 'key-v1', 'owner', 'external-client', 'dm', 'agent.nearby',
               'event-1', 'success', 0, 12, 1)`,
   );
   database.exec(

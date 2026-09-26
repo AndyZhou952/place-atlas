@@ -144,9 +144,6 @@ export function AtlasScreen() {
         <span>
           <Bot aria-hidden="true" /> Agent API + browser tools ready
         </span>
-        <span className="status-pending">
-          <Clock3 aria-hidden="true" /> WeChat/OpenClaw channel not connected
-        </span>
       </section>
 
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}

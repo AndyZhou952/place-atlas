@@ -10,7 +10,6 @@ import {
   createCatalogIntakeOperationGroup,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createCatalogRead } from '../../../product/application/catalog/catalog-read.ts';
-import { createProjectCommandRouter } from '../../../product/application/conversation/project-command-router.ts';
 import { createNearbyRecommendationOperationGroup } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
@@ -1019,7 +1018,7 @@ test('AtlasApplication replays the committed D1 receipt after the first confirm 
     },
     {
       ownerId: 'owner-1',
-      channel: 'wechat',
+      channel: 'external-client',
       conversationId: 'conversation-response-loss',
     },
     {
@@ -1169,31 +1168,44 @@ test('deterministic Agent Add publishes a verified D1 item that Catalog and Near
         `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`,
     }),
   });
-  const router = createProjectCommandRouter(application, {
-    catalogIntakeApplication: application,
-    conversationResolver: state,
-  });
   const context = {
     requestToken: 'agent-e2e-request',
     invocation: {
       ownerId: 'owner-agent',
-      channel: 'openclaw-weixin',
+      channel: 'web',
       conversationId: 'owner-dm',
     },
   };
 
-  assert.equal(
-    (await router.dispatch('/jpmap add 銀座テスト店', context)).value.step,
-    'candidates',
+  const discovered = await application.execute(
+    {
+      key: 'catalog.intake.discover',
+      input: { query: '銀座テスト店', requestToken: 'agent-e2e-request' },
+    },
+    context,
   );
-  assert.equal(
-    (await router.dispatch('/jpmap add select 1', context)).value.step,
-    'preview',
+  assert.equal(discovered.ok, true);
+  const selected = await application.execute(
+    {
+      key: 'catalog.intake.select',
+      input: {
+        sessionId: 'session-agent-e2e',
+        expectedSessionVersion: 1,
+        ordinal: 1,
+      },
+    },
+    context,
   );
-  const committed = await router.dispatch('/jpmap add confirm', context);
+  assert.equal(selected.ok, true);
+  const committed = await application.execute(
+    {
+      key: 'catalog.intake.confirm',
+      input: { sessionId: 'session-agent-e2e', expectedPreviewVersion: 1 },
+    },
+    context,
+  );
   assert.equal(committed.ok, true);
-  assert.equal(committed.value.step, 'committed');
-  assert.equal(committed.value.intake.status, 'committed_verified');
+  assert.equal(committed.value.status, 'committed_verified');
 
   const verified = await catalog.list('verified_catalog');
   assert.deepEqual(

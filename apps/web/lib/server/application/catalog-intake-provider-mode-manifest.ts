@@ -26,49 +26,35 @@ export const catalogIntakeProviderPolicy = {
     endpoint: 'https://nominatim.openstreetmap.org/search',
     cacheTtlDays: 30,
   },
-  researchRelay: {
-    policyVersion: 'tabelog-detail-guarded-v1',
-    modeVariable: 'CATALOG_INTAKE_RESEARCH_RELAY_MODE',
-    enabledValue: 'relay_enabled_guarded_v1',
-    disabledValue: 'relay_disabled_manual_unknown',
-  },
 } as const;
 
 export interface CatalogIntakeProviderModes {
   readonly googlePlaces?: string;
   readonly durableGeocoder?: string;
-  readonly researchRelay?: string;
 }
 
 export interface OwnerPocCatalogIntakeRuntimeBindings {
+  readonly AGENT_API_KEY?: string;
+  readonly AGENT_BASE_URL?: string;
+  readonly AGENT_MODEL?: string;
+  readonly SEARCH_API_KEY?: string;
   readonly GOOGLE_PLACES_API_KEY?: string;
   readonly CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;
   readonly CATALOG_INTAKE_DURABLE_GEOCODER_MODE?: string;
-  readonly CATALOG_INTAKE_RESEARCH_RELAY_MODE?: string;
-  readonly RESEARCH_RELAY_ENDPOINT?: string;
-  readonly RESEARCH_RELAY_INGRESS_BEARER_SECRET?: string;
-  readonly RESEARCH_ALLOWANCE_KEY_VERSION?: string;
-  readonly RESEARCH_ALLOWANCE_HMAC_SECRET?: string;
-  readonly RESEARCH_RESULT_KEY_VERSION?: string;
-  readonly RESEARCH_RESULT_HMAC_SECRET?: string;
 }
 
 export function projectOwnerPocCatalogIntakeRuntime(
   bindings: OwnerPocCatalogIntakeRuntimeBindings,
 ) {
   return {
+    agentApiKey: bindings.AGENT_API_KEY,
+    agentBaseUrl: bindings.AGENT_BASE_URL,
+    agentModel: bindings.AGENT_MODEL,
+    searchApiKey: bindings.SEARCH_API_KEY,
     googlePlacesApiKey: bindings.GOOGLE_PLACES_API_KEY,
-    researchRelayEndpoint: bindings.RESEARCH_RELAY_ENDPOINT,
-    researchRelayIngressBearerSecret:
-      bindings.RESEARCH_RELAY_INGRESS_BEARER_SECRET,
-    researchAllowanceKeyVersion: bindings.RESEARCH_ALLOWANCE_KEY_VERSION,
-    researchAllowanceHmacSecret: bindings.RESEARCH_ALLOWANCE_HMAC_SECRET,
-    researchResultKeyVersion: bindings.RESEARCH_RESULT_KEY_VERSION,
-    researchResultHmacSecret: bindings.RESEARCH_RESULT_HMAC_SECRET,
     providerModes: {
       googlePlaces: bindings.CATALOG_INTAKE_GOOGLE_PLACES_MODE,
       durableGeocoder: bindings.CATALOG_INTAKE_DURABLE_GEOCODER_MODE,
-      researchRelay: bindings.CATALOG_INTAKE_RESEARCH_RELAY_MODE,
     },
   };
 }
@@ -87,10 +73,5 @@ export function inspectCatalogIntakeProviderModes(
       catalogIntakeProviderPolicy.durableGeocoder.enabledValue
         ? ('enabled' as const)
         : ('disabled' as const),
-    researchRelay:
-      modes.researchRelay ===
-      catalogIntakeProviderPolicy.researchRelay.enabledValue
-        ? ('relay_enabled_guarded_v1' as const)
-        : ('relay_disabled_manual_unknown' as const),
   };
 }

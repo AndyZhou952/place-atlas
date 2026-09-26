@@ -1,0 +1,395 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  createPlaceResearchAgent,
+  createConfiguredPlaceResearchAgent,
+} from './place-research.ts';
+
+const subject = {
+  ownerQuery: 'Aldebaran 麻布十番',
+  providerNamespace: 'google-places',
+  placeId: 'example',
+  transientName: 'アルデバラン',
+  transientAddress: '東京都港区麻布十番',
+};
+const input = {
+  phase: 'initial',
+  selectedSubject: subject,
+  scope: { ownerId: 'owner', channel: 'web', conversationId: 'test' },
+  sessionId: 'session',
+  expectedSessionVersion: 1,
+  queryOrUrlsDigest: 'unused',
+};
+const url = 'https://tabelog.com/tokyo/A1307/A130702/13212345/';
+const config = {
+  apiKey: 'test',
+  baseUrl: 'https://model.example/v1',
+  model: 'test-model',
+  searchApiKey: 'search-test',
+};
+const content = 'アルデバラン 東京都港区麻布十番 食べログ 3.97 予約可';
+const proposal = {
+  subjectMatch: 'matched',
+  tabelog: { status: 'known', score: 3.97, url },
+  reservation: { status: 'unknown' },
+  evidence: {
+    identity: { url, quote: 'アルデバラン 東京都港区麻布十番' },
+    tabelog: { url, quote: '食べログ 3.97' },
+  },
+};
+const tool = {
+  id: 'search1',
+  type: 'function',
+  function: {
+    name: 'search_web',
+    arguments: JSON.stringify({ query: 'アルデバラン 麻布十番 食べログ' }),
+  },
+};
+
+function harness(final = proposal) {
+  const requests = [];
+  let turn = 0;
+  return {
+    requests,
+    agent: createPlaceResearchAgent({
+      ...config,
+      fetch: async (endpoint, init) => {
+        requests.push({ endpoint, body: JSON.parse(init.body) });
+        if (endpoint === 'https://api.tavily.com/search')
+          return Response.json({
+            results: [{ url, title: 'アルデバラン', content }],
+          });
+        assert.equal(endpoint, 'https://model.example/v1/chat/completions');
+        return Response.json({
+          choices: [
+            {
+              message:
+                turn++ === 0
+                  ? { tool_calls: [tool], content: null }
+                  : { content: JSON.stringify(final) },
+            },
+          ],
+        });
+      },
+    }),
+  };
+}
+
+test('research executes fixed search tool then produces validated sourced preview facts', async () => {
+  const { agent, requests } = harness();
+  const result = await agent.research(input);
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.value.tabelog.score, 3.97);
+  assert.equal(result.value.tabelog.provenance, 'agent_observed');
+  assert.equal(requests.length, 3);
+});
+
+test('invented evidence and another branch are not saved as known facts', async () => {
+  const forged = structuredClone(proposal);
+  forged.evidence.tabelog.quote = '食べログ 4.99';
+  forged.tabelog.score = 4.99;
+  assert.equal(
+    (await harness(forged).agent.research(input)).value.tabelog.status,
+    'unknown',
+  );
+  assert.equal(
+    (
+      await harness({ ...proposal, subjectMatch: 'uncertain' }).agent.research(
+        input,
+      )
+    ).value.tabelog.status,
+    'unknown',
+  );
+});
+
+test('unsupported tools and provider failures return unavailable with no writes', async () => {
+  const agent = createPlaceResearchAgent({
+    ...config,
+    fetch: async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  ...tool,
+                  function: { name: 'write_database', arguments: '{}' },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+  });
+  assert.deepEqual(await agent.research(input), { kind: 'unavailable' });
+  const unavailable = createPlaceResearchAgent({
+    ...config,
+    fetch: async () => new Response('', { status: 429 }),
+  });
+  assert.deepEqual(await unavailable.research(input), { kind: 'unavailable' });
+});
+
+test('search budget stops repeated tool calls after two searches', async () => {
+  let searches = 0;
+  const agent = createPlaceResearchAgent({
+    ...config,
+    fetch: async (endpoint) => {
+      if (endpoint === 'https://api.tavily.com/search') {
+        searches++;
+        return Response.json({ results: [] });
+      }
+      return Response.json({
+        choices: [
+          { message: { tool_calls: [{ ...tool, id: `call-${searches}` }] } },
+        ],
+      });
+    },
+  });
+  assert.deepEqual(await agent.research(input), { kind: 'unavailable' });
+  assert.equal(searches, 2);
+});
+
+test('DeepSeek multiple tool_calls receive matching sequential results in one turn', async () => {
+  let searches = 0;
+  let turns = 0;
+  const calls = [tool, { ...tool, id: 'search2' }];
+  const agent = createPlaceResearchAgent({
+    ...config,
+    fetch: async (endpoint, init) => {
+      if (endpoint === 'https://api.tavily.com/search') {
+        searches++;
+        return Response.json({
+          results: [{ url, title: 'アルデバラン', content }],
+        });
+      }
+      const body = JSON.parse(init.body);
+      if (turns++ === 0)
+        return Response.json({
+          choices: [
+            {
+              finish_reason: 'tool_calls',
+              message: { role: 'assistant', content: null, tool_calls: calls },
+            },
+          ],
+        });
+      assert.deepEqual(
+        body.messages
+          .filter((message) => message.role === 'tool')
+          .map((message) => message.tool_call_id),
+        ['search1', 'search2'],
+      );
+      return Response.json({
+        choices: [{ message: { content: JSON.stringify(proposal) } }],
+      });
+    },
+  });
+  assert.equal((await agent.research(input)).value.tabelog.score, 3.97);
+  assert.equal(searches, 2);
+  assert.equal(turns, 2);
+});
+
+test('invalid multi-call batches do not execute a partial search', async () => {
+  for (const second of [
+    tool,
+    {
+      ...tool,
+      id: 'bad',
+      function: { name: 'write_database', arguments: '{}' },
+    },
+  ]) {
+    let searches = 0;
+    const agent = createPlaceResearchAgent({
+      ...config,
+      fetch: async (endpoint) => {
+        if (endpoint === 'https://api.tavily.com/search') {
+          searches++;
+          return Response.json({ results: [] });
+        }
+        return Response.json({
+          choices: [{ message: { tool_calls: [tool, second] } }],
+        });
+      },
+    });
+    assert.deepEqual(await agent.research(input), { kind: 'unavailable' });
+    assert.equal(searches, 0);
+  }
+});
+
+test('missing model configuration is explicit unavailable; empty config is disabled', async () => {
+  assert.equal(createConfiguredPlaceResearchAgent({}), undefined);
+  for (const options of [
+    { agentApiKey: 'key' },
+    {
+      agentApiKey: 'key',
+      agentBaseUrl: 'https://model.example/v1',
+    },
+  ]) {
+    const port = createConfiguredPlaceResearchAgent(options);
+    assert.deepEqual(await port.research(input), { kind: 'unavailable' });
+  }
+});
+
+test('three model settings enable keyless search and challenge remains unavailable', async () => {
+  const endpoints = [];
+  let turn = 0;
+  const make = (blocked = false) =>
+    createConfiguredPlaceResearchAgent({
+      agentApiKey: config.apiKey,
+      agentBaseUrl: config.baseUrl,
+      agentModel: config.model,
+      fetch: async (endpoint) => {
+        endpoints.push(endpoint);
+        if (endpoint.startsWith('https://html.duckduckgo.com/html'))
+          return blocked
+            ? new Response('', { status: 202 })
+            : new Response(
+                `<a class="result__a" href="${url}">アルデバラン</a><a class="result__snippet">${content}</a>`,
+              );
+        return Response.json({
+          choices: [
+            {
+              message:
+                turn++ === 0
+                  ? { tool_calls: [tool], content: null }
+                  : { content: JSON.stringify(proposal) },
+            },
+          ],
+        });
+      },
+    });
+  assert.equal((await make().research(input)).value.tabelog.score, 3.97);
+  assert.equal(
+    endpoints.some((endpoint) => endpoint.includes('tavily')),
+    false,
+  );
+  turn = 0;
+  assert.deepEqual(await make(true).research(input), { kind: 'unavailable' });
+});
+
+test('unsupported optional fields remain unknown rather than failing the whole preview', async () => {
+  const final = {
+    subjectMatch: 'matched',
+    tabelog: { status: 'unknown' },
+    reservation: { status: 'unknown' },
+    evidence: {},
+  };
+  assert.deepEqual((await harness(final).agent.research(input)).value, {
+    tabelog: { status: 'unknown' },
+    reservation: { status: 'unknown' },
+  });
+});
+
+test('model self-reported match cannot authorize another branch or numeric substring', async () => {
+  const wrongBranch = {
+    ...input,
+    selectedSubject: {
+      ...subject,
+      transientName: 'Suidobashi Mentsudan',
+      transientAddress: 'Tokyo Bunkyo 1-13-2',
+    },
+  };
+  assert.equal(
+    (await harness().agent.research(wrongBranch)).value.tabelog.status,
+    'unknown',
+  );
+  const partialScore = structuredClone(proposal);
+  partialScore.tabelog.score = 3.9;
+  assert.equal(
+    (await harness(partialScore).agent.research(input)).value.tabelog.status,
+    'unknown',
+  );
+  const otherSource = structuredClone(proposal);
+  otherSource.reservation = {
+    status: 'known',
+    mode: 'reservable',
+    label: 'Reservations accepted',
+    url: 'https://other.example/',
+  };
+  assert.equal(
+    (await harness(otherSource).agent.research(input)).value.reservation.status,
+    'unknown',
+  );
+});
+
+test('malformed model endpoint leaves research unavailable without breaking composition', async () => {
+  const port = createConfiguredPlaceResearchAgent({
+    agentApiKey: 'key',
+    agentBaseUrl: 'not a URL',
+    agentModel: 'model',
+    searchApiKey: 'key',
+  });
+  assert.deepEqual(await port.research(input), { kind: 'unavailable' });
+});
+
+test('Japanese branch evidence can match English Google address by alias and street numbers', async () => {
+  const name = '東京麺通団';
+  const text =
+    '東京麺通団 東京都新宿区西新宿7丁目9番15号 食べログ 3.57 予約可 公式';
+  const official = 'https://restaurant.example/reservations';
+  const final = {
+    subjectMatch: 'matched',
+    tabelog: { status: 'known', score: 3.57, url },
+    reservation: {
+      status: 'known',
+      mode: 'reservable',
+      label: '予約可',
+      url: official,
+    },
+    evidence: {
+      tabelog: {
+        url,
+        quote: '食べログ 3.57',
+        identityQuote: '東京麺通団 東京都新宿区西新宿7丁目9番15号',
+      },
+      reservation: {
+        url: official,
+        quote: '予約可 公式',
+        identityQuote: '東京麺通団 東京都新宿区西新宿7丁目9番15号',
+      },
+    },
+  };
+  let turn = 0;
+  const agent = createPlaceResearchAgent({
+    ...config,
+    fetch: async (endpoint) => {
+      if (endpoint === 'https://api.tavily.com/search')
+        return Response.json({
+          results: [url, official].map((source) => ({
+            url: source,
+            content: text,
+          })),
+        });
+      return Response.json({
+        choices: [
+          {
+            message:
+              turn++ % 2 === 0
+                ? { tool_calls: [tool] }
+                : { content: JSON.stringify(final) },
+          },
+        ],
+      });
+    },
+  });
+  const multilingual = {
+    ...input,
+    selectedSubject: {
+      ...subject,
+      ownerQuery: `讃岐うどん大使 ${name} 新宿`,
+      transientName: 'Tōkyō Mentsūdan',
+      transientAddress:
+        'Japan, 〒160-0023 Tokyo, Shinjuku City, Nishishinjuku, 7-chōme−9−１５',
+    },
+  };
+  const result = await agent.research(multilingual);
+  assert.equal(result.value.tabelog.score, 3.57);
+  assert.equal(result.value.reservation.status, 'known');
+  const wrong = await agent.research({
+    ...multilingual,
+    selectedSubject: {
+      ...multilingual.selectedSubject,
+      transientAddress: '1-chōme-13-2 Hongō, Bunkyo City, Tokyo',
+    },
+  });
+  assert.equal(wrong.value.tabelog.status, 'unknown');
+});

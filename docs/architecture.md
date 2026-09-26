@@ -1,51 +1,39 @@
-# Architecture
+# Application architecture
 
-Browser routes and the signed Agent API call one application layer. Provider-specific behavior is isolated behind typed ports, and Cloudflare bindings are assembled at the server boundary.
+The browser calls authenticated application APIs. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
 
-```text
-Browser UI ─┐
-            ├─ application operations ─ domain ─ D1/R2 adapters
-Agent API ──┘                         └─ provider ports
-                                               ├─ Google Places
-                                               ├─ durable geocoder
-                                               ├─ private route sidecar
-                                               └─ signed Agent Service RPC
-```
+## Add
 
-An LLM is not the source of truth. A bounded OpenAI-compatible adapter can extract approved scalar facts from already-fetched evidence; it does not browse or write. Deterministic validation, identity, authorization, idempotency, and persistence remain in the application.
+1. Accept a short restaurant hint and optional neighborhood.
+2. Search for real identities and resolve the branch. Ask a focused question when multiple branches remain plausible.
+3. Collect search evidence and deterministic location evidence. Let the model extract structured facts from those sources. The current search adapter reads search-result excerpts, not full source pages.
+4. Validate the proposal and display a concise preview. Missing optional facts remain unknown; research failure does not erase the session.
+5. On confirmation, persist through the application write service. Return the saved item ID and refresh the map/list.
 
-## Stable locations
+The model proposes facts; application code validates and commits them. Source text is untrusted input. A page cannot authorize a write or change the restaurant under investigation. Retries have bounded budgets and confirmation is idempotent.
 
-- `apps/web/app`: HTTP and page entry points.
-- `apps/web/features`: browser feature modules.
-- `apps/web/product`: domain and application contracts.
-- `apps/web/lib/server/application`: server composition and durable services.
-- `apps/web/adapters`: D1, provider, and Agent adapters.
-- `apps/web/route-sidecar`: private geocoding and route worker.
-- `packages/research-relay`: repository-owned Agent Service for bounded search,
-  fetch, and model-assisted evidence extraction.
-- `apps/web/migrations/owner-poc`: deployable D1 chain and seed manifest.
-- `apps/web/migrations/agent-poc`: isolated Agent fixtures.
-- `apps/web/adapters/providers/policies`: provider policy evidence.
-- `packages/openclaw-jpmap`: OpenClaw integration.
-- `docs/deployment`: operational runbooks.
+## Storage and views
 
-Runtime code, migrations, fixtures, and policy files must not live in planning/history folders.
+Cloudflare D1 stores restaurant identity, coordinates, sources, personal ratings, visits, and photo metadata. R2 stores images. Personal ratings and external ratings are independent fields. Updating one must preserve the others.
 
-## Data and trust
+Nearby compares only saved restaurants. Coordinates permit a distance prefilter; an optional route provider supplies walking time. An unavailable route provider must not turn straight-line distance into a claimed travel time.
 
-D1 is authoritative for catalog records, review candidates, personal state, visits, notes, receipts, and usage reservations. R2 stores media; D1 stores its metadata. A committed review candidate must remain readable through an Owner surface.
+## Module boundaries
 
-Public reads need no Owner credentials. Browser writes require an Owner session. Agent operations require a scoped HMAC signature. The route sidecar is private and holds only its route-provider credential. Secrets never enter browser bundles, source control, logs, or evidence artifacts.
+- `apps/web/app`: browser routes and HTTP endpoints.
+- `apps/web/components` and `apps/web/features`: interface components.
+- `apps/web/product`: executable domain/application code, not planning documents.
+- `apps/web/adapters`: storage, model, search, and external integrations.
+- `apps/web/agent`: the bounded model/search loop, evidence checks, and live smoke runner.
+- `apps/web/route-sidecar`: optional private route-provider Worker.
+- `apps/web/evals`: benchmark datasets and scorers.
 
-## Semantic extension seam
+The application runs its research adapter inside the Worker. External clients can use application interfaces without a required messaging platform. The root README contains complete setup instructions. These notes describe ownership boundaries, not a claim that every enrichment field has passed live evaluation.
 
-The model-neutral research extractor consumes one bounded, untrusted page plus its canonical source URL and returns a schema-validated proposal or an explicit stop/no-evidence result. The included DeepSeek configuration uses the same port as any other OpenAI-compatible provider. It has no direct D1 access and no built-in browsing role.
+Search is provider-independent from the model. With no search credential, the tool reads DuckDuckGo HTML result snippets from a fixed endpoint. Supplying `SEARCH_API_KEY` selects Tavily. Both paths feed source excerpts into the same bounded research loop and evidence validation. HTML changes, rate limits, and challenges can make the no-key path unavailable; they do not authorize challenge bypass or unsupported claims.
 
-The separate Agent Service owns bounded search and fetching, deadlines, signed
-selected-branch binding, and provenance. Its default direct provider uses a
-fixed search endpoint and a Tabelog-only source/redirect policy. OpenClaw is an
-optional channel or compatibility adapter, never a required enrichment host.
-Production enrichment remains disabled until the live evaluation gate passes.
-Recommendation requires a separate, later contract; it is not implied by the
-scalar extractor.
+## Design reference and current limits
+
+The relevant guidance from [the agent-book skills proposal](https://github.com/bojieli/ai-agent-book/pull/1137) is goal-oriented tools, bounded execution, untrusted-source isolation, explicit failure handling, and independent evaluation. The repository does not copy or depend on the 22 skill packages.
+
+The current loop enriches an already selected identity with Tabelog and reservation evidence. Candidate discovery still requires Google Places; Google-free agent discovery, full-page research, and live benchmark acceptance remain follow-up work. A successful offline test is not evidence that these follow-up capabilities work.

@@ -1,27 +1,11 @@
-# Intake and evaluation
+# Add evaluation
 
-## Deterministic intake today
+Add succeeds when the correct restaurant becomes visible after confirmation. A plausible preview alone is insufficient.
 
-1. Normalize the Owner query.
-2. Request identity candidates from Google Places.
-3. Ask the Owner to choose when identity is ambiguous.
-4. Build a preview with durable fields and explicit unknowns.
-5. Confirm once, using idempotent mutation receipts.
-6. Publish a verified record when minimum evidence is present; otherwise keep an actionable review candidate.
+`apps/web/evals/place-resolution` tests multilingual, romanized, partial, short, ambiguous-chain, and no-match queries. A chain-only hint requires a focused location question or two to three branch choices. Short input does not imply a unique restaurant.
 
-Browser and Agent API use this workflow. The selected provider identity and branch are carried through preview, research authorization, and model extraction; a subject-bound proposal must explicitly confirm a match. The guarded Relay implementation applies its source policy to search candidates, every redirect, and each known claim. Its first policy version accepts only canonical Tabelog restaurant-detail pages. The checked-in production deployment still keeps research disabled until live evaluation passes, so external facts may remain unknown.
+`apps/web/evals/place-enrichment` tests categories, dishes, ratings, reservations, and provenance. Some fields describe target behavior rather than current production support. Missing, stale, conflicting, wrong-branch, or unavailable evidence must not become invented facts.
 
-## Semantic enrichment seam
+From `apps/web`, run `npm run test:evals`, `npm run eval:place-resolution`, and `npm run eval:place-enrichment`. Example prediction files test the scorers, not live model quality. Generate separate predictions through the actual pipeline for live evaluation; record model configuration, latency, source failures, and available cost information without committing secrets.
 
-The repository includes a bounded OpenAI-compatible extractor for Tabelog and reservation scalars. The DeepSeek configuration is one implementation of that port. It receives one already-fetched page, treats the body as untrusted data, returns only a strict proposal/no-evidence/stop result, and never writes directly to D1. The separate loopback Relay calls OpenClaw's structured `web_search` and `web_fetch`, persists replay claims before egress, and returns only signed scalar proposals. OpenClaw and DeepSeek credentials remain on the Relay host rather than in Cloudflare.
-
-Category tags, signature dishes, Google ratings, full source collection, vague-language interpretation, and recommendations still require later typed contracts rather than a larger free-form prompt.
-
-## Evaluation gate
-
-Two offline, versioned benchmark packages live under `apps/web/evals`:
-
-- `place-resolution` covers Japanese/Chinese/English aliases, short input, branch ambiguity, same-name collisions, and no-match cases. Ambiguous input must clarify; unsafe auto-resolution must remain zero.
-- `place-enrichment` covers supported fields, provenance, stale/conflicting evidence, wrong branches, prompt injection, missing evidence, and provider failure. Unsupported claims must remain zero.
-
-Run `npm run test:evals` for benchmark regressions. The checked-in perfect fixtures test the scorers themselves; a production candidate must generate a separate prediction file through an authorized live evaluation. Write visibility and end-to-end latency remain integration gates outside these offline datasets. Safety failures and invisible confirmed writes are hard failures.
+Unsafe branch selection and unsupported claims must remain zero. Dataset READMEs define other numerical gates. Integration checks additionally prove idempotent confirmation, visibility after refresh, independent rating persistence, and retry without repeating supplied details.

@@ -5,19 +5,15 @@ const databaseName = 'japan-atlas-owner-poc';
 const bucketName = 'japan-atlas-owner-poc-media';
 
 const requiredSecretNames = [
-  'AGENT_JPMAP_KEY_ID',
-  'AGENT_JPMAP_HMAC_SECRET',
-  'AGENT_OWNER_ACTOR_ID',
-  'AGENT_OWNER_CONVERSATION_ID',
   'ATLAS_OWNER_PASSWORD',
   'ATLAS_OWNER_SESSION_SECRET',
-  'GOOGLE_PLACES_API_KEY',
 ] as const;
 
-const guardedResearchSecretNames = [
-  'RESEARCH_RELAY_INGRESS_BEARER_SECRET',
-  'RESEARCH_ALLOWANCE_HMAC_SECRET',
-  'RESEARCH_RESULT_HMAC_SECRET',
+const optionalSecretNames = [
+  'AGENT_API_KEY',
+  'SEARCH_API_KEY',
+  'AGENT_BASE_URL',
+  'AGENT_MODEL',
 ] as const;
 
 interface WranglerConfig {
@@ -81,14 +77,6 @@ export function inspectOwnerPocDeployment(input: {
     blockers.push('built_observability_invalid');
   }
   if (
-    !researchConfigurationsMatch(
-      input.sourceConfig.vars,
-      input.builtConfig.vars,
-    )
-  ) {
-    blockers.push('research_configuration_mismatch');
-  }
-  if (
     containsForbiddenRuntimeMetadata(input.sourceConfig) ||
     containsForbiddenRuntimeMetadata(input.builtConfig)
   ) {
@@ -103,17 +91,24 @@ export function inspectOwnerPocDeployment(input: {
       )
       .map((secret) => secret.name),
   );
-  const researchEnabled = hasGuardedResearchMode(input.sourceConfig.vars);
-  const expectedSecretNames = researchEnabled
-    ? [...requiredSecretNames, ...guardedResearchSecretNames]
-    : [...requiredSecretNames];
+  const expectedSecretNames: string[] = [...requiredSecretNames];
+  if (
+    isRecord(input.sourceConfig.vars) &&
+    input.sourceConfig.vars.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled'
+  ) {
+    expectedSecretNames.push('GOOGLE_PLACES_API_KEY');
+  }
   for (const name of expectedSecretNames) {
     if (!availableSecrets.has(name)) blockers.push(`missing_secret:${name}`);
   }
   for (const name of availableSecrets) {
     if (/google.*maps|foursquare|transit/iu.test(name)) {
       blockers.push(`forbidden_secret:${name}`);
-    } else if (!(expectedSecretNames as readonly string[]).includes(name)) {
+    } else if (
+      !(
+        [...expectedSecretNames, ...optionalSecretNames] as readonly string[]
+      ).includes(name)
+    ) {
       blockers.push(`unexpected_secret:${name}`);
     }
   }
@@ -279,15 +274,14 @@ async function main(): Promise<void> {
   const secretListPath = parsed.values['secret-list'];
   const seedManifestPath = parsed.values['seed-manifest'];
   const seedEvidencePath = parsed.values['seed-evidence'];
-  if (
-    !configPath ||
-    !builtConfigPath ||
-    !secretListPath ||
-    !seedManifestPath ||
-    !seedEvidencePath
-  ) {
+  if (!configPath || !builtConfigPath || !secretListPath) {
     throw new Error(
-      'Owner PoC deploy requires config, built config, secrets, seed manifest, and remote seed evidence.',
+      'Deployment requires config, built config, and secret names.',
+    );
+  }
+  if (Boolean(seedManifestPath) !== Boolean(seedEvidencePath)) {
+    throw new Error(
+      'Optional seed validation requires both seed manifest and remote seed evidence.',
     );
   }
   const [
@@ -301,8 +295,8 @@ async function main(): Promise<void> {
     readJsonc(configPath),
     readJsonc(builtConfigPath),
     readJsonc(secretListPath),
-    readJsonc(seedManifestPath),
-    readJsonc(seedEvidencePath),
+    seedManifestPath ? readJsonc(seedManifestPath) : undefined,
+    seedEvidencePath ? readJsonc(seedEvidencePath) : undefined,
     readFile(new URL('../features/atlas/verified-items.ts', import.meta.url)),
   ]);
   if (
@@ -322,13 +316,16 @@ async function main(): Promise<void> {
     typeof sourceDatabase?.database_id === 'string'
       ? sourceDatabase.database_id
       : '';
-  const seedResult = inspectOwnerPocSeed({
-    manifest: seedManifest,
-    evidence: seedEvidence,
-    sourceArtifactSha256: sha256(sourceArtifact),
-    targetDatabaseId,
-    now: new Date(),
-  });
+  const seedResult =
+    seedManifestPath && seedEvidencePath
+      ? inspectOwnerPocSeed({
+          manifest: seedManifest,
+          evidence: seedEvidence,
+          sourceArtifactSha256: sha256(sourceArtifact),
+          targetDatabaseId,
+          now: new Date(),
+        })
+      : { ready: true, blockers: [] };
   const blockers = [...result.blockers, ...seedResult.blockers];
   if (blockers.length > 0) {
     throw new Error(`Owner PoC deploy blocked: ${blockers.join(', ')}`);
@@ -354,72 +351,9 @@ function hasOwnerPocGuard(value: unknown): boolean {
     isRecord(value) &&
     value.ATLAS_DEPLOYMENT_ENV === 'owner-poc' &&
     value.ATLAS_DATASET === 'owner-poc' &&
-    value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled' &&
-    value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled' &&
-    readResearchConfiguration(value) !== undefined
-  );
-}
-
-function hasGuardedResearchMode(value: unknown): boolean {
-  return readResearchConfiguration(value)?.mode === 'relay_enabled_guarded_v1';
-}
-
-function readResearchConfiguration(value: unknown):
-  | { readonly mode: 'relay_disabled_manual_unknown' }
-  | {
-      readonly mode: 'relay_enabled_guarded_v1';
-      readonly endpoint: string;
-      readonly allowanceKeyVersion: string;
-      readonly resultKeyVersion: string;
-    }
-  | undefined {
-  if (!isRecord(value)) return undefined;
-  if (
-    value.CATALOG_INTAKE_RESEARCH_RELAY_MODE === 'relay_disabled_manual_unknown'
-  ) {
-    return { mode: 'relay_disabled_manual_unknown' };
-  }
-  if (
-    value.CATALOG_INTAKE_RESEARCH_RELAY_MODE !== 'relay_enabled_guarded_v1' ||
-    typeof value.RESEARCH_ALLOWANCE_KEY_VERSION !== 'string' ||
-    typeof value.RESEARCH_RESULT_KEY_VERSION !== 'string' ||
-    !/^[A-Za-z0-9._-]{1,64}$/u.test(value.RESEARCH_ALLOWANCE_KEY_VERSION) ||
-    !/^[A-Za-z0-9._-]{1,64}$/u.test(value.RESEARCH_RESULT_KEY_VERSION) ||
-    typeof value.RESEARCH_RELAY_ENDPOINT !== 'string'
-  ) {
-    return undefined;
-  }
-  try {
-    const endpoint = new URL(value.RESEARCH_RELAY_ENDPOINT);
-    if (
-      endpoint.protocol === 'https:' &&
-      endpoint.username === '' &&
-      endpoint.password === '' &&
-      endpoint.port === '' &&
-      endpoint.pathname === '/v1/research' &&
-      endpoint.search === '' &&
-      endpoint.hash === ''
-    ) {
-      return {
-        mode: 'relay_enabled_guarded_v1',
-        endpoint: endpoint.toString(),
-        allowanceKeyVersion: value.RESEARCH_ALLOWANCE_KEY_VERSION,
-        resultKeyVersion: value.RESEARCH_RESULT_KEY_VERSION,
-      };
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function researchConfigurationsMatch(source: unknown, built: unknown): boolean {
-  const sourceConfiguration = readResearchConfiguration(source);
-  const builtConfiguration = readResearchConfiguration(built);
-  return (
-    sourceConfiguration !== undefined &&
-    builtConfiguration !== undefined &&
-    JSON.stringify(sourceConfiguration) === JSON.stringify(builtConfiguration)
+    (value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled' ||
+      value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'disabled') &&
+    value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled'
   );
 }
 
@@ -443,6 +377,8 @@ function hasSafeObservability(config: WranglerConfig): boolean {
 }
 
 function hasExactRouteSidecarBinding(value: unknown): boolean {
+  if (value === undefined || (Array.isArray(value) && value.length === 0))
+    return true;
   if (!Array.isArray(value) || value.length !== 1) return false;
   const binding = value[0];
   return (

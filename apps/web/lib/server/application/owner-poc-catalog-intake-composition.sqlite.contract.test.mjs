@@ -10,42 +10,38 @@ import { createOwnerPocComposition } from './owner-poc-composition.ts';
 
 const root = new URL('../../../migrations/owner-poc/', import.meta.url);
 
-test('production composition recognizes guarded Relay only when every reviewed binding is present', () => {
+test('production composition wires the repository agent without an external service', () => {
   const database = {
     prepare() {
       throw new Error('construction must not query D1');
     },
   };
   const complete = {
-    providerModes: { researchRelay: 'relay_enabled_guarded_v1' },
-    researchRelayEndpoint: 'https://research.example/v1/research',
-    researchRelayIngressBearerSecret: 'i'.repeat(32),
-    researchAllowanceKeyVersion: 'allowance-v1',
-    researchAllowanceHmacSecret: 'a'.repeat(32),
-    researchResultKeyVersion: 'result-v1',
-    researchResultHmacSecret: 'r'.repeat(32),
+    agentApiKey: 'model-key',
+    agentBaseUrl: 'https://model.example/v1',
+    agentModel: 'model',
+    searchApiKey: 'search-key',
   };
   assert.equal(
     createOwnerPocComposition(database, undefined, complete).providerModes
-      .researchRelay,
-    'relay_enabled_guarded_v1',
+      .agentResearch,
+    'configured',
   );
   for (const key of Object.keys(complete).filter(
     (candidate) => candidate !== 'providerModes',
   )) {
-    assert.throws(
+    assert.doesNotThrow(
       () =>
         createOwnerPocComposition(database, undefined, {
           ...complete,
           [key]: undefined,
         }),
-      /Guarded Research Relay configuration is invalid/u,
       key,
     );
   }
 });
 
-test('production owner-poc composition fails closed to manual unknown when guarded Relay configuration is incomplete', async () => {
+test('production owner-poc composition supports manual fields when research is disabled', async () => {
   const sqlite = new DatabaseSync(':memory:');
   for (const migration of [
     '0001_owner_poc_schema.sql',
@@ -67,7 +63,6 @@ test('production owner-poc composition fails closed to manual unknown when guard
     providerModes: {
       googlePlaces: 'enabled',
       durableGeocoder: 'enabled',
-      researchRelay: 'relay_enabled-must-be-ignored',
     },
     clock: { now: () => new Date('2026-09-24T00:00:00.000Z') },
     idSource: { nextId: () => ids.shift() },
@@ -153,10 +148,7 @@ test('production owner-poc composition fails closed to manual unknown when guard
     'committed_verified',
     JSON.stringify(confirmed),
   );
-  assert.equal(
-    composition.providerModes.researchRelay,
-    'relay_disabled_manual_unknown',
-  );
+  assert.equal(composition.providerModes.agentResearch, 'disabled');
   assert.equal(calls.length, 4);
   assert.doesNotMatch(
     JSON.stringify(

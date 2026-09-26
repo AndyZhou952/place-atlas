@@ -2158,7 +2158,11 @@ test('catalog intake sessions are isolated by owner, channel, and conversation',
 
   for (const invocation of [
     { ownerId: 'owner-2', channel: 'web', conversationId: 'conversation-1' },
-    { ownerId: 'owner-1', channel: 'wechat', conversationId: 'conversation-1' },
+    {
+      ownerId: 'owner-1',
+      channel: 'external-client',
+      conversationId: 'conversation-1',
+    },
     { ownerId: 'owner-1', channel: 'web', conversationId: 'conversation-2' },
   ]) {
     const result = await application.execute(

@@ -9,7 +9,6 @@ const apiRoot = fileURLToPath(new URL('../../../app/api/', import.meta.url));
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const closedRouteSurface = [
-  route('agent/v1/tools/route.ts', ['POST'], 'agent_hmac'),
   route('auth/owner/route.ts', ['DELETE', 'POST'], 'owner_auth'),
   route('catalog-intake/cancel/route.ts', ['POST'], 'owner_cookie'),
   route('catalog-intake/confirm/route.ts', ['POST'], 'owner_cookie'),
@@ -86,16 +85,8 @@ void test('the complete unsafe route surface is closed over owner-cookie and exp
       ),
       `${expected.filename} is an explicit non-cookie exception.`,
     );
-    if (expected.policy === 'agent_hmac') {
-      assert.match(
-        candidate.source,
-        /createIsolatedReadonlyAgentHttpHandler/u,
-        'The Agent exception must retain its independent HMAC gateway.',
-      );
-    } else {
-      assert.match(candidate.source, /ownerLoginResponse/u);
-      assert.match(candidate.source, /ownerLogoutResponse/u);
-    }
+    assert.match(candidate.source, /ownerLoginResponse/u);
+    assert.match(candidate.source, /ownerLogoutResponse/u);
   }
 });
 

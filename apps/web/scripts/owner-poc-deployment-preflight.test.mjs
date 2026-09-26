@@ -6,6 +6,30 @@ import { inspectOwnerPocDeployment } from './owner-poc-deployment-preflight.ts';
 
 const configUrl = new URL('../wrangler.owner-poc.jsonc', import.meta.url);
 
+test('standalone agent deployment accepts model and search credentials without Google or route sidecar', async () => {
+  const template = JSON.parse(
+    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
+  );
+  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
+  template.vars.CATALOG_INTAKE_GOOGLE_PLACES_MODE = 'disabled';
+  template.vars.AGENT_BASE_URL = 'https://api.deepseek.com';
+  template.vars.AGENT_MODEL = 'deepseek-chat';
+  delete template.services;
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: structuredClone(template),
+      remoteSecrets: [
+        'ATLAS_OWNER_PASSWORD',
+        'ATLAS_OWNER_SESSION_SECRET',
+        'AGENT_API_KEY',
+        'SEARCH_API_KEY',
+      ].map((name) => ({ name, type: 'secret_text' })),
+    }),
+    { ready: true, blockers: [] },
+  );
+});
+
 void test('the owner PoC template selects only blue-green D1 and R2 resources', async () => {
   const source = await readFile(configUrl, 'utf8');
   const config = JSON.parse(source.replace(/,\s*([}\]])/gu, '$1'));
@@ -16,7 +40,6 @@ void test('the owner PoC template selects only blue-green D1 and R2 resources', 
     ATLAS_DEPLOYMENT_ENV: 'owner-poc',
     CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
     CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
-    CATALOG_INTAKE_RESEARCH_RELAY_MODE: 'relay_disabled_manual_unknown',
   });
   assert.equal(config.preview_urls, false);
   assert.deepEqual(config.observability, {
@@ -61,10 +84,6 @@ void test('owner PoC preflight accepts only a matching blue-green artifact with 
   );
   template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
   const secrets = [
-    'AGENT_JPMAP_KEY_ID',
-    'AGENT_JPMAP_HMAC_SECRET',
-    'AGENT_OWNER_ACTOR_ID',
-    'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
     'GOOGLE_PLACES_API_KEY',
@@ -77,70 +96,6 @@ void test('owner PoC preflight accepts only a matching blue-green artifact with 
       remoteSecrets: secrets,
     }),
     { ready: true, blockers: [] },
-  );
-});
-
-void test('owner PoC preflight accepts guarded research only with the exact fixed endpoint vars and three extra secrets', async () => {
-  const template = JSON.parse(
-    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
-  );
-  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
-  Object.assign(template.vars, {
-    CATALOG_INTAKE_RESEARCH_RELAY_MODE: 'relay_enabled_guarded_v1',
-    RESEARCH_RELAY_ENDPOINT: 'https://research.example/v1/research',
-    RESEARCH_ALLOWANCE_KEY_VERSION: 'allowance-v1',
-    RESEARCH_RESULT_KEY_VERSION: 'result-v1',
-  });
-  const secrets = [
-    'AGENT_JPMAP_KEY_ID',
-    'AGENT_JPMAP_HMAC_SECRET',
-    'AGENT_OWNER_ACTOR_ID',
-    'AGENT_OWNER_CONVERSATION_ID',
-    'ATLAS_OWNER_PASSWORD',
-    'ATLAS_OWNER_SESSION_SECRET',
-    'GOOGLE_PLACES_API_KEY',
-    'RESEARCH_RELAY_INGRESS_BEARER_SECRET',
-    'RESEARCH_ALLOWANCE_HMAC_SECRET',
-    'RESEARCH_RESULT_HMAC_SECRET',
-  ].map((name) => ({ name, type: 'secret_text' }));
-  assert.deepEqual(
-    inspectOwnerPocDeployment({
-      sourceConfig: template,
-      builtConfig: structuredClone(template),
-      remoteSecrets: secrets,
-    }),
-    { ready: true, blockers: [] },
-  );
-  assert.deepEqual(
-    inspectOwnerPocDeployment({
-      sourceConfig: template,
-      builtConfig: structuredClone(template),
-      remoteSecrets: secrets.filter(
-        ({ name }) => name !== 'RESEARCH_RESULT_HMAC_SECRET',
-      ),
-    }),
-    {
-      ready: false,
-      blockers: ['missing_secret:RESEARCH_RESULT_HMAC_SECRET'],
-    },
-  );
-
-  const staleBuilt = structuredClone(template);
-  staleBuilt.vars.CATALOG_INTAKE_RESEARCH_RELAY_MODE =
-    'relay_disabled_manual_unknown';
-  delete staleBuilt.vars.RESEARCH_RELAY_ENDPOINT;
-  delete staleBuilt.vars.RESEARCH_ALLOWANCE_KEY_VERSION;
-  delete staleBuilt.vars.RESEARCH_RESULT_KEY_VERSION;
-  assert.deepEqual(
-    inspectOwnerPocDeployment({
-      sourceConfig: template,
-      builtConfig: staleBuilt,
-      remoteSecrets: secrets,
-    }),
-    {
-      ready: false,
-      blockers: ['research_configuration_mismatch'],
-    },
   );
 });
 
@@ -155,12 +110,7 @@ void test('owner PoC preflight rejects placeholders, missing owner secrets, and 
     inspectOwnerPocDeployment({
       sourceConfig: template,
       builtConfig: built,
-      remoteSecrets: [
-        { name: 'AGENT_JPMAP_KEY_ID', type: 'secret_text' },
-        { name: 'AGENT_JPMAP_HMAC_SECRET', type: 'secret_text' },
-        { name: 'AGENT_OWNER_ACTOR_ID', type: 'secret_text' },
-        { name: 'AGENT_OWNER_CONVERSATION_ID', type: 'secret_text' },
-      ],
+      remoteSecrets: [],
     }),
     {
       ready: false,
@@ -181,10 +131,6 @@ void test('owner PoC rejects direct Google, Transit, or Foursquare runtime capab
   );
   template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
   const secrets = [
-    'AGENT_JPMAP_KEY_ID',
-    'AGENT_JPMAP_HMAC_SECRET',
-    'AGENT_OWNER_ACTOR_ID',
-    'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
     'GOOGLE_PLACES_API_KEY',
@@ -229,28 +175,18 @@ void test('owner PoC rejects direct Google, Transit, or Foursquare runtime capab
   );
 });
 
-void test('owner PoC preflight requires exactly one well-formed private Route Sidecar binding in source and built artifacts', async () => {
+void test('owner PoC preflight validates an optional Route Sidecar binding when present', async () => {
   const template = JSON.parse(
     (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
   );
   template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
   const secrets = [
-    'AGENT_JPMAP_KEY_ID',
-    'AGENT_JPMAP_HMAC_SECRET',
-    'AGENT_OWNER_ACTOR_ID',
-    'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
     'GOOGLE_PLACES_API_KEY',
   ].map((name) => ({ name, type: 'secret_text' }));
 
   const cases = [
-    {
-      name: 'source missing',
-      sourceServices: [],
-      builtServices: template.services,
-      blocker: 'source_route_sidecar_binding_invalid',
-    },
     {
       name: 'source extra',
       sourceServices: [
@@ -259,12 +195,6 @@ void test('owner PoC preflight requires exactly one well-formed private Route Si
       ],
       builtServices: template.services,
       blocker: 'source_route_sidecar_binding_invalid',
-    },
-    {
-      name: 'built missing',
-      sourceServices: template.services,
-      builtServices: [],
-      blocker: 'built_route_sidecar_binding_invalid',
     },
     {
       name: 'built wrong service',
@@ -315,10 +245,6 @@ void test('owner PoC preflight rejects an unexpected encrypted secret name', asy
   );
   template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
   const secrets = [
-    'AGENT_JPMAP_KEY_ID',
-    'AGENT_JPMAP_HMAC_SECRET',
-    'AGENT_OWNER_ACTOR_ID',
-    'AGENT_OWNER_CONVERSATION_ID',
     'ATLAS_OWNER_PASSWORD',
     'ATLAS_OWNER_SESSION_SECRET',
     'GOOGLE_PLACES_API_KEY',

@@ -2,6 +2,7 @@ declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
     MEDIA: R2Bucket;
+    BROWSER?: import('../agent/browser-source-reader').BrowserContentBinding;
     ROUTE_SIDECAR: import('../route-sidecar/metered-route-sidecar-client').RouteSidecarServiceBinding;
     GOOGLE_PLACES_API_KEY?: string;
     CATALOG_INTAKE_GOOGLE_PLACES_MODE?: string;

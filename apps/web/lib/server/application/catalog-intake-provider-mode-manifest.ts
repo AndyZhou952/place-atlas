@@ -34,6 +34,7 @@ export interface CatalogIntakeProviderModes {
 }
 
 export interface OwnerPocCatalogIntakeRuntimeBindings {
+  readonly BROWSER?: import('../../../agent/browser-source-reader.ts').BrowserContentBinding;
   readonly ATLAS_OWNER_SESSION_SECRET?: string;
   readonly AGENT_SETTINGS_SECRET?: string;
   readonly AGENT_API_KEY?: string;
@@ -49,6 +50,7 @@ export function projectOwnerPocCatalogIntakeRuntime(
   bindings: OwnerPocCatalogIntakeRuntimeBindings,
 ) {
   return {
+    browser: bindings.BROWSER,
     agentSettingsSecret:
       bindings.AGENT_SETTINGS_SECRET ?? bindings.ATLAS_OWNER_SESSION_SECRET,
     agentApiKey: bindings.AGENT_API_KEY,

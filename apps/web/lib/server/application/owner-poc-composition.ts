@@ -17,6 +17,10 @@ import { createNominatimDurableGeocoderAdapter } from '../../../adapters/provide
 import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
 import { createConfiguredPlaceResearchAgent } from '../../../agent/place-research.ts';
 import {
+  createRestaurantSourceReader,
+  type BrowserContentBinding,
+} from '../../../agent/browser-source-reader.ts';
+import {
   createAgentSettingsService,
   createD1AgentSettingsStore,
 } from '../agent-settings.ts';
@@ -30,6 +34,7 @@ import {
 } from './catalog-intake-provider-mode-manifest.ts';
 
 export interface OwnerPocCatalogIntakeOptions {
+  readonly browser?: BrowserContentBinding;
   readonly agentSettingsSecret?: string;
   readonly agentApiKey?: string;
   readonly agentBaseUrl?: string;
@@ -56,6 +61,9 @@ export function createOwnerPocComposition(
 ) {
   const catalogRead = createD1OwnerPocCatalogRead(database);
   const clock = intakeOptions.clock ?? { now: () => new Date() };
+  const sourceReader = intakeOptions.browser
+    ? createRestaurantSourceReader(intakeOptions.browser, intakeOptions.fetch)
+    : undefined;
   const routeEvidence = createRouteSidecarNearbyAdapter(
     createD1MeteredRouteSidecarClient({
       database,
@@ -109,6 +117,7 @@ export function createOwnerPocComposition(
     providerModes.googlePlaces === 'enabled' && intakeOptions.googlePlacesApiKey
       ? googleDiscovery
       : createTabelogPlaceDiscoveryPort({
+          ...(sourceReader ? { sourceReader } : {}),
           ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
           ...(intakeOptions.searchApiKey
             ? { searchApiKey: intakeOptions.searchApiKey }
@@ -130,8 +139,12 @@ export function createOwnerPocComposition(
   const idSource = intakeOptions.idSource ?? {
     nextId: () => crypto.randomUUID(),
   };
+  const researchOptions = {
+    ...intakeOptions,
+    ...(sourceReader ? { sourceReader } : {}),
+  };
   const environmentResearchPort =
-    createConfiguredPlaceResearchAgent(intakeOptions);
+    createConfiguredPlaceResearchAgent(researchOptions);
   const webResearchPort = intakeOptions.agentSettingsSecret
     ? {
         async research(
@@ -146,7 +159,7 @@ export function createOwnerPocComposition(
               intakeOptions,
             ).resolve();
             const agent = createConfiguredPlaceResearchAgent({
-              ...intakeOptions,
+              ...researchOptions,
               ...config,
             });
             return agent

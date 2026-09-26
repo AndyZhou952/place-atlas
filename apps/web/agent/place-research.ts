@@ -4,6 +4,7 @@ import {
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
+import type { RestaurantSourceReader } from './browser-source-reader.ts';
 import {
   readTabelogListingResult,
   type TabelogEvidence,
@@ -21,6 +22,7 @@ export interface AgentConfiguration {
   searchApiKey?: string;
   fetch?: typeof fetch;
   readSourcePages?: boolean;
+  sourceReader?: RestaurantSourceReader;
 }
 
 type Evidence = SearchEvidence;
@@ -29,6 +31,7 @@ export function createConfiguredPlaceResearchAgent(options: {
   agentBaseUrl?: string;
   agentModel?: string;
   searchApiKey?: string;
+  sourceReader?: RestaurantSourceReader;
   fetch?: typeof fetch;
 }): WebResearchPort | undefined {
   if (
@@ -51,6 +54,7 @@ export function createConfiguredPlaceResearchAgent(options: {
       model: options.agentModel,
       ...(options.searchApiKey ? { searchApiKey: options.searchApiKey } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),
+      ...(options.sourceReader ? { sourceReader: options.sourceReader } : {}),
     });
   } catch {
     return {
@@ -98,7 +102,9 @@ export function createPlaceResearchAgent(
       const usedCallIds = new Set<string>();
       let sourceAccessIssue: 'blocked' | 'unavailable' | undefined;
       const readListing = async (url: string) => {
-        const result = await readTabelogListingResult(url, fetcher, signal);
+        const result = config.sourceReader
+          ? await config.sourceReader(url, signal)
+          : await readTabelogListingResult(url, fetcher, signal);
         if (result.kind === 'read') return result.evidence;
         if (result.kind === 'blocked') sourceAccessIssue = 'blocked';
         else sourceAccessIssue ??= 'unavailable';

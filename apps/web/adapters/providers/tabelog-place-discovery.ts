@@ -1,6 +1,7 @@
 import { createWebSearch } from '../../agent/web-search.ts';
 import { isTabelogRestaurantListing } from '../../agent/research-instructions.ts';
 import { readTabelogListing } from '../../agent/tabelog-listing.ts';
+import type { RestaurantSourceReader } from '../../agent/browser-source-reader.ts';
 import type {
   GooglePlaceDiscoveryCandidate,
   GooglePlaceDiscoveryPort,
@@ -12,6 +13,7 @@ export function createTabelogPlaceDiscoveryPort(
   options: {
     fetch?: typeof fetch;
     searchApiKey?: string;
+    sourceReader?: RestaurantSourceReader;
   } = {},
 ): GooglePlaceDiscoveryPort {
   const fetcher = options.fetch ?? fetch;
@@ -21,7 +23,14 @@ export function createTabelogPlaceDiscoveryPort(
   });
 
   async function read(placeId: string, ordinal: number, signal: AbortSignal) {
-    const listing = await readTabelogListing(placeId, fetcher, signal);
+    const result = options.sourceReader
+      ? await options.sourceReader(placeId, signal)
+      : undefined;
+    const listing = options.sourceReader
+      ? result?.kind === 'read'
+        ? result.evidence
+        : undefined
+      : await readTabelogListing(placeId, fetcher, signal);
     const restaurant = listing?.restaurant;
     if (
       !restaurant ||

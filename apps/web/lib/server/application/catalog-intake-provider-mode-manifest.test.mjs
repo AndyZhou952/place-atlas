@@ -42,6 +42,7 @@ test('the shared runtime projection maps only the reviewed catalog-intake bindin
       SEARCH_API_KEY: 'search-key',
     }),
     {
+      browser: undefined,
       agentSettingsSecret: undefined,
       googlePlacesApiKey: 'server-secret',
       agentApiKey: 'agent-key',

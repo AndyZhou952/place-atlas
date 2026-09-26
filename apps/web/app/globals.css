@@ -341,6 +341,12 @@
   width: min(28rem, 48vw);
 }
 
+.collection-panel .search-field {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .search-field > svg {
   position: absolute;
   z-index: 1;

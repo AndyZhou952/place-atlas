@@ -2,6 +2,8 @@
 
 Updated: 2026-09-26. This checklist tracks the usable product, not repository housekeeping.
 
+Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
+
 - [x] means the stated implementation or verification is complete.
 - [ ] means implementation, integration, or acceptance is still pending; the note identifies which.
 - Local tests are not production acceptance. All three user journeys must pass on the deployed website before the PoC is ready.

@@ -79,8 +79,10 @@ Image input follows its own benchmark and is not part of the first text PoC.
 
 ## Order
 
-Finish the reported Add branch-enrichment regression first. R1 and N1 can then
-proceed independently. N2 depends on N1; N3 validates the integrated result.
+The reported Add branch-enrichment regression has a verified deployed preview
+fix; broader Add coverage remains open. Finish the Record loop next. R1 and N1
+can proceed independently when parallel work is authorized. N2 depends on N1;
+N3 validates the integrated result. See [agent handoff](record-nearby-handoff.md).
 This document does not authorize or claim those later features as implemented.
 
 ## Review retirement

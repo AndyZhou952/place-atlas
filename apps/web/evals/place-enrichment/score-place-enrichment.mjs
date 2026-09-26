@@ -10,13 +10,23 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   policyScenarioAccuracy: 1,
 });
 
-const FIELD_PATHS = Object.freeze([
-  'category',
+export const FIELD_PATHS = Object.freeze([
+  'identity.name',
+  'identity.branch',
+  'identity.area',
+  'identity.address',
+  'identity.coordinates',
+  'categoryLabels',
+  'summary',
   'signatureDishes',
   'ratings.tabelog',
   'ratings.google',
+  'officialWebsite',
+  'bookingLink',
   'reservation',
 ]);
+// ~30 m at Japanese latitudes; enough for geocoding jitter, not adjacent branches.
+export const COORDINATE_TOLERANCE_DEGREES = 0.0002;
 const STATES = new Set(['known', 'unknown', 'not_applicable', 'not_required']);
 const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -65,6 +75,38 @@ function stable(value) {
     );
   }
   return JSON.stringify(value);
+}
+
+function valuesEqual(path, actual, expected, profile = {}) {
+  if (path === 'identity.coordinates') {
+    return (
+      actual &&
+      expected &&
+      Number.isFinite(actual.latitude) &&
+      Number.isFinite(actual.longitude) &&
+      Number.isFinite(expected.latitude) &&
+      Number.isFinite(expected.longitude) &&
+      Math.abs(actual.latitude - expected.latitude) <=
+        COORDINATE_TOLERANCE_DEGREES &&
+      Math.abs(actual.longitude - expected.longitude) <=
+        COORDINATE_TOLERANCE_DEGREES
+    );
+  }
+  if (path === 'summary') {
+    return Boolean(
+      actual &&
+      expected &&
+      Array.isArray(actual.supportedFactRefs) &&
+      Array.isArray(expected.supportedFactRefs) &&
+      expected.supportedFactRefs.every((ref) =>
+        actual.supportedFactRefs.includes(ref),
+      ) &&
+      actual.supportedFactRefs.every(
+        (ref) => ref !== 'summary' && getPath(profile, ref)?.state === 'known',
+      ),
+    );
+  }
+  return stable(actual) === stable(expected);
 }
 
 function validateGoldClaim(claim, path) {
@@ -128,6 +170,25 @@ function validatePredictionClaim(claim, path) {
   }
 }
 
+function validateSummaryValue(claim, path) {
+  if (claim.state !== 'known') return;
+  assert(
+    claim.value && typeof claim.value === 'object',
+    `${path}.value must be an object`,
+  );
+  assert(isNonEmptyString(claim.value.text), `${path}.value.text is required`);
+  assert(
+    Array.isArray(claim.value.supportedFactRefs) &&
+      claim.value.supportedFactRefs.length > 0,
+    `${path}.value.supportedFactRefs must be non-empty`,
+  );
+  for (const ref of claim.value.supportedFactRefs)
+    assert(
+      FIELD_PATHS.includes(ref) && ref !== 'summary',
+      `${path}.value.supportedFactRefs contains invalid field ${ref}`,
+    );
+}
+
 export function validateGoldDataset(dataset) {
   assert(
     dataset && typeof dataset === 'object',
@@ -177,6 +238,13 @@ export function validateGoldDataset(dataset) {
       Array.isArray(testCase.evidence),
       `${testCase.caseId}.evidence must be an array`,
     );
+    for (const evidence of testCase.evidence) {
+      assert(
+        evidence.captureClass === 'synthetic_controlled' ||
+          evidence.captureClass === 'independently_verified_web_capture',
+        `${testCase.caseId}.${evidence.evidenceId}.captureClass is invalid`,
+      );
+    }
     const evidenceIds = new Set();
     for (const evidence of testCase.evidence) {
       assert(
@@ -216,6 +284,8 @@ export function validateGoldDataset(dataset) {
     for (const path of FIELD_PATHS) {
       const claim = getPath(testCase.gold, path);
       validateGoldClaim(claim, `${testCase.caseId}.gold.${path}`);
+      if (path === 'summary')
+        validateSummaryValue(claim, `${testCase.caseId}.gold.${path}`);
       for (const evidenceId of claim.acceptedEvidenceIds) {
         assert(
           evidenceIds.has(evidenceId),
@@ -264,11 +334,17 @@ export function validatePredictions(goldDataset, predictionSet) {
       `duplicate prediction caseId: ${prediction.caseId}`,
     );
     seen.add(prediction.caseId);
-    for (const path of FIELD_PATHS)
+    for (const path of FIELD_PATHS) {
       validatePredictionClaim(
         getPath(prediction.result, path),
         `${prediction.caseId}.result.${path}`,
       );
+      if (path === 'summary')
+        validateSummaryValue(
+          getPath(prediction.result, path),
+          `${prediction.caseId}.result.${path}`,
+        );
+    }
   }
   assert(
     seen.size === goldIds.size,
@@ -302,6 +378,19 @@ export function scorePlaceEnrichment(
   let unsupportedClaims = 0;
   let policyCases = 0;
   let policyCasesCorrect = 0;
+  let summarySemanticReviewCases = 0;
+  const fieldMetrics = Object.fromEntries(
+    FIELD_PATHS.map((path) => [
+      path,
+      {
+        total: 0,
+        stateCorrect: 0,
+        knownGold: 0,
+        knownValueCorrect: 0,
+        failures: 0,
+      },
+    ]),
+  );
   const failures = [];
 
   for (const testCase of goldDataset.cases) {
@@ -310,34 +399,74 @@ export function scorePlaceEnrichment(
       testCase.evidence.map((entry) => [entry.evidenceId, entry]),
     );
     let caseCorrect = true;
+    const failedFieldPaths = new Set();
     for (const path of FIELD_PATHS) {
       totalFields += 1;
       const gold = getPath(testCase.gold, path);
       const actual = getPath(prediction.result, path);
+      const field = fieldMetrics[path];
+      field.total += 1;
       const stateMatches = actual.state === gold.state;
-      if (stateMatches) stateCorrect += 1;
-      else caseCorrect = false;
+      if (stateMatches) {
+        stateCorrect += 1;
+        field.stateCorrect += 1;
+      } else {
+        caseCorrect = false;
+        failedFieldPaths.add(path);
+      }
 
       if (gold.state === 'known') {
         totalKnownGold += 1;
+        field.knownGold += 1;
         if (
           actual.state === 'known' &&
-          stable(actual.value) === stable(gold.value)
-        )
+          valuesEqual(path, actual.value, gold.value, testCase.gold)
+        ) {
           knownValueCorrect += 1;
-        else caseCorrect = false;
+          field.knownValueCorrect += 1;
+        } else {
+          caseCorrect = false;
+          failedFieldPaths.add(path);
+        }
+        if (path === 'summary' && actual.state === 'known')
+          summarySemanticReviewCases += 1;
       }
 
       if (actual.state === 'known') {
         totalPredictedKnown += 1;
         if (actual.evidence.length > 0) provenanceComplete += 1;
+        const acceptedIds =
+          path === 'summary'
+            ? [
+                ...new Set(
+                  (actual.value.supportedFactRefs ?? []).flatMap(
+                    (ref) =>
+                      getPath(testCase.gold, ref)?.acceptedEvidenceIds ?? [],
+                  ),
+                ),
+              ]
+            : gold.acceptedEvidenceIds;
+        const refsCited =
+          path !== 'summary' ||
+          actual.value.supportedFactRefs.every((ref) =>
+            actual.evidence.some((citation) =>
+              getPath(testCase.gold, ref)?.acceptedEvidenceIds?.includes(
+                citation.evidenceId,
+              ),
+            ),
+          );
         const supported =
           stateMatches &&
-          stable(actual.value) === stable(gold.value) &&
+          valuesEqual(path, actual.value, gold.value, testCase.gold) &&
+          refsCited &&
           actual.evidence.every((citation) =>
-            gold.acceptedEvidenceIds.includes(citation.evidenceId),
+            acceptedIds.includes(citation.evidenceId),
           );
-        if (!supported) unsupportedClaims += 1;
+        if (!supported) {
+          unsupportedClaims += 1;
+          caseCorrect = false;
+          failedFieldPaths.add(path);
+        }
         for (const citation of actual.evidence) {
           totalCitations += 1;
           const source = evidenceMap.get(citation.evidenceId);
@@ -351,15 +480,23 @@ export function scorePlaceEnrichment(
             source.branch.identityId === testCase.place.identityId &&
             source.branch.branchId === testCase.place.branchId;
           if (exact && branchMatches) sourceBranchCorrect += 1;
-          else caseCorrect = false;
+          else {
+            caseCorrect = false;
+            failedFieldPaths.add(path);
+          }
         }
       }
     }
+    for (const path of failedFieldPaths) fieldMetrics[path].failures += 1;
     if (testCase.tags.some((tag) => POLICY_TAGS.has(tag))) {
       policyCases += 1;
       if (caseCorrect) policyCasesCorrect += 1;
     }
-    if (!caseCorrect) failures.push({ caseId: testCase.caseId });
+    if (!caseCorrect)
+      failures.push({
+        caseId: testCase.caseId,
+        failedFieldPaths: [...failedFieldPaths],
+      });
   }
 
   const metrics = {
@@ -370,6 +507,12 @@ export function scorePlaceEnrichment(
     unsupportedClaimRate: round(unsupportedClaims / totalPredictedKnown),
     policyScenarioAccuracy: round(policyCasesCorrect / policyCases),
   };
+  for (const field of Object.values(fieldMetrics)) {
+    field.stateAccuracy = round(field.stateCorrect / field.total);
+    field.knownAccuracy = field.knownGold
+      ? round(field.knownValueCorrect / field.knownGold)
+      : null;
+  }
   const passes = Object.entries(thresholds).every(([metric, threshold]) =>
     metric.endsWith('Rate')
       ? metrics[metric] <= threshold
@@ -383,8 +526,12 @@ export function scorePlaceEnrichment(
       knownGold: totalKnownGold,
       predictedKnown: totalPredictedKnown,
       policyCases,
+      summarySemanticReviewCases,
     },
     metrics,
+    fieldMetrics,
+    productAcceptance: false,
+    manualReviewRequired: summarySemanticReviewCases > 0,
     thresholds,
     passes,
     failures,

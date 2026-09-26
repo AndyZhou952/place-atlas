@@ -64,7 +64,7 @@ Add these model settings to the local Wrangler configuration's `vars`:
 ```json
 {
   "AGENT_BASE_URL": "https://api.deepseek.com/v1",
-  "AGENT_MODEL": "deepseek-chat"
+  "AGENT_MODEL": "deepseek-flash"
 }
 ```
 
@@ -181,3 +181,11 @@ node --experimental-strip-types agent/live-smoke.mjs "Restaurant name" "Exact br
 ```
 
 This incurs provider usage and prints structured research output and elapsed time. It does not write a restaurant. It tests the current narrow enrichment stage (Tabelog and explicit reservation facts); it is not an end-to-end Add benchmark or a test of all desired fields.
+
+To evaluate full-profile extraction with your actual model, put `AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL` in `apps/web/.env` (Git-ignored), then run from `apps/web`. For DeepSeek V4.1 Flash, use the official model ID `deepseek-flash` and set `AGENT_EVAL_REASONING_EFFORT=none` for this bounded extraction baseline. DeepSeek otherwise defaults to thinking mode, which can exhaust this test's token cap before returning JSON. This setting applies only to the evaluation runner; leave it unset for providers that do not support `reasoning_effort`.
+
+```sh
+node --experimental-strip-types --env-file=.env evals/run-add-enrichment.mjs evals/runs/add-extraction.json
+```
+
+This makes one model request per benchmark case (currently ten), with a 4,500 output-token cap and a 60-second limit per request. It uses supplied, labelled source fixtures rather than live search, and a separate experimental full-profile extraction prompt rather than the current production Add prompt. It tests identity/address/coordinates, categories, summary/dishes, ratings, official/booking links, and reservation rules. Expected answers are withheld from the model. Results include per-field failures, token usage when available, latency, and the production workflow's unsupported fields. Failed cases are retained. Output is private and Git-ignored; choose a new filename for another run. Passing extraction is not full Add acceptance: live retrieval, description review, confirmation, database persistence and map rendering still require separate checks. No restaurant is written by this command.

@@ -1,6 +1,6 @@
-# Place-enrichment benchmark v1
+# Place-enrichment benchmark v2 (Complete Add)
 
-This package evaluates the second stage of Add after one concrete restaurant branch has already been resolved. It asks whether an enrichment worker can turn captured evidence into a small, source-backed restaurant profile without inventing missing facts.
+This package evaluates the complete Add profile after one concrete restaurant branch has already been resolved. It asks whether an enrichment worker can turn captured evidence into a source-backed restaurant profile without inventing missing facts.
 
 This is a benchmark contract only. It does not mean the production application currently supports every field or provider represented here.
 
@@ -8,18 +8,24 @@ This is a benchmark contract only. It does not mean the production application c
 
 Each case supplies a resolved branch and a minimal, structured evidence bundle captured at a known time. The expected output covers:
 
-- cuisine/category tags;
+- restaurant name, branch, area, address, and coordinates;
+- cuisine/category labels (the former `category` field is now `categoryLabels`);
+- a grounded short summary and signature dishes;
+- official website and booking link when present;
 - signature dishes;
 - Tabelog rating policy for Japan;
 - Google review rating policy outside mainland China;
-- reservation policy and advance-booking advice;
+- reservation mode (`reservation_required`, `mixed`, `walk_in`), explicit lead time, and evidence-based difficulty;
 - exact provenance for every known claim.
 
-Unknown is a valid and often required answer. Tabelog is `not_applicable` outside Japan. Google review is `not_required` for mainland China in this product policy. A provider failure, stale snapshot, wrong-branch result, or untrusted page must never be converted into a confident claim.
+Unknown is a valid and often required answer. Tabelog is `not_applicable` outside Japan. Google review is `not_required` for mainland China in this product policy. A provider failure, stale snapshot, wrong-branch result, or untrusted page must never be converted into a confident claim. Reservation difficulty must come from explicit booking evidence; it must never be inferred from a rating.
 
 ## Contents
 
-- `place-enrichment-gold.v1.json`: ten source-grounded cases and their accepted evidence.
+- `place-enrichment-gold.v1.json`: ten controlled cases and their accepted evidence (`datasetId` `place-enrichment-complete-add.v2.2`). Existing fixture facts are synthetic controlled facts unless an evidence item is explicitly marked `independently_verified_web_capture`; the first Tabelog capture contains verified identity, location, categories and score; its synthetic menu evidence is a separate source.
+
+Correction note v2.2: summary cases now allow additional grounded identity references, controlled coordinates use plausible country geography, and known booking/website claims have matching controlled payload facts. This rebaseline follows a diagnostic run; it does not tune gold facts to model predictions.
+
 - `place-enrichment-gold.schema.json`: portable JSON Schema for the dataset.
 - `place-enrichment-predictions.example.v1.json`: a perfect offline prediction fixture.
 - `place-enrichment-predictions.schema.json`: portable JSON Schema for worker output.
@@ -30,7 +36,7 @@ The evidence payloads are deliberately short, structured captures rather than co
 
 ## Contract
 
-Every field has one of four states:
+Every exported field path has one of four states. The scorer exports the contract as `FIELD_PATHS`; it currently contains 13 paths under `identity.*`, `categoryLabels`, `summary`, `signatureDishes`, the two ratings, `officialWebsite`, `bookingLink`, and `reservation`.
 
 - `known`: the value is supported by accepted, current evidence for the resolved branch;
 - `unknown`: the benchmark does not contain enough safe evidence;
@@ -38,6 +44,8 @@ Every field has one of four states:
 - `not_required`: product policy intentionally does not require the field, currently Google review in mainland China.
 
 A `known` field must include at least one provenance record containing the exact evidence ID, provider, source URL, and observation time from the evidence bundle. Evidence for another branch is never acceptable, even when the restaurant brand is the same.
+
+Coordinates are compared within `0.0002` degrees per axis (about 30 m at Japanese latitudes), which accommodates geocoding jitter without accepting an adjacent branch. Summary prose is not an exact-string score: its `supportedFactRefs` must match the grounded facts, while the `text` remains flagged for manual semantic review (`counts.summarySemanticReviewCases`).
 
 ## Scenarios
 

@@ -14,6 +14,31 @@
     }
   },
   "$defs": {
+    "summaryClaim": {
+      "allOf": [
+        { "$ref": "#/$defs/claim" },
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "object",
+                "required": ["text", "supportedFactRefs"],
+                "properties": {
+                  "text": { "type": "string", "minLength": 1 },
+                  "supportedFactRefs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string" }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ]
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
@@ -60,9 +85,31 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["category", "signatureDishes", "ratings", "reservation"],
+      "required": [
+        "identity",
+        "categoryLabels",
+        "summary",
+        "signatureDishes",
+        "ratings",
+        "officialWebsite",
+        "bookingLink",
+        "reservation"
+      ],
       "properties": {
-        "category": { "$ref": "#/$defs/claim" },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "branch", "area", "address", "coordinates"],
+          "properties": {
+            "name": { "$ref": "#/$defs/claim" },
+            "branch": { "$ref": "#/$defs/claim" },
+            "area": { "$ref": "#/$defs/claim" },
+            "address": { "$ref": "#/$defs/claim" },
+            "coordinates": { "$ref": "#/$defs/claim" }
+          }
+        },
+        "categoryLabels": { "$ref": "#/$defs/claim" },
+        "summary": { "$ref": "#/$defs/summaryClaim" },
         "signatureDishes": { "$ref": "#/$defs/claim" },
         "ratings": {
           "type": "object",
@@ -73,6 +120,8 @@
             "google": { "$ref": "#/$defs/claim" }
           }
         },
+        "officialWebsite": { "$ref": "#/$defs/claim" },
+        "bookingLink": { "$ref": "#/$defs/claim" },
         "reservation": { "$ref": "#/$defs/claim" }
       }
     },

@@ -11,9 +11,85 @@ import {
 
 const directory = dirname(fileURLToPath(import.meta.url));
 
+test('known website links have explicit payload support and live captures exclude synthetic dishes', async () => {
+  const gold = await fixture('place-enrichment-gold.v1.json');
+  for (const entry of gold.cases) {
+    for (const field of ['officialWebsite', 'bookingLink']) {
+      const claim = entry.gold[field];
+      if (claim.state !== 'known') continue;
+      assert.ok(entry.evidence.some((source) =>
+        claim.acceptedEvidenceIds.includes(source.evidenceId) &&
+        JSON.stringify(source.payload).includes(claim.value)), `${entry.caseId}: ${field}`);
+    }
+  }
+  const live = gold.cases[0].evidence.find((source) => source.captureClass === 'independently_verified_web_capture');
+  assert.equal(live.payload.signatureDishes, undefined);
+  assert.equal(live.payload.reservationNotListed, undefined);
+  assert.equal(gold.cases[0].evidence.some((source) => source.evidenceId === 'controlled-identity'), false);
+});
+
 async function fixture(name) {
   return JSON.parse(await readFile(join(directory, name), 'utf8'));
 }
+
+test('coordinate tolerance rejects location drift and reports the specific field', async () => {
+  const gold = await fixture('place-enrichment-gold.v1.json');
+  const predictions = await fixture(
+    'place-enrichment-predictions.example.v1.json',
+  );
+  predictions.predictions[0].result.identity.coordinates.value.latitude += 0.0001;
+  assert.equal(scorePlaceEnrichment(gold, predictions).passes, true);
+  predictions.predictions[0].result.identity.coordinates.value.latitude += 0.001;
+  const report = scorePlaceEnrichment(gold, predictions);
+  assert.equal(report.passes, false);
+  assert.ok(
+    report.failures[0].failedFieldPaths.includes('identity.coordinates'),
+  );
+});
+
+test('summary wording is not exact matched but needs manual semantic review', async () => {
+  const gold = await fixture('place-enrichment-gold.v1.json');
+  const predictions = await fixture(
+    'place-enrichment-predictions.example.v1.json',
+  );
+  predictions.predictions[0].result.summary.value.text =
+    'A dining spot serving croquettes and Western-style dishes, with seasonal oysters in the supplied fixture.';
+  const report = scorePlaceEnrichment(gold, predictions);
+  assert.equal(report.passes, true);
+  assert.equal(report.manualReviewRequired, true);
+  assert.equal(report.productAcceptance, false);
+  predictions.predictions[0].result.summary.value.supportedFactRefs.push(
+    'identity.name',
+  );
+  predictions.predictions[0].result.summary.evidence.push(
+    ...predictions.predictions[0].result.identity.name.evidence,
+  );
+  assert.equal(scorePlaceEnrichment(gold, predictions).passes, true);
+  predictions.predictions[0].result.summary.value.supportedFactRefs.push(
+    'reservation',
+  );
+  assert.equal(scorePlaceEnrichment(gold, predictions).passes, false);
+});
+
+test('invented reservation difficulty and incorrect citations fail with field diagnostics', async () => {
+  const gold = await fixture('place-enrichment-gold.v1.json');
+  const predictions = await fixture(
+    'place-enrichment-predictions.example.v1.json',
+  );
+  predictions.predictions[0].result.ratings.tabelog.evidence[0].observedAt =
+    '2020-01-01T00:00:00Z';
+  const first = scorePlaceEnrichment(gold, predictions);
+  assert.equal(first.passes, false);
+  assert.ok(first.failures[0].failedFieldPaths.includes('ratings.tabelog'));
+  assert.equal(first.fieldMetrics['ratings.tabelog'].failures, 1);
+  predictions.predictions[1].result.reservation.value.difficulty = 'easy';
+  const second = scorePlaceEnrichment(gold, predictions);
+  assert.ok(
+    second.failures
+      .find((f) => f.caseId === predictions.predictions[1].caseId)
+      .failedFieldPaths.includes('reservation'),
+  );
+});
 
 test('the perfect offline fixture passes every gate', async () => {
   const gold = await fixture('place-enrichment-gold.v1.json');
@@ -23,7 +99,7 @@ test('the perfect offline fixture passes every gate', async () => {
   const report = scorePlaceEnrichment(gold, predictions);
 
   assert.equal(report.counts.cases, 10);
-  assert.equal(report.counts.fields, 50);
+  assert.equal(report.counts.fields, 130);
   assert.equal(report.counts.policyCases, 6);
   assert.equal(report.metrics.fieldStateAccuracy, 1);
   assert.equal(report.metrics.knownValueAccuracy, 1);
@@ -110,7 +186,7 @@ test('altered provenance metadata fails even when the value is correct', async (
     'place-enrichment-predictions.example.v1.json',
   );
   const changed = structuredClone(predictions);
-  changed.predictions[0].result.category.evidence[0].sourceUrl =
+  changed.predictions[0].result.categoryLabels.evidence[0].sourceUrl =
     'https://example.com/not-the-captured-source';
 
   const report = scorePlaceEnrichment(gold, changed);

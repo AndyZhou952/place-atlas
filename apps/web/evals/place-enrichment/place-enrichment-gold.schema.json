@@ -23,6 +23,31 @@
     }
   },
   "$defs": {
+    "summaryClaim": {
+      "allOf": [
+        { "$ref": "#/$defs/claim" },
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "object",
+                "required": ["text", "supportedFactRefs"],
+                "properties": {
+                  "text": { "type": "string", "minLength": 1 },
+                  "supportedFactRefs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string" }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ]
+    },
     "place": {
       "type": "object",
       "additionalProperties": false,
@@ -49,6 +74,7 @@
         "provider",
         "kind",
         "trust",
+        "captureClass",
         "capturedAt",
         "sourceUrl",
         "branch",
@@ -68,6 +94,9 @@
         },
         "trust": {
           "enum": ["authoritative", "directory", "owner", "untrusted"]
+        },
+        "captureClass": {
+          "enum": ["synthetic_controlled", "independently_verified_web_capture"]
         },
         "capturedAt": { "type": "string", "format": "date-time" },
         "sourceUrl": {
@@ -120,9 +149,31 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["category", "signatureDishes", "ratings", "reservation"],
+      "required": [
+        "identity",
+        "categoryLabels",
+        "summary",
+        "signatureDishes",
+        "ratings",
+        "officialWebsite",
+        "bookingLink",
+        "reservation"
+      ],
       "properties": {
-        "category": { "$ref": "#/$defs/claim" },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "branch", "area", "address", "coordinates"],
+          "properties": {
+            "name": { "$ref": "#/$defs/claim" },
+            "branch": { "$ref": "#/$defs/claim" },
+            "area": { "$ref": "#/$defs/claim" },
+            "address": { "$ref": "#/$defs/claim" },
+            "coordinates": { "$ref": "#/$defs/claim" }
+          }
+        },
+        "categoryLabels": { "$ref": "#/$defs/claim" },
+        "summary": { "$ref": "#/$defs/summaryClaim" },
         "signatureDishes": { "$ref": "#/$defs/claim" },
         "ratings": {
           "type": "object",
@@ -133,6 +184,8 @@
             "google": { "$ref": "#/$defs/claim" }
           }
         },
+        "officialWebsite": { "$ref": "#/$defs/claim" },
+        "bookingLink": { "$ref": "#/$defs/claim" },
         "reservation": { "$ref": "#/$defs/claim" }
       }
     },

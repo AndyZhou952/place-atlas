@@ -34,6 +34,8 @@ export interface CatalogIntakeProviderModes {
 }
 
 export interface OwnerPocCatalogIntakeRuntimeBindings {
+  readonly RESTAURANT_SOURCE_READER?: string;
+  readonly FIRECRAWL_API_KEY?: string;
   readonly BROWSER?: import('../../../agent/browser-source-reader.ts').BrowserContentBinding;
   readonly ATLAS_OWNER_SESSION_SECRET?: string;
   readonly AGENT_SETTINGS_SECRET?: string;
@@ -50,6 +52,8 @@ export function projectOwnerPocCatalogIntakeRuntime(
   bindings: OwnerPocCatalogIntakeRuntimeBindings,
 ) {
   return {
+    sourceReaderProvider: bindings.RESTAURANT_SOURCE_READER,
+    firecrawlApiKey: bindings.FIRECRAWL_API_KEY,
     browser: bindings.BROWSER,
     agentSettingsSecret:
       bindings.AGENT_SETTINGS_SECRET ?? bindings.ATLAS_OWNER_SESSION_SECRET,

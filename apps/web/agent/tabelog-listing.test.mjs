@@ -28,6 +28,27 @@ const restaurant = {
 const html = (record) =>
   `<script type="application/ld+json">${JSON.stringify(record)}</script>`;
 
+test('HTTP 200 challenge pages are blocked rather than invalid restaurant evidence', async () => {
+  for (const body of [
+    '<title>Just a moment...</title>',
+    '<title class="error">現在アクセスが集中しています [食べログ]</title>',
+    '<script src="/cdn-cgi/challenge-platform/cf-chl-test"></script>',
+    '<title>Just a moment...</title>' + html(restaurant),
+  ]) {
+    assert.deepEqual(
+      await readTabelogListingResult(
+        url,
+        async () =>
+          new Response(body, {
+            headers: { 'content-type': 'text/html' },
+          }),
+        AbortSignal.timeout(1000),
+      ),
+      { kind: 'blocked' },
+    );
+  }
+});
+
 test('reader distinguishes denied access, unavailable transport and invalid evidence', async () => {
   for (const status of [401, 403, 429]) {
     let calls = 0;

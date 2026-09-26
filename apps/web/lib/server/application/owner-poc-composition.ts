@@ -16,6 +16,7 @@ import { createTabelogPlaceDiscoveryPort } from '../../../adapters/providers/tab
 import { createNominatimDurableGeocoderAdapter } from '../../../adapters/providers/nominatim-durable-geocoder.ts';
 import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
 import { createConfiguredPlaceResearchAgent } from '../../../agent/place-research.ts';
+import { createFirecrawlRestaurantReader } from '../../../agent/firecrawl-source-reader.ts';
 import {
   createRestaurantSourceReader,
   type BrowserContentBinding,
@@ -34,6 +35,8 @@ import {
 } from './catalog-intake-provider-mode-manifest.ts';
 
 export interface OwnerPocCatalogIntakeOptions {
+  readonly sourceReaderProvider?: string;
+  readonly firecrawlApiKey?: string;
   readonly browser?: BrowserContentBinding;
   readonly agentSettingsSecret?: string;
   readonly agentApiKey?: string;
@@ -61,9 +64,18 @@ export function createOwnerPocComposition(
 ) {
   const catalogRead = createD1OwnerPocCatalogRead(database);
   const clock = intakeOptions.clock ?? { now: () => new Date() };
-  const sourceReader = intakeOptions.browser
-    ? createRestaurantSourceReader(intakeOptions.browser, intakeOptions.fetch)
-    : undefined;
+  const sourceReader =
+    intakeOptions.sourceReaderProvider === 'firecrawl'
+      ? createFirecrawlRestaurantReader({
+          apiKey: intakeOptions.firecrawlApiKey,
+          fetch: intakeOptions.fetch,
+        })
+      : intakeOptions.browser
+        ? createRestaurantSourceReader(
+            intakeOptions.browser,
+            intakeOptions.fetch,
+          )
+        : undefined;
   const routeEvidence = createRouteSidecarNearbyAdapter(
     createD1MeteredRouteSidecarClient({
       database,

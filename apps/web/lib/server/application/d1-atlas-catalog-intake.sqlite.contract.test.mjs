@@ -87,6 +87,8 @@ test('complete researched profile survives D1 publication and public projection 
     ),
   );
   assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  const catalog = createCatalogRead(new D1CatalogState(toD1(sqlite)), []);
+  assert.equal((await catalog.list('verified_catalog'))[0]?.id, 'profile-item');
   const browserItems = await loadPublicCatalog({
     async request(url) {
       return url === '/api/items'
@@ -284,6 +286,157 @@ test('D1 Atlas Catalog commits incomplete durable evidence as owner-only needs r
         verificationStatus: 'needs_review',
       },
     ],
+  );
+});
+
+test('a newly researched preview promotes an existing review candidate into the public map exactly once', async () => {
+  const sqlite = await migratedDatabase();
+  const incomplete = withDigest({
+    ...verifiedPreview(),
+    locationEvidence: { status: 'unknown' },
+    unknownFields: ['coordinates'],
+  });
+  insertPreviewSession(sqlite, incomplete, 'e'.repeat(64));
+  let attempt = 0;
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => `promotion-attempt-${++attempt}`,
+  });
+  const first = await publisher.publish(
+    incomplete,
+    'e'.repeat(64),
+    2,
+    'catalog-r1',
+  );
+  assert.equal(first.status, 'committed_needs_review');
+  const complete = withDigest({
+    ...verifiedPreview(),
+    sessionId: 'promotion-session',
+    catalogRevision: 'catalog-r2',
+    locationEvidence: {
+      status: 'known',
+      provenance: 'agent_observed',
+      normalizedAddress: 'Tokyo fixture address',
+      latitude: 35.6,
+      longitude: 139.7,
+      sourceUrl: 'https://example.com/restaurant',
+      observedAt: '2026-09-23T01:59:00.000Z',
+    },
+  });
+  insertPreviewSession(sqlite, complete, 'd'.repeat(64));
+  const committed = await publisher.publish(
+    complete,
+    'd'.repeat(64),
+    2,
+    'catalog-r2',
+  );
+  assert.deepEqual(committed, {
+    status: 'committed_verified',
+    itemId: first.itemId,
+    receiptRef: 'd'.repeat(64),
+    replayed: false,
+  });
+  assert.equal(count(sqlite, 'atlas_items'), 1);
+  assert.equal(count(sqlite, 'atlas_review_candidates'), 0);
+  assert.equal(count(sqlite, 'atlas_place_identities'), 1);
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.equal(stored.id, first.itemId);
+  assert.deepEqual(
+    stored.intakeEvidence.locationEvidence,
+    complete.locationEvidence,
+  );
+  assert.equal(
+    sqlite
+      .prepare('SELECT created_by_mutation_key FROM atlas_place_identities')
+      .get().created_by_mutation_key,
+    'e'.repeat(64),
+  );
+  assert.equal(
+    sqlite.prepare('SELECT revision_number FROM atlas_catalog_revision').get()
+      .revision_number,
+    3,
+  );
+  for (const table of [
+    'atlas_item_location_snapshots',
+    'atlas_item_tabelog_snapshots',
+    'atlas_item_reservation_snapshots',
+  ]) {
+    assert.equal(count(sqlite, table), 1, table);
+  }
+  const catalog = createCatalogRead(new D1CatalogState(toD1(sqlite)), []);
+  assert.deepEqual(
+    (await catalog.list('verified_catalog')).map((item) => item.id),
+    [first.itemId],
+  );
+  const invalidProfile = {
+    ...stored,
+    intakeEvidence: {
+      ...stored.intakeEvidence,
+      profile: { categories: { value: ['Udon'] } },
+    },
+  };
+  sqlite
+    .prepare('UPDATE atlas_items SET payload_json = ?')
+    .run(JSON.stringify(invalidProfile));
+  assert.deepEqual(
+    await catalog.list('verified_catalog'),
+    [],
+    'new profile fields still require valid source evidence',
+  );
+  sqlite
+    .prepare('UPDATE atlas_items SET payload_json = ?')
+    .run(JSON.stringify(stored));
+  assert.deepEqual(
+    await publisher.publish(complete, 'd'.repeat(64), 2, 'catalog-r2'),
+    { ...committed, replayed: true },
+  );
+});
+
+test('a revision race during candidate promotion preserves the candidate and its existing snapshots', async () => {
+  const sqlite = await migratedDatabase();
+  const incomplete = withDigest({
+    ...verifiedPreview(),
+    locationEvidence: { status: 'unknown' },
+  });
+  insertPreviewSession(sqlite, incomplete, 'e'.repeat(64));
+  await new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'original-candidate',
+  }).publish(incomplete, 'e'.repeat(64), 2, 'catalog-r1');
+  const priorSnapshots = sqlite
+    .prepare('SELECT * FROM atlas_item_tabelog_snapshots')
+    .all();
+  const complete = withDigest({
+    ...verifiedPreview(),
+    sessionId: 'racing-promotion',
+    catalogRevision: 'catalog-r2',
+  });
+  insertPreviewSession(sqlite, complete, 'd'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(
+    toD1(sqlite, {
+      beforeFirstBatchOnce() {
+        sqlite
+          .prepare('UPDATE atlas_catalog_revision SET revision_number = 3')
+          .run();
+      },
+    }),
+    {
+      now: () => new Date('2026-09-23T02:00:00.000Z'),
+      nextId: () => 'racing-attempt',
+    },
+  );
+  assert.equal(
+    (await publisher.publish(complete, 'd'.repeat(64), 2, 'catalog-r2')).status,
+    'conflict',
+  );
+  assert.equal(count(sqlite, 'atlas_items'), 0);
+  assert.equal(count(sqlite, 'atlas_review_candidates'), 1);
+  assert.equal(count(sqlite, 'catalog_intake_publish_receipts'), 1);
+  assert.deepEqual(
+    sqlite.prepare('SELECT * FROM atlas_item_tabelog_snapshots').all(),
+    priorSnapshots,
   );
 });
 

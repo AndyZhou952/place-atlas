@@ -2,6 +2,7 @@ import { isTabelogRestaurantListing } from './research-instructions.ts';
 import {
   parseTabelogListing,
   readTabelogListingResult,
+  isTabelogAccessChallenge,
   type TabelogReadResult,
 } from './tabelog-listing.ts';
 import { readBoundedText } from './web-search.ts';
@@ -85,14 +86,9 @@ export function createBrowserRestaurantReader(
       )
         return { kind: 'unavailable' };
       const html = payload.result;
+      if (isTabelogAccessChallenge(html)) return { kind: 'blocked' };
       const evidence = parseTabelogListing(html, target.href);
       if (evidence) return { kind: 'read', evidence };
-      if (
-        /現在アクセスが集中|<title>\s*Just a moment|cf-chl-|cf_chl_/iu.test(
-          html,
-        )
-      )
-        return { kind: 'blocked' };
       return { kind: 'invalid_source' };
     } catch {
       return { kind: 'unavailable' };

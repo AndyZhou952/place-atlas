@@ -6,6 +6,7 @@ import type {
 import type { CatalogStateSnapshot } from './catalog-state.ts';
 import { isEffectivelyVisited } from '../assessments/effective-visited.ts';
 import { hasCanonicalCatalogIntakeWarningOrder } from '../catalog-intake/catalog-intake-warning-policy.ts';
+import { validateEnrichedProfile } from '../catalog-intake/catalog-intake-coordinator.ts';
 
 export function projectCatalog(
   snapshot: CatalogStateSnapshot,
@@ -155,6 +156,7 @@ function isReviewEvidence(value: unknown): boolean {
     !hasAllowedKeys(
       value,
       [
+        'profile',
         'candidateIdentity',
         'ownerFields',
         'titleProposal',
@@ -175,6 +177,7 @@ function isReviewEvidence(value: unknown): boolean {
         'warnings',
       ],
     ) ||
+    (value.profile !== undefined && !validateEnrichedProfile(value.profile)) ||
     !hasExactKeys(value.candidateIdentity, ['providerNamespace', 'placeId']) ||
     typeof value.candidateIdentity.providerNamespace !== 'string' ||
     typeof value.candidateIdentity.placeId !== 'string' ||
@@ -256,6 +259,23 @@ function isReviewAddressProposal(value: unknown): boolean {
 function isReviewLocation(value: unknown): boolean {
   if (hasExactKeys(value, ['status'])) return value.status === 'unknown';
   if (!isRecord(value) || value.status !== 'known') return false;
+  if (value.provenance === 'agent_observed') {
+    return (
+      hasExactKeys(value, [
+        'status',
+        'provenance',
+        'normalizedAddress',
+        'latitude',
+        'longitude',
+        'sourceUrl',
+        'observedAt',
+      ]) &&
+      typeof value.normalizedAddress === 'string' &&
+      isCoordinates(value) &&
+      isCanonicalHttpsUrl(value.sourceUrl) &&
+      isIsoTimestamp(value.observedAt)
+    );
+  }
   if (value.provenance === 'durable_geocoder_observed') {
     return (
       hasExactKeys(value, [
@@ -372,7 +392,9 @@ function isReviewReservation(value: unknown): boolean {
       ],
       ['status', 'mode', 'label', 'url', 'provenance', timeKey, 'freshness'],
     ) &&
-    (value.mode === 'reservable' || value.mode === 'reservation_required') &&
+    (value.mode === 'reservable' ||
+      value.mode === 'reservation_required' ||
+      value.mode === 'not_reservable') &&
     typeof value.label === 'string' &&
     (value.advanceDays === undefined ||
       (typeof value.advanceDays === 'number' &&

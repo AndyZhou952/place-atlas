@@ -15,6 +15,7 @@ const optionalSecretNames = [
   'AGENT_BASE_URL',
   'AGENT_MODEL',
   'AGENT_SETTINGS_SECRET',
+  'FIRECRAWL_API_KEY',
 ] as const;
 
 interface WranglerConfig {

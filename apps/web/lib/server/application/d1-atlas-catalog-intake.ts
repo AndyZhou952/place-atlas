@@ -73,9 +73,23 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
     const verificationStatus = isVerified(preview)
       ? 'verified'
       : 'needs_review';
+    // A previously incomplete Add must be promotable after research succeeds.
+    // Keep its identity and original creation audit; never overwrite a public item.
+    // Every write below still checks the preview's catalog revision atomically.
+    const promotion =
+      verificationStatus === 'verified'
+        ? await this.#database
+            .prepare(findPromotableIdentitySql)
+            .bind(
+              preview.candidateIdentity.providerNamespace,
+              preview.candidateIdentity.placeId,
+            )
+            .first<{ item_id: string }>()
+        : null;
+    const promotionId = promotion?.item_id ?? null;
     const item =
       verificationStatus === 'verified'
-        ? toAtlasItem(preview, itemId, now)
+        ? toAtlasItem(preview, promotionId ?? itemId, now)
         : undefined;
     const reviewCandidate =
       verificationStatus === 'needs_review'
@@ -121,7 +135,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
         this.#database
           .prepare(insertItemSql)
           .bind(
-            itemId,
+            promotionId ?? itemId,
             item ? JSON.stringify(item) : null,
             verificationStatus,
             now.toISOString(),
@@ -131,6 +145,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             preview.candidateIdentity.providerNamespace,
             preview.candidateIdentity.placeId,
             mutationKey,
+            promotionId,
             verificationStatus,
             ...activeCondition(
               preview,
@@ -173,6 +188,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             preview.candidateIdentity.providerNamespace,
             preview.candidateIdentity.placeId,
             mutationKey,
+            promotionId,
             preview.locationEvidence.status === 'known'
               ? JSON.stringify(preview.locationEvidence)
               : null,
@@ -189,6 +205,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             preview.candidateIdentity.providerNamespace,
             preview.candidateIdentity.placeId,
             mutationKey,
+            promotionId,
             preview.tabelog.status === 'known'
               ? JSON.stringify(preview.tabelog)
               : null,
@@ -205,6 +222,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             preview.candidateIdentity.providerNamespace,
             preview.candidateIdentity.placeId,
             mutationKey,
+            promotionId,
             preview.reservation.status === 'known'
               ? JSON.stringify(preview.reservation)
               : null,
@@ -220,6 +238,7 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             catalogRevision,
             itemId,
             mutationKey,
+            promotionId,
             committedStatus,
             mutationKey,
             now.getTime(),
@@ -252,6 +271,9 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
           .bind(preview.sessionId, mutationKey, itemId),
         this.#database.prepare(incrementRevisionSql).bind(mutationKey, itemId),
         this.#database.prepare(deleteClaimSql).bind(mutationKey, itemId),
+        this.#database
+          .prepare(deletePromotedCandidateSql)
+          .bind(promotionId, mutationKey, itemId),
       ]);
       const receipt = await this.#receipt(mutationKey);
       if (receipt) {
@@ -409,6 +431,20 @@ const insertClaimSql =
   'JOIN atlas_catalog_revision r ON r.singleton = 1 WHERE ' +
   activeWhere;
 
+const findPromotableIdentitySql =
+  'SELECT i.item_id FROM atlas_place_identities i ' +
+  'JOIN atlas_review_candidates candidate ON candidate.id = i.item_id ' +
+  'WHERE i.provider_namespace = ? AND i.place_id = ? ' +
+  'AND NOT EXISTS (SELECT 1 FROM atlas_items item WHERE item.id = i.item_id)';
+
+const deletePromotedCandidateSql =
+  'DELETE FROM atlas_review_candidates WHERE id = ? AND EXISTS (' +
+  'SELECT 1 FROM catalog_intake_publish_receipts receipt ' +
+  'JOIN atlas_items item ON item.id = receipt.item_id ' +
+  'WHERE receipt.mutation_key = ? AND receipt.claim_attempt_id = ? ' +
+  'AND receipt.item_id = atlas_review_candidates.id ' +
+  "AND json_extract(receipt.outcome_json, '$.status') = 'committed_verified')";
+
 const insertItemSql =
   'INSERT INTO atlas_items ' +
   '(id, payload_json, verification_status, created_at, updated_at) ' +
@@ -418,7 +454,7 @@ const insertItemSql =
   'JOIN catalog_intake_publish_claims claim ' +
   'ON claim.mutation_key = ? AND claim.claim_attempt_id = ? ' +
   'WHERE i.provider_namespace = ? AND i.place_id = ? ' +
-  "AND i.created_by_mutation_key = ? AND ? = 'verified' AND " +
+  "AND (i.created_by_mutation_key = ? OR i.item_id = ?) AND ? = 'verified' AND " +
   activeWhere;
 
 const insertReviewCandidateSql =
@@ -440,7 +476,8 @@ const insertTabelogSql =
   'JOIN catalog_intake_publish_claims claim ' +
   'ON claim.mutation_key = ? AND claim.claim_attempt_id = ? ' +
   'WHERE i.provider_namespace = ? AND i.place_id = ? ' +
-  'AND i.created_by_mutation_key = ? AND ? IS NOT NULL';
+  'AND (i.created_by_mutation_key = ? OR i.item_id = ?) AND ? IS NOT NULL ' +
+  'ON CONFLICT(item_id) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at_ms = excluded.updated_at_ms';
 
 const insertLocationSql =
   'INSERT INTO atlas_item_location_snapshots ' +
@@ -449,7 +486,8 @@ const insertLocationSql =
   'JOIN catalog_intake_publish_claims claim ' +
   'ON claim.mutation_key = ? AND claim.claim_attempt_id = ? ' +
   'WHERE i.provider_namespace = ? AND i.place_id = ? ' +
-  'AND i.created_by_mutation_key = ? AND ? IS NOT NULL';
+  'AND (i.created_by_mutation_key = ? OR i.item_id = ?) AND ? IS NOT NULL ' +
+  'ON CONFLICT(item_id) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at_ms = excluded.updated_at_ms';
 
 const insertReservationSql =
   'INSERT INTO atlas_item_reservation_snapshots ' +
@@ -458,7 +496,8 @@ const insertReservationSql =
   'JOIN catalog_intake_publish_claims claim ' +
   'ON claim.mutation_key = ? AND claim.claim_attempt_id = ? ' +
   'WHERE i.provider_namespace = ? AND i.place_id = ? ' +
-  'AND i.created_by_mutation_key = ? AND ? IS NOT NULL';
+  'AND (i.created_by_mutation_key = ? OR i.item_id = ?) AND ? IS NOT NULL ' +
+  'ON CONFLICT(item_id) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at_ms = excluded.updated_at_ms';
 
 const insertReceiptSql =
   'INSERT OR IGNORE INTO catalog_intake_publish_receipts ' +
@@ -466,7 +505,7 @@ const insertReceiptSql =
   'source_session_version, catalog_revision, claim_attempt_id, item_id, outcome_json, ' +
   'committed_at_ms, retain_until_ms) ' +
   'SELECT ?, ?, ?, ?, ?, ?, ?, i.item_id, json_object(' +
-  "'status', CASE WHEN i.created_by_mutation_key = ? THEN ? " +
+  "'status', CASE WHEN i.created_by_mutation_key = ? OR i.item_id = ? THEN ? " +
   "ELSE 'reused_existing' END, " +
   "'itemId', i.item_id, 'receiptRef', ?, 'replayed', json('false')), ?, ? " +
   'FROM atlas_place_identities i ' +

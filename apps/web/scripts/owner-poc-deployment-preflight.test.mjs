@@ -37,6 +37,7 @@ void test('the owner PoC template selects only blue-green D1 and R2 resources', 
   assert.equal(config.name, 'japan-atlas-owner-poc');
   assert.deepEqual(config.vars, {
     ATLAS_DATASET: 'owner-poc',
+    RESTAURANT_SOURCE_READER: 'firecrawl',
     ATLAS_DEPLOYMENT_ENV: 'owner-poc',
     CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
     CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',

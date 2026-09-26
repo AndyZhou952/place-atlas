@@ -11,6 +11,8 @@ declare namespace Cloudflare {
     AGENT_BASE_URL?: string;
     AGENT_MODEL?: string;
     SEARCH_API_KEY?: string;
+    RESTAURANT_SOURCE_READER?: string;
+    FIRECRAWL_API_KEY?: string;
     ATLAS_DEPLOYMENT_ENV?: string;
   }
 }

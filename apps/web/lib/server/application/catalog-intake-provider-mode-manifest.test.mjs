@@ -40,9 +40,13 @@ test('the shared runtime projection maps only the reviewed catalog-intake bindin
       AGENT_BASE_URL: 'https://model.example/v1',
       AGENT_MODEL: 'model',
       SEARCH_API_KEY: 'search-key',
+      RESTAURANT_SOURCE_READER: 'firecrawl',
+      FIRECRAWL_API_KEY: 'reader-key',
     }),
     {
       browser: undefined,
+      sourceReaderProvider: 'firecrawl',
+      firecrawlApiKey: 'reader-key',
       agentSettingsSecret: undefined,
       googlePlacesApiKey: 'server-secret',
       agentApiKey: 'agent-key',

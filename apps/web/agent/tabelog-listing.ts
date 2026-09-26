@@ -29,6 +29,13 @@ export type TabelogReadResult =
   | { kind: 'read'; evidence: TabelogEvidence }
   | { kind: 'blocked' | 'unavailable' | 'invalid_source' };
 
+/** An HTTP 200 challenge is still a refused source read, not an empty restaurant. */
+export function isTabelogAccessChallenge(html: string): boolean {
+  return /<title[^>]*>\s*(?:Just a moment|現在アクセスが集中)|cf-chl-|cf_chl_/iu.test(
+    html,
+  );
+}
+
 /** Keep access failures distinct from a successfully read page with missing facts. */
 export async function readTabelogListingResult(
   url: string,
@@ -56,10 +63,9 @@ export async function readTabelogListingResult(
       await response.body?.cancel();
       return { kind: 'unavailable' };
     }
-    const evidence = parseTabelogListing(
-      await readBoundedText(response, 1_048_576),
-      url,
-    );
+    const html = await readBoundedText(response, 1_048_576);
+    if (isTabelogAccessChallenge(html)) return { kind: 'blocked' };
+    const evidence = parseTabelogListing(html, url);
     return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
   } catch {
     return { kind: 'unavailable' };

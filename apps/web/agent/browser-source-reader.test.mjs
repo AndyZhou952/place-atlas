@@ -50,6 +50,15 @@ test('direct success and invalid pages do not incur browser work; denied reads h
   );
   assert.equal((await denied(url, signal)).kind, 'read');
   assert.equal(renders, 1);
+  const challenged = createRestaurantSourceReader(
+    browser,
+    async () =>
+      new Response('<title>Just a moment...</title>', {
+        headers: { 'content-type': 'text/html' },
+      }),
+  );
+  assert.equal((await challenged(url, signal)).kind, 'read');
+  assert.equal(renders, 2);
   const unavailable = createRestaurantSourceReader(
     {
       async quickAction() {
@@ -106,7 +115,7 @@ test('browser API success is not source success: challenge, malformed, wrong bra
       () =>
         Response.json({
           success: true,
-          result: '現在アクセスが集中しています',
+          result: '<title>現在アクセスが集中しています [食べログ]</title>',
         }),
       'blocked',
     ],

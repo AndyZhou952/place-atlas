@@ -6,7 +6,7 @@ The application owns the Agent workflow. You provide an OpenAI-compatible model 
 
 This is an evolving PoC. Add now researches sourced restaurant profiles, presents a preview, and saves after owner confirmation. Categories, signature dishes, descriptions, ratings and official links flow to the saved card when sources supply them. Missing information stays unknown. Live source coverage varies; screenshots and Agent-led Nearby remain follow-up work. Offline benchmark success alone does not demonstrate live provider coverage.
 
-Current acceptance limit: the Cloudflare PoC can connect to DeepSeek and search for a branch, but Tabelog page reads returned HTTP 403 in live testing. Cloudflare-native browser reads have also been tested: some pages succeeded, but the deployed Tokyo Mentsudan Add still encountered a challenge. Automatic Add-to-map acceptance has **not passed**. A model key alone does not guarantee source access; a preview without usable coordinates cannot be saved from the website. See the current delivery checklist in `docs/status.md` for verified versus pending work.
+Live check (2026-09-26): the Cloudflare PoC used DeepSeek and a Firecrawl listing reader to research Tokyo Mentsudan, confirm it, and display the saved restaurant with Tabelog 3.54, location, cuisine/dishes, official website and reservation policy after refresh. Repeating confirmation returned the same item without a duplicate. Two source listings were read successfully from Cloudflare. This is a limited live acceptance result, not proof that every restaurant or ambiguous hint works. Anonymous reader quotas, broader live benchmarks and official-site booking research remain open. A model key alone does not guarantee source access; a preview without usable coordinates cannot be saved from the website.
 
 First-time setup order: prepare credentials → create Cloudflare resources → configure owner secrets → deploy → log in → test and save model settings → use Add. Model settings may alternatively be configured as deployment secrets. Local development is optional and described after deployment and usage instructions.
 
@@ -85,7 +85,19 @@ This is an example endpoint/model pair. Replace both with your provider's docume
 
 Search works without a separate key using Yahoo Japan for Japanese/Tabelog queries and DuckDuckGo for other queries. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or invent facts. It reads discovered Tabelog main listings for branch identity, address, coordinates, cuisine, aggregate rating, explicit reservation rules, restaurant introductions and official website links. Individual review scores are excluded. The model extracts sourced dishes; the application builds a concise description from validated categories, area and dishes. Official-source search is supported, but arbitrary full-page official-site browsing is not; missing booking lead times remain unknown. A failed source does not discard independently supported facts.
 
-The owner-PoC configuration includes Cloudflare Browser Run (`"browser": { "binding": "BROWSER" }`). It is an optional, fixed-Tabelog-source fallback after a failed ordinary read, shared by discovery and research. It uses the native binding: no browser-service API token or additional server is required. If omitted, ordinary HTTP reading remains available. Browser use counts toward Cloudflare's [Browser Run allowance and charges](https://developers.cloudflare.com/browser-run/pricing/). A successful browser API response is not proof that the source loaded: challenge pages are rejected, not treated as restaurant evidence. This fallback is not a guarantee of Tabelog access.
+### Restaurant page reader
+
+Search finds a restaurant's page; a separate reader retrieves the actual listing and aggregate score. The checked-in PoC configuration selects `"RESTAURANT_SOURCE_READER": "firecrawl"` in `vars`. This calls Firecrawl from the Worker; the website, model workflow, database and photos remain on Cloudflare. Only the public Tabelog listing URL is sent to this reader, not owner cookies or model credentials.
+
+[Firecrawl currently documents initial calls without a key](https://docs.firecrawl.dev/introduction). That anonymous path worked in the deployed PoC, but it is not an unlimited-free or long-term reliability guarantee. If you need higher limits, obtain your own account/key and set this optional server secret before deployment:
+
+```sh
+npx wrangler secret put FIRECRAWL_API_KEY --config wrangler.owner-poc.local.jsonc
+```
+
+The reader requests fresh HTML and checks the exact branch URL, source status and restaurant aggregate rating. Service quota errors and challenge pages are reported as unavailable evidence, never invented scores. Check your reader account's limits and pricing before enabling paid usage. A DeepSeek/OpenAI key cannot be used as a Firecrawl key.
+
+Alternatively, remove `RESTAURANT_SOURCE_READER` to use ordinary reads with the optional Cloudflare Browser Run binding (`"browser": { "binding": "BROWSER" }`) as a fallback. This path was unreliable for Tabelog in the tested deployment. It requires no browser-service token or extra server, but counts toward Cloudflare's [Browser Run allowance and charges](https://developers.cloudflare.com/browser-run/pricing/). Remove the browser binding too if you only want ordinary HTTP reads. A successful browser API response does not prove the source page loaded.
 
 To use Tavily instead, optionally set its key:
 

@@ -58,24 +58,62 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     method: 'POST',
     path: '/api/catalog-intake/discover',
     bodyKind: 'json',
+    capability: {
+      name: 'discover_restaurant',
+      contract: { required: ['query', 'requestToken'], savesRestaurant: false },
+    },
   },
   'catalog.intake.select': {
     key: 'catalog.intake.select',
     method: 'POST',
     path: '/api/catalog-intake/select',
     bodyKind: 'json',
+    capability: {
+      name: 'preview_restaurant',
+      contract: {
+        required: ['sessionId', 'expectedSessionVersion', 'ordinal'],
+        optional: ['ownerFields', 'tabelog', 'reservation'],
+        savesRestaurant: false,
+      },
+    },
   },
   'catalog.intake.confirm': {
     key: 'catalog.intake.confirm',
     method: 'POST',
     path: '/api/catalog-intake/confirm',
     bodyKind: 'json',
+    capability: {
+      name: 'confirm_restaurant',
+      contract: {
+        required: ['sessionId', 'expectedPreviewVersion'],
+        requiresExplicitOwnerConfirmation: true,
+        returns: [
+          'status',
+          'itemId on commit/reuse',
+          'receiptRef on commit/reuse',
+        ],
+        successStatuses: [
+          'committed_verified',
+          'committed_needs_review',
+          'reused_existing',
+        ],
+        mapVisibleStatus: 'committed_verified',
+        mayReturnConflictOrFailedNoWrite: true,
+      },
+    },
   },
   'catalog.intake.cancel': {
     key: 'catalog.intake.cancel',
     method: 'POST',
     path: '/api/catalog-intake/cancel',
     bodyKind: 'json',
+    capability: {
+      name: 'cancel_restaurant',
+      contract: {
+        required: ['sessionId', 'expectedSessionVersion'],
+        savesRestaurant: false,
+      },
+    },
   },
   'catalog.update_item': {
     key: 'catalog.update_item',
@@ -201,8 +239,16 @@ export function createAgentCapabilitiesDocument() {
   );
   return {
     service: 'Japan Atlas',
-    version: '0.5',
-    channelStatus: 'not_connected',
+    version: '0.6',
+    intakeAuthentication: {
+      type: 'owner_session_cookie',
+      loginPath: '/api/auth/owner',
+      sameOriginRequired: true,
+      conversationHeader: 'x-atlas-web-conversation-id',
+      conversationInstruction:
+        'Read the conversation header returned by discover and echo it on select, confirm, and cancel using the same owner session.',
+      note: 'Model provider keys are not application credentials. External agent token authentication is not implemented.',
+    },
     operations,
   } as const;
 }

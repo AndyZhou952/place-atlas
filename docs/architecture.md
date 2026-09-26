@@ -34,6 +34,16 @@ Search is provider-independent from the model. With no search credential, the to
 
 ## Design reference and current limits
 
+### Research responsibilities and prompt
+
+The runtime loads `apps/web/agent/research-instructions.ts`, a versioned prompt and search-tool description. It is deliberately a small component rather than a second orchestration framework. The selected branch and user hint are supplied as data; search excerpts are untrusted tool results.
+
+The application resolves identity and owns confirmation/persistence. The model plans targeted searches, interprets source evidence, and proposes structured facts. Tabelog's exact restaurant listing supplies the aggregate rating; individual reviews and ranking pages are not rating sources. Branch-specific official sites or their linked booking pages are preferred for reservation rules, with Tabelog as fallback. Booking availability, queues, and required lead times are separate facts, not deductions from popularity or a booking button.
+
+Only `search_web` is currently exposed to the research model. Its description specifies when to use it, query examples, result shape, budget, and the limitation that results are snippets. A source-reading tool is planned but not implemented; the prompt must not pretend the model has browsed full pages. The model cannot confirm or write a restaurant. Existing authenticated application APIs perform writes only after owner confirmation.
+
+Source priority is currently a prompt instruction, not a deterministic proof of official-domain ownership. Code separately checks quoted evidence, branch anchors, score tokens, main-listing URLs, and the output schema. Live evaluation must establish the quality of the combined system. Track incomplete implementation and validation in `docs/status.md`.
+
 The relevant guidance from [the agent-book skills proposal](https://github.com/bojieli/ai-agent-book/pull/1137) is goal-oriented tools, bounded execution, untrusted-source isolation, explicit failure handling, and independent evaluation. The repository does not copy or depend on the 22 skill packages.
 
 The current loop enriches an already selected identity with Tabelog and reservation evidence. Candidate discovery still requires Google Places; Google-free agent discovery, full-page research, and live benchmark acceptance remain follow-up work. A successful offline test is not evidence that these follow-up capabilities work.

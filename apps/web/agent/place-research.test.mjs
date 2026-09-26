@@ -46,7 +46,7 @@ const tool = {
   },
 };
 
-function harness(final = proposal) {
+function harness(final = proposal, sourceUrl = url) {
   const requests = [];
   let turn = 0;
   return {
@@ -57,7 +57,7 @@ function harness(final = proposal) {
         requests.push({ endpoint, body: JSON.parse(init.body) });
         if (endpoint === 'https://api.tavily.com/search')
           return Response.json({
-            results: [{ url, title: 'アルデバラン', content }],
+            results: [{ url: sourceUrl, title: 'アルデバラン', content }],
           });
         assert.equal(endpoint, 'https://model.example/v1/chat/completions');
         return Response.json({
@@ -82,6 +82,22 @@ test('research executes fixed search tool then produces validated sourced previe
   assert.equal(result.value.tabelog.score, 3.97);
   assert.equal(result.value.tabelog.provenance, 'agent_observed');
   assert.equal(requests.length, 3);
+  assert.match(requests[0].body.messages[0].content, /official website/u);
+  assert.match(
+    requests[0].body.tools[0].function.description,
+    /not full pages/u,
+  );
+});
+
+test('a sourced individual review score is not accepted as a restaurant aggregate', async () => {
+  const reviewUrl = `${url}dtlrvwlst/B123/`;
+  const review = structuredClone(proposal);
+  review.tabelog.url = reviewUrl;
+  review.evidence.identity.url = reviewUrl;
+  review.evidence.tabelog.url = reviewUrl;
+  const result = await harness(review, reviewUrl).agent.research(input);
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.value.tabelog.status, 'unknown');
 });
 
 test('invented evidence and another branch are not saved as known facts', async () => {

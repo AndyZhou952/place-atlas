@@ -4,15 +4,9 @@ A self-hosted restaurant map for saving places, recording visits and photos, and
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
-## Using the website
-
-1. Select **Owner login** and enter your deployment's password.
-2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. If multiple branches fit, choose the intended branch.
-3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
-4. Use the heart to mark a favorite and the visited control to mark a visit. Edit and Journal provide personal ratings, notes, visits, and photos. Personal scores are separate from external ratings.
-5. Enter a neighborhood or address in Nearby to search your saved places. Straight-line distance is not a verified walking time.
-
 This is an evolving PoC. Map, owner authentication, personal records, and deterministic Add are implemented. Automated research is being integrated and evaluated. Categories, signature dishes, international ratings, and screenshot input are not all guaranteed by the current runtime. Offline benchmark success alone does not demonstrate live provider coverage.
+
+First-time setup order: prepare credentials → create Cloudflare resources → configure owner/model secrets → deploy → log in and use the website. Local development is optional and described after the deployment and usage instructions.
 
 ## Requirements
 
@@ -63,7 +57,7 @@ npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.l
 npx wrangler secret put AGENT_API_KEY --config wrangler.owner-poc.local.jsonc
 ```
 
-Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32`. `AGENT_API_KEY` is your model key. Never use a `NEXT_PUBLIC_` variable for secrets.
+Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32`. The password is configured here as a server secret; there is no first-run password creation or registration page. After deployment, Owner login checks this password. To change it later, repeat the password secret command. `AGENT_API_KEY` is your model key. Never use a `NEXT_PUBLIC_` variable for secrets.
 
 Add these model settings to the local Wrangler configuration's `vars`:
 
@@ -107,7 +101,44 @@ npx wrangler deploy --config wrangler.route-sidecar.jsonc
 
 Keep the app's `ROUTE_SIDECAR` binding pointed at `japan-atlas-route-sidecar`. If omitting route services, remove that entry from the app's `services` array to avoid referencing a missing Worker. Nearby must report unavailable route information rather than invent travel times. The route Worker has no public website endpoint.
 
-## Local development
+## Verify and deploy
+
+From `apps/web`:
+
+```sh
+npm run lint
+npm run typecheck
+npm run test:evals
+npm run build:owner-poc
+npx wrangler deploy --config dist/server/wrangler.json
+```
+
+Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+
+For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resources. Do not overwrite newer records with an older backup during rollback.
+
+## Using the website
+
+Start here only after completing configuration and deployment above. Visitors can read the site without logging in; changing data requires the owner password.
+
+1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
+2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. If multiple branches fit, choose the intended branch.
+3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
+4. Use the heart to mark a favorite and the visited control to mark a visit. Edit and Journal provide personal ratings, notes, visits, and photos. Personal scores are separate from external ratings.
+5. Enter a neighborhood or address in Nearby to search your saved places. Straight-line distance is not a verified walking time.
+
+### Calling Add from an integration
+
+`GET /api/agent/capabilities` describes the existing Add operations and required inputs:
+
+1. `POST /api/catalog-intake/discover`: send `query` and a retry-stable `requestToken`; receive candidates and a session/version.
+2. `POST /api/catalog-intake/select`: send the session ID, expected session version and chosen `ordinal`; receive clarification or a preview.
+3. `POST /api/catalog-intake/confirm`: only after explicit owner approval, send the session ID and expected preview version. Inspect the returned status and item ID; `committed_needs_review` is not a map-ready success. Handle conflicts rather than silently confirming a changed preview.
+4. `POST /api/catalog-intake/cancel`: cancel with the session ID and expected session version.
+
+These endpoints require the existing owner session cookie and same-origin checks. Read the `x-atlas-web-conversation-id` response header from discovery and echo it on later requests using the same session. A model API key is not an application login credential. There is no dedicated external-agent bearer-token interface yet. The built-in model proposes research facts; application code validates them, and confirmation authorizes persistence. Do not send inferred facts as owner assertions or write directly to the database.
+
+## Local development (optional)
 
 Create an ignored `apps/web/.dev.vars` file:
 
@@ -129,22 +160,6 @@ npx vinext dev --mode owner-poc
 ```
 
 Local development does not automatically start a route Worker. Start or bind it separately for route integration tests. Never commit `.dev.vars`, keys, exports, or local account configuration.
-
-## Verify and deploy
-
-From `apps/web`:
-
-```sh
-npm run lint
-npm run typecheck
-npm run test:evals
-npm run build:owner-poc
-npx wrangler deploy --config dist/server/wrangler.json
-```
-
-Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
-
-For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resources. Do not overwrite newer records with an older backup during rollback.
 
 ## Agent evaluation
 

@@ -16,6 +16,17 @@ export interface OwnerReviewCandidateView {
           readonly latitude: number;
           readonly longitude: number;
         };
+        readonly provenance: 'agent_observed';
+        readonly sourceUrl: string;
+        readonly observedAt: string;
+      }
+    | {
+        readonly status: 'known';
+        readonly address: string;
+        readonly coordinates: {
+          readonly latitude: number;
+          readonly longitude: number;
+        };
         readonly provenance: 'owner_asserted';
         readonly sourceUrl?: string;
         readonly assertedAt: string;
@@ -58,7 +69,7 @@ export interface OwnerReviewCandidateView {
     | { readonly status: 'unknown' }
     | {
         readonly status: 'known';
-        readonly mode: 'reservable' | 'reservation_required';
+        readonly mode: 'reservable' | 'reservation_required' | 'not_reservable';
         readonly label: string;
         readonly advanceDays?: number;
         readonly bookingWindowLabel?: string;
@@ -71,7 +82,7 @@ export interface OwnerReviewCandidateView {
       }
     | {
         readonly status: 'known';
-        readonly mode: 'reservable' | 'reservation_required';
+        readonly mode: 'reservable' | 'reservation_required' | 'not_reservable';
         readonly label: string;
         readonly advanceDays?: number;
         readonly bookingWindowLabel?: string;

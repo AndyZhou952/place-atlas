@@ -30,7 +30,7 @@ Nearby compares only saved restaurants. Coordinates permit a distance prefilter;
 
 The application runs its research adapter inside the Worker. External clients can use application interfaces without a required messaging platform. The root README contains complete setup instructions. These notes describe ownership boundaries, not a claim that every enrichment field has passed live evaluation.
 
-Search is provider-independent from the model. With no search credential, the tool reads DuckDuckGo HTML result snippets from a fixed endpoint. Supplying `SEARCH_API_KEY` selects Tavily. Both paths feed source excerpts into the same bounded research loop and evidence validation. HTML changes, rate limits, and challenges can make the no-key path unavailable; they do not authorize challenge bypass or unsupported claims.
+Search is provider-independent from the model. With no search credential, Japanese/Tabelog queries use Yahoo Japan and other queries use DuckDuckGo, each through a fixed public endpoint. Supplying `SEARCH_API_KEY` selects Tavily. All paths feed source excerpts into the same bounded research loop and evidence validation. HTML changes, rate limits, and challenges can make the no-key path unavailable; they do not authorize challenge bypass or unsupported claims. Requests use manual redirects and reject non-success responses so credentials cannot follow arbitrary redirects; the Workers runtime does not support the `error` redirect mode used by standard Node fetch.
 
 ## Design reference and current limits
 

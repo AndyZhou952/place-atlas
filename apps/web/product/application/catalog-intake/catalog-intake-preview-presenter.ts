@@ -86,11 +86,16 @@ export function presentCatalogIntakePreview(
                 sourceUrl: location.sourceUrl,
                 evidenceAt: location.assertedAt,
               }
-            : {
-                sourceUrl: location.sourceUrl,
-                evidenceAt: location.checkedAt,
-                license: location.license,
-              },
+            : location.provenance === 'agent_observed'
+              ? {
+                  sourceUrl: location.sourceUrl,
+                  evidenceAt: location.observedAt,
+                }
+              : {
+                  sourceUrl: location.sourceUrl,
+                  evidenceAt: location.checkedAt,
+                  license: location.license,
+                },
         )
       : field(
           'coordinates',
@@ -142,14 +147,20 @@ export function presentCatalogIntakePreview(
         'identity',
         'Place identity',
         `${preview.candidateIdentity.providerNamespace} / ${preview.candidateIdentity.placeId}`,
-        'Google identity',
+        preview.candidateIdentity.providerNamespace === 'google-places'
+          ? 'Google identity'
+          : 'Source identity',
       ),
       title,
       field(
         'area',
         'Area',
-        preview.ownerFields.area ?? 'Unknown',
-        preview.ownerFields.area ? 'Owner asserted' : 'No durable evidence',
+        preview.ownerFields.area ?? preview.profile?.area?.value ?? 'Unknown',
+        preview.ownerFields.area
+          ? 'Owner asserted'
+          : preview.profile?.area
+            ? 'Agent observed'
+            : 'No durable evidence',
       ),
       address,
       coordinates,

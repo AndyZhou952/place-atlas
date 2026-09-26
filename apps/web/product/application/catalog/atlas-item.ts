@@ -41,6 +41,7 @@ export interface EventSchedule {
 }
 
 export interface AtlasIntakeEvidence {
+  readonly profile?: CatalogIntakeEnrichedProfile;
   readonly candidateIdentity: {
     readonly providerNamespace: string;
     readonly placeId: string;
@@ -74,6 +75,7 @@ export interface AtlasItem {
   readonly verifiedAt: string;
   readonly officialUrl?: string;
   readonly tabelog?: TabelogSnapshot;
+  readonly googleRating?: TabelogSnapshot;
   readonly reservation: ReservationSnapshot;
   readonly event?: EventSchedule;
   readonly personalState: PersonalState;
@@ -123,6 +125,7 @@ export interface NearbyAtlasItem {
   readonly reservation: ReservationSnapshot;
 }
 import type {
+  CatalogIntakeEnrichedProfile,
   CatalogIntakeAddressProposal,
   CatalogIntakeLocationEvidence,
   CatalogIntakeOwnerFields,

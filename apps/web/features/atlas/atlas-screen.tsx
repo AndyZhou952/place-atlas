@@ -735,6 +735,7 @@ function PlaceRow({
             <span className="place-local">{item.alternateTitle}</span>
           ) : null}
           <span className="place-meta">
+            {item.tags.length ? `${item.tags.slice(0, 3).join(' · ')} · ` : ''}
             {item.area} · {item.reservation.label}
             {distance === undefined ? '' : ` · ${distance.toFixed(1)} km`}
           </span>
@@ -1141,7 +1142,10 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
         <div className="detail-heading-row">
           <div>
             <p className="eyebrow">
-              {kindLabel[item.kind]} · {item.area} · {item.verificationStatus}
+              {kindLabel[item.kind]} · {item.area}
+              {item.tags.length
+                ? ` · ${item.tags.slice(0, 3).join(' · ')}`
+                : ''}
             </p>
             <CardTitle>{item.title}</CardTitle>
             {item.alternateTitle ? (
@@ -1277,6 +1281,17 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                   <small>
                     {item.tabelog.reviewCount?.toLocaleString()} reviews
                   </small>
+                </a>
+              ) : null}
+              {item.googleRating ? (
+                <a
+                  className="rating-strip-item"
+                  href={item.googleRating.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Google</span>
+                  <strong>{item.googleRating.score.toFixed(1)}</strong>
                 </a>
               ) : null}
               <span className="rating-visit-count">

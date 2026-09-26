@@ -254,6 +254,38 @@
   font-weight: 700;
 }
 
+.owner-agent-settings {
+  min-width: 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.owner-agent-settings > summary {
+  min-height: 2.75rem;
+  padding: 0.65rem 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.owner-agent-settings > p {
+  margin: 0 0 0.7rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.owner-agent-settings [data-slot='input'] {
+  min-height: 2.75rem;
+  width: 100%;
+}
+
+.owner-agent-settings .owner-access-actions {
+  flex-wrap: wrap;
+}
+
+.owner-agent-settings .owner-access-help {
+  overflow-wrap: anywhere;
+}
+
 .owner-password-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

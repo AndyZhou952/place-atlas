@@ -95,12 +95,38 @@ export interface WebResearchPort {
   research(input: WebResearchInput): Promise<WebResearchOutcome>;
 }
 
+export interface CatalogIntakeSourcedValue<T> {
+  readonly value: T;
+  readonly sourceUrl: string;
+  readonly observedAt: string;
+}
+
+export interface CatalogIntakeEnrichedProfile {
+  readonly name?: CatalogIntakeSourcedValue<string>;
+  readonly area?: CatalogIntakeSourcedValue<string>;
+  readonly address?: CatalogIntakeSourcedValue<string>;
+  readonly coordinates?: CatalogIntakeSourcedValue<{
+    readonly latitude: number;
+    readonly longitude: number;
+  }>;
+  readonly categories?: CatalogIntakeSourcedValue<readonly string[]>;
+  readonly signatureDishes?: CatalogIntakeSourcedValue<readonly string[]>;
+  readonly summary?: CatalogIntakeSourcedValue<string>;
+  readonly officialWebsite?: CatalogIntakeSourcedValue<string>;
+  readonly bookingLink?: CatalogIntakeSourcedValue<string>;
+  readonly googleRating?: CatalogIntakeSourcedValue<{
+    readonly score: number;
+    readonly reviewCount?: number;
+  }>;
+}
+
 export type WebResearchOutcome =
   | {
       readonly kind: 'observed';
       readonly value: {
         readonly tabelog: CatalogIntakeTabelogSnapshot;
         readonly reservation: CatalogIntakeReservationSnapshot;
+        readonly profile?: CatalogIntakeEnrichedProfile;
       };
     }
   | {
@@ -218,7 +244,7 @@ export interface OwnerTabelogAssertion {
 }
 
 export interface OwnerReservationAssertion {
-  readonly mode: 'reservable' | 'reservation_required';
+  readonly mode: 'reservable' | 'reservation_required' | 'not_reservable';
   readonly label: string;
   readonly advanceDays?: number;
   readonly bookingWindowLabel?: string;
@@ -273,6 +299,15 @@ export type CatalogIntakeAddressProposal =
 
 export type CatalogIntakeLocationEvidence =
   | { readonly status: 'unknown' }
+  | {
+      readonly status: 'known';
+      readonly provenance: 'agent_observed';
+      readonly normalizedAddress: string;
+      readonly latitude: number;
+      readonly longitude: number;
+      readonly sourceUrl: string;
+      readonly observedAt: string;
+    }
   | {
       readonly status: 'known';
       readonly provenance: 'durable_geocoder_observed';
@@ -373,6 +408,7 @@ export type CatalogIntakeSource =
     };
 
 export interface CatalogIntakePreview {
+  readonly profile?: CatalogIntakeEnrichedProfile;
   readonly sessionId: string;
   readonly previewVersion: number;
   readonly state: 'preview_ready';
@@ -946,7 +982,7 @@ export function createCatalogIntakeModule(options: {
                 fields: ['area', 'address'] as const,
               } satisfies CatalogIntakeClarification)
             : undefined;
-        if (clarification) {
+        if (clarification && !options.webResearchPort) {
           const next: CatalogIntakeCandidatesSession = {
             ...session,
             state: 'candidates_ready',
@@ -996,22 +1032,24 @@ export function createCatalogIntakeModule(options: {
         }
 
         const assertedAt = acceptedAt.toISOString();
-        const titleProposal = !ownerFields.title
-          ? ({
-              provenance: 'owner_query' as const,
-              value: session.ownerQuery,
-            } satisfies CatalogIntakeTitleProposal)
-          : undefined;
-        const addressProposal = geocoderProposal
-          ? ({
-              provenance: 'durable_geocoder_observed' as const,
-              value: geocoderProposal.normalizedAddress,
-              sourceUrl: geocoderProposal.sourceUrl,
-              license: geocoderProposal.license,
-              checkedAt: geocoderProposal.checkedAt,
-            } satisfies CatalogIntakeAddressProposal)
-          : undefined;
-        const locationEvidence =
+        let titleProposal: CatalogIntakeTitleProposal | undefined =
+          !ownerFields.title
+            ? ({
+                provenance: 'owner_query' as const,
+                value: session.ownerQuery,
+              } satisfies CatalogIntakeTitleProposal)
+            : undefined;
+        let addressProposal: CatalogIntakeAddressProposal | undefined =
+          geocoderProposal
+            ? ({
+                provenance: 'durable_geocoder_observed' as const,
+                value: geocoderProposal.normalizedAddress,
+                sourceUrl: geocoderProposal.sourceUrl,
+                license: geocoderProposal.license,
+                checkedAt: geocoderProposal.checkedAt,
+              } satisfies CatalogIntakeAddressProposal)
+            : undefined;
+        let locationEvidence: CatalogIntakeLocationEvidence =
           ownerFields.coordinates && ownerFields.address
             ? {
                 status: 'known' as const,
@@ -1059,6 +1097,7 @@ export function createCatalogIntakeModule(options: {
               ? session.preview.reservation
               : { status: 'unknown' as const };
         let researched: {
+          readonly profile?: CatalogIntakeEnrichedProfile;
           readonly tabelog: CatalogIntakeTabelogSnapshot;
           readonly reservation: CatalogIntakeReservationSnapshot;
         } = {
@@ -1115,6 +1154,34 @@ export function createCatalogIntakeModule(options: {
             researched = normalizedResearch;
           }
         }
+        const profile =
+          researched.profile ??
+          (session.state === 'preview_ready'
+            ? session.preview.profile
+            : undefined);
+        if (!ownerFields.title && profile?.name) {
+          titleProposal = { provenance: 'agent_observed', ...profile.name };
+        }
+        if (!ownerFields.address && !addressProposal && profile?.address) {
+          addressProposal = {
+            provenance: 'agent_observed',
+            ...profile.address,
+          };
+        }
+        if (
+          locationEvidence.status === 'unknown' &&
+          profile?.address &&
+          profile.coordinates
+        ) {
+          locationEvidence = {
+            status: 'known',
+            provenance: 'agent_observed',
+            normalizedAddress: ownerFields.address ?? profile.address.value,
+            ...profile.coordinates.value,
+            sourceUrl: profile.coordinates.sourceUrl,
+            observedAt: profile.coordinates.observedAt,
+          };
+        }
         const tabelog =
           ownerTabelog.status === 'known'
             ? ownerTabelog
@@ -1139,6 +1206,7 @@ export function createCatalogIntakeModule(options: {
             placeId: candidate.placeId,
           },
           ownerFields,
+          ...(profile ? { profile } : {}),
           ...(titleProposal ? { titleProposal } : {}),
           ...(addressProposal ? { addressProposal } : {}),
           locationEvidence,
@@ -1390,7 +1458,12 @@ export function createCatalogIntakeModule(options: {
         let refreshedTabelog = session.preview.tabelog;
         let refreshedReservation = session.preview.reservation;
         let providerRefreshFailed = false;
-        if (options.durableGeocoderPort) {
+        if (
+          options.durableGeocoderPort &&
+          (session.preview.locationEvidence.status === 'unknown' ||
+            session.preview.locationEvidence.provenance ===
+              'durable_geocoder_observed')
+        ) {
           const geocoderRefresh = await options.durableGeocoderPort.propose({
             trigger: 'owner_intake_confirm',
             dataClassification: 'public_place_query',
@@ -2817,7 +2890,9 @@ export function validateOwnerReservation(
     url,
   } = value;
   if (
-    (mode !== 'reservable' && mode !== 'reservation_required') ||
+    (mode !== 'reservable' &&
+      mode !== 'reservation_required' &&
+      mode !== 'not_reservable') ||
     typeof label !== 'string' ||
     !isOptionalBoundedText(label, 1, 500) ||
     (advanceDays !== undefined &&
@@ -2856,9 +2931,16 @@ export function validateWebResearchOutput(
   | {
       readonly tabelog: CatalogIntakeTabelogSnapshot;
       readonly reservation: CatalogIntakeReservationSnapshot;
+      readonly profile?: CatalogIntakeEnrichedProfile;
     }
   | undefined {
-  if (!isRecordWithExactKeys(value, ['tabelog', 'reservation'])) {
+  if (
+    !isRecordWithAllowedKeys(
+      value,
+      ['tabelog', 'reservation', 'profile'],
+      ['tabelog', 'reservation'],
+    )
+  ) {
     return undefined;
   }
   const tabelog = validateResearchTabelog(value.tabelog, preview.tabelog);
@@ -2866,7 +2948,92 @@ export function validateWebResearchOutput(
     value.reservation,
     preview.reservation,
   );
-  return tabelog && reservation ? { tabelog, reservation } : undefined;
+  const profile =
+    value.profile === undefined
+      ? undefined
+      : validateEnrichedProfile(value.profile);
+  if (value.profile !== undefined && !profile) return undefined;
+  return tabelog && reservation
+    ? { tabelog, reservation, ...(profile ? { profile } : {}) }
+    : undefined;
+}
+
+export function validateEnrichedProfile(
+  value: unknown,
+): CatalogIntakeEnrichedProfile | undefined {
+  const keys = [
+    'name',
+    'area',
+    'address',
+    'coordinates',
+    'categories',
+    'signatureDishes',
+    'summary',
+    'officialWebsite',
+    'bookingLink',
+    'googleRating',
+  ];
+  if (!isRecordWithAllowedKeys(value, keys, [])) return undefined;
+  const webUrl = (input: unknown) => {
+    if (typeof input !== 'string' || input.length > 2048) return false;
+    try {
+      const url = new URL(input);
+      return (
+        ['http:', 'https:'].includes(url.protocol) &&
+        !url.username &&
+        !url.password
+      );
+    } catch {
+      return false;
+    }
+  };
+  const text = (input: unknown, max = 500) =>
+    typeof input === 'string' && input.trim().length > 0 && input.length <= max;
+  for (const [key, claim] of Object.entries(value)) {
+    if (
+      !isRecordWithExactKeys(claim, ['value', 'sourceUrl', 'observedAt']) ||
+      !webUrl(claim.sourceUrl) ||
+      !normalizeIsoTimestamp(claim.observedAt)
+    )
+      return undefined;
+    const field = claim.value;
+    if (key === 'coordinates') {
+      if (
+        !isRecordWithExactKeys(field, ['latitude', 'longitude']) ||
+        typeof field.latitude !== 'number' ||
+        !Number.isFinite(field.latitude) ||
+        Math.abs(field.latitude) > 90 ||
+        typeof field.longitude !== 'number' ||
+        !Number.isFinite(field.longitude) ||
+        Math.abs(field.longitude) > 180
+      )
+        return undefined;
+    } else if (key === 'googleRating') {
+      if (
+        !isRecordWithAllowedKeys(field, ['score', 'reviewCount'], ['score']) ||
+        typeof field.score !== 'number' ||
+        !Number.isFinite(field.score) ||
+        field.score < 0 ||
+        field.score > 5 ||
+        (field.reviewCount !== undefined &&
+          (typeof field.reviewCount !== 'number' ||
+            !Number.isSafeInteger(field.reviewCount) ||
+            field.reviewCount < 0))
+      )
+        return undefined;
+    } else if (key === 'categories' || key === 'signatureDishes') {
+      if (
+        !Array.isArray(field) ||
+        field.length > 12 ||
+        !field.every((entry) => text(entry, 100))
+      )
+        return undefined;
+    } else if (key === 'officialWebsite' || key === 'bookingLink') {
+      if (!webUrl(field)) return undefined;
+    } else if (!text(field, key === 'summary' ? 1200 : 500)) return undefined;
+  }
+  // Every allowed field, sourced wrapper, and value shape was checked above.
+  return value as CatalogIntakeEnrichedProfile;
 }
 
 function validateResearchTabelog(

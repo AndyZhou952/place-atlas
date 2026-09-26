@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createWebSearch, parseDuckDuckGoHtml } from './web-search.ts';
+import {
+  createWebSearch,
+  parseDuckDuckGoHtml,
+  parseYahooJapanHtml,
+} from './web-search.ts';
 
 const url = 'https://tabelog.com/tokyo/A1307/A130702/13212345/';
 const fixture = `<html><div class="result"><h2><a class="result__a" href="//duckduckgo.com/l/?uddg=${encodeURIComponent(url)}&amp;rut=abc">アルデバラン &amp; Burger</a></h2><div class="result__extras">Tabelog</div><a href="${url}" class="result__snippet">麻布十番 <b>3.97</b> &#x4e88;約</a></div></html>`;
@@ -18,6 +22,39 @@ test('parses encoded result URLs and plain text without following result links',
   });
 });
 
+test('Japanese research uses a bounded public Yahoo search without forwarding credentials', async () => {
+  const html = `<div id="web"><ol><li><a href="${url}"><b>Restaurant</b></a><div>Address &amp; facts</div></li><li><a href="https://127.0.0.1/">Unsafe</a></li></ol></div>`;
+  assert.deepEqual(parseYahooJapanHtml(html), {
+    kind: 'results',
+    sources: [
+      { url, title: 'Restaurant', content: 'Restaurant\nAddress & facts' },
+    ],
+  });
+  const calls = [];
+  const port = createWebSearch({
+    fetch: async (endpoint, init) => {
+      calls.push(endpoint);
+      assert.equal(init.redirect, 'manual');
+      assert.equal(init.headers.Authorization, undefined);
+      return new Response(html);
+    },
+  });
+  assert.equal(
+    (await port.search('東京麺通団', new AbortController().signal)).kind,
+    'results',
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(new URL(calls[0]).origin, 'https://search.yahoo.co.jp');
+  assert.equal(
+    parseYahooJapanHtml('<form id="captcha"></form>').reason,
+    'blocked',
+  );
+  assert.equal(
+    parseYahooJapanHtml('<html>changed layout</html>').reason,
+    'invalid_response',
+  );
+});
+
 test('no-key search uses one fixed endpoint and rejects challenge without retrying', async () => {
   const requests = [];
   const search = createWebSearch({
@@ -27,14 +64,14 @@ test('no-key search uses one fixed endpoint and rejects challenge without retryi
     },
   });
   assert.equal(
-    (await search.search('アルデバラン', new AbortController().signal)).kind,
+    (await search.search('restaurant', new AbortController().signal)).kind,
     'results',
   );
   assert.equal(
     new URL(requests[0].endpoint).origin,
     'https://html.duckduckgo.com',
   );
-  assert.equal(requests[0].init.redirect, 'error');
+  assert.equal(requests[0].init.redirect, 'manual');
   assert.equal(requests.length, 1);
   let calls = 0;
   const blocked = createWebSearch({

@@ -34,6 +34,8 @@ export interface CatalogIntakeProviderModes {
 }
 
 export interface OwnerPocCatalogIntakeRuntimeBindings {
+  readonly ATLAS_OWNER_SESSION_SECRET?: string;
+  readonly AGENT_SETTINGS_SECRET?: string;
   readonly AGENT_API_KEY?: string;
   readonly AGENT_BASE_URL?: string;
   readonly AGENT_MODEL?: string;
@@ -47,6 +49,8 @@ export function projectOwnerPocCatalogIntakeRuntime(
   bindings: OwnerPocCatalogIntakeRuntimeBindings,
 ) {
   return {
+    agentSettingsSecret:
+      bindings.AGENT_SETTINGS_SECRET ?? bindings.ATLAS_OWNER_SESSION_SECRET,
     agentApiKey: bindings.AGENT_API_KEY,
     agentBaseUrl: bindings.AGENT_BASE_URL,
     agentModel: bindings.AGENT_MODEL,

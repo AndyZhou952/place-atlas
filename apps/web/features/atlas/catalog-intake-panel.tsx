@@ -419,6 +419,50 @@ function PreviewStep({
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
+      {preview.profile ? (
+        <section
+          className="catalog-intake-preview-group"
+          aria-label="Restaurant profile"
+        >
+          {preview.profile.categories ? (
+            <p>{preview.profile.categories.value.join(' · ')}</p>
+          ) : null}
+          {preview.profile.summary ? (
+            <p>{preview.profile.summary.value}</p>
+          ) : null}
+          {preview.profile.signatureDishes?.value.length ? (
+            <p>
+              Recommended dishes:{' '}
+              {preview.profile.signatureDishes.value.join(', ')}
+            </p>
+          ) : null}
+          {preview.profile.googleRating ? (
+            <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
+          ) : null}
+          {preview.profile.officialWebsite ? (
+            <p>
+              <a
+                href={preview.profile.officialWebsite.value}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Official website
+              </a>
+            </p>
+          ) : null}
+          {preview.profile.bookingLink ? (
+            <p>
+              <a
+                href={preview.profile.bookingLink.value}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Booking
+              </a>
+            </p>
+          ) : null}
+        </section>
+      ) : null}
       {groups.map((group) => (
         <section
           key={group.id}
@@ -500,7 +544,18 @@ function PreviewStep({
         ) : null}
       </section>
       <div className="catalog-intake-actions">
-        <Button type="button" onClick={() => void onConfirm()} disabled={busy}>
+        {preview.locationEvidence.status === 'unknown' ? (
+          <p>
+            Location research is incomplete. Nothing has been saved to your map.
+            Try a more specific branch or retry when the lookup service is
+            available.
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          onClick={() => void onConfirm()}
+          disabled={busy || preview.locationEvidence.status === 'unknown'}
+        >
           {confirmLabel}
         </Button>
         <Button

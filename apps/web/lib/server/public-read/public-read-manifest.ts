@@ -28,6 +28,7 @@ export interface PublicCatalogItemV1 {
   readonly verifiedAt?: string;
   readonly officialUrl?: string;
   readonly tabelog?: PublicTabelogEvidenceV1;
+  readonly googleRating?: PublicTabelogEvidenceV1;
   readonly reservation: PublicReservationEvidenceV1;
   readonly event?: {
     readonly startDate: string;
@@ -84,7 +85,7 @@ type PublicReservationEvidenceV1 =
     }
   | {
       readonly status: 'known';
-      readonly mode: 'reservable' | 'reservation_required';
+      readonly mode: 'reservable' | 'reservation_required' | 'not_reservable';
       readonly label: string;
       readonly advanceDays?: number;
       readonly bookingWindowLabel?: string;
@@ -97,7 +98,7 @@ type PublicReservationEvidenceV1 =
     }
   | {
       readonly status: 'known';
-      readonly mode: 'reservable' | 'reservation_required';
+      readonly mode: 'reservable' | 'reservation_required' | 'not_reservable';
       readonly label: string;
       readonly advanceDays?: number;
       readonly bookingWindowLabel?: string;
@@ -321,6 +322,9 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     reservation: projectReservation(
       intakeEvidence ? asRecord(intakeEvidence.reservation) : reservation,
     ),
+    ...(source.googleRating === undefined
+      ? {}
+      : { googleRating: projectTabelog(asRecord(source.googleRating)) }),
     ...(source.event === undefined
       ? {}
       : { event: projectEvent(asRecord(source.event)) }),
@@ -336,7 +340,30 @@ function projectIntakeSources(
   evidence: Readonly<Record<string, unknown>>,
 ): readonly PublicSourceEvidenceV1[] {
   const candidates: Record<string, unknown>[] = [];
+  if (evidence.profile !== undefined) {
+    const profile = asRecord(evidence.profile);
+    for (const [key, role, label] of [
+      ['officialWebsite', 'official', 'Official website'],
+      ['bookingLink', 'reservation', 'Booking'],
+    ]) {
+      if (profile[key] !== undefined)
+        candidates.push({
+          role,
+          label,
+          url: asString(asRecord(profile[key]).value),
+        });
+    }
+  }
   const location = asRecord(evidence.locationEvidence);
+  if (location.status === 'known' && location.provenance === 'agent_observed') {
+    candidates.push({
+      role: 'location',
+      label: 'Location source',
+      url: asString(location.sourceUrl),
+      provenance: 'agent_observed',
+      observedAt: asString(location.observedAt),
+    });
+  }
   if (
     location.status === 'known' &&
     location.provenance === 'durable_geocoder_observed'
@@ -690,8 +717,13 @@ function asReservationMode(
 
 function asIntakeReservationMode(
   value: unknown,
-): 'reservable' | 'reservation_required' {
-  if (value === 'reservable' || value === 'reservation_required') return value;
+): 'reservable' | 'reservation_required' | 'not_reservable' {
+  if (
+    value === 'reservable' ||
+    value === 'reservation_required' ||
+    value === 'not_reservable'
+  )
+    return value;
   throw new TypeError('Expected intake reservation mode');
 }
 

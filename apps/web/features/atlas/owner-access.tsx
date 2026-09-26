@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 import type { OwnerSessionController } from './use-owner-session';
+import { OwnerAgentSettings } from './owner-agent-settings';
 
 const panelId = 'owner-access-panel';
 const passwordId = 'owner-password';
@@ -119,6 +120,7 @@ export function OwnerAccessPanel({
               Close
             </Button>
           </div>
+          <OwnerAgentSettings />
         </div>
       ) : (
         <form

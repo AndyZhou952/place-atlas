@@ -11,6 +11,7 @@ import {
   createInMemoryCatalogIntakeStatePort,
   createUnavailableCatalogIntakeModule,
   deriveCatalogIntakeResearchInputDigest,
+  validateWebResearchOutput,
 } from './catalog-intake-coordinator.ts';
 
 const ownerConversation = {
@@ -20,6 +21,92 @@ const ownerConversation = {
     conversationId: 'conversation-1',
   },
 };
+
+test('complete sourced research yields map-ready preview without owner retyping; explicit owner title wins', async () => {
+  const claim = (value) => ({
+    value,
+    sourceUrl: 'https://example.com/menu',
+    observedAt: '2026-09-22T10:00:00.000Z',
+  });
+  const profile = {
+    name: claim('Canonical restaurant'),
+    area: claim('Yotsuya'),
+    address: claim('Tokyo Yotsuya 1-4-2'),
+    coordinates: claim({ latitude: 35.6864, longitude: 139.7293 }),
+    categories: claim(['洋食']),
+    signatureDishes: claim(['Oysters']),
+    summary: claim('A western-style Japanese restaurant.'),
+    officialWebsite: claim('https://example.com/'),
+  };
+  const value = {
+    tabelog: { status: 'unknown' },
+    reservation: { status: 'unknown' },
+    profile,
+  };
+  assert.deepEqual(validateWebResearchOutput(value, value), value);
+  assert.equal(
+    validateWebResearchOutput(
+      {
+        ...value,
+        profile: { coordinates: claim({ latitude: 999, longitude: 1 }) },
+      },
+      value,
+    ),
+    undefined,
+  );
+  assert.equal(
+    validateWebResearchOutput(
+      { ...value, profile: { officialWebsite: claim('javascript:alert(1)') } },
+      value,
+    ),
+    undefined,
+  );
+  for (const ownerFields of [{}, { title: 'My title' }]) {
+    const app = createFixtureApplication({
+      discoveryPort: discoveryFixture(),
+      enrichmentPolicy: 'enrich_if_available',
+      webResearchPort: {
+        async research() {
+          return { kind: 'observed', value };
+        },
+      },
+    });
+    await app.execute({
+      key: 'catalog.intake.discover',
+      input: { query: 'restaurant', requestToken: 'request-1' },
+    });
+    const result = await app.execute({
+      key: 'catalog.intake.select',
+      input: {
+        sessionId: 'session-1',
+        expectedSessionVersion: 1,
+        ordinal: 1,
+        ownerFields,
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.value.status, 'preview_ready');
+    assert.equal(result.value.preview.locationEvidence.status, 'known');
+    assert.equal(
+      result.value.preview.locationEvidence.provenance,
+      'agent_observed',
+    );
+    assert.equal(
+      result.value.preview.addressProposal.value,
+      profile.address.value,
+    );
+    assert.equal(
+      result.value.preview.ownerFields.title ??
+        result.value.preview.titleProposal.value,
+      ownerFields.title ?? profile.name.value,
+    );
+    assert.deepEqual(result.value.preview.profile, profile);
+    assert.equal(
+      result.value.preview.unknownFields.includes('coordinates'),
+      false,
+    );
+  }
+});
 
 test('AtlasApplication awaits rejected handlers and returns one sanitized failure', async () => {
   const application = createAtlasApplication(

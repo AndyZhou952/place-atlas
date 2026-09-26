@@ -78,7 +78,7 @@ test('real-model harness reports unknown-only completion as failed, with no prod
   assert.equal(report.productAcceptance, false);
   assert.doesNotMatch(JSON.stringify(report), /test-secret|"ignored"/u);
   assert.ok(
-    report.productionOutputCoverage.missingClaimPaths.includes('summary'),
+    report.productionOutputCoverage.supportedClaimPaths.includes('summary'),
   );
 });
 
@@ -101,12 +101,28 @@ test('provider failures preserve every case and redact error bodies', async () =
 });
 
 test('reasoning effort is explicit and token exhaustion is reported with usage', async () => {
-  const report = await runExtractionEvaluation({ dataset, config: { ...config, reasoningEffort: 'none' }, fetcher: async (_url, init) => {
-    assert.equal(JSON.parse(init.body).reasoning_effort, 'none');
-    return Response.json({ choices: [{ finish_reason: 'length', message: { content: '' } }], usage: { completion_tokens: 4500, completion_tokens_details: { reasoning_tokens: 4500 } } });
-  } });
+  const report = await runExtractionEvaluation({
+    dataset,
+    config: { ...config, reasoningEffort: 'none' },
+    fetcher: async (_url, init) => {
+      assert.equal(JSON.parse(init.body).reasoning_effort, 'none');
+      return Response.json({
+        choices: [{ finish_reason: 'length', message: { content: '' } }],
+        usage: {
+          completion_tokens: 4500,
+          completion_tokens_details: { reasoning_tokens: 4500 },
+        },
+      });
+    },
+  });
   assert.equal(report.reasoningEffort, 'none');
-  assert.ok(report.cases.every((entry) => entry.error === 'output_token_limit' && entry.usage.reasoning_tokens === 4500));
+  assert.ok(
+    report.cases.every(
+      (entry) =>
+        entry.error === 'output_token_limit' &&
+        entry.usage.reasoning_tokens === 4500,
+    ),
+  );
   assert.equal(report.automatedChecksPass, false);
   assert.match(report.datasetSha256, /^[a-f0-9]{64}$/u);
 });

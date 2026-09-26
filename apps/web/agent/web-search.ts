@@ -20,7 +20,7 @@ export function createWebSearch(options: {
         if (options.apiKey) {
           const response = await fetcher('https://api.tavily.com/search', {
             method: 'POST',
-            redirect: 'error',
+            redirect: 'manual',
             signal,
             headers: {
               'Content-Type': 'application/json',
@@ -61,11 +61,25 @@ export function createWebSearch(options: {
             .slice(0, 3);
           return { kind: 'results', sources };
         }
+        if (/[\u3040-\u30ff\u3400-\u9fff]|tabelog/iu.test(query)) {
+          const endpoint = new URL('https://search.yahoo.co.jp/search');
+          endpoint.searchParams.set('p', query);
+          const response = await fetcher(endpoint.href, {
+            redirect: 'manual',
+            signal,
+            headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
+          });
+          if ([202, 403, 429].includes(response.status))
+            return { kind: 'unavailable', reason: 'blocked' };
+          if (!response.ok)
+            return { kind: 'unavailable', reason: 'provider_failure' };
+          return parseYahooJapanHtml(await readBoundedText(response, 262_144));
+        }
         const endpoint = new URL('https://html.duckduckgo.com/html');
         endpoint.searchParams.set('q', query);
         endpoint.searchParams.set('kp', '-1');
         const response = await fetcher(endpoint.href, {
-          redirect: 'error',
+          redirect: 'manual',
           signal,
           headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
         });
@@ -83,6 +97,40 @@ export function createWebSearch(options: {
       }
     },
   };
+}
+
+export function parseYahooJapanHtml(html: string): SearchOutcome {
+  if (/captcha|challenge-form|ロボットではない/iu.test(html))
+    return { kind: 'unavailable', reason: 'blocked' };
+  if (/に一致するウェブページは見つかりませんでした/u.test(plainText(html)))
+    return { kind: 'results', sources: [] };
+  const region = html.split(/<div\b[^>]*id=["']web["'][^>]*>/iu)[1];
+  if (!region) return { kind: 'unavailable', reason: 'invalid_response' };
+  const sources: SearchEvidence[] = [];
+  for (const row of region.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/giu)) {
+    const link = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/iu.exec(row[1]);
+    const url = link && decodeEntities(attribute(link[1], 'href') ?? '');
+    if (
+      !url ||
+      !link ||
+      !publicHttps(url) ||
+      new URL(url).hostname.endsWith('yahoo.co.jp')
+    )
+      continue;
+    const title = plainText(link[2]).slice(0, 300);
+    const snippet =
+      /<div\b[^>]*>([\s\S]*?)<\/div\s*>/iu.exec(row[1])?.[1] ?? '';
+    if (title && !sources.some((source) => source.url === url))
+      sources.push({
+        url,
+        title,
+        content: `${title}\n${plainText(snippet).slice(0, 8000)}`.trim(),
+      });
+    if (sources.length === 3) break;
+  }
+  return sources.length
+    ? { kind: 'results', sources }
+    : { kind: 'unavailable', reason: 'invalid_response' };
 }
 
 export function parseDuckDuckGoHtml(html: string): SearchOutcome {

@@ -1,19 +1,33 @@
 import { isTabelogRestaurantListing } from './research-instructions.ts';
 import { readBoundedText, type SearchEvidence } from './web-search.ts';
 
+export interface TabelogEvidence extends SearchEvidence {
+  restaurant?: {
+    name: string;
+    address: string;
+    area: string;
+    score: number;
+    coordinates?: { latitude: number; longitude: number };
+    categories: string[];
+    reservation?: string;
+    officialWebsite?: string;
+    introduction?: string;
+  };
+}
+
 /** Only a discovered main listing on a fixed public host, never arbitrary model URLs. */
 export async function readTabelogListing(
   url: string,
   fetcher: typeof fetch,
   parentSignal: AbortSignal,
-): Promise<SearchEvidence | undefined> {
+): Promise<TabelogEvidence | undefined> {
   if (!isTabelogRestaurantListing(url)) return undefined;
   const target = new URL(url);
   target.search = '';
   target.hash = '';
   try {
     const response = await fetcher(target.href, {
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.any([parentSignal, AbortSignal.timeout(5000)]),
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
@@ -32,7 +46,7 @@ export async function readTabelogListing(
 export function parseTabelogListing(
   html: string,
   sourceUrl: string,
-): SearchEvidence | undefined {
+): TabelogEvidence | undefined {
   if (!isTabelogRestaurantListing(sourceUrl)) return undefined;
   const identity = (value: string) =>
     new URL(value).pathname.replace(/\/$/u, '');
@@ -87,9 +101,60 @@ export function parseTabelogListing(
     return undefined;
   const score = Number(rawScore);
   if (score < 1 || score > 5) return undefined;
+  const clean = (text: string) =>
+    text
+      .replace(/<[^>]*>/gu, ' ')
+      .replace(/&nbsp;|&#160;/gu, ' ')
+      .replace(/&amp;/gu, '&')
+      .replace(/&quot;/gu, '"')
+      .replace(/&#39;/gu, "'")
+      .replace(/\s+/gu, ' ')
+      .trim();
+  const row = (label: string) =>
+    new RegExp(
+      `<th[^>]*>\\s*${label}\\s*</th>\\s*<td[^>]*>([\\s\\S]*?)</td>`,
+      'iu',
+    ).exec(html)?.[1];
+  const reservation = clean(row('予約可否') ?? '').slice(0, 1000);
+  const introduction = clean(row('お店のPR') ?? '')
+    .replace(/続きを読む/gu, '')
+    .slice(0, 1200);
+  const officialRow = row('ホームページ');
+  const website =
+    officialRow && /href=["'](https:\/\/[^"']+)["']/iu.exec(officialRow)?.[1];
+  const categories = (
+    typeof record.servesCuisine === 'string'
+      ? record.servesCuisine.split(/[、,]/u)
+      : []
+  )
+    .map(clean)
+    .filter(Boolean)
+    .slice(0, 8);
+  const geo = record.geo as Record<string, unknown> | undefined;
+  const coordinates =
+    typeof geo?.latitude === 'number' &&
+    typeof geo.longitude === 'number' &&
+    Number.isFinite(geo.latitude) &&
+    Number.isFinite(geo.longitude) &&
+    Math.abs(geo.latitude) <= 90 &&
+    Math.abs(geo.longitude) <= 180
+      ? { latitude: geo.latitude, longitude: geo.longitude }
+      : undefined;
+  const restaurant: NonNullable<TabelogEvidence['restaurant']> = {
+    name,
+    address: parts.join(''),
+    score,
+    categories,
+    area: `${String(parts[1])}${String(parts[2]).split(/[0-9０-９]/u)[0]}`.trim(),
+    ...(coordinates ? { coordinates } : {}),
+    ...(reservation ? { reservation } : {}),
+    ...(introduction ? { introduction } : {}),
+    ...(website ? { officialWebsite: clean(website) } : {}),
+  };
   return {
     url: sourceUrl,
     title: name,
-    content: `${name} ${parts.join('')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}`,
+    content: `${name} ${parts.join('')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
+    restaurant,
   };
 }

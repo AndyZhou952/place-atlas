@@ -32,7 +32,7 @@ test('runtime instructions expose source precedence, limitations and confirmatio
   assert.match(restaurantResearchPrompt, /fallback/u);
   assert.match(
     restaurantResearchPrompt,
-    /does not yet populate those optional fields/u,
+    /populate them only from explicit source rules/u,
   );
   assert.match(restaurantResearchPrompt, /owner confirms separately/u);
   assert.match(restaurantSearchDescription, /not full pages/u);

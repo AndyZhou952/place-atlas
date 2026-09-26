@@ -8,6 +8,8 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 
 ## 1. Add — research a restaurant, confirm, and see it on the map
 
+**Current production blocker (2026-09-26):** owner model settings and a real DeepSeek tool-call check work on Cloudflare. Google branch discovery and no-key Japanese search work, but the matched Tabelog page returns HTTP 403 from the Worker. The Tokyo Mentsudan preview therefore lacks a usable sourced location/rating. No restaurant was confirmed during this test. Add is **not yet accepted**; a reliable permitted source-access path is required before declaring it ready. Missing-coordinate previews disable saving rather than publishing invisible candidates.
+
 - [x] **Core flow in code:** discover → branch selection/clarification → preview → version-bound confirmation; shared publication and duplicate-prevention tests.
 - [x] **Repository-owned research foundation:** configurable OpenAI-compatible model, no-key search, bounded tool calls, evidence validation; model has no direct database-write permission.
 - [x] **Targeted rating source reader:** discovered Tabelog main-listing JSON-LD supplies branch identity and aggregate score; review scores are excluded. Three direct development-host page checks returned scores; this is not a DeepSeek or Cloudflare acceptance result.
@@ -17,16 +19,19 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 - [x] **Rating acceptance set:** eight cases (three directly checked restaurant listings, one controlled review-score distractor and four synthetic safety controls), executable scorer and regression tests. No real model success rate has been claimed.
 - [x] **Complete Add benchmark contract:** ten mixed-capture cases cover 13 field groups, including coordinates, official/booking links, categories, summary/dishes, ratings and reservation difficulty/lead time. Captures explicitly distinguish synthetic controls from verified webpage facts; summaries require semantic review.
 - [x] **Real-model extraction runner:** calls the configured model on frozen evidence without gold answers, records per-field failures and errors, and does not write restaurants. This separate evaluation prompt is not the production Add workflow.
-- [x] **DeepSeek full-profile extraction measured:** Flash completed 10/10 cases; 129/130 field states matched. One unsupported reservation-state claim fails the zero-unsupported-claims gate. See [evaluation report](add-evaluation-2026-09-26.md). This is frozen-evidence extraction, not production Add acceptance.
-- [ ] **Reservation unknown handling:** a source not listing rules must yield an unknown claim, not a known object containing only `not_stated` values.
+- [x] **DeepSeek full-profile extraction measured:** the corrected Flash v3 run passed 130/130 field states and 88/88 known values across ten cases, with zero unsupported known claims. See [evaluation report](add-evaluation-2026-09-26.md). This is frozen-evidence extraction, not production Add acceptance or semantic summary review.
+- [x] **Reservation unknown handling:** a source not listing rules yields unknown; explicit no-reservation policies are represented separately. Regression tests reject a known object containing only `not_stated` values.
+- [x] **Owner model settings implemented:** owner-only connection check and encrypted server-side credentials; DeepSeek tested, official OpenAI-compatible endpoint supported. Native Claude/GLM configuration remains outside the first slice.
+- [x] **Owner settings live verification:** login, connection check, encrypted save and safe status response passed in Chromium on Cloudflare; the saved key field is cleared and no secret is returned.
+- [x] **No-Google discovery fallback implemented:** verified Tabelog listing discovery for Japan and direct listing URLs. No-key search availability is not guaranteed; Google discovery remains preferred when configured.
 - [ ] **Live rating benchmark:** independently verify a small set of current aggregate scores and report completion, exact branch/score accuracy, provenance, unavailable sources and latency. Frozen old scores are not live truth.
 - [ ] **Complete source research:** read useful restaurant sources beyond snippets; preserve the selected branch and explain source failures without asking for already supplied details.
-- [ ] **Complete the data path:** research → structured preview → validation → D1 → list/detail card for all fields below.
+- [x] **Profile data path implemented and contract-tested:** research → structured preview → validation → D1 → public DTO → list/detail card. Live acceptance is tracked separately below.
   - [x] Name, area, address and coordinates have application fields and an intake path; coordinates remain internal to map/distance calculations.
-  - [ ] Categories and signature dishes: populate visible keywords. Existing `tags` is currently empty on Add publication.
-  - [ ] One-sentence source-grounded description: replace the generic intake message.
+  - [x] Categories and signature dishes populate visible keywords when supported by branch-matched evidence.
+  - [x] Source-grounded description replaces the generic intake message; production composes validated category/area/dish facts, not unconstrained model prose.
   - [ ] Japan: reliably obtain the aggregate Tabelog rating; Google rating is optional. Other overseas places: support Google rating. Mainland China: no external rating required.
-  - [ ] Official and booking links: propagate the existing `officialUrl`/`sources` fields through research and Add.
+  - [x] Official and booking links propagate through research and Add when supported by evidence.
   - [ ] Reservation policy and explicit lead time: prefer the correct branch's official source, use Tabelog as fallback. Existing advance-days/release-window fields still need automated population.
 - [ ] **Independent external-Agent access:** authenticated structured-proposal integration using the same validation and confirmation services; dedicated agent-token authentication is not implemented.
 - [ ] **Live Add acceptance:** useful sourced preview → owner confirms → same restaurant visible in list/map after refresh → retry creates no duplicate. An unknown-only preview or review-only candidate is not success.

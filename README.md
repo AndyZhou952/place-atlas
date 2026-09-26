@@ -4,16 +4,18 @@ A self-hosted restaurant map for saving places, recording visits and photos, and
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
-This is an evolving PoC. Map, owner authentication, personal records, and deterministic Add are implemented. Automated research is being integrated and evaluated. Categories, signature dishes, international ratings, and screenshot input are not all guaranteed by the current runtime. Offline benchmark success alone does not demonstrate live provider coverage.
+This is an evolving PoC. Add now researches sourced restaurant profiles, presents a preview, and saves after owner confirmation. Categories, signature dishes, descriptions, ratings and official links flow to the saved card when sources supply them. Missing information stays unknown. Live source coverage varies; screenshots and Agent-led Nearby remain follow-up work. Offline benchmark success alone does not demonstrate live provider coverage.
 
-First-time setup order: prepare credentials → create Cloudflare resources → configure owner/model secrets → deploy → log in and use the website. Local development is optional and described after the deployment and usage instructions.
+Current acceptance limit: the Cloudflare PoC can connect to DeepSeek and search for a branch, but Tabelog page reads returned HTTP 403 in live testing. Automatic Add-to-map acceptance has **not passed**. A model key alone does not guarantee source access; a preview without usable coordinates cannot be saved from the website. See the current delivery checklist in `docs/status.md` for verified versus pending work.
+
+First-time setup order: prepare credentials → create Cloudflare resources → configure owner secrets → deploy → log in → test and save model settings → use Add. Model settings may alternatively be configured as deployment secrets. Local development is optional and described after deployment and usage instructions.
 
 ## Requirements
 
 - Node.js 22.13 or newer and npm.
 - A Cloudflare account with Workers, D1, and R2 enabled. Workers runs the app; D1 stores records; R2 stores photos.
 - An OpenAI-compatible chat-completions endpoint, model name, and API key for automated extraction.
-- No separate search key is required. Optionally provide a Tavily API key to use Tavily instead of the default DuckDuckGo HTML search.
+- No separate search key is required. Japanese/Tabelog queries use Yahoo Japan public search; other queries use DuckDuckGo HTML search. Optionally provide a Tavily API key instead.
 - Optionally, Google Cloud credentials for Places API (New), Geocoding API, and Routes API. Without these services, Google matching and verified route calculations are unavailable.
 
 Provider usage can incur charges. Set quotas and budget alerts in your accounts. Credentials belong on the server.
@@ -54,10 +56,21 @@ Set secrets through the interactive prompts:
 ```sh
 npx wrangler secret put ATLAS_OWNER_PASSWORD --config wrangler.owner-poc.local.jsonc
 npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.local.jsonc
-npx wrangler secret put AGENT_API_KEY --config wrangler.owner-poc.local.jsonc
 ```
 
-Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32`. The password is configured here as a server secret; there is no first-run password creation or registration page. After deployment, Owner login checks this password. To change it later, repeat the password secret command. `AGENT_API_KEY` is your model key. Never use a `NEXT_PUBLIC_` variable for secrets.
+Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32` (at least 32 characters). The password is configured here as a server secret; there is no registration page. After deployment, Owner login checks this password. To change it later, repeat the password secret command. Never use a `NEXT_PUBLIC_` variable for secrets.
+
+Recommended: after deployment, log in and open **Owner active → Agent API settings**. Enter your model API key, base URL and model, then choose **Test & save**. DeepSeek defaults are `https://api.deepseek.com` and `deepseek-flash`; `https://api.openai.com/v1` is also allowed, but individual OpenAI models are not all tested. The server first checks tool-call support, then encrypts the settings in D1. Keys are never returned to the browser or saved in browser storage. Only the owner can view configuration status or change settings. Leave the key blank to keep it when the endpoint is unchanged; changing providers requires a new key.
+
+For this PoC, the web form allows only these official endpoints. GLM, native Claude Messages API and arbitrary proxy endpoints are not yet supported by the form. Server-managed OpenAI-compatible endpoints remain configurable below; operators are responsible for trusting that endpoint. Do not claim compatibility without testing tool calls.
+
+Stored credentials use `AGENT_SETTINGS_SECRET`, or the owner session secret if no dedicated encryption secret is set. For independent key rotation, configure `AGENT_SETTINGS_SECRET` with a random 32+ character value **before** saving settings. Changing that secret makes previously encrypted settings unreadable; re-enter credentials afterward. **Use deployment settings** removes the saved override and restores server configuration (which may be empty).
+
+Alternatively, configure the model entirely at deployment time:
+
+```sh
+npx wrangler secret put AGENT_API_KEY --config wrangler.owner-poc.local.jsonc
+```
 
 Add these model settings to the local Wrangler configuration's `vars`:
 
@@ -70,7 +83,7 @@ Add these model settings to the local Wrangler configuration's `vars`:
 
 This is an example endpoint/model pair. Replace both with your provider's documented values. The model must support chat completions with function/tool calls. Enter the API base URL, not a consumer chat website URL. Set all three model settings (`AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL`) together: incomplete configuration returns research unavailable. Test your chosen combination before relying on automatic enrichment.
 
-Search works without a separate key by requesting DuckDuckGo's HTML results. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or turn a failed search into invented facts. Search results supply snippets. For the first discovered Tabelog restaurant listing in each search, the backend also tries a bounded page read and extracts only structured branch identity and aggregate rating, never individual review scores. This is not a general full-page browsing service; official-site reservation reading remains incomplete. A failed source does not discard facts supported by another successful source.
+Search works without a separate key using Yahoo Japan for Japanese/Tabelog queries and DuckDuckGo for other queries. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or invent facts. It reads discovered Tabelog main listings for branch identity, address, coordinates, cuisine, aggregate rating, explicit reservation rules, restaurant introductions and official website links. Individual review scores are excluded. The model extracts sourced dishes; the application builds a concise description from validated categories, area and dishes. Official-source search is supported, but arbitrary full-page official-site browsing is not; missing booking lead times remain unknown. A failed source does not discard independently supported facts.
 
 To use Tavily instead, optionally set its key:
 
@@ -90,7 +103,7 @@ npx wrangler secret put GOOGLE_PLACES_API_KEY --config wrangler.owner-poc.local.
 
 Set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled` only with working credentials; otherwise set it to `disabled`. Existing records remain readable without Google.
 
-The current Add candidate-discovery step still requires Google Places. No-key web search enriches a selected restaurant; it does not yet replace Google for finding and choosing restaurant identities. Google-free Add discovery remains follow-up work.
+Without Google matching configuration, Add uses no-key search plus verified Tabelog listing identities for Japanese restaurants. Pasting a full Tabelog main-listing URL skips search. This fallback is not worldwide discovery and may fail when a provider blocks requests. Google improves international matching but does not itself guarantee complete or persistable restaurant research.
 
 For address resolution and walking routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
 
@@ -122,6 +135,7 @@ For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resou
 Start here only after completing configuration and deployment above. Visitors can read the site without logging in; changing data requires the owner password.
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
+   If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
 2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. If multiple branches fit, choose the intended branch.
 3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
 4. Use the heart to mark a favorite and the visited control to mark a visit. Edit and Journal provide personal ratings, notes, visits, and photos. Personal scores are separate from external ratings.
@@ -180,9 +194,9 @@ For a live research smoke test, set `AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGEN
 node --experimental-strip-types agent/live-smoke.mjs "Restaurant name" "Exact branch address"
 ```
 
-This incurs provider usage and prints structured research output and elapsed time. It does not write a restaurant. It tests the current narrow enrichment stage (Tabelog and explicit reservation facts); it is not an end-to-end Add benchmark or a test of all desired fields.
+This incurs provider usage and prints structured research output and elapsed time. It does not write a restaurant. It tests production research including sourced profile fields; it is not an end-to-end confirmation, persistence or browser test.
 
-To evaluate full-profile extraction with your actual model, put `AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL` in `apps/web/.env` (Git-ignored), then run from `apps/web`. For DeepSeek V4.1 Flash, use the official model ID `deepseek-flash` and set `AGENT_EVAL_REASONING_EFFORT=none` for this bounded extraction baseline. DeepSeek otherwise defaults to thinking mode, which can exhaust this test's token cap before returning JSON. This setting applies only to the evaluation runner; leave it unset for providers that do not support `reasoning_effort`.
+To evaluate full-profile extraction with your actual model, put `AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL` in `apps/web/.env` (Git-ignored), then run from `apps/web`. For DeepSeek V4.1 Flash, use `deepseek-flash` and set `AGENT_EVAL_REASONING_EFFORT=none` for this bounded extraction baseline. Production research also explicitly disables thinking for the official DeepSeek endpoint to leave its token budget for tool calls and structured results. Leave the evaluation setting unset for providers that do not support `reasoning_effort`.
 
 ```sh
 node --experimental-strip-types --env-file=.env evals/run-add-enrichment.mjs evals/runs/add-extraction.json

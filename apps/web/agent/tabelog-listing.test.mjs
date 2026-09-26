@@ -35,6 +35,33 @@ test('structured listing exposes aggregate and branch identity, never reviews', 
   );
 });
 
+test('listing exposes sourced location, cuisine, official link and explicit reservation refusal', () => {
+  const result = parseTabelogListing(
+    html({
+      ...restaurant,
+      geo: { latitude: 35.68, longitude: 139.72 },
+      servesCuisine: '洋食、コロッケ',
+    }) +
+      '<table><tr><th>予約可否</th><td><p>予約不可</p></td></tr>' +
+      '<tr><th>ホームページ</th><td><a href="https://restaurant.example/">Website</a></td></tr>' +
+      '<tr><th>お店のPR</th><td>熟成ロースカツがおすすめ。</td></tr></table>',
+    url,
+  );
+  assert.deepEqual(result.restaurant.coordinates, {
+    latitude: 35.68,
+    longitude: 139.72,
+  });
+  assert.deepEqual(result.restaurant.categories, ['洋食', 'コロッケ']);
+  assert.equal(result.restaurant.reservation, '予約不可');
+  assert.equal(
+    result.restaurant.officialWebsite,
+    'https://restaurant.example/',
+  );
+  assert.match(result.content, /熟成ロースカツ/u);
+  const missing = parseTabelogListing(html(restaurant), url);
+  assert.equal(missing.restaurant.reservation, undefined);
+});
+
 test('wrong identities, review-only ratings, malformed and conflicting records provide no fact', () => {
   for (const record of [
     { ...restaurant, '@id': url.replace('13131643', '13131644') },
@@ -72,7 +99,7 @@ test('reader fetches only fixed main-listing host without redirects or query par
   const fetcher = async (target, init) => {
     calls++;
     assert.equal(target, url);
-    assert.equal(init.redirect, 'error');
+    assert.equal(init.redirect, 'manual');
     assert.equal(init.headers.Authorization, undefined);
     return new Response(html(restaurant), {
       headers: { 'content-type': 'text/html' },

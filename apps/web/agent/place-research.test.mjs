@@ -47,6 +47,21 @@ const tool = {
   },
 };
 
+test('an all-not-stated reservation is unknown even with a copied source quote', async () => {
+  const invalid = structuredClone(proposal);
+  invalid.reservation = {
+    status: 'known',
+    mode: 'not_stated',
+    label: 'not_stated',
+    url,
+  };
+  invalid.evidence.reservation = { url, quote: '予約可' };
+  assert.equal(
+    (await harness(invalid).agent.research(input)).value.reservation.status,
+    'unknown',
+  );
+});
+
 function harness(final = proposal, sourceUrl = url) {
   const requests = [];
   let turn = 0;
@@ -300,6 +315,8 @@ test('discovered main listing supplies aggregate evidence missing from search sn
               '@type': 'AggregateRating',
               ratingValue: '3.97',
             },
+            geo: { latitude: 35.65, longitude: 139.73 },
+            servesCuisine: 'ハンバーガー',
           })}</script>`,
           { headers: { 'content-type': 'text/html' } },
         );
@@ -319,6 +336,12 @@ test('discovered main listing supplies aggregate evidence missing from search sn
   });
   const result = await agent.research(input);
   assert.equal(result.value.tabelog.score, 3.97);
+  assert.equal(result.value.profile.name.value, 'アルデバラン');
+  assert.deepEqual(result.value.profile.coordinates.value, {
+    latitude: 35.65,
+    longitude: 139.73,
+  });
+  assert.deepEqual(result.value.profile.categories.value, ['ハンバーガー']);
   assert.equal(reads, 1);
 });
 
@@ -382,11 +405,11 @@ test('three model settings enable keyless search and challenge remains unavailab
         endpoints.push(endpoint);
         if (endpoint.startsWith('https://tabelog.com/'))
           return new Response('', { status: 403 });
-        if (endpoint.startsWith('https://html.duckduckgo.com/html'))
+        if (endpoint.startsWith('https://search.yahoo.co.jp/search'))
           return blocked
             ? new Response('', { status: 202 })
             : new Response(
-                `<a class="result__a" href="${url}">アルデバラン</a><a class="result__snippet">${content}</a>`,
+                `<div id="web"><ol><li><a href="${url}">アルデバラン</a><div>${content}</div></li></ol></div>`,
               );
         return Response.json({
           choices: [
@@ -591,4 +614,12 @@ test('Japanese branch evidence can match English Google address by alias and str
     },
   });
   assert.equal(wrong.value.tabelog.status, 'unknown');
+  const sameNumbersDifferentCity = await agent.research({
+    ...multilingual,
+    selectedSubject: {
+      ...multilingual.selectedSubject,
+      transientAddress: '7-chōme-9-15 Hongō, Bunkyo City, Tokyo',
+    },
+  });
+  assert.equal(sameNumbersDifferentCity.value.tabelog.status, 'unknown');
 });

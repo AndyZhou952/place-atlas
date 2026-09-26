@@ -15,6 +15,8 @@ import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
 import { D1CatalogState } from './d1-catalog-state.ts';
 import { D1DestructiveState } from './d1-destructive-state.ts';
+import { createPublicReadManifest } from '../public-read/public-read-manifest.ts';
+import { loadPublicCatalog } from '../../../features/atlas/public-read-client.ts';
 
 const baseMigration = new URL(
   '../../../migrations/owner-poc/0001_owner_poc_schema.sql',
@@ -32,6 +34,70 @@ const researchAllowanceMigration = new URL(
   '../../../migrations/owner-poc/0009_catalog_intake_research_allowances.sql',
   import.meta.url,
 );
+
+test('complete researched profile survives D1 publication and public projection without a new schema', async () => {
+  const sqlite = await migratedDatabase();
+  const claim = (value) => ({
+    value,
+    sourceUrl: 'https://example.com/menu',
+    observedAt: '2026-09-23T01:59:00.000Z',
+  });
+  const preview = withDigest({
+    ...verifiedPreview(),
+    profile: {
+      area: claim('Yotsuya'),
+      categories: claim(['洋食']),
+      signatureDishes: claim(['Oysters']),
+      summary: claim('A small restaurant.'),
+      officialWebsite: claim('https://example.com/'),
+      bookingLink: claim('https://example.com/book'),
+      googleRating: claim({ score: 4.2, reviewCount: 10 }),
+    },
+    reservation: {
+      status: 'known',
+      mode: 'not_reservable',
+      label: 'Reservations not accepted; queue unknown.',
+      url: 'https://example.com/menu',
+      provenance: 'agent_observed',
+      observedAt: '2026-09-23T01:59:00.000Z',
+      freshness: 'fresh',
+    },
+  });
+  insertPreviewSession(sqlite, preview, 'b'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'profile-item',
+  });
+  assert.equal(
+    (await publisher.publish(preview, 'b'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  const projected = createPublicReadManifest().project('catalog.get', stored);
+  assert.deepEqual(projected.tags, ['洋食', 'Oysters']);
+  assert.match(projected.description, /A small restaurant.*Oysters/);
+  assert.equal(projected.officialUrl, 'https://example.com/');
+  assert.equal(projected.googleRating.score, 4.2);
+  assert.equal(projected.reservation.mode, 'not_reservable');
+  assert.ok(
+    projected.sources.some(
+      (source) => source.url === 'https://example.com/book',
+    ),
+  );
+  assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  const browserItems = await loadPublicCatalog({
+    async request(url) {
+      return url === '/api/items'
+        ? Response.json([projected])
+        : Response.json({ favorite: false, effectiveVisited: false });
+    },
+  });
+  assert.equal(browserItems[0].googleRating.score, 4.2);
+  assert.equal(browserItems[0].reservation.mode, 'unavailable');
+  assert.deepEqual(browserItems[0].tags, ['洋食', 'Oysters']);
+});
 
 test('D1 Atlas Catalog publish atomically commits a verified item, identity, snapshots, receipt, and terminal session', async () => {
   const sqlite = await migratedDatabase();

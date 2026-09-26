@@ -608,17 +608,60 @@ function toAtlasItem(
     id: itemId,
     kind: 'food',
     title,
-    area: preview.ownerFields.area ?? '',
+    area: preview.ownerFields.area ?? preview.profile?.area?.value ?? '',
     address,
-    description: 'Added through Atlas Catalog intake.',
+    description: [
+      preview.profile?.summary?.value,
+      preview.profile?.signatureDishes?.value.length
+        ? `Recommended dishes: ${preview.profile.signatureDishes.value.join(', ')}.`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(' '),
+    ...(preview.profile?.officialWebsite
+      ? { officialUrl: preview.profile.officialWebsite.value }
+      : {}),
+    ...(preview.profile?.googleRating
+      ? {
+          googleRating: {
+            ...preview.profile.googleRating.value,
+            url: preview.profile.googleRating.sourceUrl,
+            checkedAt: preview.profile.googleRating.observedAt,
+          },
+        }
+      : {}),
     latitude: location.latitude,
     longitude: location.longitude,
     verificationStatus: 'verified',
     verifiedAt: now.toISOString(),
     reservation: reservationSnapshot(preview),
     personalState: 'saved',
-    tags: [],
-    sources: [],
+    tags: [
+      ...new Set([
+        ...(preview.profile?.categories?.value ?? []),
+        ...(preview.profile?.signatureDishes?.value ?? []),
+      ]),
+    ],
+    sources: [
+      ...(preview.profile?.officialWebsite
+        ? [
+            {
+              role: 'official' as const,
+              label: 'Official website',
+              url: preview.profile.officialWebsite.value,
+            },
+          ]
+        : []),
+      ...(preview.profile?.bookingLink
+        ? [
+            {
+              role: 'reservation' as const,
+              label: 'Booking',
+              url: preview.profile.bookingLink.value,
+            },
+          ]
+        : []),
+    ],
     intakeEvidence: intakeEvidence(preview),
     updatedAt: now.toISOString(),
   };
@@ -650,6 +693,7 @@ function toReviewCandidate(
 
 function intakeEvidence(preview: CatalogIntakePreview) {
   return {
+    ...(preview.profile ? { profile: preview.profile } : {}),
     candidateIdentity: preview.candidateIdentity,
     ownerFields: preview.ownerFields,
     ...(preview.titleProposal ? { titleProposal: preview.titleProposal } : {}),
@@ -677,7 +721,9 @@ function reservationSnapshot(
     mode:
       preview.reservation.mode === 'reservation_required'
         ? 'advance'
-        : 'unknown',
+        : preview.reservation.mode === 'not_reservable'
+          ? 'unavailable'
+          : 'unknown',
     label: preview.reservation.label,
     ...(preview.reservation.channel
       ? { channel: preview.reservation.channel }

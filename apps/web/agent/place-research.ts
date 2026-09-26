@@ -1,9 +1,10 @@
 import {
   validateWebResearchOutput,
+  validateEnrichedProfile,
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
-import { readTabelogListing } from './tabelog-listing.ts';
+import { readTabelogListing, type TabelogEvidence } from './tabelog-listing.ts';
 import {
   restaurantResearchPrompt,
   restaurantSearchDescription,
@@ -83,7 +84,7 @@ export function createPlaceResearchAgent(
     async research(input) {
       if (!('selectedSubject' in input)) return { kind: 'unavailable' };
       const signal = AbortSignal.timeout(35_000);
-      const evidence: Evidence[] = [];
+      const evidence: TabelogEvidence[] = [];
       const messages: Record<string, unknown>[] = [
         { role: 'system', content: restaurantResearchPrompt },
         { role: 'user', content: JSON.stringify(input.selectedSubject) },
@@ -93,10 +94,40 @@ export function createPlaceResearchAgent(
       const readUrls = new Set<string>();
       const usedCallIds = new Set<string>();
       try {
+        const selectedListing =
+          input.selectedSubject.providerNamespace === 'tabelog'
+            ? input.selectedSubject.placeId
+            : input.selectedSubject.ownerQuery.match(
+                /https:\/\/tabelog\.com\/[^\s]+/u,
+              )?.[0];
+        if (
+          selectedListing &&
+          isTabelogRestaurantListing(selectedListing) &&
+          config.readSourcePages !== false
+        ) {
+          const page = await readTabelogListing(
+            selectedListing,
+            fetcher,
+            signal,
+          );
+          readUrls.add(selectedListing);
+          if (page) {
+            evidence.push(page);
+            successfulSearches++;
+            messages.push({
+              role: 'user',
+              content: JSON.stringify({
+                discoveredSource: page,
+                instruction:
+                  'This source was read by the application. Extract supported facts; search only for missing details.',
+              }),
+            });
+          }
+        }
         for (let step = 0; step < 3; step++) {
           const response = await fetcher(endpoint, {
             method: 'POST',
-            redirect: 'error',
+            redirect: 'manual',
             signal,
             headers: {
               'Content-Type': 'application/json',
@@ -105,7 +136,10 @@ export function createPlaceResearchAgent(
             body: JSON.stringify({
               model: config.model,
               temperature: 0,
-              max_tokens: 1200,
+              max_tokens: 3000,
+              ...(base.hostname === 'api.deepseek.com'
+                ? { reasoning_effort: 'none' }
+                : {}),
               messages,
               ...(searches < 2
                 ? {
@@ -203,7 +237,22 @@ export function createPlaceResearchAgent(
               value: { tabelog: unknown, reservation: unknown },
             };
           const observedAt = new Date().toISOString();
-          const fact = (field: 'tabelog' | 'reservation') => {
+          const matchedListing = evidence.find(
+            (source) =>
+              source.restaurant &&
+              (input.selectedSubject.providerNamespace === 'tabelog'
+                ? source.url.replace(/\/$/u, '') ===
+                  input.selectedSubject.placeId.replace(/\/$/u, '')
+                : matchesSelectedBranch(
+                    `${source.restaurant.name} ${source.restaurant.address}`,
+                    input.selectedSubject.transientName,
+                    input.selectedSubject.transientAddress,
+                    input.selectedSubject.ownerQuery,
+                  )),
+          );
+          const fact = (
+            field: 'tabelog' | 'reservation',
+          ): Record<string, unknown> => {
             const value = proposal[field];
             const quote = proposal.evidence?.[field];
             const identityQuote =
@@ -227,6 +276,15 @@ export function createPlaceResearchAgent(
             )
               return unknown;
             if (
+              field === 'reservation' &&
+              ![
+                'reservable',
+                'reservation_required',
+                'not_reservable',
+              ].includes(value.mode)
+            )
+              return unknown;
+            if (
               field === 'tabelog' &&
               (typeof value.url !== 'string' ||
                 !isTabelogRestaurantListing(value.url) ||
@@ -234,15 +292,155 @@ export function createPlaceResearchAgent(
                 !numericToken(quote.quote, value.score))
             )
               return unknown;
+            const allowed =
+              field === 'tabelog'
+                ? ['status', 'score', 'reviewCount', 'url']
+                : [
+                    'status',
+                    'mode',
+                    'label',
+                    'advanceDays',
+                    'bookingWindowLabel',
+                    'releaseNote',
+                    'channel',
+                    'url',
+                  ];
             return {
-              ...value,
+              ...Object.fromEntries(
+                allowed
+                  .filter((key) => value[key] !== undefined)
+                  .map((key) => [key, value[key]]),
+              ),
               provenance: 'agent_observed',
               observedAt,
               freshness: 'fresh',
             };
           };
+          const profile: Record<string, unknown> = {};
+          for (const field of [
+            'name',
+            'area',
+            'address',
+            'categories',
+            'signatureDishes',
+            'officialWebsite',
+            'bookingLink',
+            'googleRating',
+          ]) {
+            const claim = proposal.profile?.[field];
+            const proof =
+              proposal.evidence?.[field] ?? proposal.profile?.evidence?.[field];
+            if (
+              claim === undefined ||
+              !supported(proof, evidence) ||
+              typeof proof?.identityQuote !== 'string' ||
+              !supported(
+                { url: proof.url, quote: proof.identityQuote },
+                evidence,
+              ) ||
+              !matchesSelectedBranch(
+                proof.identityQuote,
+                input.selectedSubject.transientName,
+                input.selectedSubject.transientAddress,
+                input.selectedSubject.ownerQuery,
+              )
+            )
+              continue;
+            // Exact factual values must occur in evidence; only a description may paraphrase.
+            const tokens = Array.isArray(claim)
+              ? claim
+              : field === 'googleRating' && claim && typeof claim === 'object'
+                ? [
+                    claim.score,
+                    ...(claim.reviewCount === undefined
+                      ? []
+                      : [claim.reviewCount]),
+                  ]
+                : [claim];
+            if (
+              !tokens.every((token: unknown) =>
+                typeof token === 'number'
+                  ? numericToken(proof.quote, token)
+                  : typeof token === 'string' && proof.quote.includes(token),
+              )
+            )
+              continue;
+            profile[field] = { value: claim, sourceUrl: proof.url, observedAt };
+          }
+          let reservation = fact('reservation');
+          let tabelog = fact('tabelog');
+          if (matchedListing?.restaurant) {
+            const details = matchedListing.restaurant;
+            const sourceUrl = matchedListing.url;
+            for (const field of [
+              'name',
+              'address',
+              'area',
+              'coordinates',
+              'categories',
+              'officialWebsite',
+            ] as const) {
+              const value = details[field];
+              if (
+                value !== undefined &&
+                (!Array.isArray(value) || value.length)
+              )
+                profile[field] = { value, sourceUrl, observedAt };
+            }
+            tabelog = {
+              status: 'known',
+              score: details.score,
+              url: sourceUrl,
+              provenance: 'agent_observed',
+              observedAt,
+              freshness: 'fresh',
+            };
+            // Absence of a policy is unknown, never "known/not_stated". An explicit
+            // refusal is a policy but says nothing about seats, queues or opening now.
+            const policy = details.reservation;
+            if (reservation.status === 'unknown' && policy) {
+              const mode = /予約不可/u.test(policy)
+                ? 'not_reservable'
+                : /完全予約制|予約必須|要予約/u.test(policy)
+                  ? 'reservation_required'
+                  : /予約可/u.test(policy)
+                    ? 'reservable'
+                    : undefined;
+              if (mode)
+                reservation = {
+                  status: 'known',
+                  mode,
+                  label: policy.slice(0, 500),
+                  url: sourceUrl,
+                  provenance: 'agent_observed',
+                  observedAt,
+                  freshness: 'fresh',
+                };
+            }
+          }
+          for (const key of Object.keys(profile)) {
+            if (!validateEnrichedProfile({ [key]: profile[key] }))
+              delete profile[key];
+          }
+          const checkedProfile = validateEnrichedProfile(profile);
+          if (checkedProfile?.categories?.value.length) {
+            // Constrain prose to validated facts rather than trusting a citation as
+            // proof for arbitrary model-generated claims (awards, popularity, etc.).
+            const categories = checkedProfile.categories.value.join(' / ');
+            const dishes = checkedProfile.signatureDishes?.value.join(', ');
+            const area = checkedProfile.area?.value;
+            profile.summary = {
+              value: `${categories}${area ? ` in ${area}` : ''}.${dishes ? ` Featured dishes: ${dishes}.` : ''}`,
+              sourceUrl: checkedProfile.categories.sourceUrl,
+              observedAt,
+            };
+          }
           const value = validateWebResearchOutput(
-            { tabelog: fact('tabelog'), reservation: fact('reservation') },
+            {
+              tabelog,
+              reservation,
+              ...(Object.keys(profile).length ? { profile } : {}),
+            },
             { tabelog: unknown, reservation: unknown },
           );
           return value ? { kind: 'observed', value } : { kind: 'unavailable' };
@@ -304,8 +502,44 @@ function matchesSelectedBranch(
       .replace(/-+/gu, '-')
       .match(/\d{1,4}-\d{1,4}-\d{1,4}/gu) ?? [];
   const selectedNumbers = streetNumbers(address);
-  return selectedNumbers.some((numbers) =>
-    streetNumbers(quote).includes(numbers),
+  if (
+    !selectedNumbers.some((numbers) => streetNumbers(quote).includes(numbers))
+  )
+    return false;
+  const locality =
+    address.normalize('NFKC').match(/[\p{Script=Han}ぁ-んァ-ヶ]+[区市郡]/gu) ??
+    [];
+  if (locality.length)
+    return locality.some((part) => text.includes(normalize(part)));
+  // Common bilingual ward/neighborhood aliases are corroboration, never identity
+  // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
+  const aliasesByLocality: Record<string, string> = {
+    shinjuku: '新宿',
+    nishishinjuku: '西新宿',
+    ikebukuro: '池袋',
+    toshima: '豊島',
+    minato: '港区',
+    shibuya: '渋谷',
+    bunkyo: '文京',
+    koto: '江東',
+    sumida: '墨田',
+    taito: '台東',
+    chiyoda: '千代田',
+    setagaya: '世田谷',
+    suginami: '杉並',
+    meguro: '目黒',
+    shinagawa: '品川',
+    ginza: '銀座',
+    azabujuban: '麻布十番',
+  };
+  const latinAddress = address
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z]/gu, '');
+  return Object.entries(aliasesByLocality).some(
+    ([latin, japanese]) =>
+      latinAddress.includes(latin) && text.includes(normalize(japanese)),
   );
 }
 

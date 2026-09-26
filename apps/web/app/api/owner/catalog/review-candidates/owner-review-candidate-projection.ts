@@ -18,9 +18,13 @@ export interface OwnerReviewCandidateV1 {
           readonly latitude: number;
           readonly longitude: number;
         };
-        readonly provenance: 'owner_asserted' | 'durable_geocoder_observed';
+        readonly provenance:
+          | 'owner_asserted'
+          | 'durable_geocoder_observed'
+          | 'agent_observed';
         readonly sourceUrl?: string;
         readonly assertedAt?: string;
+        readonly observedAt?: string;
         readonly checkedAt?: string;
         readonly provider?: string;
         readonly license?: string;
@@ -78,6 +82,18 @@ function projectLocation(
   location: AtlasReviewCandidate['reviewEvidence']['locationEvidence'],
 ): OwnerReviewCandidateV1['location'] {
   if (location.status === 'unknown') return { status: 'unknown' };
+  if (location.provenance === 'agent_observed')
+    return {
+      status: 'known',
+      address: location.normalizedAddress,
+      coordinates: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+      },
+      provenance: 'agent_observed',
+      sourceUrl: location.sourceUrl,
+      observedAt: location.observedAt,
+    };
   if (location.provenance === 'owner_asserted') {
     return {
       status: 'known',

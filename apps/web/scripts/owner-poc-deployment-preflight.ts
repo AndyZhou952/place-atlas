@@ -14,6 +14,7 @@ const optionalSecretNames = [
   'SEARCH_API_KEY',
   'AGENT_BASE_URL',
   'AGENT_MODEL',
+  'AGENT_SETTINGS_SECRET',
 ] as const;
 
 interface WranglerConfig {
@@ -383,7 +384,11 @@ function hasExactRouteSidecarBinding(value: unknown): boolean {
   const binding = value[0];
   return (
     isRecord(binding) &&
-    Object.keys(binding).length === 2 &&
+    Object.keys(binding).every((key) =>
+      ['binding', 'service', 'environment'].includes(key),
+    ) &&
+    (binding.environment === undefined ||
+      binding.environment === 'production') &&
     binding.binding === 'ROUTE_SIDECAR' &&
     binding.service === 'japan-atlas-route-sidecar'
   );

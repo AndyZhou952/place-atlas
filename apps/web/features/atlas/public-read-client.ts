@@ -219,6 +219,22 @@ function decodeCandidateLocation(
       assertedAt: requiredString(value.assertedAt),
     };
   }
+  if (value.provenance === 'agent_observed') {
+    requireExactKeys(value, [
+      'status',
+      'address',
+      'coordinates',
+      'provenance',
+      'sourceUrl',
+      'observedAt',
+    ]);
+    return {
+      ...shared,
+      provenance: 'agent_observed',
+      sourceUrl: requiredString(value.sourceUrl),
+      observedAt: requiredString(value.observedAt),
+    };
+  }
   if (value.provenance !== 'durable_geocoder_observed') {
     throw new TypeError('Invalid Review Candidate location provenance.');
   }
@@ -292,7 +308,11 @@ function decodeCandidateReservation(
     return { status: 'unknown' };
   }
   const mode = value.mode;
-  if (mode !== 'reservable' && mode !== 'reservation_required') {
+  if (
+    mode !== 'reservable' &&
+    mode !== 'reservation_required' &&
+    mode !== 'not_reservable'
+  ) {
     throw new TypeError('Invalid Review Candidate reservation mode.');
   }
   const optional = [
@@ -308,7 +328,7 @@ function decodeCandidateReservation(
   ]);
   const result = {
     status: 'known' as const,
-    mode: mode as 'reservable' | 'reservation_required',
+    mode: mode as 'reservable' | 'reservation_required' | 'not_reservable',
     label: requiredString(value.label),
     ...(value.advanceDays === undefined
       ? {}
@@ -449,6 +469,9 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
     ...(optionalString(value.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(value.officialUrl) }),
+    ...(value.googleRating === undefined
+      ? {}
+      : { googleRating: decodeTabelog(value.googleRating, 'legacy') }),
     ...(value.tabelog === undefined
       ? {}
       : { tabelog: decodeTabelog(value.tabelog, evidenceShape) }),
@@ -503,12 +526,16 @@ function decodeReservation(
   }
   if (value.status === 'known') {
     const mode = value.mode;
-    if (mode !== 'reservable' && mode !== 'reservation_required') {
+    if (
+      mode !== 'reservable' &&
+      mode !== 'reservation_required' &&
+      mode !== 'not_reservable'
+    ) {
       throw new TypeError('Invalid reservation evidence.');
     }
     return {
       value: {
-        mode: 'advance',
+        mode: mode === 'not_reservable' ? 'unavailable' : 'advance',
         label: requiredString(value.label),
         ...(optionalString(value.channel) === undefined
           ? {}

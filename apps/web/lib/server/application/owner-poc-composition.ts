@@ -12,9 +12,14 @@ import { createRouteSidecarNearbyAdapter } from '../../../route-sidecar/route-si
 import { D1ProviderUsage } from '../../../adapters/agent/d1-provider-usage.ts';
 import { createGooglePlaceDiscoveryAdapter } from '../../../adapters/providers/google-place-discovery.ts';
 import { createGooglePlacesNewClient } from '../../../adapters/providers/google-places-new-client.ts';
+import { createTabelogPlaceDiscoveryPort } from '../../../adapters/providers/tabelog-place-discovery.ts';
 import { createNominatimDurableGeocoderAdapter } from '../../../adapters/providers/nominatim-durable-geocoder.ts';
 import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
 import { createConfiguredPlaceResearchAgent } from '../../../agent/place-research.ts';
+import {
+  createAgentSettingsService,
+  createD1AgentSettingsStore,
+} from '../agent-settings.ts';
 import { createCatalogIntakeModule } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
@@ -25,6 +30,7 @@ import {
 } from './catalog-intake-provider-mode-manifest.ts';
 
 export interface OwnerPocCatalogIntakeOptions {
+  readonly agentSettingsSecret?: string;
   readonly agentApiKey?: string;
   readonly agentBaseUrl?: string;
   readonly agentModel?: string;
@@ -90,7 +96,7 @@ export function createOwnerPocComposition(
   );
   const state = new D1CatalogIntakeState(database, clock);
   const usage = new D1ProviderUsage(database, () => clock.now());
-  const discovery = createGooglePlaceDiscoveryAdapter(
+  const googleDiscovery = createGooglePlaceDiscoveryAdapter(
     createGooglePlacesNewClient({
       ...(providerModes.googlePlaces === 'enabled'
         ? { apiKey: intakeOptions.googlePlacesApiKey }
@@ -99,6 +105,15 @@ export function createOwnerPocComposition(
       ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
     }),
   );
+  const discovery =
+    providerModes.googlePlaces === 'enabled' && intakeOptions.googlePlacesApiKey
+      ? googleDiscovery
+      : createTabelogPlaceDiscoveryPort({
+          ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+          ...(intakeOptions.searchApiKey
+            ? { searchApiKey: intakeOptions.searchApiKey }
+            : {}),
+        });
   const nominatimState = new D1NominatimPolicyState(database, clock);
   const durableGeocoder =
     providerModes.durableGeocoder === 'enabled'
@@ -115,7 +130,34 @@ export function createOwnerPocComposition(
   const idSource = intakeOptions.idSource ?? {
     nextId: () => crypto.randomUUID(),
   };
-  const webResearchPort = createConfiguredPlaceResearchAgent(intakeOptions);
+  const environmentResearchPort =
+    createConfiguredPlaceResearchAgent(intakeOptions);
+  const webResearchPort = intakeOptions.agentSettingsSecret
+    ? {
+        async research(
+          input: Parameters<
+            NonNullable<typeof environmentResearchPort>['research']
+          >[0],
+        ) {
+          try {
+            const config = await createAgentSettingsService(
+              createD1AgentSettingsStore(database),
+              intakeOptions.agentSettingsSecret,
+              intakeOptions,
+            ).resolve();
+            const agent = createConfiguredPlaceResearchAgent({
+              ...intakeOptions,
+              ...config,
+            });
+            return agent
+              ? agent.research(input)
+              : { kind: 'unavailable' as const };
+          } catch {
+            return { kind: 'unavailable' as const };
+          }
+        },
+      }
+    : environmentResearchPort;
   const catalogIntakeModule = createCatalogIntakeModule({
     discoveryPort: discovery,
     ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),

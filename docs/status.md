@@ -59,6 +59,13 @@ Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
 
 Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-plan.md).
 
+- [x] **Date-only/photo-first recording:** both HTTP and application validation accept a dated Visit without a rating/note, so photos can be attached after creation. Default date uses the browser's local calendar date.
+- [x] **Submission feedback and duplicate-click guard:** synchronous in-flight guard plus a saved-record lock. After a photo failure, the Visit remains saved; another Visit requires an explicit new-record action. This does not claim exactly-once behavior across unrelated browser sessions.
+- [x] **Overall-score wording:** create/edit forms explicitly label the restaurant-level personal score; no per-Visit rating storage was added.
+- [x] **Deployed Record API smoke:** real date-only creation, identical-mutation replay, two R2-backed photo uploads, caption/date/note edits, fresh reads, single-photo deletion, anonymous-write rejection and test-record cleanup passed. See `apps/web/scripts/record-api-smoke.mjs` (explicit write opt-in required).
+- [x] **Personal-score API regression:** temporarily changing the overall score through a test Visit preserved both external-rating fields; the original personal score and effective visited state were restored after cleanup. Full browser rating acceptance remains open below. Local Record/API/media/state coverage passed 81 tests, typecheck and lint.
+- [ ] **Complete browser acceptance still open:** native Chromium hit `ERR_INSUFFICIENT_RESOURCES` while loading the catalog. A real-endpoint API-bridge run reached saved Visit/photo-viewer interaction but the page crashed during caption testing; its temporary Visit/photos were cleaned up. Neither run counts as full browser acceptance. `scripts/record-browser-smoke.mjs` preserves the opt-in scenario for rerunning in a healthy environment.
+
 - [x] **Data/API foundation:** personal rating, favorite/visited state, Visit date/note, photo upload and caption-update operations exist.
 - [x] **Journal editing in code:** edit Visit date/rating/note and update photo captions; local state/API tests exist.
 - [ ] **Rating semantics:** the Visit form's rating currently updates the restaurant-level personal assessment; historical per-Visit scores are not stored separately. Clarify the UI and decide whether history is required before expanding storage.

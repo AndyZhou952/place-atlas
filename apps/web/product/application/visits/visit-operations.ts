@@ -220,8 +220,6 @@ function validateNewVisit(input: unknown): Result<NewVisit> {
     !input.itemId ||
     typeof input.visitedAt !== 'string' ||
     !input.visitedAt ||
-    (input.rating === undefined &&
-      !(typeof input.note === 'string' && input.note.trim())) ||
     (input.rating !== undefined && !isRating(input.rating)) ||
     (input.note !== undefined && typeof input.note !== 'string')
   ) {
@@ -261,7 +259,7 @@ function validateVisitUpdate(input: unknown): Result<VisitUpdate> {
 function invalidNewVisit(): Result<never> {
   return failure(
     'invalid_input',
-    'Valid place and date are required; add at least a rating or note, and keep ratings between 0 and 5.',
+    'Valid place and date are required; optional ratings must be between 0 and 5.',
   );
 }
 

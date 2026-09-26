@@ -97,8 +97,6 @@ function isHttpNewVisit(value: unknown): value is HttpNewVisit {
     Boolean(value.itemId) &&
     typeof value.visitedAt === 'string' &&
     Boolean(value.visitedAt) &&
-    (value.rating !== undefined ||
-      (typeof value.note === 'string' && Boolean(value.note.trim()))) &&
     (value.rating === undefined || isRating(value.rating)) &&
     (value.note === undefined || typeof value.note === 'string')
   );
@@ -130,4 +128,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const invalidCreateMessage =
-  'Valid place and date are required; add at least a rating or note, and keep ratings between 0 and 5';
+  'Valid place and date are required; optional ratings must be between 0 and 5';

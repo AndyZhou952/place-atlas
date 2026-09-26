@@ -80,7 +80,7 @@ test('Journal writes require mutation IDs and preserve sanitized errors', async 
       throw new Error('must not run');
     }),
     request,
-    { itemId: 'place-one', visitedAt: '2026-09-12' },
+    { itemId: 'place-one', visitedAt: '2026-09-12', rating: 6 },
   );
   const missing = await updateVisitResponse(
     coordinator(async () => ({
@@ -97,6 +97,23 @@ test('Journal writes require mutation IDs and preserve sanitized errors', async 
   assert.equal(missing.status, 404);
   assert.equal(await missing.text(), 'Journal entry not found');
   assert.equal(calls, 0);
+});
+
+test('Journal POST allows date-only records for optional notes and photos', async () => {
+  let envelope;
+  const response = await createVisitResponse(
+    coordinator(async (input) => {
+      envelope = input;
+      return okReceipt(input.mutationId, { visit: { id: 'date-only' } });
+    }),
+    request,
+    { itemId: 'place-one', visitedAt: '2026-09-12' },
+  );
+  assert.equal(response.status, 201);
+  assert.deepEqual(envelope.input, {
+    itemId: 'place-one',
+    visitedAt: '2026-09-12',
+  });
 });
 
 function coordinator(mutate) {

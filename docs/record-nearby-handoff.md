@@ -51,6 +51,13 @@ configuration or server secrets; never copy them into reports or Git.
 
 ## First: complete Record without an Agent
 
+Latest progress: date-only/photo-first creation, local default dates, explicit
+overall-score wording and repeated-submit guards are deployed. Real API
+persistence/edit/delete/replay checks passed. The remaining priority is browser
+acceptance and interrupted-upload recovery, not rewriting existing Visit APIs.
+The test browser ran out of resources and crashed; see the current status and
+opt-in smoke scripts documented in `docs/record-nearby-plan.md`.
+
 Use `apps/web/features/atlas/atlas-screen.tsx`,
 `use-atlas-view-model.ts`, and `apps/web/product/application/visits/`.
 The detail card and Journal already share Visit components and APIs. Keep one

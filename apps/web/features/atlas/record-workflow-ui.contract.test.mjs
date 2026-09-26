@@ -15,7 +15,7 @@ test('place detail and Journal share one Visit composer', () => {
   assert.match(screenSource, /function VisitComposer\(/u);
   assert.match(
     screenSource,
-    /<VisitComposer\s+vm=\{vm\}\s+itemId=\{item\.id\}/u,
+    /<VisitComposer\s+key=\{item\.id\}\s+vm=\{vm\}\s+itemId=\{item\.id\}/u,
   );
   assert.match(
     screenSource,
@@ -32,7 +32,7 @@ test('place detail and Journal share one Visit composer', () => {
 
 test('place detail history reuses editable Visit and media behavior', () => {
   const detailStart = screenSource.indexOf('function PlaceDetail');
-  const detailEnd = screenSource.indexOf('function ReviewWorkspace');
+  const detailEnd = screenSource.indexOf('function JournalWorkspace');
   const detailSource = screenSource.slice(detailStart, detailEnd);
 
   assert.match(detailSource, /<JournalVisitRow/u);
@@ -48,7 +48,7 @@ test('place detail history reuses editable Visit and media behavior', () => {
 test('Visit composition exposes progress and durable success feedback', () => {
   assert.match(
     screenSource,
-    /status === 'saving' \? 'Saving…' : 'Save visit'/u,
+    /status === 'saving'[\s\S]*?'Saving…'[\s\S]*?savedVisitId[\s\S]*?'Visit saved'[\s\S]*?'Save visit'/u,
   );
   assert.match(
     screenSource,
@@ -59,6 +59,17 @@ test('Visit composition exposes progress and durable success feedback', () => {
     screenSource,
     /The visit was saved, but some photos did not upload/u,
   );
+});
+
+test('saved visits cannot be resubmitted, including after photo failure', () => {
+  assert.match(
+    screenSource,
+    /if \(submitting.current \|\| savedVisitId \|\| vm.journalBusy\) return/u,
+  );
+  assert.match(screenSource, /setSavedVisitId\(result.visit.id\)/u);
+  assert.match(screenSource, /Record another visit/u);
+  assert.match(screenSource, /Overall マイスコア/u);
+  assert.match(screenSource, /not a separate visit score/u);
 });
 
 test('record controls keep mobile-sized edit, delete, and upload targets', () => {

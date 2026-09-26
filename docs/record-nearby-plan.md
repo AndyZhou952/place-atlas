@@ -23,6 +23,20 @@ Code starting points: `apps/web/features/atlas/atlas-screen.tsx`,
 
 ## Proposed work packages
 
+Record update (2026-09-26): date-only creation and photo-first recording are now
+accepted by both HTTP and application validation. The shared form blocks repeated
+submissions after save (including partial photo failure), uses a local default
+date and explicitly labels the overall restaurant score. The real deployed API
+smoke passed Visit/media persistence, editing, replay and cleanup. Full browser
+acceptance and interrupted-upload recovery remain open: constrained Chromium
+reported resource exhaustion and crashed. Do not mark R1 complete from the API
+smoke alone. Run the opt-in `scripts/record-api-smoke.mjs` and
+`scripts/record-browser-smoke.mjs` from `apps/web`; provide `ATLAS_BASE_URL`,
+`OWNER_TEST_PASSWORD`, and `ALLOW_RECORD_SMOKE_WRITES=yes`. The browser script
+requires Playwright (or `PLAYWRIGHT_MODULE` pointing to its entry). Optional
+`RECORD_API_BRIDGE=yes` forwards browser requests to real endpoints through the
+runner; report this separately from native browser-network acceptance.
+
 ### R1 — Finish the deterministic Record journey
 
 - Keep restaurant metadata editing distinct from **Record a visit**; both the

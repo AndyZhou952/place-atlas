@@ -67,7 +67,7 @@ test('create accepts a rating by itself and normalizes 0, 5, and arbitrary decim
   }
 });
 
-test('create accepts a note by itself but rejects an empty Visit', async () => {
+test('create accepts a note or date-only Visit before optional photo upload', async () => {
   const { application } = fixture();
   const created = await application.execute({
     key: 'visit.create',
@@ -77,10 +77,11 @@ test('create accepts a note by itself but rejects an empty Visit', async () => {
       note: '  omakase  ',
     },
   });
-  const invalid = await application.execute({
+  const dateOnly = await application.execute({
     key: 'visit.create',
     input: {
       itemId: 'place-one',
+      id: 'date-only',
       visitedAt: '2026-09-12',
       note: '   ',
     },
@@ -88,8 +89,10 @@ test('create accepts a note by itself but rejects an empty Visit', async () => {
 
   assert.equal(created.ok && created.value.visit.note, 'omakase');
   assert.equal(created.ok && created.value.visit.id, 'generated-visit');
-  assert.equal(invalid.ok, false);
-  assert.equal(!invalid.ok && invalid.error.kind, 'invalid_input');
+  assert.equal(dateOnly.ok, true);
+  assert.equal(dateOnly.value.visit.note, undefined);
+  assert.equal(dateOnly.value.item.hasVisited, true);
+  assert.equal(dateOnly.value.item.personalRating, undefined);
 });
 
 test('create never writes manualVisited and derives effectiveVisited from the Visit', async () => {

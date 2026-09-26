@@ -1297,6 +1297,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                 <NotebookPen aria-hidden="true" /> Add a visit
               </summary>
               <VisitComposer
+                key={item.id}
                 vm={vm}
                 itemId={item.id}
                 idPrefix={`detail-${item.id}`}
@@ -1423,8 +1424,8 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         <p className="eyebrow">Personal journal</p>
         <h2>Your own rating remains separate from Tabelog.</h2>
         <p>
-          Record a visit with photos in one step, or add more photos later. A
-          rating by itself is enough and notes are optional.
+          Record a visit with just a date, or include photos, an optional note
+          and your overall place rating. Add more photos later.
         </p>
       </div>
       <div className="journal-grid">
@@ -1583,9 +1584,7 @@ function VisitComposer({
     vm.items[0]?.id ||
     '';
   const selectedItem = vm.items.find((item) => item.id === effectiveItemId);
-  const [visitedAt, setVisitedAt] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [visitedAt, setVisitedAt] = useState(localVisitDate());
   const [rating, setRating] = useState(
     selectedItem?.personalRating?.toString() ?? '',
   );
@@ -1593,9 +1592,12 @@ function VisitComposer({
   const [visitPhotos, setVisitPhotos] = useState<File[]>([]);
   const [formError, setFormError] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const submitting = useRef(false);
+  const [savedVisitId, setSavedVisitId] = useState<string>();
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current || savedVisitId || vm.journalBusy) return;
     let normalizedRating: number | undefined;
     try {
       normalizedRating = parseOptionalRating(rating);
@@ -1605,6 +1607,7 @@ function VisitComposer({
       return;
     }
 
+    submitting.current = true;
     setStatus('saving');
     try {
       const result = await vm.addVisit({
@@ -1613,6 +1616,7 @@ function VisitComposer({
         ...(normalizedRating === undefined ? {} : { rating: normalizedRating }),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
+      setSavedVisitId(result.visit.id);
       const submittedPhotos = visitPhotos;
       setNote('');
       setVisitPhotos([]);
@@ -1623,7 +1627,7 @@ function VisitComposer({
           setFormError(
             'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
           );
-          setStatus('idle');
+          setStatus('success');
           return;
         }
       }
@@ -1631,11 +1635,13 @@ function VisitComposer({
     } catch {
       setStatus('idle');
       // The view model presents the request error in the notice bar.
+    } finally {
+      submitting.current = false;
     }
   }
 
   const feedbackId = `${idPrefix}-visit-feedback`;
-  const busy = status === 'saving' || vm.journalBusy;
+  const busy = status === 'saving' || vm.journalBusy || Boolean(savedVisitId);
 
   return (
     <form
@@ -1685,7 +1691,7 @@ function VisitComposer({
           />
         </label>
         <label htmlFor={`${idPrefix}-visit-rating`}>
-          マイスコア / 5
+          Overall マイスコア / 5
           <Input
             id={`${idPrefix}-visit-rating`}
             type="number"
@@ -1702,6 +1708,10 @@ function VisitComposer({
           />
         </label>
       </div>
+      <small>
+        This updates your overall place rating, not a separate visit score.
+        Rating and note are optional.
+      </small>
       <label htmlFor={`${idPrefix}-visit-note`}>
         Note (optional)
         <textarea
@@ -1761,10 +1771,35 @@ function VisitComposer({
       ) : null}
       <Button type="submit" disabled={busy || !effectiveItemId || !visitedAt}>
         <NotebookPen data-icon="inline-start" />
-        {status === 'saving' ? 'Saving…' : 'Save visit'}
+        {status === 'saving'
+          ? 'Saving…'
+          : savedVisitId
+            ? 'Visit saved'
+            : 'Save visit'}
       </Button>
+      {savedVisitId ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={status === 'saving' || vm.journalBusy}
+          onClick={() => {
+            setSavedVisitId(undefined);
+            setStatus('idle');
+            setFormError('');
+            setVisitedAt(localVisitDate());
+            setRating(selectedItem?.personalRating?.toString() ?? '');
+          }}
+        >
+          Record another visit
+        </Button>
+      ) : null}
     </form>
   );
+}
+
+function localVisitDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function JournalVisitRow({
@@ -1850,13 +1885,13 @@ function JournalVisitRow({
               />
             </label>
             <label htmlFor={`visit-rating-${visit.id}`}>
-              マイスコア
+              Overall マイスコア
               <Input
                 id={`visit-rating-${visit.id}`}
                 type="number"
                 min="0"
                 max="5"
-                step="0.5"
+                step="0.1"
                 value={rating}
                 onChange={(event) => setRating(event.target.value)}
               />

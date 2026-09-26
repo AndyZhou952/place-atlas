@@ -45,7 +45,7 @@ export function isTabelogRestaurantListing(value: unknown): boolean {
       !url.username &&
       !url.password &&
       !url.port &&
-      /^\/(?:en\/|cn\/|tw\/|kr\/)?[a-z]+\/A\d+\/A\d+\/\d{8}\/?$/u.test(
+      /^\/(?:en\/|cn\/|tw\/|kr\/)?[a-z]+\/A\d+\/A\d+\/\d{7,8}\/?$/u.test(
         url.pathname,
       )
     );

@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict';
+import { isTabelogRestaurantListing } from './research-instructions.ts';
 import test from 'node:test';
+
+test('regional seven-digit restaurant IDs are accepted, reviews remain excluded', () => {
+  const source = 'https://tabelog.com/aomori/A0201/A020101/2000092/';
+  assert.equal(isTabelogRestaurantListing(source), true);
+  assert.equal(isTabelogRestaurantListing(source + 'dtlrvwlst/'), false);
+  assert.equal(
+    isTabelogRestaurantListing(source.replace('2000092', '200092')),
+    false,
+  );
+});
 import {
   parseTabelogListing,
   readTabelogListing,

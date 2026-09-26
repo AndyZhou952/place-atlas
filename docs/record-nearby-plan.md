@@ -8,7 +8,7 @@ not claims that the deployed end-to-end journeys have passed.
 | Area | Implemented | Gap / not yet accepted |
 | --- | --- | --- |
 | Personal assessment | Favorite, visited state, personal rating and overall comment | Deployed regression for independence from external ratings and dated visits |
-| Visits | Shared Visit composer/history in restaurant detail and Journal; date, rating input, note, multiple photos; edit/delete | Card **Edit** still edits restaurant metadata, not the Visit form; clarify score semantics and unify entry points |
+| Visits | Shared Visit composer/history in restaurant detail and Journal; date, rating input, note, multiple photos; edit/delete | The rating input updates the restaurant-level personal assessment, not a separate historical Visit score. Card **Edit** still edits restaurant metadata, not the Visit form |
 | Photos | Upload, remove, open viewer, edit optional captions from thumbnails/viewer | Real R2 persistence and partial-upload recovery acceptance; per-photo scores are not implemented |
 | Journal | Restaurant/date filters and existing Visit editing | Verify changes from either entry point after reload and failed/repeated submissions |
 | Nearby tools | Saved restaurants only, geocoding, straight-line distance, walking evidence, unvisited preference and labelled distance fallback | Current input is only `locationHint`; no Agent interpretation of cuisine/preferences, conversational clarification or images |
@@ -28,8 +28,9 @@ Code starting points: `apps/web/features/atlas/atlas-screen.tsx`,
 - Keep restaurant metadata editing distinct from **Record a visit**; both the
   detail card and Journal use the same date/note/photo editor and APIs.
 - Make personal overall rating, a dated Visit and its note explicit. Do not
-  silently overwrite external scores. Decide separately whether a Visit rating
-  is a historical rating or an update to the restaurant's personal score.
+  silently overwrite external scores. Current Visit rating input updates the
+  restaurant's personal score. A separate historical per-Visit score needs a
+  data/API change and an explicit product decision; do not imply it exists.
 - Verify caption editing inside the photo viewer and persistent edit/delete.
 - Prevent duplicate visits on repeat submissions; failed photo uploads must
   retain the saved Visit and offer retry against that Visit, not create another.

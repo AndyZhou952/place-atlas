@@ -110,6 +110,43 @@ export function createPlaceResearchAgent(
         else sourceAccessIssue ??= 'unavailable';
         return undefined;
       };
+      const readSelectedListing = async (sources: SearchEvidence[]) => {
+        // Search order is not branch identity. Prefer corroborated address/name
+        // snippets and try another listing after a wrong branch or failed read.
+        const subject = input.selectedSubject;
+        const matches = (text: string) =>
+          matchesSelectedBranch(
+            text,
+            subject.transientName,
+            subject.transientAddress,
+            subject.ownerQuery,
+          );
+        const ranked = [...sources].sort(
+          (a, b) =>
+            Number(matches(`${b.title} ${b.content}`)) -
+            Number(matches(`${a.title} ${a.content}`)),
+        );
+        for (const source of ranked) {
+          if (readUrls.size >= 3) break;
+          const url = canonicalListingUrl(source.url);
+          if (!url || readUrls.has(url)) continue;
+          readUrls.add(url);
+          const page = await readListing(url);
+          if (!page) continue;
+          sources.unshift(page);
+          if (
+            page.restaurant &&
+            matchesSelectedBranch(
+              `${page.restaurant.name} ${page.restaurant.address}`,
+              subject.transientName,
+              subject.transientAddress,
+              subject.ownerQuery,
+              page.restaurant.address,
+            )
+          )
+            break;
+        }
+      };
       try {
         const selectedListing =
           input.selectedSubject.providerNamespace === 'tabelog'
@@ -146,14 +183,7 @@ export function createPlaceResearchAgent(
           const result = await searchProvider.search(query, signal);
           if (result.kind === 'results') {
             successfulSearches++;
-            const listing = result.sources.find((source) =>
-              isTabelogRestaurantListing(source.url),
-            );
-            if (listing) {
-              readUrls.add(listing.url);
-              const page = await readListing(listing.url);
-              if (page) result.sources.unshift(page);
-            }
+            await readSelectedListing(result.sources);
             evidence.push(...result.sources);
           }
           messages.push({
@@ -244,15 +274,8 @@ export function createPlaceResearchAgent(
               const result = await searchProvider.search(call.query, signal);
               if (result.kind === 'results') {
                 successfulSearches++;
-                const listing = result.sources.find(
-                  (source) =>
-                    isTabelogRestaurantListing(source.url) &&
-                    !readUrls.has(source.url),
-                );
-                if (listing && config.readSourcePages !== false) {
-                  readUrls.add(listing.url);
-                  const page = await readListing(listing.url);
-                  if (page) result.sources.unshift(page);
+                if (config.readSourcePages !== false) {
+                  await readSelectedListing(result.sources);
                 }
                 evidence.push(...result.sources);
               }
@@ -288,6 +311,7 @@ export function createPlaceResearchAgent(
                     input.selectedSubject.transientName,
                     input.selectedSubject.transientAddress,
                     input.selectedSubject.ownerQuery,
+                    source.restaurant.address,
                   )),
           );
           const fact = (
@@ -544,11 +568,21 @@ function supported(value: unknown, sources: Evidence[]): boolean {
   );
 }
 
+function canonicalListingUrl(value: string): string | undefined {
+  if (!isTabelogRestaurantListing(value)) return undefined;
+  const url = new URL(value);
+  url.pathname = url.pathname.replace(/^\/(?:en|tw|cn|kr)\//u, '/');
+  url.search = '';
+  url.hash = '';
+  return url.href;
+}
+
 function matchesSelectedBranch(
   quote: string,
   name: string,
   address: string,
   ownerQuery: string,
+  sourceAddress?: string,
 ): boolean {
   const normalize = (value: string) =>
     value
@@ -558,15 +592,19 @@ function matchesSelectedBranch(
   const text = normalize(quote);
   const selectedName = normalize(name);
   const selectedAddress = normalize(address);
+  const addressText = sourceAddress ? normalize(sourceAddress) : text;
   const aliases = ownerQuery.split(/\s+/u).map(normalize);
   const nameMatches =
     (selectedName.length >= 2 && text.includes(selectedName)) ||
     aliases.some(
       (alias) =>
-        alias.length >= 4 && !/\d/u.test(alias) && text.includes(alias),
+        (alias.length >= 4 ||
+          (alias.length >= 3 && /\p{Script=Han}/u.test(alias))) &&
+        !/\d/u.test(alias) &&
+        text.includes(alias),
     );
   if (!nameMatches) return false;
-  if (selectedAddress.length >= 8 && text.includes(selectedAddress))
+  if (selectedAddress.length >= 8 && addressText.includes(selectedAddress))
     return true;
   // Street/block numbers survive Japanese/English address formatting, unlike city names.
   // A name match alone is insufficient for chains; ambiguous address evidence stays unknown.
@@ -580,14 +618,16 @@ function matchesSelectedBranch(
       .match(/\d{1,4}-\d{1,4}-\d{1,4}/gu) ?? [];
   const selectedNumbers = streetNumbers(address);
   if (
-    !selectedNumbers.some((numbers) => streetNumbers(quote).includes(numbers))
+    !selectedNumbers.some((numbers) =>
+      streetNumbers(sourceAddress ?? quote).includes(numbers),
+    )
   )
     return false;
   const locality =
     address.normalize('NFKC').match(/[\p{Script=Han}ぁ-んァ-ヶ]+[区市郡]/gu) ??
     [];
   if (locality.length)
-    return locality.some((part) => text.includes(normalize(part)));
+    return locality.some((part) => addressText.includes(normalize(part)));
   // Common bilingual ward/neighborhood aliases are corroboration, never identity
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
   const aliasesByLocality: Record<string, string> = {
@@ -616,7 +656,7 @@ function matchesSelectedBranch(
     .replace(/[^a-z]/gu, '');
   return Object.entries(aliasesByLocality).some(
     ([latin, japanese]) =>
-      latinAddress.includes(latin) && text.includes(normalize(japanese)),
+      latinAddress.includes(latin) && addressText.includes(normalize(japanese)),
   );
 }
 

@@ -502,6 +502,100 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
   }
 });
 
+test('selected chain research ranks branch evidence, recovers failed reads and rejects other branches', async () => {
+  const dataset = JSON.parse(
+    readFileSync(
+      new URL(
+        '../evals/place-enrichment/selected-chain-regressions.v1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const capture = dataset.sourceCapture;
+  const wrongUrl = 'https://tabelog.com/tokyo/A1304/A130401/13143147/';
+  for (const entry of dataset.cases) {
+    const reads = [];
+    const correctAddress = entry.sourceAddress ?? capture.address;
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async (target) => {
+        reads.push(target);
+        if (target === wrongUrl && entry.firstRead === 'unavailable')
+          return { kind: 'unavailable' };
+        return {
+          kind: 'read',
+          evidence: {
+            url: target,
+            title: capture.name,
+            content: 'Controlled parsed listing evidence.',
+            restaurant: {
+              ...capture,
+              address:
+                target === wrongUrl
+                  ? '東京都新宿区新宿3-34-11'
+                  : correctAddress,
+            },
+          },
+        };
+      },
+      fetch: async (endpoint) => {
+        if (endpoint === 'https://api.tavily.com/search')
+          return Response.json({
+            results: [
+              {
+                url: wrongUrl,
+                title: 'Other branch',
+                content: 'Uncorroborated first result',
+              },
+              {
+                url: entry.localizedUrl
+                  ? capture.url.replace('/tokyo/', '/en/tokyo/')
+                  : capture.url,
+                title: capture.name,
+                content: entry.rankedSnippet
+                  ? `${capture.name} ${correctAddress}`
+                  : 'Second result',
+              },
+            ],
+          });
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  subjectMatch: 'matched',
+                  tabelog: { status: 'unknown' },
+                  reservation: { status: 'unknown' },
+                }),
+              },
+            },
+          ],
+        });
+      },
+    });
+    const result = await agent.research({
+      ...input,
+      selectedSubject: dataset.selectedSubject,
+    });
+    assert.equal(result.kind, 'observed', entry.id);
+    assert.equal(
+      result.value.tabelog.status,
+      entry.expectedKnown ? 'known' : 'unknown',
+      entry.id,
+    );
+    assert.ok(reads.length <= 3, entry.id);
+    if (entry.rankedSnippet) assert.deepEqual(reads, [capture.url], entry.id);
+    else assert.deepEqual(reads, [wrongUrl, capture.url], entry.id);
+    if (entry.expectedKnown) {
+      assert.equal(result.value.tabelog.score, capture.score);
+      assert.equal(result.value.profile.address.value, capture.address);
+      assert.equal(result.value.reservation.mode, 'reservable');
+    } else assert.equal(result.value.profile?.coordinates, undefined);
+  }
+});
+
 test('failed search can recover within budget but all-failed searches cannot accept a model claim', async () => {
   for (const recover of [true, false]) {
     let searches = 0;

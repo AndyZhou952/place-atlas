@@ -26,7 +26,6 @@ import type { NearbyRecommendResult } from '../../product/application/decision/a
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
-
 export function useAtlasViewModel() {
   const [view, setView] = useState<AtlasView>('map');
   const [state, dispatch] = useReducer(

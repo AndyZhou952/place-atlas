@@ -263,7 +263,10 @@ test('production refuses incomplete Add without creating a hidden review candida
   assert.equal(confirmed.ok, true);
   assert.equal(confirmed.value.status, 'failed_no_write');
   assert.equal(confirmed.value.reason, 'validation');
-  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_review_candidates').get().n, 0);
+  assert.equal(
+    sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_review_candidates').get().n,
+    0,
+  );
 });
 
 function toD1(database) {

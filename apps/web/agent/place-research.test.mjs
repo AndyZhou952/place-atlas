@@ -105,6 +105,40 @@ test('research executes fixed search tool then produces validated sourced previe
   );
 });
 
+test('a denied listing is surfaced even when search snippets support some facts', async () => {
+  let turn = 0;
+  const agent = createPlaceResearchAgent({
+    ...config,
+    readSourcePages: true,
+    fetch: async (endpoint) => {
+      if (endpoint === url) return new Response('denied', { status: 403 });
+      if (endpoint === 'https://api.tavily.com/search')
+        return Response.json({
+          results: [{ url, title: 'アルデバラン', content }],
+        });
+      return Response.json({
+        choices: [
+          {
+            message:
+              turn++ === 0
+                ? { tool_calls: [tool], content: null }
+                : { content: JSON.stringify(proposal) },
+          },
+        ],
+      });
+    },
+  });
+  const result = await agent.research(input);
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.sourceAccessIssue, 'blocked');
+  assert.equal(
+    result.value.tabelog.score,
+    3.97,
+    'retain independently supported evidence',
+  );
+  assert.equal(result.value.reservation.status, 'unknown');
+});
+
 test('a sourced individual review score is not accepted as a restaurant aggregate', async () => {
   const reviewUrl = `${url}dtlrvwlst/B123/`;
   const review = structuredClone(proposal);

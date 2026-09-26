@@ -12,6 +12,8 @@ Updated: 2026-09-26. This checklist tracks the usable product, not repository ho
 
 - [x] **Core flow in code:** discover → branch selection/clarification → preview → version-bound confirmation; shared publication and duplicate-prevention tests.
 - [x] **Repository-owned research foundation:** configurable OpenAI-compatible model, no-key search, bounded tool calls, evidence validation; model has no direct database-write permission.
+- [x] **Source-access diagnosis and regression coverage:** same-page checks returned 200 on the development host, 403/high-traffic on Cloudflare, and 403/challenge on the existing Lightsail server. Changing language headers did not resolve Cloudflare access. Read failures now produce explicit preview warnings, not silent missing-information claims.
+- [ ] **Reliable deployed source access:** validate an accessible source/search provider from the deployed runtime. Moving to the existing AWS server is not a proven fix. No new research service has been deployed.
 - [x] **Targeted rating source reader:** discovered Tabelog main-listing JSON-LD supplies branch identity and aggregate score; review scores are excluded. Three direct development-host page checks returned scores; this is not a DeepSeek or Cloudflare acceptance result.
 - [x] **Structured API discovery:** expose discover/select/confirm/cancel with required inputs and owner-session requirements.
 - [ ] **Resolve rough hints reliably:** run the actual resolution pipeline against `place-resolution-gold.v1.json`; include short names, romanization, ambiguous chains and no-match cases. The selected-place enrichment smoke is not this benchmark.

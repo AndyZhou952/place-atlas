@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseTabelogListing, readTabelogListing } from './tabelog-listing.ts';
+import {
+  parseTabelogListing,
+  readTabelogListing,
+  readTabelogListingResult,
+} from './tabelog-listing.ts';
 
 const url = 'https://tabelog.com/tokyo/A1309/A130902/13131643/';
 // Synthetic schema fixture, not a claim about today's score.
@@ -23,6 +27,43 @@ const restaurant = {
 };
 const html = (record) =>
   `<script type="application/ld+json">${JSON.stringify(record)}</script>`;
+
+test('reader distinguishes denied access, unavailable transport and invalid evidence', async () => {
+  for (const status of [401, 403, 429]) {
+    let calls = 0;
+    const result = await readTabelogListingResult(
+      url,
+      async () => {
+        calls++;
+        return new Response('<title>Access unavailable</title>', { status });
+      },
+      AbortSignal.timeout(1000),
+    );
+    assert.deepEqual(result, { kind: 'blocked' });
+    assert.equal(calls, 1, 'do not retry or bypass a refusal');
+  }
+  assert.deepEqual(
+    await readTabelogListingResult(
+      url,
+      async () => {
+        throw new Error('network');
+      },
+      AbortSignal.timeout(1000),
+    ),
+    { kind: 'unavailable' },
+  );
+  assert.deepEqual(
+    await readTabelogListingResult(
+      url,
+      async () =>
+        new Response('no restaurant', {
+          headers: { 'content-type': 'text/html' },
+        }),
+      AbortSignal.timeout(1000),
+    ),
+    { kind: 'invalid_source' },
+  );
+});
 
 test('structured listing exposes aggregate and branch identity, never reviews', () => {
   const result = parseTabelogListing(html(restaurant), url);

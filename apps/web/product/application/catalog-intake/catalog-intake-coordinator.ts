@@ -123,6 +123,7 @@ export interface CatalogIntakeEnrichedProfile {
 export type WebResearchOutcome =
   | {
       readonly kind: 'observed';
+      readonly sourceAccessIssue?: 'blocked' | 'unavailable';
       readonly value: {
         readonly tabelog: CatalogIntakeTabelogSnapshot;
         readonly reservation: CatalogIntakeReservationSnapshot;
@@ -1105,6 +1106,7 @@ export function createCatalogIntakeModule(options: {
           reservation: { status: 'unknown' as const },
         };
         let researchUnavailable = false;
+        let researchSourceIssue: 'blocked' | 'unavailable' | undefined;
         if (
           (options.enrichmentPolicy === 'enrich_if_available' ||
             (options.enrichmentPolicy === undefined &&
@@ -1140,6 +1142,8 @@ export function createCatalogIntakeModule(options: {
           if (research.kind !== 'observed') {
             researchUnavailable = true;
           } else {
+            researchSourceIssue = research.sourceAccessIssue;
+            researchUnavailable = researchSourceIssue !== undefined;
             const normalizedResearch = validateWebResearchOutput(
               research.value,
               { tabelog: ownerTabelog, reservation: ownerReservation },
@@ -1230,9 +1234,14 @@ export function createCatalogIntakeModule(options: {
               ? ([
                   {
                     code: 'provider_unavailable' as const,
-                    message: geocoderUnavailable
-                      ? 'Durable location lookup is unavailable; review the owner-provided details.'
-                      : 'Web research is unavailable; review the owner-provided details.',
+                    message:
+                      researchSourceIssue === 'blocked'
+                        ? 'Tabelog refused the server request. Automatic research is incomplete; this does not mean the restaurant has no rating or reservation information. Your selected restaurant is retained.'
+                        : researchSourceIssue === 'unavailable'
+                          ? 'The restaurant source could not be read. Automatic research is incomplete; missing fields are not evidence that the information does not exist.'
+                          : geocoderUnavailable
+                            ? 'Durable location lookup is unavailable; review the owner-provided details.'
+                            : 'Web research is unavailable; review the owner-provided details.',
                   },
                 ] as const)
               : []),
@@ -1606,7 +1615,7 @@ export function createCatalogIntakeModule(options: {
               false,
             );
           }
-          if (research.kind !== 'observed') {
+          if (research.kind !== 'observed' || research.sourceAccessIssue) {
             providerRefreshFailed = true;
             refreshedTabelog = markAgentTabelogStale(session.preview.tabelog);
             refreshedReservation = markAgentReservationStale(

@@ -50,6 +50,24 @@ The existing production research adapter completed two model calls and bounded s
 
 ## Remaining work
 
+### Source-access comparison (2026-09-26)
+
+A bounded GET to the same Tokyo Mentsudan listing was compared across environments using the same application User-Agent and HTML Accept header:
+
+| Execution environment | Result |
+| --- | --- |
+| Development host | HTTP 200, correct restaurant page title |
+| Isolated Cloudflare remote preview, no production bindings | HTTP 403, Tabelog's high-traffic / try-later page |
+| Existing Seoul Lightsail server, read-only diagnostic | HTTP 403, `Just a moment...` challenge page |
+
+Adding a Japanese Accept-Language header and testing an explicitly identified Mozilla-compatible JapanAtlas User-Agent did not change the Cloudflare result. This establishes environment-dependent source access, not a universal Cloudflare ban or an identified IP rule. A successful Codex/development-host request is not evidence that deployed fetch will succeed. The source's exact detection rule is unknown. No cookies, private data, model credentials or production database were used in these probes. The temporary remote preview was stopped. No AWS configuration or service was changed.
+
+Moving the reader to the existing Lightsail server is **not a verified remedy**. Do not deploy a relay there based only on development-host success. Next source-access candidates must demonstrate correct-branch identity, aggregate rating, location and booking evidence from the actual intended runtime before deployment. Search excerpts may contribute individually validated facts, but cannot establish coordinates or missing booking rules by inference.
+
+Source failures now propagate to Add previews as explicit provider warnings while preserving independently supported facts. HTTP 401/403/429 are distinct from a successfully read page with absent information. A failed confirmation-time refresh retains stale prior evidence instead of silently replacing it with unknown fields. The three affected test files passed 67 tests; this error-handling improvement does **not** complete Add acceptance.
+
+The warning fix was deployed as Worker version `7b719122-5f38-4e62-885c-3b004757c93c` after type checking, lint, build and deployment preflight passed. An authenticated live Tokyo Mentsudan discovery/select returned 200 and the explicit Tabelog refusal warning. Address, coordinates, rating and reservation remained unresolved. No confirm was sent and no restaurant was created. A subsequent cancellation request returned 400; the temporary preview was left to expire, not reported as successfully cancelled.
+
 ### Cloudflare browser findings
 
 Real Chromium checks found and corrected an edge-runtime incompatibility: Workers rejects `redirect: error` before sending the request. Manual redirects plus non-success rejection now preserve the no-redirect security boundary. A local workerd probe reproduced the error; the deployed DeepSeek connection check and encrypted settings save subsequently returned 200.

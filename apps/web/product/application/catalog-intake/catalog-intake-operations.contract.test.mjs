@@ -2507,6 +2507,45 @@ test('closed input validation accepts two-decimal Tabelog values and rejects for
   }
 });
 
+test('source access failure appears in preview instead of silently becoming missing information', async () => {
+  const app = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    enrichmentPolicy: 'enrich_if_available',
+    webResearchPort: {
+      async research() {
+        return {
+          kind: 'observed',
+          sourceAccessIssue: 'blocked',
+          value: {
+            tabelog: { status: 'unknown' },
+            reservation: { status: 'unknown' },
+          },
+        };
+      },
+    },
+  });
+  await app.execute({
+    key: 'catalog.intake.discover',
+    input: { query: 'restaurant', requestToken: 'request-1' },
+  });
+  const result = await app.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {},
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'preview_ready');
+  const warning = result.value.preview.warnings.find(
+    ({ code }) => code === 'provider_unavailable',
+  );
+  assert.match(warning.message, /Tabelog refused the server request/u);
+  assert.match(warning.message, /does not mean/u);
+});
+
 async function discoverAndSelect(
   application,
   ownerFields = {},

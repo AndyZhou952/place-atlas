@@ -21,7 +21,21 @@ export async function readTabelogListing(
   fetcher: typeof fetch,
   parentSignal: AbortSignal,
 ): Promise<TabelogEvidence | undefined> {
-  if (!isTabelogRestaurantListing(url)) return undefined;
+  const result = await readTabelogListingResult(url, fetcher, parentSignal);
+  return result.kind === 'read' ? result.evidence : undefined;
+}
+
+export type TabelogReadResult =
+  | { kind: 'read'; evidence: TabelogEvidence }
+  | { kind: 'blocked' | 'unavailable' | 'invalid_source' };
+
+/** Keep access failures distinct from a successfully read page with missing facts. */
+export async function readTabelogListingResult(
+  url: string,
+  fetcher: typeof fetch,
+  parentSignal: AbortSignal,
+): Promise<TabelogReadResult> {
+  if (!isTabelogRestaurantListing(url)) return { kind: 'invalid_source' };
   const target = new URL(url);
   target.search = '';
   target.hash = '';
@@ -31,14 +45,24 @@ export async function readTabelogListing(
       signal: AbortSignal.any([parentSignal, AbortSignal.timeout(5000)]),
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
+    if ([401, 403, 429].includes(response.status)) {
+      await response.body?.cancel();
+      return { kind: 'blocked' };
+    }
     if (
       !response.ok ||
       !response.headers.get('content-type')?.includes('text/html')
-    )
-      return undefined;
-    return parseTabelogListing(await readBoundedText(response, 1_048_576), url);
+    ) {
+      await response.body?.cancel();
+      return { kind: 'unavailable' };
+    }
+    const evidence = parseTabelogListing(
+      await readBoundedText(response, 1_048_576),
+      url,
+    );
+    return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
   } catch {
-    return undefined;
+    return { kind: 'unavailable' };
   }
 }
 

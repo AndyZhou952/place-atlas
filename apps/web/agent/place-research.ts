@@ -4,7 +4,10 @@ import {
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
-import { readTabelogListing, type TabelogEvidence } from './tabelog-listing.ts';
+import {
+  readTabelogListingResult,
+  type TabelogEvidence,
+} from './tabelog-listing.ts';
 import {
   restaurantResearchPrompt,
   restaurantSearchDescription,
@@ -93,6 +96,14 @@ export function createPlaceResearchAgent(
       let successfulSearches = 0;
       const readUrls = new Set<string>();
       const usedCallIds = new Set<string>();
+      let sourceAccessIssue: 'blocked' | 'unavailable' | undefined;
+      const readListing = async (url: string) => {
+        const result = await readTabelogListingResult(url, fetcher, signal);
+        if (result.kind === 'read') return result.evidence;
+        if (result.kind === 'blocked') sourceAccessIssue = 'blocked';
+        else sourceAccessIssue ??= 'unavailable';
+        return undefined;
+      };
       try {
         const selectedListing =
           input.selectedSubject.providerNamespace === 'tabelog'
@@ -105,11 +116,7 @@ export function createPlaceResearchAgent(
           isTabelogRestaurantListing(selectedListing) &&
           config.readSourcePages !== false
         ) {
-          const page = await readTabelogListing(
-            selectedListing,
-            fetcher,
-            signal,
-          );
+          const page = await readListing(selectedListing);
           readUrls.add(selectedListing);
           if (page) {
             evidence.push(page);
@@ -208,11 +215,7 @@ export function createPlaceResearchAgent(
                 );
                 if (listing && config.readSourcePages !== false) {
                   readUrls.add(listing.url);
-                  const page = await readTabelogListing(
-                    listing.url,
-                    fetcher,
-                    signal,
-                  );
+                  const page = await readListing(listing.url);
                   if (page) result.sources.unshift(page);
                 }
                 evidence.push(...result.sources);
@@ -235,6 +238,7 @@ export function createPlaceResearchAgent(
             return {
               kind: 'observed',
               value: { tabelog: unknown, reservation: unknown },
+              ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
             };
           const observedAt = new Date().toISOString();
           const matchedListing = evidence.find(
@@ -443,7 +447,13 @@ export function createPlaceResearchAgent(
             },
             { tabelog: unknown, reservation: unknown },
           );
-          return value ? { kind: 'observed', value } : { kind: 'unavailable' };
+          return value
+            ? {
+                kind: 'observed',
+                value,
+                ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
+              }
+            : { kind: 'unavailable' };
         }
       } catch {
         return { kind: 'unavailable' };

@@ -6,6 +6,9 @@ import type {
   VisitCountRecord,
 } from '@/product/application/catalog/catalog-state';
 import type { AtlasItem } from '@/product/application/catalog/atlas-item';
+import type { AtomicMutationCommit } from '@/product/application/atlas-application';
+
+import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface ItemRow {
   readonly payload_json: string;
@@ -105,49 +108,64 @@ export class D1CatalogState implements CatalogRecordState {
     };
   }
 
-  async saveDynamicItem(item: AtlasItem, storedAt: string): Promise<void> {
-    await this.database.batch([
-      this.database
-        .prepare(
-          `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
+  async saveDynamicItem(
+    item: AtlasItem,
+    storedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    await commitD1MutationAtomically(
+      this.database,
+      [
+        this.database
+          .prepare(
+            `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            payload_json = excluded.payload_json,
            verification_status = excluded.verification_status,
            updated_at = excluded.updated_at`,
-        )
-        .bind(
-          item.id,
-          JSON.stringify(item),
-          item.verificationStatus,
-          storedAt,
-          storedAt,
-        ),
-      this.database.prepare(incrementCatalogRevisionSql),
-    ]);
+          )
+          .bind(
+            item.id,
+            JSON.stringify(item),
+            item.verificationStatus,
+            storedAt,
+            storedAt,
+          ),
+        this.database.prepare(incrementCatalogRevisionSql),
+      ],
+      atomicCommit,
+    );
   }
 
-  async saveOverride(override: AtlasItemOverrideRecord): Promise<void> {
-    await this.database.batch([
-      this.database
-        .prepare(
-          `INSERT INTO atlas_item_overrides (item_id, title, description, personal_state, updated_at)
+  async saveOverride(
+    override: AtlasItemOverrideRecord,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    await commitD1MutationAtomically(
+      this.database,
+      [
+        this.database
+          .prepare(
+            `INSERT INTO atlas_item_overrides (item_id, title, description, personal_state, updated_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(item_id) DO UPDATE SET
            title = excluded.title,
            description = excluded.description,
            personal_state = excluded.personal_state,
            updated_at = excluded.updated_at`,
-        )
-        .bind(
-          override.itemId,
-          override.title,
-          override.description,
-          override.personalState,
-          override.updatedAt,
-        ),
-      this.database.prepare(incrementCatalogRevisionSql),
-    ]);
+          )
+          .bind(
+            override.itemId,
+            override.title,
+            override.description,
+            override.personalState,
+            override.updatedAt,
+          ),
+        this.database.prepare(incrementCatalogRevisionSql),
+      ],
+      atomicCommit,
+    );
   }
 
   private async allOrEmpty<Row>(sql: string): Promise<Row[]> {

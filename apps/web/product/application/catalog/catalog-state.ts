@@ -1,4 +1,5 @@
 import type { AtlasItem, PersonalState } from './atlas-item.ts';
+import type { AtomicMutationCommit } from '../atlas-application.ts';
 
 export interface AtlasItemOverrideRecord {
   readonly itemId: string;
@@ -30,8 +31,15 @@ export interface CatalogStateSnapshot {
 
 export interface CatalogRecordState {
   readSnapshot(): Promise<CatalogStateSnapshot>;
-  saveDynamicItem(item: AtlasItem, storedAt: string): Promise<void>;
-  saveOverride(override: AtlasItemOverrideRecord): Promise<void>;
+  saveDynamicItem(
+    item: AtlasItem,
+    storedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void>;
+  saveOverride(
+    override: AtlasItemOverrideRecord,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void>;
 }
 
 export interface CatalogSeed {

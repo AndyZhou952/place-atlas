@@ -109,11 +109,15 @@ export function createCatalogOperationGroup(
       effect: 'write',
       validate: validateDiscoveredItem,
     },
-    async handle(item) {
+    async handle(item, execution) {
       try {
         const storedAt = writeDependencies.clock.now();
         const stored = { ...item, updatedAt: storedAt };
-        await writeDependencies.state.saveDynamicItem(stored, storedAt);
+        await writeDependencies.state.saveDynamicItem(
+          stored,
+          storedAt,
+          execution?.atomicMutation?.receiptFor(stored),
+        );
         return success(stored);
       } catch {
         return failure(
@@ -136,7 +140,7 @@ export function createCatalogOperationGroup(
       effect: 'write',
       validate: validateUpdateCatalogItem,
     },
-    async handle(input) {
+    async handle(input, execution) {
       try {
         const existing = await catalog.get(input.id);
         if (!existing) {
@@ -148,12 +152,12 @@ export function createCatalogOperationGroup(
           description: input.description,
           personalState: input.personalState,
         };
-        await writeDependencies.state.saveOverride({
-          itemId: input.id,
-          ...edit,
-          updatedAt,
-        });
-        return success({ ...existing, ...edit, updatedAt });
+        const output = { ...existing, ...edit, updatedAt };
+        await writeDependencies.state.saveOverride(
+          { itemId: input.id, ...edit, updatedAt },
+          execution?.atomicMutation?.receiptFor(output),
+        );
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

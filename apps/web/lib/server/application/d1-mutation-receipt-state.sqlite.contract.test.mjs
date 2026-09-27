@@ -9,6 +9,9 @@ import {
 } from '../../../product/application/atlas-application.ts';
 import { createInvocationCoordinator } from '../../../product/application/invocation/invocation-coordinator.ts';
 import { success } from '../../../product/application/result.ts';
+import { createCatalogOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
+import { createD1OwnerPocCatalogRead } from '../../../adapters/agent/d1-owner-poc-catalog.ts';
+import { D1CatalogState } from './d1-catalog-state.ts';
 import {
   commitD1MutationAtomically,
   D1MutationReceiptState,
@@ -18,12 +21,98 @@ const migrationUrl = new URL(
   '../../../migrations/owner-poc/0001_owner_poc_schema.sql',
   import.meta.url,
 );
+const catalogPublicationMigrationUrl = new URL(
+  '../../../migrations/owner-poc/0008_catalog_intake_publication.sql',
+  import.meta.url,
+);
 const invocation = {
   principal: 'owner',
   channel: 'web',
   scopes: ['atlas:owner'],
   requestedAt: '2026-09-21T00:00:00.000Z',
 };
+
+void test('catalog item edits commit the override and mutation receipt together', async () => {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(await readFile(migrationUrl, 'utf8'));
+  sqlite.exec(await readFile(catalogPublicationMigrationUrl, 'utf8'));
+  const original = {
+    id: 'verve-test',
+    kind: 'food',
+    title: 'Verve Coffee',
+    area: 'Roppongi',
+    address: 'Tokyo address',
+    description: 'Original description',
+    latitude: 35.66,
+    longitude: 139.73,
+    verificationStatus: 'verified',
+    verifiedAt: '2026-09-27',
+    reservation: { mode: 'unknown', label: 'Unknown', checkedAt: '2026-09-27' },
+    personalState: 'saved',
+    tags: [],
+    sources: [],
+  };
+  sqlite
+    .prepare(
+      `INSERT INTO atlas_items
+      (id, payload_json, verification_status, created_at, updated_at)
+      VALUES (?, ?, 'verified', ?, ?)`,
+    )
+    .run(
+      original.id,
+      JSON.stringify(original),
+      invocation.requestedAt,
+      invocation.requestedAt,
+    );
+  const database = toD1(sqlite);
+  const application = createAtlasApplication(
+    createCatalogOperationGroup(createD1OwnerPocCatalogRead(database), {
+      state: new D1CatalogState(database),
+      clock: { now: () => '2026-09-27T01:00:00.000Z' },
+    }),
+  );
+  const coordinator = createInvocationCoordinator({
+    application,
+    receipts: new D1MutationReceiptState(database),
+  });
+  const input = {
+    id: original.id,
+    title: original.title,
+    description: '主营咖啡馆。位于港区六本木。',
+    personalState: 'saved',
+  };
+  const first = await coordinator.mutate({
+    operation: 'catalog.update_item',
+    input,
+    mutationId: 'edit-verve',
+    invocation,
+  });
+  const replay = await coordinator.mutate({
+    operation: 'catalog.update_item',
+    input,
+    mutationId: 'edit-verve',
+    invocation,
+  });
+
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(first.value.replayed, false);
+  assert.equal(replay.ok, true);
+  assert.equal(replay.value.replayed, true);
+  assert.equal(rows(sqlite, 'atlas_mutation_receipts').length, 1);
+  assert.equal(rows(sqlite, 'atlas_item_overrides').length, 1);
+  assert.equal(
+    sqlite
+      .prepare('SELECT description FROM atlas_item_overrides WHERE item_id = ?')
+      .get(original.id).description,
+    input.description,
+  );
+  const read = await application.execute({
+    key: 'catalog.get',
+    input: { id: original.id },
+  });
+  assert.equal(read.ok, true);
+  assert.equal(read.value.description, input.description);
+});
 
 void test('normalized payload replay is stable and a different payload conflicts', async () => {
   const harness = await createHarness();

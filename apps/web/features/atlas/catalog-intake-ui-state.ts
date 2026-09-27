@@ -35,6 +35,21 @@ export interface CatalogIntakeUiState {
   readonly title: string;
   readonly area: string;
   readonly address: string;
+  readonly categories: string;
+  readonly signatureDishes: string;
+  readonly summary: string;
+  readonly latitude: string;
+  readonly longitude: string;
+  readonly tabelogScore: string;
+  readonly tabelogUrl: string;
+  readonly reservationMode:
+    | 'unknown'
+    | 'reservable'
+    | 'reservation_required'
+    | 'not_reservable';
+  readonly reservationLabel: string;
+  readonly reservationUrl: string;
+  readonly previewNeedsRefresh: boolean;
   readonly requestToken?: string;
   readonly sessionId?: string;
   readonly sessionVersion?: number;
@@ -59,7 +74,22 @@ export interface CatalogIntakeUiState {
 export type CatalogIntakeUiAction =
   | {
       readonly type: 'field_changed';
-      readonly field: 'query' | 'searchArea' | 'title' | 'area' | 'address';
+      readonly field:
+        | 'query'
+        | 'searchArea'
+        | 'title'
+        | 'area'
+        | 'address'
+        | 'categories'
+        | 'signatureDishes'
+        | 'summary'
+        | 'latitude'
+        | 'longitude'
+        | 'tabelogScore'
+        | 'tabelogUrl'
+        | 'reservationMode'
+        | 'reservationLabel'
+        | 'reservationUrl';
       readonly value: string;
     }
   | { readonly type: 'candidate_selected'; readonly ordinal: number }
@@ -144,10 +174,89 @@ export function catalogIntakeInitialState(): CatalogIntakeUiState {
     title: '',
     area: '',
     address: '',
+    categories: '',
+    signatureDishes: '',
+    summary: '',
+    latitude: '',
+    longitude: '',
+    tabelogScore: '',
+    tabelogUrl: '',
+    reservationMode: 'unknown',
+    reservationLabel: '',
+    reservationUrl: '',
+    previewNeedsRefresh: false,
     candidates: [],
     hasMore: false,
     focusRevision: 0,
   };
+}
+
+export function catalogIntakeManualCompletionError(
+  state: CatalogIntakeUiState,
+): string | undefined {
+  for (const [label, value] of [
+    ['Categories', state.categories],
+    ['Signature dishes', state.signatureDishes],
+  ] as const) {
+    const entries = catalogIntakeManualLabels(value);
+    if (entries.length > 12 || entries.some((entry) => entry.length > 100)) {
+      return `${label} must have at most 12 entries of 100 characters each.`;
+    }
+  }
+  if (state.summary.trim().length > 1200 || /\p{Cc}/u.test(state.summary)) {
+    return 'The overview must be one line and at most 1,200 characters.';
+  }
+  const latitude = state.latitude.trim();
+  const longitude = state.longitude.trim();
+  if (latitude || longitude) {
+    if (!latitude || !longitude || !state.address.trim()) {
+      return 'Enter an address and both coordinates, or leave coordinates empty for address lookup.';
+    }
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      Math.abs(lat) > 90 ||
+      Math.abs(lng) > 180
+    ) {
+      return 'Latitude must be between -90 and 90; longitude between -180 and 180.';
+    }
+  }
+  if (state.tabelogScore.trim() || state.tabelogUrl.trim()) {
+    const score = Number(state.tabelogScore);
+    if (
+      !state.tabelogScore.trim() ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > 5 ||
+      !state.tabelogUrl.trim().startsWith('https://tabelog.com/')
+    ) {
+      return 'A manual Tabelog score needs a 0–5 score and its main listing URL.';
+    }
+  }
+  if (
+    state.reservationMode === 'unknown' &&
+    (state.reservationLabel.trim() || state.reservationUrl.trim())
+  ) {
+    return 'Choose a reservation rule, or clear the explanation and source URL.';
+  }
+  if (state.reservationMode !== 'unknown') {
+    if (
+      !state.reservationLabel.trim() ||
+      !state.reservationUrl.trim().startsWith('https://')
+    ) {
+      return 'A manual reservation rule needs a short explanation and HTTPS source URL.';
+    }
+  }
+  return undefined;
+}
+
+export function catalogIntakeManualLabels(value: string): string[] {
+  return value
+    .split(/[,，、]/u)
+    .map((entry) => entry.normalize('NFC').trim())
+    .filter(Boolean);
 }
 
 export function reduceCatalogIntakeUi(
@@ -159,6 +268,12 @@ export function reduceCatalogIntakeUi(
       return {
         ...state,
         [action.field]: action.value,
+        previewNeedsRefresh:
+          state.previewNeedsRefresh ||
+          (action.field !== 'query' &&
+            action.field !== 'searchArea' &&
+            action.value !== state[action.field] &&
+            (state.stage === 'preview' || state.stage === 'conflict')),
         ...((action.field === 'query' || action.field === 'searchArea') &&
         action.value !== state[action.field]
           ? {
@@ -170,6 +285,17 @@ export function reduceCatalogIntakeUi(
               title: '',
               area: '',
               address: '',
+              categories: '',
+              signatureDishes: '',
+              summary: '',
+              latitude: '',
+              longitude: '',
+              tabelogScore: '',
+              tabelogUrl: '',
+              reservationMode: 'unknown',
+              reservationLabel: '',
+              reservationUrl: '',
+              previewNeedsRefresh: false,
             }
           : {}),
       };
@@ -217,6 +343,7 @@ export function reduceCatalogIntakeUi(
     case 'select_succeeded':
       return action.output.status === 'clarification_required'
         ? toStage(state, 'clarification', {
+            previewNeedsRefresh: false,
             sessionId: action.output.sessionId,
             sessionVersion: action.output.sessionVersion,
             clarification: action.output.clarification,
@@ -224,6 +351,7 @@ export function reduceCatalogIntakeUi(
             error: undefined,
           })
         : toStage(state, 'preview', {
+            previewNeedsRefresh: false,
             sessionId: action.output.sessionId,
             sessionVersion: action.output.sessionVersion,
             clarification: undefined,
@@ -267,6 +395,16 @@ export function reduceCatalogIntakeUi(
         title: state.title,
         area: state.area,
         address: state.address,
+        categories: state.categories,
+        signatureDishes: state.signatureDishes,
+        summary: state.summary,
+        latitude: state.latitude,
+        longitude: state.longitude,
+        tabelogScore: state.tabelogScore,
+        tabelogUrl: state.tabelogUrl,
+        reservationMode: state.reservationMode,
+        reservationLabel: state.reservationLabel,
+        reservationUrl: state.reservationUrl,
         focusRevision: state.focusRevision + 1,
       };
   }

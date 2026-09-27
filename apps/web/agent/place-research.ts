@@ -3,6 +3,7 @@ import {
   validateEnrichedProfile,
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
+import { composeRestaurantSummary } from '../product/application/catalog-intake/restaurant-profile-presentation.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
 import type { RestaurantSourceReader } from './browser-source-reader.ts';
 import {
@@ -518,17 +519,25 @@ export function createPlaceResearchAgent(
               delete profile[key];
           }
           const checkedProfile = validateEnrichedProfile(profile);
-          if (checkedProfile?.categories?.value.length) {
+          if (checkedProfile) {
             // Constrain prose to validated facts rather than trusting a citation as
             // proof for arbitrary model-generated claims (awards, popularity, etc.).
-            const categories = checkedProfile.categories.value.join(' / ');
-            const dishes = checkedProfile.signatureDishes?.value.join(', ');
-            const area = checkedProfile.area?.value;
-            profile.summary = {
-              value: `${categories}${area ? ` in ${area}` : ''}.${dishes ? ` Featured dishes: ${dishes}.` : ''}${reservation.status === 'known' && typeof reservation.label === 'string' ? ` Reservations: ${reservation.label}.` : ''}`,
-              sourceUrl: checkedProfile.categories.sourceUrl,
-              observedAt,
-            };
+            const summary = composeRestaurantSummary({
+              categories: checkedProfile.categories?.value,
+              dishes: checkedProfile.signatureDishes?.value,
+              area: checkedProfile.area?.value,
+            });
+            const summarySource =
+              checkedProfile.categories ??
+              checkedProfile.signatureDishes ??
+              checkedProfile.area;
+            if (summary && summarySource) {
+              profile.summary = {
+                value: summary,
+                sourceUrl: summarySource.sourceUrl,
+                observedAt,
+              };
+            }
           }
           const value = validateWebResearchOutput(
             {

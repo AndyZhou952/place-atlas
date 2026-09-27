@@ -163,9 +163,15 @@ function buildQuery(
     readonly transientAddress: string;
   },
 ): string | undefined {
+  // An owner-supplied address is a new, durable lookup input. Keep it separate
+  // from the transient discovery label so an unsuccessful branch-name lookup
+  // can be recovered without copying provider presentation into storage.
+  if (ownerDraft.address) {
+    return normalizeText(ownerDraft.address, 1, 500);
+  }
   const selected = [
     ownerDraft.title ?? selectedSubject.transientName ?? ownerQuery,
-    ownerDraft.address ?? selectedSubject.transientAddress,
+    selectedSubject.transientAddress,
     ownerDraft.area,
   ].filter((value): value is string => Boolean(value));
   return normalizeText(selected.join(' '), 1, 500);

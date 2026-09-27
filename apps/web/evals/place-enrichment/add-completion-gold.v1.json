@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "add-manual-completion-v1",
+  "kind": "synthetic-provider-failure-workflow",
+  "cases": [
+    {
+      "caseId": "shake-shack-shinjuku-google-match-research-unavailable",
+      "candidate": {
+        "transientName": "SHAKE SHACK Shinjuku Southern Terrace",
+        "transientAddress": "2-2-1 Yoyogi, Shibuya, Tokyo"
+      },
+      "query": "shake shack shinjuku",
+      "ownerCompletion": {
+        "title": "シェイク シャック 新宿サザンテラス",
+        "area": "新宿",
+        "address": "東京都渋谷区代々木2-2-1",
+        "categories": ["汉堡", "美式快餐"],
+        "signatureDishes": ["ShackBurger", "Crinkle-cut fries"],
+        "summary": "新宿南口的汉堡店。"
+      },
+      "expected": {
+        "firstLocationStatus": "unknown",
+        "completedLocationStatus": "known",
+        "completedLocationProvenance": "durable_geocoder_observed",
+        "publicationStatus": "committed_verified",
+        "publicationCount": 1
+      }
+    }
+  ]
+}

@@ -77,7 +77,7 @@ test('complete researched profile survives D1 publication and public projection 
   );
   const projected = createPublicReadManifest().project('catalog.get', stored);
   assert.deepEqual(projected.tags, ['洋食', 'Oysters']);
-  assert.match(projected.description, /A small restaurant.*Oysters/);
+  assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
   assert.equal(projected.googleRating.score, 4.2);
   assert.equal(projected.reservation.mode, 'not_reservable');
@@ -99,6 +99,41 @@ test('complete researched profile survives D1 publication and public projection 
   assert.equal(browserItems[0].googleRating.score, 4.2);
   assert.equal(browserItems[0].reservation.mode, 'unavailable');
   assert.deepEqual(browserItems[0].tags, ['洋食', 'Oysters']);
+});
+
+test('owner-completed profile publishes with explicit owner provenance and compact tags', async () => {
+  const sqlite = await migratedDatabase();
+  const base = verifiedPreview();
+  const preview = withDigest({
+    ...base,
+    ownerFields: {
+      ...base.ownerFields,
+      title: 'SHAKE SHACK Shinjuku Southern Terrace',
+      categories: ['汉堡', '美式快餐'],
+      signatureDishes: ['ShackBurger', 'Crinkle-cut fries', 'Frozen custard'],
+      summary: '新宿南口的汉堡店，提供 ShackBurger 和薯条。',
+    },
+  });
+  insertPreviewSession(sqlite, preview, '7'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'owner-completed-shake-shack',
+  });
+  assert.equal(
+    (await publisher.publish(preview, '7'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.equal(stored.description, preview.ownerFields.summary);
+  assert.deepEqual(stored.tags, [
+    '汉堡',
+    '美式快餐',
+    'ShackBurger',
+    'Crinkle-cut fries',
+  ]);
+  assert.deepEqual(stored.intakeEvidence.ownerFields, preview.ownerFields);
 });
 
 test('D1 Atlas Catalog publish atomically commits a verified item, identity, snapshots, receipt, and terminal session', async () => {

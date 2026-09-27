@@ -3,8 +3,67 @@ import test from 'node:test';
 
 import {
   catalogIntakeInitialState,
+  catalogIntakeManualCompletionError,
+  catalogIntakeManualLabels,
   reduceCatalogIntakeUi,
 } from './catalog-intake-ui-state.ts';
+
+test('manual completion validates coordinates and source-backed facts', () => {
+  const base = catalogIntakeInitialState();
+  assert.deepEqual(catalogIntakeManualLabels('焼鳥、 つくね, 焼き鳥'), [
+    '焼鳥',
+    'つくね',
+    '焼き鳥',
+  ]);
+  assert.match(
+    catalogIntakeManualCompletionError({ ...base, latitude: '35.68' }),
+    /both coordinates/u,
+  );
+  assert.match(
+    catalogIntakeManualCompletionError({
+      ...base,
+      address: 'Tokyo',
+      latitude: '91',
+      longitude: '139',
+    }),
+    /Latitude/u,
+  );
+  assert.match(
+    catalogIntakeManualCompletionError({ ...base, tabelogScore: '3.5' }),
+    /listing URL/u,
+  );
+  assert.equal(
+    catalogIntakeManualCompletionError({
+      ...base,
+      address: 'Tokyo',
+      latitude: '35.68',
+      longitude: '139.7',
+      tabelogScore: '3.5',
+      tabelogUrl: 'https://tabelog.com/tokyo/A1304/A130401/12345678/',
+    }),
+    undefined,
+  );
+});
+
+test('a changed manual detail requires a refreshed preview before publish', () => {
+  let state = reduceCatalogIntakeUi(catalogIntakeInitialState(), {
+    type: 'select_succeeded',
+    output: previewOutput(),
+  });
+  state = reduceCatalogIntakeUi(state, {
+    type: 'field_changed',
+    field: 'address',
+    value: '東京都渋谷区代々木2丁目2−1',
+  });
+  assert.equal(state.previewNeedsRefresh, true);
+  assert.equal(state.preview?.previewVersion, 3);
+  state = reduceCatalogIntakeUi(state, {
+    type: 'select_succeeded',
+    output: previewOutput(),
+  });
+  assert.equal(state.previewNeedsRefresh, false);
+  assert.equal(state.address, '東京都渋谷区代々木2丁目2−1');
+});
 
 test('catalog intake UI keeps owner input through loading, empty, and error retries', () => {
   let state = catalogIntakeInitialState();

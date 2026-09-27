@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-09-26. This checklist tracks the usable product, not repository housekeeping.
+Updated: 2026-09-27. This checklist tracks the usable product, not repository housekeeping.
 
 Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
 
@@ -11,6 +11,8 @@ Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
 ## 1. Add — research a restaurant, confirm, and see it on the map
 
 - [x] **Keita failure regression:** selected-name source discovery, six controlled post-selection cases, research progress and truthful incomplete status. Deployed preview verified location, category, rating and reservation; cancelled without saving. See [incident and boundaries](add-keita-regression.md).
+- [x] **Owner completion for incomplete Add previews:** a selected match whose independent location research fails can be refreshed with an owner-confirmed address or coordinates; optional profile and source-backed facts can also be corrected. Confirmation still requires a durable location and a current preview. A synthetic Shake Shack Shinjuku provider-failure case covers selection, manual completion and one publication in `add-completion-gold.v1.json`. Deployed browser acceptance reproduced the unknown-location failure, refreshed the address, then reached a save-enabled preview with owner-supplied coordinates. Edits after refresh disabled confirmation until another refresh. The test session was cancelled without publishing; a complete live publication still needs acceptance.
+- [x] **Add presentation controls, in code:** deterministic Chinese overview copy uses sourced cuisine, area and up to three dishes; top tags keep up to two distinct categories and two dishes, including a yakitori synonym control. Four controlled cases run in the default test suite. This tests publication presentation, not the live model's source recall or semantic accuracy.
 - [x] **Frontend ambiguity refinement:** mobile browser tests passed for Torikizoku + Shinjuku west exit, AFURI + Roppongi (two branches), and Tokyo Mentsudan + Shinjuku. Name retained, new query/session token used, stale results cleared, multi-match choice required. Six search sessions cancelled without restaurant writes; this is discovery/selection acceptance, not six full Add completions.
 - [ ] **Full profile and broad acceptance:** richer grounded overview/dishes and repeated live reliability. Basic preview success does not close these gates.
 - [x] **Grounded dish extraction:** Keita live research now retains two sourced dishes despite Japanese quote punctuation; per-dish validation drops unsupported additions without discarding supported dishes. Summaries combine validated cuisine, area, dishes and reservation policy. Wider menu coverage remains part of broad acceptance.

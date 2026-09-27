@@ -16,6 +16,7 @@ import { presentCatalogIntakePreview } from '@/product/application/catalog-intak
 import { useCatalogIntake } from './use-catalog-intake';
 import {
   catalogIntakeLiveMessage,
+  catalogIntakeManualCompletionError,
   catalogIntakePendingMessage,
 } from './catalog-intake-ui-state';
 import './catalog-intake-panel.css';
@@ -141,8 +142,8 @@ export function CatalogIntakePanel({
       state.preview?.locationEvidence.status === 'unknown' ? (
         <div className="catalog-intake-state is-attention" role="alert">
           <p>
-            The research did not produce a verified address and coordinates. You
-            do not need to fill these in yourself; retry the lookup.
+            The research did not produce a verified address and coordinates.
+            Complete the place details below, or retry the lookup.
           </p>
           <Button
             type="button"
@@ -216,6 +217,7 @@ export function CatalogIntakePanel({
 
       {(state.stage === 'preview' || confirmInProgress) && state.preview ? (
         <PreviewStep
+          intake={intake}
           preview={state.preview}
           onConfirm={intake.confirm}
           onCancel={intake.cancel}
@@ -235,6 +237,7 @@ export function CatalogIntakePanel({
             again only if this version is correct.
           </p>
           <PreviewStep
+            intake={intake}
             preview={state.preview}
             onConfirm={intake.confirm}
             onCancel={intake.cancel}
@@ -428,12 +431,14 @@ function CandidateStep({
 }
 
 function PreviewStep({
+  intake,
   preview,
   onConfirm,
   onCancel,
   confirmLabel = 'Confirm and save',
   busy = false,
 }: {
+  readonly intake: IntakeController;
   readonly preview: NonNullable<IntakeController['state']['preview']>;
   readonly onConfirm: () => Promise<void>;
   readonly onCancel: () => Promise<void>;
@@ -441,6 +446,20 @@ function PreviewStep({
   readonly busy?: boolean;
 }) {
   const presentation = presentCatalogIntakePreview(preview);
+  const manualError = catalogIntakeManualCompletionError(intake.state);
+  const hasManualInput = Boolean(
+    intake.state.title.trim() ||
+    intake.state.area.trim() ||
+    intake.state.address.trim() ||
+    intake.state.categories.trim() ||
+    intake.state.signatureDishes.trim() ||
+    intake.state.summary.trim() ||
+    intake.state.latitude.trim() ||
+    intake.state.longitude.trim() ||
+    intake.state.tabelogScore.trim() ||
+    intake.state.tabelogUrl.trim() ||
+    intake.state.reservationMode !== 'unknown',
+  );
   const groups = [
     {
       id: 'catalog-intake-preview-place',
@@ -461,27 +480,45 @@ function PreviewStep({
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
-      {preview.profile ? (
+      {preview.profile ||
+      preview.ownerFields.categories ||
+      preview.ownerFields.signatureDishes ||
+      preview.ownerFields.summary ? (
         <section
           className="catalog-intake-preview-group"
           aria-label="Restaurant profile"
         >
-          {preview.profile.categories ? (
-            <p>{preview.profile.categories.value.join(' · ')}</p>
-          ) : null}
-          {preview.profile.summary ? (
-            <p>{preview.profile.summary.value}</p>
-          ) : null}
-          {preview.profile.signatureDishes?.value.length ? (
+          {preview.ownerFields.categories || preview.profile?.categories ? (
             <p>
-              Recommended dishes:{' '}
-              {preview.profile.signatureDishes.value.join(', ')}
+              {(
+                preview.ownerFields.categories ??
+                preview.profile?.categories?.value ??
+                []
+              ).join(' · ')}
             </p>
           ) : null}
-          {preview.profile.googleRating ? (
+          {preview.ownerFields.summary || preview.profile?.summary ? (
+            <p>
+              {preview.ownerFields.summary ?? preview.profile?.summary?.value}
+            </p>
+          ) : null}
+          {(
+            preview.ownerFields.signatureDishes ??
+            preview.profile?.signatureDishes?.value
+          )?.length ? (
+            <p>
+              Recommended dishes:{' '}
+              {(
+                preview.ownerFields.signatureDishes ??
+                preview.profile?.signatureDishes?.value ??
+                []
+              ).join(', ')}
+            </p>
+          ) : null}
+          {preview.profile?.googleRating ? (
             <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
           ) : null}
-          {preview.profile.officialWebsite ? (
+          {preview.profile?.officialWebsite ? (
             <p>
               <a
                 href={preview.profile.officialWebsite.value}
@@ -492,7 +529,7 @@ function PreviewStep({
               </a>
             </p>
           ) : null}
-          {preview.profile.bookingLink ? (
+          {preview.profile?.bookingLink ? (
             <p>
               <a
                 href={preview.profile.bookingLink.value}
@@ -585,18 +622,217 @@ function PreviewStep({
           <p className="catalog-intake-note">No warnings in this preview.</p>
         ) : null}
       </section>
+      <section
+        className="catalog-intake-preview-group"
+        aria-label="Complete or correct details"
+      >
+        <h5>Complete or correct details</h5>
+        <p className="catalog-intake-note">
+          Enter the correct address and refresh the preview. If the address
+          lookup still cannot locate this place, enter its map coordinates too.
+          Ratings and reservation rules can remain unknown.
+        </p>
+        <div className="catalog-intake-owner-fields">
+          <label htmlFor="catalog-intake-preview-title">Confirmed name</label>
+          <Input
+            id="catalog-intake-preview-title"
+            value={intake.state.title}
+            onChange={(event) => intake.setField('title', event.target.value)}
+            placeholder="Use the restaurant's exact branch name"
+            disabled={busy}
+          />
+          <label htmlFor="catalog-intake-preview-area">Area</label>
+          <Input
+            id="catalog-intake-preview-area"
+            value={intake.state.area}
+            onChange={(event) => intake.setField('area', event.target.value)}
+            placeholder="e.g. Shinjuku"
+            disabled={busy}
+          />
+          <label htmlFor="catalog-intake-preview-address">Address</label>
+          <Input
+            id="catalog-intake-preview-address"
+            value={intake.state.address}
+            onChange={(event) => intake.setField('address', event.target.value)}
+            placeholder="Street address"
+            disabled={busy}
+          />
+          <label htmlFor="catalog-intake-preview-categories">
+            Cuisine labels (separate with commas)
+          </label>
+          <Input
+            id="catalog-intake-preview-categories"
+            value={intake.state.categories}
+            onChange={(event) =>
+              intake.setField('categories', event.target.value)
+            }
+            placeholder="e.g. 焼鳥"
+            disabled={busy}
+          />
+          <label htmlFor="catalog-intake-preview-dishes">
+            Signature dishes (separate with commas)
+          </label>
+          <Input
+            id="catalog-intake-preview-dishes"
+            value={intake.state.signatureDishes}
+            onChange={(event) =>
+              intake.setField('signatureDishes', event.target.value)
+            }
+            placeholder="Optional menu items"
+            disabled={busy}
+          />
+          <label htmlFor="catalog-intake-preview-summary">Short overview</label>
+          <Input
+            id="catalog-intake-preview-summary"
+            value={intake.state.summary}
+            onChange={(event) => intake.setField('summary', event.target.value)}
+            placeholder="Optional, in your preferred language"
+            disabled={busy}
+          />
+          <div className="catalog-intake-coordinate-row">
+            <div>
+              <label htmlFor="catalog-intake-preview-latitude">
+                Latitude (if lookup fails)
+              </label>
+              <Input
+                id="catalog-intake-preview-latitude"
+                type="number"
+                step="any"
+                value={intake.state.latitude}
+                onChange={(event) =>
+                  intake.setField('latitude', event.target.value)
+                }
+                placeholder="35.000000"
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label htmlFor="catalog-intake-preview-longitude">
+                Longitude
+              </label>
+              <Input
+                id="catalog-intake-preview-longitude"
+                type="number"
+                step="any"
+                value={intake.state.longitude}
+                onChange={(event) =>
+                  intake.setField('longitude', event.target.value)
+                }
+                placeholder="139.000000"
+                disabled={busy}
+              />
+            </div>
+          </div>
+          <details className="catalog-intake-corrections">
+            <summary>Optional source-backed facts</summary>
+            <p className="catalog-intake-note">
+              Only enter facts you can verify from the linked source.
+            </p>
+            <label htmlFor="catalog-intake-preview-tabelog-score">
+              Tabelog score
+            </label>
+            <Input
+              id="catalog-intake-preview-tabelog-score"
+              type="number"
+              min="0"
+              max="5"
+              step="0.01"
+              value={intake.state.tabelogScore}
+              onChange={(event) =>
+                intake.setField('tabelogScore', event.target.value)
+              }
+              placeholder="0–5"
+              disabled={busy}
+            />
+            <label htmlFor="catalog-intake-preview-tabelog-url">
+              Tabelog main listing URL
+            </label>
+            <Input
+              id="catalog-intake-preview-tabelog-url"
+              type="url"
+              value={intake.state.tabelogUrl}
+              onChange={(event) =>
+                intake.setField('tabelogUrl', event.target.value)
+              }
+              placeholder="https://tabelog.com/..."
+              disabled={busy}
+            />
+            <label htmlFor="catalog-intake-preview-reservation-mode">
+              Reservation rule
+            </label>
+            <select
+              id="catalog-intake-preview-reservation-mode"
+              value={intake.state.reservationMode}
+              onChange={(event) =>
+                intake.setField('reservationMode', event.target.value)
+              }
+              disabled={busy}
+            >
+              <option value="unknown">Unknown</option>
+              <option value="reservable">Reservations accepted</option>
+              <option value="reservation_required">Reservation required</option>
+              <option value="not_reservable">Reservations unavailable</option>
+            </select>
+            <label htmlFor="catalog-intake-preview-reservation-label">
+              Source-supported explanation
+            </label>
+            <Input
+              id="catalog-intake-preview-reservation-label"
+              value={intake.state.reservationLabel}
+              onChange={(event) =>
+                intake.setField('reservationLabel', event.target.value)
+              }
+              disabled={busy}
+            />
+            <label htmlFor="catalog-intake-preview-reservation-url">
+              Reservation source URL
+            </label>
+            <Input
+              id="catalog-intake-preview-reservation-url"
+              type="url"
+              value={intake.state.reservationUrl}
+              onChange={(event) =>
+                intake.setField('reservationUrl', event.target.value)
+              }
+              placeholder="https://..."
+              disabled={busy}
+            />
+          </details>
+        </div>
+        {manualError ? (
+          <p className="catalog-field-error" role="alert">
+            {manualError}
+          </p>
+        ) : null}
+        {intake.state.previewNeedsRefresh ? (
+          <output className="catalog-intake-note">
+            Your edits are not in this preview yet. Refresh it before saving.
+          </output>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void intake.select()}
+          disabled={busy || Boolean(manualError) || !hasManualInput}
+        >
+          Refresh preview with these details
+        </Button>
+      </section>
       <div className="catalog-intake-actions">
         {preview.locationEvidence.status === 'unknown' ? (
           <p>
-            Location research is incomplete. Nothing has been saved to your map.
-            Try a more specific branch or retry when the lookup service is
-            available.
+            Location is incomplete. Enter the correct address above and refresh
+            the preview before saving.
           </p>
         ) : null}
         <Button
           type="button"
           onClick={() => void onConfirm()}
-          disabled={busy || preview.locationEvidence.status === 'unknown'}
+          disabled={
+            busy ||
+            intake.state.previewNeedsRefresh ||
+            preview.locationEvidence.status === 'unknown'
+          }
         >
           {confirmLabel}
         </Button>

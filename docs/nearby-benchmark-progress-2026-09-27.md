@@ -5,7 +5,7 @@
 | Slice | Cases | Evidence | What it can assess |
 | --- | ---: | --- | --- |
 | Policy seed (`evals/nearby/nearby-gold.v1.json`) | 14 | Fixed fictional saved catalog and synthetic tool observations | Saved-only selection, route boundaries, clarification, visited preference and uncertainty labels |
-| Location seed (`evals/nearby/nearby-location-gold.v1.json`) | 6 | [Tokyo Metro Ikebukuro](https://www.tokyometro.jp/station/ikebukuro/index.html) and [Higashi-ikebukuro](https://www.tokyometro.jp/station/higashi-ikebukuro/index.html) station pages and their English versions, checked 2026-09-27 | Station identity, multilingual wording, cuisine/visited intent and an explicit two-station ambiguity |
+| Location seed (`evals/nearby/nearby-location-gold.v1.json`) | 10 | [Tokyo Metro Ikebukuro](https://www.tokyometro.jp/station/ikebukuro/index.html), [Higashi-ikebukuro](https://www.tokyometro.jp/station/higashi-ikebukuro/index.html), [Shinjuku-sanchome](https://www.tokyometro.jp/station/shinjuku-sanchome/index.html) and [Shinjuku-gyoemmae](https://www.tokyometro.jp/station/shinjuku-gyoemmae/index.html) station pages and their English versions, checked 2026-09-27 | Station identity, multilingual wording, cuisine/visited intent and two explicit two-station ambiguities |
 
 The official pages establish station names and line codes. They do not establish
 travel durations, restaurant availability or booking facts. The policy route

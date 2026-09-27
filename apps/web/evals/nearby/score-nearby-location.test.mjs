@@ -26,7 +26,7 @@ function oracle() {
 
 test('verified station cases have a satisfiable scoring contract', () => {
   const report = scoreNearbyLocation(gold, oracle());
-  assert.equal(report.cases, 6);
+  assert.equal(report.cases, 10);
   assert.equal(report.actionAccuracy, 1);
   assert.equal(report.passes, true);
 });

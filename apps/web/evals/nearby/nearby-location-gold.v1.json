@@ -23,6 +23,26 @@
         "https://www.tokyometro.jp/station/higashi-ikebukuro/index.html",
         "https://www.tokyometro.jp/lang_en/station/higashi-ikebukuro/index.html"
       ]
+    },
+    {
+      "id": "tokyo-metro:shinjuku-sanchome",
+      "nameJa": "新宿三丁目駅",
+      "nameEn": "Shinjuku-sanchome Station",
+      "lineCodes": ["M09", "F13"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/shinjuku-sanchome/index.html",
+        "https://www.tokyometro.jp/lang_en/station/shinjuku-sanchome/index.html"
+      ]
+    },
+    {
+      "id": "tokyo-metro:shinjuku-gyoemmae",
+      "nameJa": "新宿御苑前駅",
+      "nameEn": "Shinjuku-gyoemmae Station",
+      "lineCodes": ["M10"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/shinjuku-gyoemmae/index.html",
+        "https://www.tokyometro.jp/lang_en/station/shinjuku-gyoemmae/index.html"
+      ]
     }
   ],
   "cases": [
@@ -83,6 +103,45 @@
     {
       "caseId": "ikebukuro-or-east-zh",
       "input": { "message": "池袋还是东池袋附近？" },
+      "gold": { "action": "clarify" }
+    },
+    {
+      "caseId": "shinjuku-sanchome-ja-sushi",
+      "input": { "message": "新宿三丁目駅の近くで寿司" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-sanchome",
+        "cuisine": "sushi",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "shinjuku-sanchome-en-visited",
+      "input": {
+        "message": "Restaurants I've visited near Shinjuku-sanchome Station"
+      },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-sanchome",
+        "cuisine": "any",
+        "visited": "only_visited"
+      }
+    },
+    {
+      "caseId": "shinjuku-gyoemmae-zh-ramen",
+      "input": { "message": "新宿御苑前站附近没去过的拉面" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-gyoemmae",
+        "cuisine": "ramen",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "shinjuku-sanchome-or-gyoemmae-en",
+      "input": {
+        "message": "Near Shinjuku-sanchome or Shinjuku-gyoemmae Station?"
+      },
       "gold": { "action": "clarify" }
     }
   ]

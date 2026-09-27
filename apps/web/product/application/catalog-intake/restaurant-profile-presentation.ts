@@ -13,6 +13,12 @@ function categoryKey(value: string): string {
   return normalized;
 }
 
+function isAreaLabel(value: string, area?: string): boolean {
+  const label = value.normalize('NFC').toLowerCase().replace(/\s/gu, '');
+  const locality = area?.normalize('NFC').toLowerCase().replace(/\s/gu, '');
+  return Boolean(locality && label.length >= 2 && locality.includes(label));
+}
+
 const chineseCuisineNames: Readonly<Record<string, string>> = {
   yakitori: '烧鸟',
   'chicken-cuisine': '鸡肉料理',
@@ -41,6 +47,7 @@ const chineseCuisineNames: Readonly<Record<string, string>> = {
   curry: '咖喱',
   udon: '乌冬面',
   カフェ: '咖啡馆',
+  喫茶店: '咖啡馆',
   cafe: '咖啡馆',
   café: '咖啡馆',
   coffee: '咖啡馆',
@@ -60,8 +67,11 @@ function summaryCuisine(value: string): string {
 export function compactRestaurantCategories(
   values: readonly string[],
   limit = 2,
+  area?: string,
 ): string[] {
-  const labels = normalizedLabels(values);
+  const labels = normalizedLabels(values).filter(
+    (value) => !isAreaLabel(value, area),
+  );
   const hasYakitori = labels.some((value) => categoryKey(value) === 'yakitori');
   const seen = new Set<string>();
   return labels.filter((value) => {
@@ -80,11 +90,13 @@ function compactRestaurantDishes(
   categories: readonly string[],
   dishes: readonly string[],
   limit: number,
+  area?: string,
 ): string[] {
   const categoryKeys = new Set(categories.map(categoryKey));
   const seen = new Set<string>();
   const selected: string[] = [];
   for (const dish of normalizedLabels(dishes)) {
+    if (isAreaLabel(dish, area)) continue;
     const key = categoryKey(dish);
     if (categoryKeys.has(key) || seen.has(key)) continue;
     if (
@@ -102,11 +114,12 @@ function compactRestaurantDishes(
 export function compactRestaurantTags(
   categories: readonly string[],
   dishes: readonly string[],
+  area?: string,
 ): string[] {
-  const selectedCategories = compactRestaurantCategories(categories);
+  const selectedCategories = compactRestaurantCategories(categories, 2, area);
   return [
     ...selectedCategories,
-    ...compactRestaurantDishes(selectedCategories, dishes, 2),
+    ...compactRestaurantDishes(selectedCategories, dishes, 2, area),
   ];
 }
 
@@ -115,9 +128,18 @@ export function composeRestaurantSummary(input: {
   readonly dishes?: readonly string[];
   readonly area?: string;
 }): string | undefined {
-  const categories = compactRestaurantCategories(input.categories ?? []);
+  const categories = compactRestaurantCategories(
+    input.categories ?? [],
+    2,
+    input.area,
+  );
   const cuisines = [...new Set(categories.map(summaryCuisine))];
-  const dishes = compactRestaurantDishes(categories, input.dishes ?? [], 3);
+  const dishes = compactRestaurantDishes(
+    categories,
+    input.dishes ?? [],
+    3,
+    input.area,
+  );
   const area = input.area?.normalize('NFC').trim();
   const sentences = [
     cuisines.length ? `主营${cuisines.join('、')}。` : undefined,

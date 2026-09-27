@@ -12,13 +12,14 @@ const dataset = JSON.parse(
 );
 
 assert.equal(dataset.schemaVersion, 1);
-assert.equal(dataset.cases.length, 10);
+assert.equal(dataset.cases.length, 11);
 for (const entry of dataset.cases) {
   test(`Add presentation: ${entry.caseId}`, () => {
     const summary = composeRestaurantSummary(entry.input) ?? null;
     const tags = compactRestaurantTags(
       entry.input.categories,
       entry.input.dishes,
+      entry.input.area,
     );
     assert.equal(summary, entry.expected.summary, `${entry.caseId}: summary`);
     assert.deepEqual(tags, entry.expected.tags, `${entry.caseId}: tags`);

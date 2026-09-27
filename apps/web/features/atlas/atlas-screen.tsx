@@ -1136,7 +1136,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
           <div>
             <p className="eyebrow">
               {kindLabel[item.kind]} · {item.area}
-              {item.tags.length
+              {item.kind !== 'food' && item.tags.length
                 ? ` · ${item.tags.slice(0, 3).join(' · ')}`
                 : ''}
             </p>

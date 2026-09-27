@@ -2648,6 +2648,14 @@ button.personal-rating-inline:focus-visible {
   background: rgb(251 248 241 / 85%);
 }
 
+.journal-filters label:first-child {
+  grid-column: 1 / -1;
+}
+
+.journal-filters label:first-child select {
+  max-width: 18rem;
+}
+
 .journal-filters label,
 .journal-visit-form label {
   display: grid;

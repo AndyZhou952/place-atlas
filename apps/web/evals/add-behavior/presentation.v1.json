@@ -4,6 +4,18 @@
   "kind": "controlled-production-presentation",
   "cases": [
     {
+      "caseId": "tsukimori-area-terms-are-not-cuisine-tags",
+      "input": {
+        "categories": ["喫茶店", "松屋町", "大阪"],
+        "dishes": [],
+        "area": "松屋町・大阪"
+      },
+      "expected": {
+        "summary": "主营咖啡馆。位于松屋町・大阪。",
+        "tags": ["喫茶店"]
+      }
+    },
+    {
       "caseId": "verve-coffee-roppongi-cafe-source-label",
       "input": {
         "categories": ["カフェ"],

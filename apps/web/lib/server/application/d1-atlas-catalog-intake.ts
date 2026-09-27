@@ -677,6 +677,7 @@ function toAtlasItem(
       preview.ownerFields.signatureDishes ??
         preview.profile?.signatureDishes?.value ??
         [],
+      preview.ownerFields.area ?? preview.profile?.area?.value,
     ),
     sources: [
       ...(preview.profile?.officialWebsite

@@ -138,7 +138,7 @@ export function createPlaceResearchAgent(
           if (
             page.restaurant &&
             matchesSelectedBranch(
-              `${page.restaurant.name} ${page.restaurant.address}`,
+              `${page.restaurant.name} ${page.restaurant.aliases?.join(' ') ?? ''} ${page.restaurant.address}`,
               subject.transientName,
               subject.transientAddress,
               subject.ownerQuery,
@@ -308,7 +308,7 @@ export function createPlaceResearchAgent(
                 ? source.url.replace(/\/$/u, '') ===
                   input.selectedSubject.placeId.replace(/\/$/u, '')
                 : matchesSelectedBranch(
-                    `${source.restaurant.name} ${source.restaurant.address}`,
+                    `${source.restaurant.name} ${source.restaurant.aliases?.join(' ') ?? ''} ${source.restaurant.address}`,
                     input.selectedSubject.transientName,
                     input.selectedSubject.transientAddress,
                     input.selectedSubject.ownerQuery,
@@ -602,7 +602,12 @@ function matchesSelectedBranch(
   const selectedName = normalize(name);
   const selectedAddress = normalize(address);
   const addressText = sourceAddress ? normalize(sourceAddress) : text;
-  const aliases = ownerQuery.split(/\s+/u).map(normalize);
+  const aliases = ownerQuery
+    .split(/\s+/u)
+    .map(normalize)
+    // A neighborhood in the query is location context, not proof that a
+    // different business with that neighborhood in its name is the match.
+    .filter((alias) => !sourceAddress || !addressText.includes(alias));
   const nameMatches =
     (selectedName.length >= 2 && text.includes(selectedName)) ||
     aliases.some(

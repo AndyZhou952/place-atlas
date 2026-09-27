@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "add-branch-alias-v1",
+  "kind": "controlled-production-research",
+  "selectedSubject": {
+    "providerNamespace": "google-places",
+    "placeId": "ChIJg36gYPSLGGARlTI1efR23YQ",
+    "transientName": "Verve Coffee Roasters",
+    "transientAddress": "5-chōme-16-7 Roppongi, Minato City, Tokyo 106-0032, Japan"
+  },
+  "listing": {
+    "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
+    "name": "ヴァーヴ コーヒー ロースターズ 六本木",
+    "alias": "VERVE COFFEE ROASTERS",
+    "addressRegion": "東京都",
+    "addressLocality": "港区",
+    "streetAddress": "六本木5-16-7",
+    "aggregateScore": 3.55,
+    "categories": "カフェ"
+  },
+  "cases": [
+    {
+      "caseId": "verve-glued-query-with-same-page-brand-alias",
+      "ownerQuery": "Verve Coffee六本木",
+      "listingAlias": "VERVE COFFEE ROASTERS",
+      "streetAddress": "六本木5-16-7",
+      "expectedKnown": true
+    },
+    {
+      "caseId": "area-token-alone-cannot-identify-the-brand",
+      "ownerQuery": "Verve Coffee 六本木",
+      "listingAlias": "",
+      "streetAddress": "六本木5-16-7",
+      "expectedKnown": false
+    },
+    {
+      "caseId": "same-brand-alias-wrong-street-is-rejected",
+      "ownerQuery": "Verve Coffee六本木",
+      "listingAlias": "VERVE COFFEE ROASTERS",
+      "streetAddress": "六本木5-16-8",
+      "expectedKnown": false
+    }
+  ]
+}

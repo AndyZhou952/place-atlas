@@ -4,6 +4,7 @@ import { readBoundedText, type SearchEvidence } from './web-search.ts';
 export interface TabelogEvidence extends SearchEvidence {
   restaurant?: {
     name: string;
+    aliases?: string[];
     address: string;
     area: string;
     score: number;
@@ -145,6 +146,20 @@ export function parseTabelogListing(
       `<th[^>]*>\\s*${label}\\s*</th>\\s*<td[^>]*>([\\s\\S]*?)</td>`,
       'iu',
     ).exec(html)?.[1];
+  // The Restaurant JSON-LD name can be Japanese-only while the same page's
+  // 店名 row supplies an official Latin alias. Bind it to that row and to the
+  // structured restaurant name; never mine reviews or unrelated page text.
+  const displayedName = clean(row('店名') ?? '');
+  const aliases = displayedName.startsWith(name)
+    ? [
+        ...displayedName
+          .slice(name.length)
+          .matchAll(/[（(]([^（）()]{2,100})[）)]/gu),
+      ]
+        .map((match) => match[1].trim())
+        .filter((alias) => alias && !/[<>\p{Cc}]/u.test(alias))
+        .slice(0, 3)
+    : [];
   const reservation = clean(row('予約可否') ?? '').slice(0, 1000);
   const introduction = clean(
     row('お店のPR') ??
@@ -179,6 +194,7 @@ export function parseTabelogListing(
       : undefined;
   const restaurant: NonNullable<TabelogEvidence['restaurant']> = {
     name,
+    aliases,
     address: parts.join(''),
     score,
     categories,
@@ -191,7 +207,7 @@ export function parseTabelogListing(
   return {
     url: sourceUrl,
     title: name,
-    content: `${name} ${parts.join('')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
+    content: `${[name, ...aliases, parts.join('')].join(' ')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
     restaurant,
   };
 }

@@ -134,6 +134,16 @@ test('owner-completed profile publishes with explicit owner provenance and compa
     'Crinkle-cut fries',
   ]);
   assert.deepEqual(stored.intakeEvidence.ownerFields, preview.ownerFields);
+  const catalog = createCatalogRead(new D1CatalogState(toD1(sqlite)), []);
+  const visible = await catalog.list('verified_catalog');
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0].id, 'owner-completed-shake-shack');
+  const projected = createPublicReadManifest().project(
+    'catalog.get',
+    visible[0],
+  );
+  assert.equal(projected.title, 'SHAKE SHACK Shinjuku Southern Terrace');
+  assert.deepEqual(projected.tags, stored.tags);
 });
 
 test('D1 Atlas Catalog publish atomically commits a verified item, identity, snapshots, receipt, and terminal session', async () => {

@@ -104,10 +104,20 @@ export class D1VisitState implements VisitRecordState {
     const statements = [
       this.#database
         .prepare(
-          `UPDATE visits SET visited_at = ?, note = ?, updated_at = ?
+          `UPDATE visits SET item_id = ?, item_title = ?, visited_at = ?, note = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(visit.visitedAt, visit.note ?? null, visit.updatedAt, visit.id),
+        .bind(
+          visit.itemId,
+          visit.itemTitle,
+          visit.visitedAt,
+          visit.note ?? null,
+          visit.updatedAt,
+          visit.id,
+        ),
+      this.#database
+        .prepare('UPDATE visit_media SET item_id = ? WHERE visit_id = ?')
+        .bind(visit.itemId, visit.id),
     ];
     if (assessment) statements.push(this.upsertRatingStatement(assessment));
     await commitD1MutationAtomically(this.#database, statements, atomicCommit);

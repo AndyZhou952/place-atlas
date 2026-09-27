@@ -62,6 +62,7 @@ export type VisitMediaRecord = Pick<
   | 'visitId'
   | 'itemId'
   | 'originalFilename'
+  | 'contentType'
   | 'caption'
   | 'displayOrder'
   | 'contentUrl'

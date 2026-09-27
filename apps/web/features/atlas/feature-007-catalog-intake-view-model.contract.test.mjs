@@ -124,7 +124,10 @@ test('Feature 007 ViewModel announces each Add outcome and names pending work', 
       replayed: false,
     },
   });
-  assert.match(catalogIntakeLiveMessage(success), /legacy save is not map-ready/u);
+  assert.match(
+    catalogIntakeLiveMessage(success),
+    /legacy save is not map-ready/u,
+  );
 });
 
 function discoverOutput(candidates) {

@@ -118,6 +118,13 @@ void test('every owner business write is coordinated or fails closed before lega
       );
       assert.ok(method, `${expected.filename} ${methodName}`);
       const handler = method.handlerStatements.join('\n');
+      if (
+        expected.filename === 'items/[id]/route.ts' &&
+        methodName === 'PATCH'
+      ) {
+        assert.match(handler, /getServerInvocationCoordinator\(\)/u);
+        continue;
+      }
       if (expected.ownerPocPolicy === 'coordinator') {
         assert.match(
           handler,

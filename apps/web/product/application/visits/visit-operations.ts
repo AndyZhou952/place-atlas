@@ -135,12 +135,25 @@ export function createVisitOperationGroup(
         if (!context) {
           return failure('not_found', 'Journal entry not found.');
         }
-        const item = itemProjection.project(context);
+        const moving =
+          input.itemId !== undefined && input.itemId !== context.visit.itemId;
+        if (moving && input.rating !== undefined) {
+          return failure(
+            'invalid_input',
+            'Change the restaurant and its overall rating separately.',
+          );
+        }
+        const targetContext = moving
+          ? await state.readItemContext(input.itemId!)
+          : context;
+        const item = itemProjection.project(targetContext);
         if (!item) return failure('not_found', 'Atlas item not found.');
 
         const now = dependencies.clock.now();
         const visit: Visit = {
           ...context.visit,
+          itemId: item.id,
+          itemTitle: item.title,
           visitedAt: input.visitedAt,
           note: normalizeNote(input.note),
           updatedAt: now,
@@ -149,7 +162,7 @@ export function createVisitOperationGroup(
           input.rating === undefined
             ? undefined
             : assessmentWithRating(
-                context.assessment,
+                targetContext.assessment,
                 item.id,
                 input.rating,
                 now,
@@ -157,8 +170,9 @@ export function createVisitOperationGroup(
         const output = {
           visit,
           item: itemProjection.project({
-            ...context,
-            assessment: assessment ?? context.assessment,
+            ...targetContext,
+            assessment: assessment ?? targetContext.assessment,
+            visitCount: targetContext.visitCount + (moving ? 1 : 0),
           })!,
         };
         await state.update(
@@ -239,6 +253,8 @@ function validateVisitUpdate(input: unknown): Result<VisitUpdate> {
     !isRecord(input) ||
     typeof input.id !== 'string' ||
     !input.id ||
+    (input.itemId !== undefined &&
+      (typeof input.itemId !== 'string' || !input.itemId)) ||
     typeof input.visitedAt !== 'string' ||
     !input.visitedAt ||
     (input.note !== undefined && typeof input.note !== 'string') ||
@@ -250,6 +266,7 @@ function validateVisitUpdate(input: unknown): Result<VisitUpdate> {
   }
   return success({
     id: input.id,
+    ...(typeof input.itemId === 'string' ? { itemId: input.itemId } : {}),
     visitedAt: input.visitedAt,
     ...(typeof input.note === 'string' ? { note: input.note } : {}),
     ...(input.rating === undefined ? {} : { rating: input.rating }),

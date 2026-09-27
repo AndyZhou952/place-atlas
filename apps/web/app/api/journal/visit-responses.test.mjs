@@ -64,6 +64,48 @@ test('Journal PATCH preserves update and rating-clear input semantics', async ()
   });
 });
 
+test('Journal PATCH moves a visit to another saved restaurant without a rating change', async () => {
+  let envelope;
+  const moveRequest = new Request(
+    'https://atlas.example/api/journal/visit-one',
+    {
+      method: 'PATCH',
+      headers: { 'x-atlas-mutation-id': 'visit-move-1' },
+    },
+  );
+  const coordinated = coordinator(async (input) => {
+    envelope = input;
+    return okReceipt(input.mutationId, { visit: { itemId: 'place-two' } });
+  });
+  const response = await updateVisitResponse(
+    coordinated,
+    moveRequest,
+    'visit-one',
+    {
+      itemId: 'place-two',
+      visitedAt: '2026-09-13',
+      note: 'first line\nsecond line',
+    },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(envelope.input, {
+    id: 'visit-one',
+    itemId: 'place-two',
+    visitedAt: '2026-09-13',
+    note: 'first line\nsecond line',
+  });
+  const invalid = await updateVisitResponse(
+    coordinated,
+    moveRequest,
+    'visit-one',
+    {
+      itemId: '',
+      visitedAt: '2026-09-13',
+    },
+  );
+  assert.equal(invalid.status, 400);
+});
+
 test('Journal writes require mutation IDs and preserve sanitized errors', async () => {
   let calls = 0;
   const noId = await createVisitResponse(

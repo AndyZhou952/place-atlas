@@ -175,12 +175,14 @@ export function useAtlasViewModel() {
 
   const saveItemEdit = useCallback(
     async (id: string, edit: AtlasItemEdit) => {
+      const mutationId = crypto.randomUUID();
       setItemPending(id, true);
       setNotice('');
       try {
         const updated = await browserAtlasApplication.execute({
           key: 'catalog.update_item',
           input: { id, ...edit },
+          mutationId,
         });
         dispatch({ type: 'item.received', item: updated });
         setNotice('Changes saved. The Agent API will read the same record.');
@@ -277,9 +279,16 @@ export function useAtlasViewModel() {
         (item) => item.id === previousVisit.itemId,
       );
       if (!previousItem) throw new Error('Atlas item not found');
+      const destination = input.itemId
+        ? items.find((item) => item.id === input.itemId)
+        : previousItem;
+      if (!destination) throw new Error('Destination restaurant not found');
+      const moving = destination.id !== previousItem.id;
 
       const optimisticVisit: VisitRecord = {
         ...previousVisit,
+        itemId: destination.id,
+        itemTitle: destination.title,
         visitedAt: input.visitedAt,
         note: input.note?.trim() || undefined,
         updatedAt: new Date().toISOString(),
@@ -298,7 +307,7 @@ export function useAtlasViewModel() {
         itemId: previousItem.id,
         mutationId,
         patch:
-          input.rating === undefined
+          moving || input.rating === undefined
             ? {}
             : {
                 personalRating:
@@ -319,7 +328,14 @@ export function useAtlasViewModel() {
             visit: result.visit,
           });
         }
-        if ('address' in result.item) {
+        if (moving) {
+          dispatch({
+            type: 'item.mutation.failed',
+            itemId: previousItem.id,
+            mutationId,
+          });
+          reloadCatalogViews();
+        } else if ('address' in result.item) {
           dispatch({
             type: 'item.mutation.succeeded',
             itemId: previousItem.id,
@@ -349,7 +365,7 @@ export function useAtlasViewModel() {
         setJournalBusy(false);
       }
     },
-    [items, visits],
+    [items, visits, reloadCatalogViews],
   );
 
   const removeVisit = useCallback(

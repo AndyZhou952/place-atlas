@@ -39,6 +39,21 @@ test('all 14 synthetic policy cases have a satisfiable scoring contract', () => 
   const report = scoreNearby(gold, oracle());
   assert.equal(report.cases, 14);
   assert.equal(report.passes, true);
+  assert.equal(report.selectionAccuracy, 1);
+  assert.equal(report.uncertaintyCoverage, 1);
+  assert.equal(report.safetyViolationCases, 0);
+  assert.equal(report.telemetryCoverage, 0);
+});
+test('latency, tool calls and cost are reported separately when every run supplies telemetry', () => {
+  const predictions = oracle();
+  predictions.predictions.forEach((prediction) => {
+    prediction.telemetry = { latencyMs: 200, toolCalls: 2, costUsd: 0.001 };
+  });
+  const report = scoreNearby(gold, predictions);
+  assert.equal(report.telemetryCoverage, 1);
+  assert.equal(report.meanLatencyMs, 200);
+  assert.equal(report.totalToolCalls, 28);
+  assert.equal(report.totalCostUsd.toFixed(3), '0.014');
 });
 test('missing cases cannot inflate pass rate', () => {
   const predictions = oracle();
@@ -69,6 +84,12 @@ test('malformed, duplicate and unknown outputs are rejected', () => {
     (p) => p.predictions.push(p.predictions[0]),
     (p) => (p.predictions[0].caseId = 'unknown-case'),
     (p) => (p.predictions[0].routeClaims[0].seconds = '600'),
+    (p) =>
+      (p.predictions[0].telemetry = {
+        latencyMs: -1,
+        toolCalls: 2,
+        costUsd: 0,
+      }),
   ]) {
     const p = oracle();
     mutate(p);

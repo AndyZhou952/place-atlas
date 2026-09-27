@@ -618,9 +618,8 @@ function NearbyResult({
                     : `${candidate.straightLineDistanceKm.toFixed(1)} km · distance layer`}
                 </span>
                 <span>
-                  {visited
-                    ? `Visited · ${candidate.visit.visitCount}`
-                    : 'Not visited'}
+                  {visited ? 'Visited' : 'Not visited'}
+                  {visited && ` · ${candidate.visit.visitCount}`}
                   {candidate.visit.personalRating === undefined
                     ? ''
                     : ` · My ${candidate.visit.personalRating}`}
@@ -1338,6 +1337,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                     <JournalVisitRow
                       key={visit.id}
                       item={item}
+                      items={vm.items}
                       visit={visit}
                       visitNumber={itemVisits.length - index}
                       busy={vm.journalBusy}
@@ -1508,6 +1508,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                       <JournalVisitRow
                         key={visit.id}
                         item={item}
+                        items={vm.items}
                         visit={visit}
                         visitNumber={visits.length - index}
                         busy={vm.journalBusy}
@@ -1727,16 +1728,16 @@ function VisitComposer({
         />
       </label>
       <label className="journal-media-picker">
-        <span>Photos (optional)</span>
+        <span>Photos or videos (optional)</span>
         <span className="media-upload-control">
           <ImagePlus aria-hidden="true" />
           {visitPhotos.length
             ? `${visitPhotos.length} selected`
-            : 'Choose photos'}
+            : 'Choose photos or videos'}
           <input
             key={visitPhotos.length ? 'selected' : 'empty'}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
             multiple
             disabled={busy}
             onChange={(event) => {
@@ -1804,6 +1805,7 @@ function localVisitDate() {
 
 function JournalVisitRow({
   item,
+  items,
   visit,
   visitNumber,
   busy,
@@ -1816,6 +1818,7 @@ function JournalVisitRow({
   onDelete,
 }: {
   readonly item: AtlasItem;
+  readonly items: readonly AtlasItem[];
   readonly visit: VisitRecord;
   readonly visitNumber: number;
   readonly busy: boolean;
@@ -1829,6 +1832,7 @@ function JournalVisitRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [visitedAt, setVisitedAt] = useState(visit.visitedAt);
+  const [itemId, setItemId] = useState(visit.itemId);
   const [note, setNote] = useState(visit.note ?? '');
   const [rating, setRating] = useState(
     item.personalRating === undefined ? '' : item.personalRating.toString(),
@@ -1836,6 +1840,7 @@ function JournalVisitRow({
   const [error, setError] = useState('');
 
   function beginEditing() {
+    setItemId(visit.itemId);
     setVisitedAt(visit.visitedAt);
     setNote(visit.note ?? '');
     setRating(
@@ -1859,9 +1864,12 @@ function JournalVisitRow({
     setEditing(false);
     try {
       await onSave(visit.id, {
+        itemId,
         visitedAt,
         note: note.trim() || undefined,
-        rating: normalizedRating ?? null,
+        ...(itemId === visit.itemId
+          ? { rating: normalizedRating ?? null }
+          : {}),
       });
     } catch {
       setEditing(true);
@@ -1873,6 +1881,33 @@ function JournalVisitRow({
     return (
       <li className="journal-visit is-editing">
         <form className="journal-visit-form" onSubmit={submit} noValidate>
+          <label htmlFor={`visit-place-${visit.id}`}>
+            Restaurant for this visit
+            <select
+              id={`visit-place-${visit.id}`}
+              value={itemId}
+              onChange={(event) => setItemId(event.target.value)}
+              disabled={busy}
+            >
+              {items
+                .filter(
+                  (candidate) =>
+                    candidate.verificationStatus === 'verified' &&
+                    candidate.personalState !== 'candidate',
+                )
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.title}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {itemId !== visit.itemId ? (
+            <small>
+              The note and media will move with this visit. Overall restaurant
+              scores stay where they are.
+            </small>
+          ) : null}
           <div className="form-pair">
             <label htmlFor={`visit-date-${visit.id}`}>
               Visited
@@ -1893,6 +1928,7 @@ function JournalVisitRow({
                 max="5"
                 step="0.1"
                 value={rating}
+                disabled={itemId !== visit.itemId || busy}
                 onChange={(event) => setRating(event.target.value)}
               />
             </label>
@@ -1921,6 +1957,7 @@ function JournalVisitRow({
               disabled={busy}
               onClick={() => {
                 setVisitedAt(visit.visitedAt);
+                setItemId(visit.itemId);
                 setNote(visit.note ?? '');
                 setRating(
                   item.personalRating === undefined
@@ -1945,7 +1982,7 @@ function JournalVisitRow({
         <span>
           {visitNumber}回目 · {visit.visitedAt}
         </span>
-        {visit.note ? <p>{visit.note}</p> : null}
+        {visit.note ? <p className="visit-note">{visit.note}</p> : null}
         <VisitMediaEditor
           visitId={visit.id}
           media={media}
@@ -1958,8 +1995,8 @@ function JournalVisitRow({
       <div className="journal-visit-actions">
         <button
           type="button"
-          aria-label={`Edit visit ${visitNumber}`}
-          title="Edit visit"
+          aria-label={`Edit visit ${visitNumber} and restaurant`}
+          title="Edit visit or change restaurant"
           onClick={beginEditing}
         >
           <Pencil aria-hidden="true" />
@@ -2025,10 +2062,10 @@ function VisitMediaEditor({
       />
       <label className={cn('media-upload-control', busy && 'is-busy')}>
         <ImagePlus aria-hidden="true" />
-        {busy ? 'Uploading…' : 'Add photos'}
+        {busy ? 'Uploading…' : 'Add photos or videos'}
         <input
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
           multiple
           disabled={busy}
           onChange={(event) => void selectFiles(event)}
@@ -2095,15 +2132,19 @@ function MediaCaptionEditor({
         aria-label={`Open ${media.caption || media.originalFilename}`}
         onClick={onOpen}
       >
-        <Image
-          src={media.contentUrl}
-          alt={media.caption || media.originalFilename}
-          width={640}
-          height={480}
-          sizes="(max-width: 600px) 50vw, 180px"
-          unoptimized
-          loading="lazy"
-        />
+        {media.contentType.startsWith('video/') ? (
+          <span className="media-video-tile">▶ Video</span>
+        ) : (
+          <Image
+            src={media.contentUrl}
+            alt={media.caption || media.originalFilename}
+            width={640}
+            height={480}
+            sizes="(max-width: 600px) 50vw, 180px"
+            unoptimized
+            loading="lazy"
+          />
+        )}
       </button>
       <div className="media-caption-row">
         <Input
@@ -2239,17 +2280,29 @@ function PhotoLightbox({
           onPointerDown={pointerDown}
           onPointerUp={pointerUp}
         >
-          <Image
-            key={active.id}
-            src={active.contentUrl}
-            alt={active.caption || active.originalFilename}
-            width={1600}
-            height={1200}
-            sizes="100vw"
-            unoptimized
-            priority
-            draggable={false}
-          />
+          {active.contentType.startsWith('video/') ? (
+            // User videos do not have a caption track at upload time.
+            // oxlint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              key={active.id}
+              src={active.contentUrl}
+              controls
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <Image
+              key={active.id}
+              src={active.contentUrl}
+              alt={active.caption || active.originalFilename}
+              width={1600}
+              height={1200}
+              sizes="100vw"
+              unoptimized
+              priority
+              draggable={false}
+            />
+          )}
           {media.length > 1 ? (
             <>
               <button

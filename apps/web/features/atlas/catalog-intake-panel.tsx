@@ -260,8 +260,8 @@ export function CatalogIntakePanel({
           <strong>{successMessage(state.success?.status)}</strong>
           {state.success?.status === 'committed_needs_review' ? (
             <p>
-              It is not visible on the public map or Nearby yet. Retry Add to complete the
-              missing information.
+              It is not visible on the public map or Nearby yet. Retry Add to
+              complete the missing information.
             </p>
           ) : null}
           <details className="catalog-intake-note">

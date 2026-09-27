@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { deleteAtlasItemResponse } from '@/app/api/destructive-responses';
 import { rejectUncoordinatedOwnerPocWrite } from '@/lib/server/application/owner-poc-write-policy';
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
+import { getServerInvocationCoordinator } from '@/lib/server/application/server-invocation-coordinator';
 import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
 import type {
   AtlasItemEdit,
@@ -10,7 +11,7 @@ import type {
 } from '@/product/application/catalog/atlas-item';
 
 import { getAtlasItemResponse } from './get-atlas-item-response';
-import { updateAtlasItemResponse } from '../item-write-response';
+import { ownerMutationResponse } from '../../owner-mutation-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,6 @@ export const PATCH = withOwnerWriteAuth(async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const unavailable = rejectUncoordinatedOwnerPocWrite();
-  if (unavailable) return unavailable;
   const { id } = await context.params;
   const edit = parseAtlasItemEdit(await request.json());
   if (!edit) {
@@ -39,7 +38,17 @@ export const PATCH = withOwnerWriteAuth(async function PATCH(
     );
   }
 
-  return updateAtlasItemResponse(getServerAtlasApplication(), id, edit);
+  return ownerMutationResponse({
+    coordinator: getServerInvocationCoordinator(),
+    request,
+    operation: 'catalog.update_item',
+    operationInput: { id, ...edit },
+    errors: {
+      invalidInput: 'Valid title, description, and state are required',
+      notFound: 'Atlas item not found',
+      dependencyFailure: 'The Atlas item could not be updated.',
+    },
+  });
 });
 
 export const DELETE = withOwnerWriteAuth(async function DELETE(

@@ -7,9 +7,7 @@
       "result": {
         "signatureDishes": {
           "state": "known",
-          "value": [
-            "seasonal oysters"
-          ],
+          "value": ["seasonal oysters"],
           "evidence": [
             {
               "evidenceId": "yotsuya-menu-control",
@@ -54,11 +52,7 @@
         },
         "categoryLabels": {
           "state": "known",
-          "value": [
-            "食堂",
-            "コロッケ",
-            "洋食"
-          ],
+          "value": ["食堂", "コロッケ", "洋食"],
           "evidence": [
             {
               "evidenceId": "tabelog-yotsuya-current",
@@ -137,10 +131,7 @@
           "state": "known",
           "value": {
             "text": "食堂, コロッケ, 洋食 restaurant featuring seasonal oysters.",
-            "supportedFactRefs": [
-              "categoryLabels",
-              "signatureDishes"
-            ]
+            "supportedFactRefs": ["categoryLabels", "signatureDishes"]
           },
           "evidence": [
             {

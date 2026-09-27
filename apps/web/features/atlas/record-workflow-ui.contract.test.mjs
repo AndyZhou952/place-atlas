@@ -26,7 +26,7 @@ test('place detail and Journal share one Visit composer', () => {
   assert.match(screenSource, /Note \(optional\)/u);
   assert.match(
     screenSource,
-    /accept="image\/jpeg,image\/png,image\/webp,image\/gif"/u,
+    /accept="image\/jpeg,image\/png,image\/webp,image\/gif,video\/mp4,video\/webm"/u,
   );
 });
 

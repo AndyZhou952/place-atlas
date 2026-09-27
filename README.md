@@ -1,6 +1,6 @@
 # Japan Personal Atlas
 
-A self-hosted restaurant map for saving places, recording visits and photos, and finding saved restaurants nearby. The website is publicly readable; only the owner can change it. Each deployment uses its own database, storage, model credentials, and optional map credentials.
+A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. The website is publicly readable; only the owner can change it. Each deployment uses its own database, storage, model credentials, and optional map credentials.
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
@@ -13,7 +13,7 @@ First-time setup order: prepare credentials → create Cloudflare resources → 
 ## Requirements
 
 - Node.js 22.13 or newer and npm.
-- A Cloudflare account with Workers, D1, and R2 enabled. Workers runs the app; D1 stores records; R2 stores photos.
+- A Cloudflare account with Workers, D1, and R2 enabled. Workers runs the app; D1 stores records; R2 stores photos and videos.
 - An OpenAI-compatible chat-completions endpoint, model name, and API key for automated extraction.
 - No separate search key is required. Japanese/Tabelog queries use Yahoo Japan public search; other queries use DuckDuckGo HTML search. Optionally provide a Tavily API key instead.
 - Optionally, Google Cloud credentials for Places API (New), Geocoding API, and Routes API. Without these services, Google matching and verified route calculations are unavailable.
@@ -152,7 +152,7 @@ Start here only after completing configuration and deployment above. Visitors ca
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
 2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. For a chain or an ambiguous name, keep the name and fill **Area, station or branch (optional)**, then select **Find matches** again. Choose the intended candidate; multiple matches are never preselected. Research shows a waiting indicator while checking sources. Incomplete research is not a saved restaurant: retry rather than inventing missing facts.
 3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
-4. Use the heart to mark a favorite and the visited control to mark a place as visited. For a dated record, use **Add a visit** in the restaurant card or **Journal**. A date is enough; notes, photos and a rating are optional. **Overall マイスコア** updates your overall restaurant score, not a historical per-visit score, and remains separate from external ratings. After saving, use **Record another visit** for a new record. If photo upload fails, add the missing photos to the saved visit rather than creating it again. Open a photo to edit its caption; press Enter or leave the caption field to save. **Edit** on the restaurant header edits restaurant metadata; the pencil beside a Visit edits that dated record.
+4. Use the heart to mark a favorite and the visited control to mark a place as visited. For a dated record, use **Add a visit** in the restaurant card or **Journal**. A date is enough; notes, photos, videos and a rating are optional. MP4 and WebM videos can be up to 50 MB each. **Overall マイスコア** updates your overall restaurant score, not a historical per-visit score, and remains separate from external ratings. After saving, use **Record another visit** for a new record. If a media upload fails, add the missing files to the saved visit rather than creating it again. Open media to edit its caption; press Enter or leave the caption field to save. **Edit** on the restaurant header edits restaurant metadata; the pencil beside a Visit edits that dated record, including its restaurant. Changing a Visit's restaurant moves its note and media without changing either restaurant's overall score.
 5. Enter a neighborhood or address in Nearby to search your saved places. Straight-line distance is not a verified walking time.
 
 ### Calling Add from an integration

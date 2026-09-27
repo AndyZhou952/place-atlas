@@ -68,6 +68,8 @@ Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-
 
 - [x] **Data/API foundation:** personal rating, favorite/visited state, Visit date/note, photo upload and caption-update operations exist.
 - [x] **Journal editing in code:** edit Visit date/rating/note and update photo captions; local state/API tests exist.
+- [x] **Visit restaurant correction:** edit one Visit's restaurant from the detail or Journal form; the Visit and its media association move atomically, while restaurant-level ratings stay with their restaurants. Deployed and verified in the browser after reload.
+- [x] **Video and note display:** MP4/WebM uploads (up to 50 MB) and playback are supported alongside photos; Journal notes preserve entered line breaks. In the deployed browser, an isolated MP4 test uploaded, persisted across reload, decoded in the player, and its temporary Visit and local download were removed. A direct R2 object audit and WebM browser test remain open.
 - [ ] **Rating semantics:** the Visit form's rating currently updates the restaurant-level personal assessment; historical per-Visit scores are not stored separately. Clarify the UI and decide whether history is required before expanding storage.
 - [x] **Photo viewer editing in code:** thumbnail and opened-photo views expose caption editing. Persistence and failure recovery still need live acceptance.
 - [ ] **Per-photo scores:** not implemented; separate from optional captions and restaurant-level personal rating.
@@ -80,6 +82,7 @@ Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-
 
 - [x] **Deterministic foundation:** saved-catalog lookup, straight-line distance, location resolution/route adapters, fallback policies and local tests.
 - [x] **Offline policy benchmark seed:** 14 synthetic cases plus a scorer cover saved-only choices, walk/transit/distance rules, visited preference, clarification and source failures; this is not live Agent acceptance.
+- [x] **Separated seed metrics:** the scorer now reports action and selection accuracy, uncertainty coverage, safety violations, and optional latency/tool/cost telemetry independently. The 14 cases are still synthetic tool evidence, not verified geography or real-model results.
 - [ ] **Agent benchmark first:** curate multilingual short-location, intent, ambiguity, visited preference, walk/transit fallback and provider-failure cases. An initial synthetic policy suite is not a live quality result.
 - [ ] **Screenshot benchmark:** add labelled map screenshots with ground-truth location/ambiguity before enabling image-based location recognition.
 - [ ] **Connect the Agent:** interpret the location and constraints, ask only necessary clarification, call catalog/location/route tools, and explain recommendations.

@@ -17,6 +17,7 @@ interface HttpNewVisit {
 }
 
 interface HttpVisitUpdate {
+  readonly itemId?: string;
   readonly visitedAt: string;
   readonly rating?: number | null;
   readonly note?: string;
@@ -76,6 +77,7 @@ export async function updateVisitResponse(
     operation: 'visit.update',
     operationInput: {
       id,
+      ...(input.itemId === undefined ? {} : { itemId: input.itemId }),
       visitedAt: input.visitedAt,
       ...(input.note === undefined ? {} : { note: input.note }),
       ...(input.rating === undefined ? {} : { rating: input.rating }),
@@ -107,6 +109,8 @@ function isHttpVisitUpdate(value: unknown): value is HttpVisitUpdate {
   return (
     typeof value.visitedAt === 'string' &&
     Boolean(value.visitedAt) &&
+    (value.itemId === undefined ||
+      (typeof value.itemId === 'string' && Boolean(value.itemId))) &&
     (value.note === undefined || typeof value.note === 'string') &&
     (value.rating === undefined ||
       value.rating === null ||

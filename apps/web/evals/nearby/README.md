@@ -19,7 +19,8 @@ Prediction shape:
       "action": "recommend",
       "itemIds": ["ramen-a"],
       "warnings": [],
-      "routeClaims": [{ "itemId": "ramen-a", "mode": "walk", "seconds": 600 }]
+      "routeClaims": [{ "itemId": "ramen-a", "mode": "walk", "seconds": 600 }],
+      "telemetry": { "latencyMs": 200, "toolCalls": 2, "costUsd": 0.001 }
     }
   ]
 }
@@ -38,7 +39,9 @@ node evals/nearby/score-nearby.mjs evals/nearby/nearby-gold.v1.json evals/runs/n
 
 The second command requires real predictions; no generated perfect prediction file is shipped. Tests create an oracle in memory solely to validate the scorer. CLI exit codes: 0 passes, 1 fails quality gates, 2 invalid input.
 
-Report case coverage, action accuracy, case pass rate and per-case failures. Require all 14 core-policy cases to pass: no unsaved recommendations, unsupported route claims, lost uncertainty warnings or unsafe ambiguity handling. Missing predictions count as failures. This small strict seed is not a claim about statistical accuracy.
+Report case coverage, action accuracy, selection accuracy, uncertainty coverage, safety violation cases, case pass rate and per-case failures. Optional per-case telemetry reports mean latency, total tool calls and total cost only when every case supplies it. Require all 14 core-policy cases to pass: no unsaved recommendations, unsupported route claims, lost uncertainty warnings or unsafe ambiguity handling. Missing predictions count as failures. This small strict seed is not a claim about statistical accuracy.
+
+The proposed acceptance gate for a future independently verified, real-model set is zero invented saved-place IDs, route times or booking facts; every ambiguity and provider-failure safety case must pass. Set action/selection thresholds after reviewing that dataset, before running the model. Do not use this synthetic oracle to tune or claim real-model quality.
 
 ## Before live Agent acceptance
 

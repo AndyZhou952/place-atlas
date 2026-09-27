@@ -68,7 +68,7 @@ test('attach stores a validated image before committing ordered VisitMedia metad
     visitId: 'visit-1',
     itemId: 'item-1',
     objectKey: 'visits/visit-1/media-1',
-    originalFilename: 'image',
+    originalFilename: 'media',
     contentType: 'image/jpeg',
     byteSize: 4,
     displayId: 'pm_public-media-token',
@@ -107,7 +107,7 @@ test('attach stores a validated image before committing ordered VisitMedia metad
   });
 });
 
-test('attach accepts matching JPEG, PNG, WebP, GIF87a, and GIF89a signatures', async () => {
+test('attach accepts matching image and video signatures', async () => {
   const cases = [
     ['image/jpeg', jpegBytes],
     [
@@ -117,6 +117,8 @@ test('attach accepts matching JPEG, PNG, WebP, GIF87a, and GIF89a signatures', a
     ['image/webp', Uint8Array.from(Buffer.from('RIFF0000WEBP'))],
     ['image/gif', Uint8Array.from(Buffer.from('GIF87a'))],
     ['image/gif', Uint8Array.from(Buffer.from('GIF89a'))],
+    ['video/mp4', Uint8Array.from(Buffer.from('0000ftypisom'))],
+    ['video/webm', Uint8Array.of(0x1a, 0x45, 0xdf, 0xa3)],
   ];
 
   for (const [contentType, bytes] of cases) {
@@ -279,7 +281,7 @@ test('attach rejects unsupported, mismatched, empty, oversized, and overlong-cap
       'text/plain',
       jpegBytes,
       undefined,
-      'Use a JPEG, PNG, WebP, or GIF image.',
+      'Use a JPEG, PNG, WebP, GIF, MP4, or WebM file.',
     ],
     [
       'image/png',

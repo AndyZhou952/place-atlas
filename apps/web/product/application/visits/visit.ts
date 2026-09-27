@@ -20,6 +20,7 @@ export interface NewVisit {
 
 export interface VisitUpdate {
   readonly id: string;
+  readonly itemId?: string;
   readonly visitedAt: string;
   readonly rating?: number | null;
   readonly note?: string;

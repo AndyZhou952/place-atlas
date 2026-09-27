@@ -37,6 +37,16 @@ requires Playwright (or `PLAYWRIGHT_MODULE` pointing to its entry). Optional
 `RECORD_API_BRIDGE=yes` forwards browser requests to real endpoints through the
 runner; report this separately from native browser-network acceptance.
 
+Update (2026-09-27): the shared Visit editor can reassign one Visit to a
+different saved restaurant. The D1 write moves its media association in the
+same atomic mutation and leaves both restaurant-level scores unchanged. MP4 and
+WebM uploads/playback are available with a 50 MB per-video limit, and Journal
+notes display their stored line breaks. Local CI passes and the changes are
+deployed. Browser verification covered Visit reassignment, multiline note
+display, and an isolated MP4 upload/playback after reload. The temporary test
+Visit and downloaded file were removed. Direct R2 object auditing and a WebM
+browser run remain open.
+
 ### R1 — Finish the deterministic Record journey
 
 - Keep restaurant metadata editing distinct from **Record a visit**; both the

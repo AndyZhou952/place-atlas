@@ -25,6 +25,7 @@ interface PublicMedia {
   readonly visitId: string;
   readonly displayOrder: number;
   readonly caption?: string;
+  readonly contentType: string;
   readonly displayUrl: string;
 }
 
@@ -371,6 +372,7 @@ export async function loadPublicMedia(
         visitId: media.visitId,
         itemId: visit.itemId,
         originalFilename: 'Photo',
+        contentType: media.contentType,
         caption: media.caption,
         displayOrder: media.displayOrder,
         contentUrl: media.displayUrl,

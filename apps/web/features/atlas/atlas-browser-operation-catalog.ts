@@ -86,10 +86,7 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
           'itemId on commit/reuse',
           'receiptRef on commit/reuse',
         ],
-        successStatuses: [
-          'committed_verified',
-          'reused_existing',
-        ],
+        successStatuses: ['committed_verified', 'reused_existing'],
         mapVisibleStatus: 'committed_verified',
         mayReturnConflictOrFailedNoWrite: true,
       },

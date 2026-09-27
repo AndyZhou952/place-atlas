@@ -84,6 +84,7 @@ Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-
 - [x] **Deterministic foundation:** saved-catalog lookup, straight-line distance, location resolution/route adapters, fallback policies and local tests.
 - [x] **Offline policy benchmark seed:** 14 synthetic cases plus a scorer cover saved-only choices, walk/transit/distance rules, visited preference, clarification and source failures; this is not live Agent acceptance.
 - [x] **Separated seed metrics:** the scorer now reports action and selection accuracy, uncertainty coverage, safety violations, and optional latency/tool/cost telemetry independently. The 14 cases are still synthetic tool evidence, not verified geography or real-model results.
+- [x] **Verified location seed:** six Chinese/Japanese/English station-identity and intent cases distinguish two officially documented Tokyo Metro stations; a separate scorer checks resolution, clarification and constraints. No route times or real-model results are inferred from station pages.
 - [ ] **Agent benchmark first:** curate multilingual short-location, intent, ambiguity, visited preference, walk/transit fallback and provider-failure cases. An initial synthetic policy suite is not a live quality result.
 - [ ] **Screenshot benchmark:** add labelled map screenshots with ground-truth location/ambiguity before enabling image-based location recognition.
 - [ ] **Connect the Agent:** interpret the location and constraints, ask only necessary clarification, call catalog/location/route tools, and explain recommendations.

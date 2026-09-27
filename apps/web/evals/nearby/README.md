@@ -1,4 +1,25 @@
-# Nearby benchmark: policy seed v1
+# Nearby benchmarks: policy and location seeds
+
+`nearby-location-gold.v1.json` is a separate six-case station-identity seed.
+Tokyo Metro's [Ikebukuro](https://www.tokyometro.jp/station/ikebukuro/index.html)
+and [Higashi-ikebukuro](https://www.tokyometro.jp/station/higashi-ikebukuro/index.html)
+station pages, plus their linked English pages, were checked on 2026-09-27.
+They establish two distinct stations and their official names and line codes;
+they do **not** establish walking durations or restaurant availability. The
+cases test Chinese, Japanese and English location hints, cuisine and visited
+intent, and an explicit choice between the two stations. Give a model only each
+case's `input`, never `gold` or the scorer's test oracle. Score predictions with:
+
+```sh
+node evals/nearby/score-nearby-location.mjs evals/nearby/nearby-location-gold.v1.json evals/runs/nearby-location-predictions.json
+```
+
+This seed has no measured model predictions yet. It is a narrow, sourced
+location-understanding check, not broad Tokyo geocoding acceptance. Expand it
+with independently checked stations and neighborhoods before selecting a model
+quality threshold.
+
+## Synthetic policy seed v1
 
 This is a **synthetic, offline policy suite**, not a measured Agent benchmark or evidence of real travel times. Build the benchmark before connecting the recommendation Agent. Actual place/location interpretation, screenshots and live route providers need additional evaluation.
 

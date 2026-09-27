@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { presentCatalogIntakePreview } from '@/product/application/catalog-intake/catalog-intake-preview-presenter';
+import { compactRestaurantCategories } from '@/product/application/catalog-intake/restaurant-profile-presentation';
 
 import { useCatalogIntake } from './use-catalog-intake';
 import {
@@ -490,10 +491,10 @@ function PreviewStep({
         >
           {preview.ownerFields.categories || preview.profile?.categories ? (
             <p>
-              {(
+              {compactRestaurantCategories(
                 preview.ownerFields.categories ??
-                preview.profile?.categories?.value ??
-                []
+                  preview.profile?.categories?.value ??
+                  [],
               ).join(' · ')}
             </p>
           ) : null}

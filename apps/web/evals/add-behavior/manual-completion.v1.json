@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "add-manual-completion-v2",
+  "kind": "synthetic-provider-failure-workflow",
+  "cases": [
+    {
+      "caseId": "shake-shack-shinjuku-google-match-research-unavailable",
+      "candidate": {
+        "transientName": "SHAKE SHACK Shinjuku Southern Terrace",
+        "transientAddress": "2-2-1 Yoyogi, Shibuya, Tokyo"
+      },
+      "query": "shake shack shinjuku",
+      "ownerCompletion": {
+        "title": "シェイク シャック 新宿サザンテラス",
+        "area": "新宿",
+        "address": "東京都渋谷区代々木2-2-1",
+        "categories": ["汉堡", "美式快餐"],
+        "signatureDishes": ["ShackBurger", "Crinkle-cut fries"],
+        "summary": "新宿南口的汉堡店。"
+      },
+      "expected": {
+        "firstLocationStatus": "unknown",
+        "completedLocationStatus": "known",
+        "completedLocationProvenance": "durable_geocoder_observed",
+        "publicationStatus": "committed_verified",
+        "publicationCount": 1
+      }
+    },
+    {
+      "caseId": "yakitori-shop-provider-outage-owner-coordinate-fallback",
+      "candidate": {
+        "transientName": "焼き鳥 例店",
+        "transientAddress": "東京都台東区上野1-1-1"
+      },
+      "query": "焼き鳥 例店 上野",
+      "ownerCompletion": {
+        "title": "焼き鳥 例店",
+        "area": "上野",
+        "address": "東京都台東区上野1-1-1",
+        "coordinates": { "latitude": 35.706, "longitude": 139.773 },
+        "categories": ["鳥料理", "串焼き", "焼き鳥"],
+        "signatureDishes": ["つくね", "ねぎま"]
+      },
+      "expected": {
+        "firstLocationStatus": "unknown",
+        "completedLocationStatus": "known",
+        "completedLocationProvenance": "owner_asserted",
+        "publicationStatus": "committed_verified",
+        "publicationCount": 1
+      }
+    },
+    {
+      "caseId": "verve-coffee-roppongi-same-candidate-source-no-match",
+      "researchOutcome": "observed_unknown",
+      "candidate": {
+        "transientName": "Verve Coffee Roasters",
+        "transientAddress": "5-chōme-16-7 Roppongi, Minato City, Tokyo 106-0032, Japan"
+      },
+      "query": "Verve Coffee六本木",
+      "ownerCompletion": {
+        "title": "ヴァーヴ コーヒー ロースターズ 六本木",
+        "area": "港区六本木",
+        "address": "東京都港区六本木5-16-7",
+        "coordinates": { "latitude": 35.66148, "longitude": 139.73625 },
+        "categories": ["カフェ"]
+      },
+      "expected": {
+        "firstLocationStatus": "unknown",
+        "completedLocationStatus": "known",
+        "completedLocationProvenance": "owner_asserted",
+        "publicationStatus": "committed_verified",
+        "publicationCount": 1
+      }
+    }
+  ]
+}

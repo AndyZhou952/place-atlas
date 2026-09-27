@@ -6,27 +6,97 @@ function normalizedLabels(values: readonly string[]): string[] {
 
 function categoryKey(value: string): string {
   const normalized = value.normalize('NFC').toLowerCase().replace(/\s/gu, '');
-  if (
-    /^(?:焼鳥|焼き鳥|やきとり|鳥料理|鶏料理|串焼|串焼き|yakitori)$/u.test(
-      normalized,
-    )
-  ) {
+  if (/^(?:焼鳥|焼き鳥|やきとり|yakitori)$/u.test(normalized))
     return 'yakitori';
-  }
+  if (/^(?:鳥料理|鶏料理)$/u.test(normalized)) return 'chicken-cuisine';
+  if (/^(?:串焼|串焼き)$/u.test(normalized)) return 'skewers';
   return normalized;
+}
+
+const chineseCuisineNames: Readonly<Record<string, string>> = {
+  yakitori: '烧鸟',
+  'chicken-cuisine': '鸡肉料理',
+  skewers: '串烧',
+  和食: '日式料理',
+  豚串: '猪肉串',
+  ラーメン: '拉面',
+  餃子: '饺子',
+  寿司: '寿司',
+  洋食: '西式料理',
+  とんかつ: '炸猪排',
+  カレー: '咖喱',
+  ハンバーガー: '汉堡',
+  hamburgers: '汉堡',
+  hamburger: '汉堡',
+  burgers: '汉堡',
+  american: '美式料理',
+  americancuisine: '美式料理',
+  'fast food': '快餐',
+  italian: '意式料理',
+  french: '法式料理',
+  chinese: '中式料理',
+  korean: '韩式料理',
+  ramen: '拉面',
+  sushi: '寿司',
+  curry: '咖喱',
+  udon: '乌冬面',
+  カフェ: '咖啡馆',
+  cafe: '咖啡馆',
+  café: '咖啡馆',
+  coffee: '咖啡馆',
+  coffeeshop: '咖啡馆',
+  specialtycoffee: '精品咖啡',
+  汉堡: '汉堡',
+  美式快餐: '美式快餐',
+};
+
+function summaryCuisine(value: string): string {
+  const key = categoryKey(value);
+  return Object.hasOwn(chineseCuisineNames, key)
+    ? chineseCuisineNames[key]
+    : value;
 }
 
 export function compactRestaurantCategories(
   values: readonly string[],
   limit = 2,
 ): string[] {
+  const labels = normalizedLabels(values);
+  const hasYakitori = labels.some((value) => categoryKey(value) === 'yakitori');
   const seen = new Set<string>();
-  return normalizedLabels(values).filter((value) => {
+  return labels.filter((value) => {
     const key = categoryKey(value);
+    // Bird cuisine and generic skewers can describe a yakitori shop, but they
+    // remain distinct categories when no explicit yakitori label is present.
+    if (hasYakitori && (key === 'chicken-cuisine' || key === 'skewers'))
+      return false;
     if (seen.has(key) || seen.size >= limit) return false;
     seen.add(key);
     return true;
   });
+}
+
+function compactRestaurantDishes(
+  categories: readonly string[],
+  dishes: readonly string[],
+  limit: number,
+): string[] {
+  const categoryKeys = new Set(categories.map(categoryKey));
+  const seen = new Set<string>();
+  const selected: string[] = [];
+  for (const dish of normalizedLabels(dishes)) {
+    const key = categoryKey(dish);
+    if (categoryKeys.has(key) || seen.has(key)) continue;
+    if (
+      categoryKeys.has('yakitori') &&
+      (key === 'chicken-cuisine' || key === 'skewers')
+    )
+      continue;
+    seen.add(key);
+    selected.push(dish);
+    if (selected.length === limit) break;
+  }
+  return selected;
 }
 
 export function compactRestaurantTags(
@@ -34,16 +104,10 @@ export function compactRestaurantTags(
   dishes: readonly string[],
 ): string[] {
   const selectedCategories = compactRestaurantCategories(categories);
-  const seen = new Set(selectedCategories.map(categoryKey));
-  const selectedDishes: string[] = [];
-  for (const dish of normalizedLabels(dishes)) {
-    const key = categoryKey(dish);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    selectedDishes.push(dish);
-    if (selectedDishes.length === 2) break;
-  }
-  return [...selectedCategories, ...selectedDishes];
+  return [
+    ...selectedCategories,
+    ...compactRestaurantDishes(selectedCategories, dishes, 2),
+  ];
 }
 
 export function composeRestaurantSummary(input: {
@@ -52,10 +116,11 @@ export function composeRestaurantSummary(input: {
   readonly area?: string;
 }): string | undefined {
   const categories = compactRestaurantCategories(input.categories ?? []);
-  const dishes = normalizedLabels(input.dishes ?? []).slice(0, 3);
+  const cuisines = [...new Set(categories.map(summaryCuisine))];
+  const dishes = compactRestaurantDishes(categories, input.dishes ?? [], 3);
   const area = input.area?.normalize('NFC').trim();
   const sentences = [
-    categories.length ? `主营${categories.join('、')}。` : undefined,
+    cuisines.length ? `主营${cuisines.join('、')}。` : undefined,
     area ? `位于${area}。` : undefined,
     dishes.length ? `招牌菜包括${dishes.join('、')}。` : undefined,
   ].filter(Boolean);

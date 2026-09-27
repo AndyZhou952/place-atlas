@@ -1,0 +1,28 @@
+# Add behavior benchmark
+
+This benchmark runs production Add presentation, production research and the real catalog-intake coordinator with controlled providers. Run it from `apps/web` with `npm run eval:add-behavior`. All cases must pass; a missing case or changed fixture count fails the suite. CI also runs these files through the default `npm test` command.
+
+## Expected behavior and cases
+
+| Dataset                     | Cases | Independent observation                                                                            | Gate                                                                                                                                                                              |
+| --------------------------- | ----: | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `presentation.v1.json`      |    10 | The exact summary and tags returned by production presentation functions                           | Chinese prose with sourced names intact; specific cuisine beats broader synonyms; at most two category and two dish tags; up to three distinct dishes in prose; no invented facts |
+| `branch-alias.v1.json`      |     3 | The production Tabelog parser and research harness with controlled page/search/model responses     | A bilingual brand alias from the same page plus matching address may establish identity; locality alone and another street must not                                               |
+| `manual-completion.v1.json` |     3 | The production discover → select → owner completion → confirm coordinator and one publication call | Provider failure or no-match leaves location unknown until owner input or independent geocoding establishes it; confirmation publishes exactly once                               |
+
+The branch-alias and presentation cases include Verve Coffee Roasters 六本木. Manual completion includes Shake Shack Shinjuku and Verve Coffee 六本木; the third case is a clearly synthetic yakitori shop. Verve's Tabelog name, same-page English alias, address, cuisine, and aggregate score were independently checked on 2026-09-27 at `https://tabelog.com/tokyo/A1307/A130701/13244766/`. The fixture is a controlled capture of those fields, not a promise that the rating will remain 3.55. Shake Shack and the yakitori case model controlled failure paths; their expectations do not assert live provider availability.
+
+The benchmark input sent to the model stub contains only the selected Google candidate and evidence. `expectedKnown` and expected presentation strings remain in the test runner. The production prompt is `agent/research-instructions.ts`; the frozen field-extraction runner in `evals/run-add-enrichment.mjs` has a separate prompt and must not be reported as production Add quality.
+
+## What is measured
+
+These 16 controlled cases gate deterministic safety and presentation behavior. They do **not** measure how often the live search provider, Tabelog reader, Nominatim, or DeepSeek returns enough evidence. The browser journey remains a separate acceptance check: verify candidate identity, review, confirm, then refresh and read the saved catalog. Record availability, model failures, latency, and first failed stage separately for each live run. Do not pool controlled cases, frozen evidence extraction, and live journeys into one pass rate.
+
+## Production harness
+
+1. `catalog.intake.discover` asks Google Places for transient candidates. It stores durable provider IDs, not Google's display fields.
+2. `catalog.intake.select` refetches the selected candidate; Nominatim proposes an independent durable location. The research agent receives a fixed system prompt and the selected subject as JSON, does one application search, may call bounded `search_web`, and reads at most three main Tabelog listings. It has three model turns, two searches total, and a 35 second deadline. The configured model is DeepSeek Flash unless the owner changes settings.
+3. The application validates every supported claim against a same-source quote and branch identity. A structured Tabelog listing can supply its aggregate score, address, cuisine, reservation row, and an alternate brand name attached to its 店名 row. The application composes the Chinese overview from validated fields; it ignores free-form model prose. The owner can correct fields in the preview.
+4. `catalog.intake.confirm` refetches identity, location and canonical sources. A changed fact returns a new preview for another confirmation; missing durable location prevents publication. The catalog port writes a verified item and an idempotent receipt. UI readback after refresh is a separate acceptance signal.
+
+The prompt is guidance; the quote/identity checks, geocoder policy, preview version, publication gate, deterministic copy and tag compaction are code hooks. Known weaknesses outside this benchmark include live provider availability, unrecognized cuisine translations, and the currently limited production Add journey sample. Extend the manifest when a new production failure is independently observed, then add a negative control to prevent an overbroad fix.

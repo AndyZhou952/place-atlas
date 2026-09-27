@@ -2551,7 +2551,7 @@ test('Shake Shack Shinjuku: a transient Google match can be completed with durab
   const benchmark = JSON.parse(
     await readFile(
       new URL(
-        '../../../evals/place-enrichment/add-completion-gold.v1.json',
+        '../../../evals/add-behavior/manual-completion.v1.json',
         import.meta.url,
       ),
       'utf8',
@@ -2672,6 +2672,114 @@ test('Shake Shack Shinjuku: a transient Google match can be completed with durab
   assert.equal(confirmed.value.status, scenario.expected.publicationStatus);
   assert.equal(publishes.length, scenario.expected.publicationCount);
   assert.ok(geocoderCalls >= 3);
+});
+
+test('source failure or no-match permits owner coordinates and one verified publication', async (t) => {
+  const benchmark = JSON.parse(
+    await readFile(
+      new URL(
+        '../../../evals/add-behavior/manual-completion.v1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const cases = benchmark.cases.filter(({ caseId }) =>
+    [
+      'yakitori-shop-provider-outage-owner-coordinate-fallback',
+      'verve-coffee-roppongi-same-candidate-source-no-match',
+    ].includes(caseId),
+  );
+  assert.equal(cases.length, 2);
+  for (const scenario of cases) {
+    await t.test(scenario.caseId, async () => {
+      const publishes = [];
+      const application = createFixtureApplication({
+        discoveryPort: discoveryFixture({
+          transientName: scenario.candidate.transientName,
+          transientAddress: scenario.candidate.transientAddress,
+        }),
+        enrichmentPolicy: 'enrich_if_available',
+        webResearchPort: {
+          async research() {
+            return scenario.researchOutcome === 'observed_unknown'
+              ? {
+                  kind: 'observed',
+                  value: {
+                    tabelog: { status: 'unknown' },
+                    reservation: { status: 'unknown' },
+                  },
+                }
+              : { kind: 'unavailable' };
+          },
+        },
+        atlasCatalogIntakePort: {
+          async publish(preview) {
+            publishes.push(preview);
+            return {
+              status: 'committed_verified',
+              itemId: `synthetic-${scenario.caseId}`,
+              receiptRef: `receipt-${scenario.caseId}`,
+              replayed: false,
+            };
+          },
+        },
+      });
+      const discovered = await application.execute({
+        key: 'catalog.intake.discover',
+        input: { query: scenario.query, requestToken: scenario.caseId },
+      });
+      assert.equal(discovered.ok, true, scenario.caseId);
+      const first = await application.execute({
+        key: 'catalog.intake.select',
+        input: {
+          sessionId: discovered.value.sessionId,
+          expectedSessionVersion: discovered.value.sessionVersion,
+          ordinal: 1,
+        },
+      });
+      assert.equal(first.ok, true, scenario.caseId);
+      assert.equal(
+        first.value.preview.locationEvidence.status,
+        scenario.expected.firstLocationStatus,
+        scenario.caseId,
+      );
+      const completed = await application.execute({
+        key: 'catalog.intake.select',
+        input: {
+          sessionId: first.value.sessionId,
+          expectedSessionVersion: first.value.sessionVersion,
+          ordinal: 1,
+          ownerFields: scenario.ownerCompletion,
+        },
+      });
+      assert.equal(completed.ok, true, scenario.caseId);
+      assert.equal(
+        completed.value.preview.locationEvidence.status,
+        scenario.expected.completedLocationStatus,
+        scenario.caseId,
+      );
+      assert.equal(
+        completed.value.preview.locationEvidence.provenance,
+        scenario.expected.completedLocationProvenance,
+        scenario.caseId,
+      );
+      const confirmed = await application.execute({
+        key: 'catalog.intake.confirm',
+        input: {
+          sessionId: completed.value.sessionId,
+          expectedPreviewVersion: completed.value.preview.previewVersion,
+        },
+      });
+      assert.equal(confirmed.ok, true, scenario.caseId);
+      assert.equal(
+        confirmed.value.status,
+        scenario.expected.publicationStatus,
+        scenario.caseId,
+      );
+      assert.equal(publishes.length, scenario.expected.publicationCount);
+    });
+  }
 });
 
 async function discoverAndSelect(

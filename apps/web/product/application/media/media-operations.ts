@@ -52,7 +52,9 @@ const allowedImageContentTypes = [
   'image/webp',
   'image/gif',
 ] as const;
+const allowedVideoContentTypes = ['video/mp4', 'video/webm'] as const;
 const maxVisitMediaBytes = 8 * 1024 * 1024;
+const maxVisitVideoBytes = 50 * 1024 * 1024;
 const maxVisitMediaCaptionLength = 160;
 
 export function createMediaOperationGroup(
@@ -185,7 +187,7 @@ export function createMediaOperationGroup(
         const now = dependencies.clock.now();
         const results = await Promise.allSettled(
           uploads.map(async (upload, index) => {
-            assertAllowedImage(upload.contentType, upload.bytes);
+            assertAllowedMedia(upload.contentType, upload.bytes);
             const id = upload.id ?? dependencies.idSource.nextId();
             const displayId = createDisplayId(dependencies.displayIdSource);
             const contentSha256 = await dependencies.digest(upload.bytes);
@@ -196,7 +198,7 @@ export function createMediaOperationGroup(
               visitId,
               itemId: context.itemId,
               objectKey,
-              originalFilename: upload.originalFilename || 'image',
+              originalFilename: upload.originalFilename || 'media',
               contentType: upload.contentType,
               byteSize: upload.bytes.byteLength,
               contentSha256,
@@ -439,9 +441,20 @@ function validateCaptionInput(
   return success({ id, caption });
 }
 
-function assertAllowedImage(contentType: string, bytes: Uint8Array): void {
+function assertAllowedMedia(contentType: string, bytes: Uint8Array): void {
+  if (allowedVideoContentTypes.some((allowed) => allowed === contentType)) {
+    if (!bytes.byteLength || bytes.byteLength > maxVisitVideoBytes) {
+      throw new MediaInputError('Each video must be between 1 byte and 50 MB.');
+    }
+    if (!hasMatchingVideoSignature(contentType, bytes)) {
+      throw new MediaInputError(
+        'The file contents do not match the video type.',
+      );
+    }
+    return;
+  }
   if (!allowedImageContentTypes.some((allowed) => allowed === contentType)) {
-    throw new MediaInputError('Use a JPEG, PNG, WebP, or GIF image.');
+    throw new MediaInputError('Use a JPEG, PNG, WebP, GIF, MP4, or WebM file.');
   }
   if (!bytes.byteLength || bytes.byteLength > maxVisitMediaBytes) {
     throw new MediaInputError('Each image must be between 1 byte and 8 MB.');
@@ -449,6 +462,19 @@ function assertAllowedImage(contentType: string, bytes: Uint8Array): void {
   if (!hasMatchingImageSignature(contentType, bytes)) {
     throw new MediaInputError('The file contents do not match the image type.');
   }
+}
+
+function hasMatchingVideoSignature(
+  contentType: string,
+  bytes: Uint8Array,
+): boolean {
+  if (contentType === 'video/mp4') return ascii(bytes, 4, 8) === 'ftyp';
+  return (
+    bytes[0] === 0x1a &&
+    bytes[1] === 0x45 &&
+    bytes[2] === 0xdf &&
+    bytes[3] === 0xa3
+  );
 }
 
 function hasMatchingImageSignature(

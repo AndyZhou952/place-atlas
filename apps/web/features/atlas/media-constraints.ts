@@ -4,12 +4,14 @@ export const allowedImageContentTypes = [
   'image/webp',
   'image/gif',
 ] as const;
+export const allowedVideoContentTypes = ['video/mp4', 'video/webm'] as const;
 
 // Keep an individual Worker request comfortably below its memory/body budget.
 // The web client chunks larger user selections into requests of this size.
 export const maxMediaFilesPerRequest = 4;
 export const maxMediaFilesPerSelection = 24;
 export const maxMediaFileBytes = 8 * 1024 * 1024;
+export const maxVideoFileBytes = 50 * 1024 * 1024;
 export const maxMediaCaptionLength = 160;
 
 export function chunkMediaSelection<T>(

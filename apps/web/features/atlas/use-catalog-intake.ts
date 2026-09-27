@@ -8,6 +8,8 @@ import {
 } from './atlas-api-client';
 import {
   catalogIntakeInitialState,
+  catalogIntakeManualLabels,
+  catalogIntakeManualCompletionError,
   reduceCatalogIntakeUi,
   type CatalogIntakeUiError,
 } from './catalog-intake-ui-state';
@@ -76,6 +78,18 @@ export function useCatalogIntake(
     ) {
       return;
     }
+    const manualError = catalogIntakeManualCompletionError(state);
+    if (manualError) {
+      dispatch({
+        type: 'request_failed',
+        error: {
+          code: 'invalid_input',
+          message: manualError,
+          retryable: false,
+        },
+      });
+      return;
+    }
     dispatch({ type: 'select_started' });
     try {
       const output = await browserAtlasApplication.execute({
@@ -88,9 +102,31 @@ export function useCatalogIntake(
             title: state.title,
             area: state.area,
             address: state.address,
+            categories: state.categories,
+            signatureDishes: state.signatureDishes,
+            summary: state.summary,
+            latitude: state.latitude,
+            longitude: state.longitude,
           }),
-          tabelog: 'unknown',
-          reservation: 'unknown',
+          ...(state.tabelogScore.trim() && state.tabelogUrl.trim()
+            ? {
+                tabelog: {
+                  score: Number(state.tabelogScore),
+                  url: state.tabelogUrl.trim(),
+                },
+              }
+            : {}),
+          ...(state.reservationMode !== 'unknown' &&
+          state.reservationLabel.trim() &&
+          state.reservationUrl.trim()
+            ? {
+                reservation: {
+                  mode: state.reservationMode,
+                  label: state.reservationLabel.trim(),
+                  url: state.reservationUrl.trim(),
+                },
+              }
+            : {}),
           requestResearch: true,
         },
       });
@@ -121,7 +157,7 @@ export function useCatalogIntake(
   }, [state.sessionId, state.sessionVersion]);
 
   const confirm = useCallback(async () => {
-    if (!state.preview) return;
+    if (!state.preview || state.previewNeedsRefresh) return;
     dispatch({ type: 'confirm_started' });
     try {
       const output = await browserAtlasApplication.execute({
@@ -138,7 +174,7 @@ export function useCatalogIntake(
     } catch (error) {
       dispatch({ type: 'request_failed', error: toUiError(error) });
     }
-  }, [onCommitted, state.preview]);
+  }, [onCommitted, state.preview, state.previewNeedsRefresh]);
 
   const retry = useCallback(() => {
     if (state.lastOperation === 'select') return select();
@@ -157,7 +193,22 @@ export function useCatalogIntake(
     startFresh,
     restart: () => dispatch({ type: 'restart' }),
     setField: (
-      field: 'query' | 'searchArea' | 'title' | 'area' | 'address',
+      field:
+        | 'query'
+        | 'searchArea'
+        | 'title'
+        | 'area'
+        | 'address'
+        | 'categories'
+        | 'signatureDishes'
+        | 'summary'
+        | 'latitude'
+        | 'longitude'
+        | 'tabelogScore'
+        | 'tabelogUrl'
+        | 'reservationMode'
+        | 'reservationLabel'
+        | 'reservationUrl',
       value: string,
     ) => dispatch({ type: 'field_changed', field, value }),
     selectCandidate: (ordinal: number) =>
@@ -169,14 +220,33 @@ function compactOwnerFields(fields: {
   readonly title: string;
   readonly area: string;
   readonly address: string;
+  readonly categories: string;
+  readonly signatureDishes: string;
+  readonly summary: string;
+  readonly latitude: string;
+  readonly longitude: string;
 }) {
   const title = fields.title.normalize('NFC').trim();
   const area = fields.area.normalize('NFC').trim();
   const address = fields.address.normalize('NFC').trim();
+  const categories = catalogIntakeManualLabels(fields.categories);
+  const signatureDishes = catalogIntakeManualLabels(fields.signatureDishes);
+  const summary = fields.summary.normalize('NFC').trim();
+  const latitude = Number(fields.latitude);
+  const longitude = Number(fields.longitude);
   return {
     ...(title ? { title } : {}),
     ...(area ? { area } : {}),
     ...(address ? { address } : {}),
+    ...(categories.length ? { categories } : {}),
+    ...(signatureDishes.length ? { signatureDishes } : {}),
+    ...(summary ? { summary } : {}),
+    ...(fields.latitude.trim() &&
+    fields.longitude.trim() &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude)
+      ? { coordinates: { latitude, longitude } }
+      : {}),
   };
 }
 

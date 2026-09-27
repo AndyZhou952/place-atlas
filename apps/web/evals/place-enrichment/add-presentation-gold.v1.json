@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "add-presentation-v1",
+  "kind": "controlled-publication-presentation-not-live-model-quality",
+  "cases": [
+    {
+      "caseId": "yakitori-synonyms-and-three-dishes",
+      "input": {
+        "categories": ["焼鳥", "鳥料理", "串焼", "和食"],
+        "dishes": ["比内地鶏串", "親子丼", "つくね", "鶏スープ"],
+        "area": "新宿"
+      },
+      "expected": {
+        "summary": "主营焼鳥、和食。位于新宿。招牌菜包括比内地鶏串、親子丼、つくね。",
+        "tags": ["焼鳥", "和食", "比内地鶏串", "親子丼"]
+      }
+    },
+    {
+      "caseId": "chain-brand-original-menu-names",
+      "input": {
+        "categories": ["Hamburgers", "American"],
+        "dishes": ["ShackBurger", "Crinkle-cut fries", "Frozen custard"],
+        "area": "新宿"
+      },
+      "expected": {
+        "summary": "主营Hamburgers、American。位于新宿。招牌菜包括ShackBurger、Crinkle-cut fries、Frozen custard。",
+        "tags": ["Hamburgers", "American", "ShackBurger", "Crinkle-cut fries"]
+      }
+    },
+    {
+      "caseId": "no-evidence-no-invented-copy",
+      "input": { "categories": [], "dishes": [] },
+      "expected": { "summary": null, "tags": [] }
+    },
+    {
+      "caseId": "cuisine-dish-overlap",
+      "input": {
+        "categories": ["焼き鳥", "やきとり"],
+        "dishes": ["焼鳥", "つくね", "ねぎま"]
+      },
+      "expected": {
+        "summary": "主营焼き鳥。招牌菜包括焼鳥、つくね、ねぎま。",
+        "tags": ["焼き鳥", "つくね", "ねぎま"]
+      }
+    }
+  ]
+}

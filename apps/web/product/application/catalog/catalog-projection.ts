@@ -205,11 +205,39 @@ function isReviewEvidence(value: unknown): boolean {
 
 function isReviewOwnerFields(value: unknown): boolean {
   return (
-    hasAllowedKeys(value, ['title', 'address', 'area', 'coordinates'], []) &&
+    hasAllowedKeys(
+      value,
+      [
+        'title',
+        'address',
+        'area',
+        'coordinates',
+        'categories',
+        'signatureDishes',
+        'summary',
+      ],
+      [],
+    ) &&
     (value.title === undefined || typeof value.title === 'string') &&
     (value.address === undefined || typeof value.address === 'string') &&
     (value.area === undefined || typeof value.area === 'string') &&
-    (value.coordinates === undefined || isCoordinates(value.coordinates))
+    (value.coordinates === undefined || isCoordinates(value.coordinates)) &&
+    (value.categories === undefined || isReviewOwnerLabels(value.categories)) &&
+    (value.signatureDishes === undefined ||
+      isReviewOwnerLabels(value.signatureDishes)) &&
+    (value.summary === undefined || typeof value.summary === 'string')
+  );
+}
+
+function isReviewOwnerLabels(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= 12 &&
+    value.every(
+      (entry) =>
+        typeof entry === 'string' && entry.length > 0 && entry.length <= 100,
+    )
   );
 }
 

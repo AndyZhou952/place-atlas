@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-09-26. This checklist tracks the usable product, not repository housekeeping.
+Updated: 2026-09-27. This checklist tracks the usable product, not repository housekeeping.
 
 Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
 
@@ -11,6 +11,8 @@ Next-agent entry point: [Record and Nearby handoff](record-nearby-handoff.md).
 ## 1. Add — research a restaurant, confirm, and see it on the map
 
 - [x] **Keita failure regression:** selected-name source discovery, six controlled post-selection cases, research progress and truthful incomplete status. Deployed preview verified location, category, rating and reservation; cancelled without saving. See [incident and boundaries](add-keita-regression.md).
+- [x] **Owner completion for incomplete Add previews:** a selected match whose independent location research fails can be refreshed with an owner-confirmed address or coordinates; optional profile and source-backed facts can also be corrected. Confirmation still requires a durable location and a current preview. A synthetic Shake Shack Shinjuku provider-failure case covers selection, manual completion and one publication in `add-completion-gold.v1.json`. Deployed browser acceptance reproduced the unknown-location failure, refreshed owner-supplied details and published one record. A first reload exposed an outdated public-catalog owner-field validator that omitted the newly saved row; the validator and publication-to-readback regression were fixed. A second deployment showed 50 catalog records, including the new restaurant, and its detail card after reload. The saved DeepSeek connection check passed, although this branch's live source research still returned unknown facts.
+- [x] **Add presentation controls, in code:** deterministic Chinese overview copy uses sourced cuisine, area and up to three dishes; top tags keep up to two distinct categories and two dishes, including a yakitori synonym control. Four controlled cases run in the default test suite. This tests publication presentation, not the live model's source recall or semantic accuracy.
 - [x] **Frontend ambiguity refinement:** mobile browser tests passed for Torikizoku + Shinjuku west exit, AFURI + Roppongi (two branches), and Tokyo Mentsudan + Shinjuku. Name retained, new query/session token used, stale results cleared, multi-match choice required. Six search sessions cancelled without restaurant writes; this is discovery/selection acceptance, not six full Add completions.
 - [ ] **Full profile and broad acceptance:** richer grounded overview/dishes and repeated live reliability. Basic preview success does not close these gates.
 - [x] **Grounded dish extraction:** Keita live research now retains two sourced dishes despite Japanese quote punctuation; per-dish validation drops unsupported additions without discarding supported dishes. Summaries combine validated cuisine, area, dishes and reservation policy. Wider menu coverage remains part of broad acceptance.
@@ -68,6 +70,9 @@ Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-
 
 - [x] **Data/API foundation:** personal rating, favorite/visited state, Visit date/note, photo upload and caption-update operations exist.
 - [x] **Journal editing in code:** edit Visit date/rating/note and update photo captions; local state/API tests exist.
+- [x] **Visit restaurant correction:** edit one Visit's restaurant from the detail or Journal form; the Visit and its media association move atomically, while restaurant-level ratings stay with their restaurants. Deployed and verified in the browser after reload.
+- [x] **Video and note display:** MP4/WebM uploads (up to 50 MB) and playback are supported alongside photos; Journal notes preserve entered line breaks. In the deployed browser, an isolated MP4 test uploaded, persisted across reload, decoded in the player, and its temporary Visit and local download were removed. A direct R2 object audit and WebM browser test remain open.
+- [x] **Journal order controls:** a flat Visit list can be sorted across restaurants by visit date or by entry time, in either direction. Same-date records use entry time as a stable tie-breaker; Visit numbers remain based on visit chronology. Deployed browser checks confirmed the controls and ascending/descending ordering.
 - [ ] **Rating semantics:** the Visit form's rating currently updates the restaurant-level personal assessment; historical per-Visit scores are not stored separately. Clarify the UI and decide whether history is required before expanding storage.
 - [x] **Photo viewer editing in code:** thumbnail and opened-photo views expose caption editing. Persistence and failure recovery still need live acceptance.
 - [ ] **Per-photo scores:** not implemented; separate from optional captions and restaurant-level personal rating.
@@ -80,6 +85,8 @@ Next scoped tasks and code-audited gaps: [Record and Nearby plan](record-nearby-
 
 - [x] **Deterministic foundation:** saved-catalog lookup, straight-line distance, location resolution/route adapters, fallback policies and local tests.
 - [x] **Offline policy benchmark seed:** 14 synthetic cases plus a scorer cover saved-only choices, walk/transit/distance rules, visited preference, clarification and source failures; this is not live Agent acceptance.
+- [x] **Separated seed metrics:** the scorer now reports action and selection accuracy, uncertainty coverage, safety violations, and optional latency/tool/cost telemetry independently. The 14 cases are still synthetic tool evidence, not verified geography or real-model results.
+- [x] **Verified location seed:** ten Chinese/Japanese/English station-identity and intent cases distinguish four officially documented Tokyo Metro stations; a separate scorer checks resolution, clarification and constraints. No route times or real-model results are inferred from station pages.
 - [ ] **Agent benchmark first:** curate multilingual short-location, intent, ambiguity, visited preference, walk/transit fallback and provider-failure cases. An initial synthetic policy suite is not a live quality result.
 - [ ] **Screenshot benchmark:** add labelled map screenshots with ground-truth location/ambiguity before enabling image-based location recognition.
 - [ ] **Connect the Agent:** interpret the location and constraints, ask only necessary clarification, call catalog/location/route tools, and explain recommendations.

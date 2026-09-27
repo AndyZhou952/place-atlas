@@ -150,15 +150,19 @@ test('update uses one context read plus one atomic batch and clearing rating wri
   });
 
   assert.equal(database.roundTrips(), 2);
-  assert.equal(database.batches[0].length, 2);
+  assert.equal(database.batches[0].length, 3);
   assert.match(database.statements[1].sql, /UPDATE visits/u);
   assert.deepEqual(database.statements[1].values, [
+    'place-one',
+    'Place one',
     '2026-09-13',
     null,
     createdVisit.updatedAt,
     'visit-one',
   ]);
-  assert.equal(database.statements[2].values[1], null);
+  assert.match(database.statements[2].sql, /UPDATE visit_media SET item_id/u);
+  assert.deepEqual(database.statements[2].values, ['place-one', 'visit-one']);
+  assert.equal(database.statements[3].values[1], null);
 });
 
 test('a rejected D1 batch exposes no separately committed structured write', async () => {

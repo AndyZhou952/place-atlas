@@ -6,12 +6,7 @@
   "cases": [
     {
       "caseId": "jp-complete-yotsuya-takeda",
-      "tags": [
-        "japan",
-        "complete",
-        "tabelog",
-        "google-review"
-      ],
+      "tags": ["japan", "complete", "tabelog", "google-review"],
       "place": {
         "identityId": "katsuretsu-yotsuya-takeda",
         "canonicalName": "かつれつ四谷たけだ",
@@ -32,11 +27,7 @@
             "branchId": "yotsuya"
           },
           "payload": {
-            "categoryTags": [
-              "食堂",
-              "コロッケ",
-              "洋食"
-            ],
+            "categoryTags": ["食堂", "コロッケ", "洋食"],
             "tabelogRating": 3.71,
             "identity": {
               "name": "かつれつ四谷たけだ",
@@ -81,9 +72,7 @@
             "branchId": "yotsuya"
           },
           "payload": {
-            "signatureDishes": [
-              "seasonal oysters"
-            ],
+            "signatureDishes": ["seasonal oysters"],
             "reservationNotListed": true
           }
         }
@@ -91,20 +80,14 @@
       "gold": {
         "signatureDishes": {
           "state": "known",
-          "value": [
-            "seasonal oysters"
-          ],
-          "acceptedEvidenceIds": [
-            "yotsuya-menu-control"
-          ]
+          "value": ["seasonal oysters"],
+          "acceptedEvidenceIds": ["yotsuya-menu-control"]
         },
         "ratings": {
           "tabelog": {
             "state": "known",
             "value": 3.71,
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           },
           "google": {
             "state": "known",
@@ -112,9 +95,7 @@
               "rating": 4.4,
               "reviewCount": 1820
             },
-            "acceptedEvidenceIds": [
-              "google-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["google-yotsuya-current"]
           }
         },
         "reservation": {
@@ -123,43 +104,29 @@
         },
         "categoryLabels": {
           "state": "known",
-          "value": [
-            "食堂",
-            "コロッケ",
-            "洋食"
-          ],
-          "acceptedEvidenceIds": [
-            "tabelog-yotsuya-current"
-          ]
+          "value": ["食堂", "コロッケ", "洋食"],
+          "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
         },
         "identity": {
           "name": {
             "state": "known",
             "value": "かつれつ四谷たけだ",
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           },
           "branch": {
             "state": "known",
             "value": "yotsuya",
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           },
           "area": {
             "state": "known",
             "value": "Yotsuya",
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           },
           "address": {
             "state": "known",
             "value": "東京都新宿区四谷1-4-2 峯村ビル1F",
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           },
           "coordinates": {
             "state": "known",
@@ -167,19 +134,14 @@
               "latitude": 35.68647459870088,
               "longitude": 139.7293480044634
             },
-            "acceptedEvidenceIds": [
-              "tabelog-yotsuya-current"
-            ]
+            "acceptedEvidenceIds": ["tabelog-yotsuya-current"]
           }
         },
         "summary": {
           "state": "known",
           "value": {
             "text": "食堂, コロッケ, 洋食 restaurant featuring seasonal oysters.",
-            "supportedFactRefs": [
-              "categoryLabels",
-              "signatureDishes"
-            ]
+            "supportedFactRefs": ["categoryLabels", "signatureDishes"]
           },
           "acceptedEvidenceIds": [
             "tabelog-yotsuya-current",
@@ -541,10 +503,7 @@
     },
     {
       "caseId": "mainland-china-haidilao-peoples-square",
-      "tags": [
-        "mainland-china",
-        "ratings-not-required"
-      ],
+      "tags": ["mainland-china", "ratings-not-required"],
       "place": {
         "identityId": "haidilao-shanghai-peoples-square",
         "canonicalName": "海底捞火锅",
@@ -590,9 +549,7 @@
             "branchId": "shanghai-peoples-square"
           },
           "payload": {
-            "categoryTags": [
-              "hot pot"
-            ],
+            "categoryTags": ["hot pot"],
             "officialWebsite": "https://www.haidilao.com/"
           },
           "captureClass": "synthetic_controlled"
@@ -619,41 +576,29 @@
         },
         "categoryLabels": {
           "state": "known",
-          "value": [
-            "hot pot"
-          ],
-          "acceptedEvidenceIds": [
-            "official-haidilao-peoples-square"
-          ]
+          "value": ["hot pot"],
+          "acceptedEvidenceIds": ["official-haidilao-peoples-square"]
         },
         "identity": {
           "name": {
             "state": "known",
             "value": "海底捞火锅",
-            "acceptedEvidenceIds": [
-              "controlled-identity"
-            ]
+            "acceptedEvidenceIds": ["controlled-identity"]
           },
           "branch": {
             "state": "known",
             "value": "shanghai-peoples-square",
-            "acceptedEvidenceIds": [
-              "controlled-identity"
-            ]
+            "acceptedEvidenceIds": ["controlled-identity"]
           },
           "area": {
             "state": "known",
             "value": "shanghai-peoples-square",
-            "acceptedEvidenceIds": [
-              "controlled-identity"
-            ]
+            "acceptedEvidenceIds": ["controlled-identity"]
           },
           "address": {
             "state": "known",
             "value": "上海市黄浦区南京东路830号第一百货商业中心",
-            "acceptedEvidenceIds": [
-              "controlled-identity"
-            ]
+            "acceptedEvidenceIds": ["controlled-identity"]
           },
           "coordinates": {
             "state": "known",
@@ -661,29 +606,21 @@
               "latitude": 31.235,
               "longitude": 121.474
             },
-            "acceptedEvidenceIds": [
-              "controlled-identity"
-            ]
+            "acceptedEvidenceIds": ["controlled-identity"]
           }
         },
         "summary": {
           "state": "known",
           "value": {
             "text": "hot pot restaurant.",
-            "supportedFactRefs": [
-              "categoryLabels"
-            ]
+            "supportedFactRefs": ["categoryLabels"]
           },
-          "acceptedEvidenceIds": [
-            "official-haidilao-peoples-square"
-          ]
+          "acceptedEvidenceIds": ["official-haidilao-peoples-square"]
         },
         "officialWebsite": {
           "state": "known",
           "value": "https://www.haidilao.com/",
-          "acceptedEvidenceIds": [
-            "official-haidilao-peoples-square"
-          ]
+          "acceptedEvidenceIds": ["official-haidilao-peoples-square"]
         },
         "bookingLink": {
           "state": "unknown",

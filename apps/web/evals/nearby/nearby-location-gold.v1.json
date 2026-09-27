@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "nearby-location-v1",
+  "verifiedAt": "2026-09-27",
+  "kind": "verified-station-identity-not-route-evidence",
+  "origins": [
+    {
+      "id": "tokyo-metro:ikebukuro",
+      "nameJa": "池袋駅",
+      "nameEn": "Ikebukuro Station",
+      "lineCodes": ["M25", "Y09", "F09"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/ikebukuro/index.html",
+        "https://www.tokyometro.jp/lang_en/station/ikebukuro/index.html"
+      ]
+    },
+    {
+      "id": "tokyo-metro:higashi-ikebukuro",
+      "nameJa": "東池袋駅",
+      "nameEn": "Higashi-ikebukuro Station",
+      "lineCodes": ["Y10"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/higashi-ikebukuro/index.html",
+        "https://www.tokyometro.jp/lang_en/station/higashi-ikebukuro/index.html"
+      ]
+    },
+    {
+      "id": "tokyo-metro:shinjuku-sanchome",
+      "nameJa": "新宿三丁目駅",
+      "nameEn": "Shinjuku-sanchome Station",
+      "lineCodes": ["M09", "F13"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/shinjuku-sanchome/index.html",
+        "https://www.tokyometro.jp/lang_en/station/shinjuku-sanchome/index.html"
+      ]
+    },
+    {
+      "id": "tokyo-metro:shinjuku-gyoemmae",
+      "nameJa": "新宿御苑前駅",
+      "nameEn": "Shinjuku-gyoemmae Station",
+      "lineCodes": ["M10"],
+      "evidenceUrls": [
+        "https://www.tokyometro.jp/station/shinjuku-gyoemmae/index.html",
+        "https://www.tokyometro.jp/lang_en/station/shinjuku-gyoemmae/index.html"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "ikebukuro-zh-unvisited-ramen",
+      "input": { "message": "池袋附近没去过的拉面" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:ikebukuro",
+        "cuisine": "ramen",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "ikebukuro-ja-ramen",
+      "input": { "message": "池袋駅の近くでラーメン" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:ikebukuro",
+        "cuisine": "ramen",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "ikebukuro-en-unvisited-sushi",
+      "input": {
+        "message": "Sushi near Ikebukuro Station, somewhere I have not tried"
+      },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:ikebukuro",
+        "cuisine": "sushi",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "higashi-ikebukuro-ja-curry",
+      "input": { "message": "東池袋のカレー" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:higashi-ikebukuro",
+        "cuisine": "curry",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "higashi-ikebukuro-en-visited",
+      "input": {
+        "message": "Previously visited places near Higashi-ikebukuro Station"
+      },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:higashi-ikebukuro",
+        "cuisine": "any",
+        "visited": "only_visited"
+      }
+    },
+    {
+      "caseId": "ikebukuro-or-east-zh",
+      "input": { "message": "池袋还是东池袋附近？" },
+      "gold": { "action": "clarify" }
+    },
+    {
+      "caseId": "shinjuku-sanchome-ja-sushi",
+      "input": { "message": "新宿三丁目駅の近くで寿司" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-sanchome",
+        "cuisine": "sushi",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "shinjuku-sanchome-en-visited",
+      "input": {
+        "message": "Restaurants I've visited near Shinjuku-sanchome Station"
+      },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-sanchome",
+        "cuisine": "any",
+        "visited": "only_visited"
+      }
+    },
+    {
+      "caseId": "shinjuku-gyoemmae-zh-ramen",
+      "input": { "message": "新宿御苑前站附近没去过的拉面" },
+      "gold": {
+        "action": "resolve",
+        "originId": "tokyo-metro:shinjuku-gyoemmae",
+        "cuisine": "ramen",
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "shinjuku-sanchome-or-gyoemmae-en",
+      "input": {
+        "message": "Near Shinjuku-sanchome or Shinjuku-gyoemmae Station?"
+      },
+      "gold": { "action": "clarify" }
+    }
+  ]
+}

@@ -32,9 +32,14 @@ export async function openOwnerVisitMediaResponse(
     );
   }
   if (
-    !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(
-      result.value.contentType,
-    )
+    ![
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/webm',
+    ].includes(result.value.contentType)
   ) {
     return new Response('Photo content is unavailable', { status: 415 });
   }

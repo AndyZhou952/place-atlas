@@ -55,7 +55,11 @@ import type {
 } from './model';
 import { maxMediaFilesPerSelection } from './media-constraints';
 import { AtlasMap } from './atlas-map';
-import { filterJournalVisits } from './journal-filter';
+import {
+  filterJournalVisits,
+  sortJournalVisits,
+  type JournalSort,
+} from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
 import { useAtlasViewModel } from './use-atlas-view-model';
 import { CatalogIntakePanel } from './catalog-intake-panel';
@@ -618,9 +622,8 @@ function NearbyResult({
                     : `${candidate.straightLineDistanceKm.toFixed(1)} km · distance layer`}
                 </span>
                 <span>
-                  {visited
-                    ? `Visited · ${candidate.visit.visitCount}`
-                    : 'Not visited'}
+                  {visited ? 'Visited' : 'Not visited'}
+                  {visited && ` · ${candidate.visit.visitCount}`}
                   {candidate.visit.personalRating === undefined
                     ? ''
                     : ` · My ${candidate.visit.personalRating}`}
@@ -1338,6 +1341,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                     <JournalVisitRow
                       key={visit.id}
                       item={item}
+                      items={vm.items}
                       visit={visit}
                       visitNumber={itemVisits.length - index}
                       busy={vm.journalBusy}
@@ -1401,6 +1405,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   const [placeFilter, setPlaceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [sort, setSort] = useState<JournalSort>('visited-desc');
   const [pendingDelete, setPendingDelete] = useState<VisitRecord>();
 
   const filteredVisits = filterJournalVisits(vm.visits, {
@@ -1408,12 +1413,18 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
     fromDate,
     toDate,
   });
-  const records = vm.items
-    .map((item) => ({
-      item,
-      visits: filteredVisits.filter((visit) => visit.itemId === item.id),
-    }))
-    .filter((record) => record.visits.length > 0);
+  const itemsById = new Map(vm.items.map((item) => [item.id, item]));
+  const records = sortJournalVisits(filteredVisits, sort).flatMap((visit) => {
+    const item = itemsById.get(visit.itemId);
+    return item ? [{ item, visit }] : [];
+  });
+  const visitNumbers = new Map<string, number>();
+  const visitCounts = new Map<string, number>();
+  for (const visit of sortJournalVisits(vm.visits, 'visited-asc')) {
+    const number = (visitCounts.get(visit.itemId) ?? 0) + 1;
+    visitCounts.set(visit.itemId, number);
+    visitNumbers.set(visit.id, number);
+  }
   const placesWithVisits = vm.items.filter((item) =>
     vm.visits.some((visit) => visit.itemId === item.id),
   );
@@ -1439,6 +1450,19 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         </Card>
         <div className="journal-browser">
           <div className="journal-filters" aria-label="Journal filters">
+            <label htmlFor="journal-sort">
+              Sort by
+              <select
+                id="journal-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as JournalSort)}
+              >
+                <option value="visited-desc">Visit date · newest first</option>
+                <option value="visited-asc">Visit date · oldest first</option>
+                <option value="recorded-desc">Added · newest first</option>
+                <option value="recorded-asc">Added · oldest first</option>
+              </select>
+            </label>
             <label htmlFor="journal-place-filter">
               Place
               <select
@@ -1488,13 +1512,14 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
           </div>
           <div className="journal-list" aria-live="polite">
             {records.length ? (
-              records.map(({ item, visits }) => (
-                <article key={item.id} className="journal-place-record">
+              records.map(({ item, visit }) => (
+                <article key={visit.id} className="journal-place-record">
                   <header>
                     <div>
                       <strong>{item.title}</strong>
                       <span>
-                        {visits.length} visits · Last {visits[0]?.visitedAt}
+                        Visit {visitNumbers.get(visit.id)} of{' '}
+                        {visitCounts.get(item.id)}
                       </span>
                     </div>
                     <span className="personal-score is-persistent">
@@ -1504,24 +1529,22 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                     </span>
                   </header>
                   <ol>
-                    {visits.map((visit, index) => (
-                      <JournalVisitRow
-                        key={visit.id}
-                        item={item}
-                        visit={visit}
-                        visitNumber={visits.length - index}
-                        busy={vm.journalBusy}
-                        media={vm.media.filter(
-                          (entry) => entry.visitId === visit.id,
-                        )}
-                        mediaBusy={vm.isMediaVisitPending(visit.id)}
-                        onSave={vm.editVisit}
-                        onUpload={vm.addVisitMedia}
-                        onSaveCaption={vm.saveMediaCaption}
-                        onDeleteMedia={vm.removeMedia}
-                        onDelete={() => setPendingDelete(visit)}
-                      />
-                    ))}
+                    <JournalVisitRow
+                      item={item}
+                      items={vm.items}
+                      visit={visit}
+                      visitNumber={visitNumbers.get(visit.id) ?? 1}
+                      busy={vm.journalBusy}
+                      media={vm.media.filter(
+                        (entry) => entry.visitId === visit.id,
+                      )}
+                      mediaBusy={vm.isMediaVisitPending(visit.id)}
+                      onSave={vm.editVisit}
+                      onUpload={vm.addVisitMedia}
+                      onSaveCaption={vm.saveMediaCaption}
+                      onDeleteMedia={vm.removeMedia}
+                      onDelete={() => setPendingDelete(visit)}
+                    />
                   </ol>
                 </article>
               ))
@@ -1727,16 +1750,16 @@ function VisitComposer({
         />
       </label>
       <label className="journal-media-picker">
-        <span>Photos (optional)</span>
+        <span>Photos or videos (optional)</span>
         <span className="media-upload-control">
           <ImagePlus aria-hidden="true" />
           {visitPhotos.length
             ? `${visitPhotos.length} selected`
-            : 'Choose photos'}
+            : 'Choose photos or videos'}
           <input
             key={visitPhotos.length ? 'selected' : 'empty'}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
             multiple
             disabled={busy}
             onChange={(event) => {
@@ -1804,6 +1827,7 @@ function localVisitDate() {
 
 function JournalVisitRow({
   item,
+  items,
   visit,
   visitNumber,
   busy,
@@ -1816,6 +1840,7 @@ function JournalVisitRow({
   onDelete,
 }: {
   readonly item: AtlasItem;
+  readonly items: readonly AtlasItem[];
   readonly visit: VisitRecord;
   readonly visitNumber: number;
   readonly busy: boolean;
@@ -1829,6 +1854,7 @@ function JournalVisitRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [visitedAt, setVisitedAt] = useState(visit.visitedAt);
+  const [itemId, setItemId] = useState(visit.itemId);
   const [note, setNote] = useState(visit.note ?? '');
   const [rating, setRating] = useState(
     item.personalRating === undefined ? '' : item.personalRating.toString(),
@@ -1836,6 +1862,7 @@ function JournalVisitRow({
   const [error, setError] = useState('');
 
   function beginEditing() {
+    setItemId(visit.itemId);
     setVisitedAt(visit.visitedAt);
     setNote(visit.note ?? '');
     setRating(
@@ -1859,9 +1886,12 @@ function JournalVisitRow({
     setEditing(false);
     try {
       await onSave(visit.id, {
+        itemId,
         visitedAt,
         note: note.trim() || undefined,
-        rating: normalizedRating ?? null,
+        ...(itemId === visit.itemId
+          ? { rating: normalizedRating ?? null }
+          : {}),
       });
     } catch {
       setEditing(true);
@@ -1873,6 +1903,33 @@ function JournalVisitRow({
     return (
       <li className="journal-visit is-editing">
         <form className="journal-visit-form" onSubmit={submit} noValidate>
+          <label htmlFor={`visit-place-${visit.id}`}>
+            Restaurant for this visit
+            <select
+              id={`visit-place-${visit.id}`}
+              value={itemId}
+              onChange={(event) => setItemId(event.target.value)}
+              disabled={busy}
+            >
+              {items
+                .filter(
+                  (candidate) =>
+                    candidate.verificationStatus === 'verified' &&
+                    candidate.personalState !== 'candidate',
+                )
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.title}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {itemId !== visit.itemId ? (
+            <small>
+              The note and media will move with this visit. Overall restaurant
+              scores stay where they are.
+            </small>
+          ) : null}
           <div className="form-pair">
             <label htmlFor={`visit-date-${visit.id}`}>
               Visited
@@ -1893,6 +1950,7 @@ function JournalVisitRow({
                 max="5"
                 step="0.1"
                 value={rating}
+                disabled={itemId !== visit.itemId || busy}
                 onChange={(event) => setRating(event.target.value)}
               />
             </label>
@@ -1921,6 +1979,7 @@ function JournalVisitRow({
               disabled={busy}
               onClick={() => {
                 setVisitedAt(visit.visitedAt);
+                setItemId(visit.itemId);
                 setNote(visit.note ?? '');
                 setRating(
                   item.personalRating === undefined
@@ -1945,7 +2004,7 @@ function JournalVisitRow({
         <span>
           {visitNumber}回目 · {visit.visitedAt}
         </span>
-        {visit.note ? <p>{visit.note}</p> : null}
+        {visit.note ? <p className="visit-note">{visit.note}</p> : null}
         <VisitMediaEditor
           visitId={visit.id}
           media={media}
@@ -1958,8 +2017,8 @@ function JournalVisitRow({
       <div className="journal-visit-actions">
         <button
           type="button"
-          aria-label={`Edit visit ${visitNumber}`}
-          title="Edit visit"
+          aria-label={`Edit visit ${visitNumber} and restaurant`}
+          title="Edit visit or change restaurant"
           onClick={beginEditing}
         >
           <Pencil aria-hidden="true" />
@@ -2025,10 +2084,10 @@ function VisitMediaEditor({
       />
       <label className={cn('media-upload-control', busy && 'is-busy')}>
         <ImagePlus aria-hidden="true" />
-        {busy ? 'Uploading…' : 'Add photos'}
+        {busy ? 'Uploading…' : 'Add photos or videos'}
         <input
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
           multiple
           disabled={busy}
           onChange={(event) => void selectFiles(event)}
@@ -2095,15 +2154,19 @@ function MediaCaptionEditor({
         aria-label={`Open ${media.caption || media.originalFilename}`}
         onClick={onOpen}
       >
-        <Image
-          src={media.contentUrl}
-          alt={media.caption || media.originalFilename}
-          width={640}
-          height={480}
-          sizes="(max-width: 600px) 50vw, 180px"
-          unoptimized
-          loading="lazy"
-        />
+        {media.contentType.startsWith('video/') ? (
+          <span className="media-video-tile">▶ Video</span>
+        ) : (
+          <Image
+            src={media.contentUrl}
+            alt={media.caption || media.originalFilename}
+            width={640}
+            height={480}
+            sizes="(max-width: 600px) 50vw, 180px"
+            unoptimized
+            loading="lazy"
+          />
+        )}
       </button>
       <div className="media-caption-row">
         <Input
@@ -2239,17 +2302,29 @@ function PhotoLightbox({
           onPointerDown={pointerDown}
           onPointerUp={pointerUp}
         >
-          <Image
-            key={active.id}
-            src={active.contentUrl}
-            alt={active.caption || active.originalFilename}
-            width={1600}
-            height={1200}
-            sizes="100vw"
-            unoptimized
-            priority
-            draggable={false}
-          />
+          {active.contentType.startsWith('video/') ? (
+            // User videos do not have a caption track at upload time.
+            // oxlint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              key={active.id}
+              src={active.contentUrl}
+              controls
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <Image
+              key={active.id}
+              src={active.contentUrl}
+              alt={active.caption || active.originalFilename}
+              width={1600}
+              height={1200}
+              sizes="100vw"
+              unoptimized
+              priority
+              draggable={false}
+            />
+          )}
           {media.length > 1 ? (
             <>
               <button

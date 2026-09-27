@@ -8,6 +8,7 @@ import type {
   AtlasItem,
   ReservationSnapshot,
 } from '../../../product/application/catalog/atlas-item.ts';
+import { compactRestaurantTags } from '../../../product/application/catalog-intake/restaurant-profile-presentation.ts';
 
 interface ReceiptRow {
   readonly outcome_json: string;
@@ -649,14 +650,8 @@ function toAtlasItem(
     title,
     area: preview.ownerFields.area ?? preview.profile?.area?.value ?? '',
     address,
-    description: [
-      preview.profile?.summary?.value,
-      preview.profile?.signatureDishes?.value.length
-        ? `Recommended dishes: ${preview.profile.signatureDishes.value.join(', ')}.`
-        : undefined,
-    ]
-      .filter(Boolean)
-      .join(' '),
+    description:
+      preview.ownerFields.summary ?? preview.profile?.summary?.value ?? '',
     ...(preview.profile?.officialWebsite
       ? { officialUrl: preview.profile.officialWebsite.value }
       : {}),
@@ -675,12 +670,14 @@ function toAtlasItem(
     verifiedAt: now.toISOString(),
     reservation: reservationSnapshot(preview),
     personalState: 'saved',
-    tags: [
-      ...new Set([
-        ...(preview.profile?.categories?.value ?? []),
-        ...(preview.profile?.signatureDishes?.value ?? []),
-      ]),
-    ],
+    tags: compactRestaurantTags(
+      preview.ownerFields.categories ??
+        preview.profile?.categories?.value ??
+        [],
+      preview.ownerFields.signatureDishes ??
+        preview.profile?.signatureDishes?.value ??
+        [],
+    ),
     sources: [
       ...(preview.profile?.officialWebsite
         ? [

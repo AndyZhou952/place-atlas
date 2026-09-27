@@ -235,7 +235,9 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
           url.startsWith('/api/nearby?')) &&
         (init?.method === undefined || init.method === 'GET');
       const isCoordinatedWrite =
-        url.startsWith('/api/journal') || url.startsWith('/api/media/');
+        url.startsWith('/api/journal') ||
+        url.startsWith('/api/media/') ||
+        (url.startsWith('/api/items/') && init?.method === 'PATCH');
       return isCoordinatedWrite && init?.method !== undefined
         ? mutationResponse(init, { ok: true })
         : Response.json(isList ? [] : { ok: true });

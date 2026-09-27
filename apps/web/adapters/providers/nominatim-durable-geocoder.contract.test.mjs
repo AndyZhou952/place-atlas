@@ -106,6 +106,42 @@ test('Nominatim uses the selected Google candidate address without persisting it
   );
 });
 
+test('Nominatim retries a failed Google candidate using the owner-entered address alone', async () => {
+  const requests = [];
+  const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };
+  const adapter = createNominatimDurableGeocoderAdapter({
+    endpoint: 'https://nominatim.openstreetmap.org/search',
+    identifyingUserAgent: 'JapanAtlasOwnerPoC/1.0 (owner@example.test)',
+    referer: 'https://japan-atlas.example.test/',
+    transport: {
+      async search(request) {
+        requests.push(request);
+        return { ok: true, value: [] };
+      },
+    },
+    cache: createInMemoryDurableGeocoderCache(),
+    rateGate: createNominatimApplicationRateGate(clock),
+    clock,
+  });
+  await adapter.propose({
+    trigger: 'owner_intake_select',
+    dataClassification: 'public_place_query',
+    ownerQuery: 'shake shack shinjuku',
+    ownerDraft: { address: '東京都渋谷区代々木2-2-1' },
+    selectedSubject: {
+      ownerQuery: 'shake shack shinjuku',
+      providerNamespace: 'google-places',
+      placeId: 'selected-branch',
+      transientName: 'SHAKE SHACK Shinjuku Southern Terrace',
+      transientAddress: 'Google transient address',
+    },
+  });
+  assert.equal(
+    new URL(requests[0].url).searchParams.get('q'),
+    '東京都渋谷区代々木2-2-1',
+  );
+});
+
 test('Nominatim rejects non-owner, non-public, or expanded input before cache, rate, or transport', async () => {
   let transportCalls = 0;
   const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };

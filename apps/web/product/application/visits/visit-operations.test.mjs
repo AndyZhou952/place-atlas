@@ -229,6 +229,52 @@ test('update can clear note and rating while preserving unrelated assessment sta
   });
 });
 
+test('moving a Visit changes its restaurant and visit counts without moving overall scores', async () => {
+  const { application, state } = fixture({
+    visits: [
+      visit(
+        'visit-one',
+        'place-one',
+        '2026-09-10',
+        'created',
+        'Line one\nLine two',
+      ),
+    ],
+    assessments: [
+      assessment('place-one', { overallRating: 3.1 }),
+      assessment('place-two', { overallRating: 4.8 }),
+    ],
+  });
+  const moved = await application.execute({
+    key: 'visit.update',
+    input: {
+      id: 'visit-one',
+      itemId: 'place-two',
+      visitedAt: '2026-09-10',
+      note: 'Line one\nLine two',
+    },
+  });
+  assert.equal(moved.ok, true);
+  assert.equal(moved.value.visit.itemId, 'place-two');
+  assert.equal(moved.value.visit.itemTitle, 'Place two');
+  assert.equal(moved.value.visit.note, 'Line one\nLine two');
+  assert.equal((await state.readItemContext('place-one')).visitCount, 0);
+  assert.equal((await state.readItemContext('place-two')).visitCount, 1);
+  assert.equal(
+    (await state.readItemContext('place-one')).assessment.overallRating,
+    3.1,
+  );
+  assert.equal(
+    (await state.readItemContext('place-two')).assessment.overallRating,
+    4.8,
+  );
+  const rejected = await application.execute({
+    key: 'visit.update',
+    input: { id: 'visit-one', itemId: 'missing', visitedAt: '2026-09-10' },
+  });
+  assert.equal(rejected.ok, false);
+});
+
 test('update preserves rating when omitted and accepts normalized values at both boundaries', async () => {
   for (const [rating, expected] of [
     [undefined, 3.3],

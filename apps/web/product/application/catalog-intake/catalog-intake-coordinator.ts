@@ -232,6 +232,9 @@ export interface CatalogIntakeOwnerFields {
   readonly title?: string;
   readonly address?: string;
   readonly area?: string;
+  readonly categories?: readonly string[];
+  readonly signatureDishes?: readonly string[];
+  readonly summary?: string;
   readonly coordinates?: {
     readonly latitude: number;
     readonly longitude: number;
@@ -964,16 +967,12 @@ export function createCatalogIntakeModule(options: {
         const nextVersion = session.sessionVersion + 1;
         let geocoderOutcome: DurableGeocoderProposal | undefined;
         let geocoderUnavailable = !options.durableGeocoderPort;
-        if (
-          !ownerFields.address &&
-          !ownerFields.coordinates &&
-          options.durableGeocoderPort
-        ) {
+        if (!ownerFields.coordinates && options.durableGeocoderPort) {
           const proposed = await options.durableGeocoderPort.propose({
             trigger: 'owner_intake_select',
             dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
-            ownerDraft: ownerFields,
+            ownerDraft: locationOwnerFields(ownerFields),
             selectedSubject,
           });
           if (proposed.ok) {
@@ -1487,7 +1486,7 @@ export function createCatalogIntakeModule(options: {
             trigger: 'owner_intake_confirm',
             dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
-            ownerDraft: session.preview.ownerFields,
+            ownerDraft: locationOwnerFields(session.preview.ownerFields),
             selectedSubject: {
               ownerQuery: session.ownerQuery,
               providerNamespace:
@@ -2801,6 +2800,17 @@ function validateCancelInput(
   });
 }
 
+function locationOwnerFields(
+  fields: CatalogIntakeOwnerFields,
+): CatalogIntakeOwnerFields {
+  return {
+    ...(fields.title ? { title: fields.title } : {}),
+    ...(fields.address ? { address: fields.address } : {}),
+    ...(fields.area ? { area: fields.area } : {}),
+    ...(fields.coordinates ? { coordinates: fields.coordinates } : {}),
+  };
+}
+
 function validateOwnerFields(
   value: unknown,
 ): CatalogIntakeOwnerFields | undefined {
@@ -2808,7 +2818,15 @@ function validateOwnerFields(
   if (
     !isRecordWithAllowedKeys(
       value,
-      ['title', 'address', 'area', 'coordinates'],
+      [
+        'title',
+        'address',
+        'area',
+        'coordinates',
+        'categories',
+        'signatureDishes',
+        'summary',
+      ],
       [],
     )
   ) {
@@ -2826,6 +2844,18 @@ function validateOwnerFields(
     value.area === undefined
       ? undefined
       : normalizeBoundedText(value.area, 0, 120);
+  const categories =
+    value.categories === undefined
+      ? undefined
+      : validateOwnerLabels(value.categories);
+  const signatureDishes =
+    value.signatureDishes === undefined
+      ? undefined
+      : validateOwnerLabels(value.signatureDishes);
+  const summary =
+    value.summary === undefined
+      ? undefined
+      : normalizeBoundedText(value.summary, 1, 1200);
   const coordinates =
     value.coordinates === undefined
       ? undefined
@@ -2834,6 +2864,9 @@ function validateOwnerFields(
     (value.title !== undefined && !title) ||
     (value.address !== undefined && !address) ||
     (value.area !== undefined && area === undefined) ||
+    (value.categories !== undefined && !categories) ||
+    (value.signatureDishes !== undefined && !signatureDishes) ||
+    (value.summary !== undefined && !summary) ||
     (value.coordinates !== undefined && !coordinates)
   ) {
     return undefined;
@@ -2842,8 +2875,21 @@ function validateOwnerFields(
     ...(title ? { title } : {}),
     ...(address ? { address } : {}),
     ...(area !== undefined ? { area } : {}),
+    ...(categories ? { categories } : {}),
+    ...(signatureDishes ? { signatureDishes } : {}),
+    ...(summary ? { summary } : {}),
     ...(coordinates ? { coordinates } : {}),
   };
+}
+
+function validateOwnerLabels(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 12) {
+    return undefined;
+  }
+  const labels = value.map((entry) => normalizeBoundedText(entry, 1, 100));
+  return labels.every((entry) => entry !== undefined)
+    ? (labels as string[])
+    : undefined;
 }
 
 export function validateOwnerTabelog(

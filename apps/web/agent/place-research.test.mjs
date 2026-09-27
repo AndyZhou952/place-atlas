@@ -493,7 +493,7 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
       ]);
       assert.match(
         result.value.profile.summary.value,
-        /Featured dishes: 六白黒豚のとんかつ/,
+        /招牌菜包括六白黒豚のとんかつ/,
       );
       assert.doesNotMatch(result.value.profile.summary.value, /invented curry/);
     } else {

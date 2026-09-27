@@ -38,6 +38,18 @@ export function scoreNearby(dataset, predictions) {
       'Invalid warnings',
     );
     requireThat(Array.isArray(prediction.routeClaims), 'Missing routeClaims');
+    if (prediction.telemetry !== undefined) {
+      const { latencyMs, toolCalls, costUsd } = prediction.telemetry;
+      requireThat(
+        Number.isFinite(latencyMs) &&
+          latencyMs >= 0 &&
+          Number.isInteger(toolCalls) &&
+          toolCalls >= 0 &&
+          Number.isFinite(costUsd) &&
+          costUsd >= 0,
+        'Invalid telemetry',
+      );
+    }
     for (const claim of prediction.routeClaims)
       requireThat(
         typeof claim.itemId === 'string' &&
@@ -59,9 +71,9 @@ export function scoreNearby(dataset, predictions) {
       };
     const failures = [];
     const actionCorrect = p.action === testCase.gold.action;
+    const selectionCorrect = same(p.itemIds, testCase.gold.itemIds);
     if (!actionCorrect) failures.push('wrong_action');
-    if (!same(p.itemIds, testCase.gold.itemIds))
-      failures.push('wrong_recommendations');
+    if (!selectionCorrect) failures.push('wrong_recommendations');
     if (p.itemIds.some((id) => !testCase.input.catalogIds.includes(id)))
       failures.push('unsaved_restaurant');
     if (p.action !== 'recommend' && p.itemIds.length)
@@ -103,15 +115,58 @@ export function scoreNearby(dataset, predictions) {
       caseId: testCase.caseId,
       passed: failures.length === 0,
       actionCorrect,
+      selectionCorrect,
+      requiredWarnings: testCase.gold.requiredWarnings.length,
+      suppliedWarnings: testCase.gold.requiredWarnings.filter((w) =>
+        p.warnings.includes(w),
+      ).length,
+      telemetry: p.telemetry,
       failures: [...new Set(failures)],
     };
   });
   const total = results.length;
+  const measured = results.filter((r) => r.telemetry !== undefined);
+  const requiredWarnings = results.reduce(
+    (sum, r) => sum + (r.requiredWarnings ?? 0),
+    0,
+  );
+  const suppliedWarnings = results.reduce(
+    (sum, r) => sum + (r.suppliedWarnings ?? 0),
+    0,
+  );
+  const safetyFailures = new Set([
+    'unsaved_restaurant',
+    'unsupported_route_claim',
+    'missing_uncertainty_warning',
+    'items_without_recommendation',
+  ]);
   return {
     datasetId: dataset.datasetId,
     cases: total,
     completedPredictions: byId.size,
     actionAccuracy: results.filter((r) => r.actionCorrect).length / total,
+    selectionAccuracy: results.filter((r) => r.selectionCorrect).length / total,
+    uncertaintyCoverage: requiredWarnings
+      ? suppliedWarnings / requiredWarnings
+      : 1,
+    safetyViolationCases: results.filter((r) =>
+      r.failures.some((f) => safetyFailures.has(f)),
+    ).length,
+    telemetryCoverage: measured.length / total,
+    ...(measured.length === total
+      ? {
+          meanLatencyMs:
+            measured.reduce((sum, r) => sum + r.telemetry.latencyMs, 0) / total,
+          totalToolCalls: measured.reduce(
+            (sum, r) => sum + r.telemetry.toolCalls,
+            0,
+          ),
+          totalCostUsd: measured.reduce(
+            (sum, r) => sum + r.telemetry.costUsd,
+            0,
+          ),
+        }
+      : {}),
     casePassRate: results.filter((r) => r.passed).length / total,
     passes: results.every((r) => r.passed),
     results,

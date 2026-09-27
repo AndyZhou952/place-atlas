@@ -5,10 +5,7 @@ import {
   createPublicReadManifest,
   executePublicJsonRead,
 } from '../../lib/server/public-read/public-read-manifest.ts';
-import {
-  loadPublicCatalog,
-  loadPublicMedia,
-} from './public-read-client.ts';
+import { loadPublicCatalog, loadPublicMedia } from './public-read-client.ts';
 
 void test('public assessment overallComment enters the browser catalog model', async () => {
   const result = await loadPublicCatalog({
@@ -161,6 +158,7 @@ void test('anonymous media reads fall back to closed public visit DTOs', async (
                 visitId: 'visit-1',
                 displayOrder: 0,
                 caption: 'Dinner',
+                contentType: 'image/jpeg',
                 displayUrl: '/api/media/display/pm_opaque-public-token/content',
               },
             ],
@@ -179,6 +177,7 @@ void test('anonymous media reads fall back to closed public visit DTOs', async (
       itemId: 'item-1',
       originalFilename: 'Photo',
       caption: 'Dinner',
+      contentType: 'image/jpeg',
       displayOrder: 0,
       contentUrl: '/api/media/display/pm_opaque-public-token/content',
     },

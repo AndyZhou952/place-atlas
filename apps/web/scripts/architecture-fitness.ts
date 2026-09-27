@@ -2120,7 +2120,7 @@ const allowedUiModelTypeExpressions: Readonly<
   Record<string, string | readonly string[]>
 > = {
   AtlasItemKind: 'CoreAtlasItemKind',
-  AtlasView: "'map'|'review'|'journal'",
+  AtlasView: "'map'|'journal'",
   AtlasKindFilter: "'all'|AtlasItemKind",
   AtlasPersonalFilter: "'all'|'unvisited'|'visited'",
   PersonalState: 'CorePersonalState',
@@ -2141,7 +2141,7 @@ const allowedUiModelTypeExpressions: Readonly<
     "Omit<CorePlaceAssessmentPatch,'manualVisited'>&EffectiveVisitedPatch",
   VisitRecord: 'CoreVisit',
   VisitMediaRecord:
-    "Pick<CoreVisitMedia,|'id'|'visitId'|'itemId'|'originalFilename'|'caption'|'displayOrder'|'contentUrl'>",
+    "Pick<CoreVisitMedia,|'id'|'visitId'|'itemId'|'originalFilename'|'contentType'|'caption'|'displayOrder'|'contentUrl'>",
   NewVisit: 'CoreNewVisit',
   VisitUpdate: "Omit<CoreVisitUpdate,'id'>",
   VisitCreateResult: 'CoreVisitMutationResult',
@@ -2160,7 +2160,6 @@ const allowedUiModelInterfaces: Readonly<
   },
   AtlasSummary: {
     saved: { optional: false, type: 'number' },
-    needsReview: { optional: false, type: 'number' },
     timeSensitive: { optional: false, type: 'number' },
   },
 };
@@ -2924,7 +2923,9 @@ function isCountProjection(node: ts.Expression): boolean {
     expression &&
     (ts.isIdentifier(expression) ||
       ts.isPropertyAccessExpression(expression)) &&
-    /(?:count|visits?|length)/iu.test(expression.getText()),
+    /(?:^|\.)(?:[A-Za-z]*Count|[A-Za-z]*Visits?|count|visits?|length)$/u.test(
+      expression.getText(),
+    ),
   );
 }
 

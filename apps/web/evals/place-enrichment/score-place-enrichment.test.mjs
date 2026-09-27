@@ -17,15 +17,27 @@ test('known website links have explicit payload support and live captures exclud
     for (const field of ['officialWebsite', 'bookingLink']) {
       const claim = entry.gold[field];
       if (claim.state !== 'known') continue;
-      assert.ok(entry.evidence.some((source) =>
-        claim.acceptedEvidenceIds.includes(source.evidenceId) &&
-        JSON.stringify(source.payload).includes(claim.value)), `${entry.caseId}: ${field}`);
+      assert.ok(
+        entry.evidence.some(
+          (source) =>
+            claim.acceptedEvidenceIds.includes(source.evidenceId) &&
+            JSON.stringify(source.payload).includes(claim.value),
+        ),
+        `${entry.caseId}: ${field}`,
+      );
     }
   }
-  const live = gold.cases[0].evidence.find((source) => source.captureClass === 'independently_verified_web_capture');
+  const live = gold.cases[0].evidence.find(
+    (source) => source.captureClass === 'independently_verified_web_capture',
+  );
   assert.equal(live.payload.signatureDishes, undefined);
   assert.equal(live.payload.reservationNotListed, undefined);
-  assert.equal(gold.cases[0].evidence.some((source) => source.evidenceId === 'controlled-identity'), false);
+  assert.equal(
+    gold.cases[0].evidence.some(
+      (source) => source.evidenceId === 'controlled-identity',
+    ),
+    false,
+  );
 });
 
 async function fixture(name) {

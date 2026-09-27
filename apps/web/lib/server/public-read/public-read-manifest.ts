@@ -159,6 +159,7 @@ export interface PublicVisitMediaV1 {
   readonly visitId: string;
   readonly displayOrder: number;
   readonly caption?: string;
+  readonly contentType: string;
   readonly displayUrl: string;
 }
 
@@ -460,6 +461,7 @@ function projectVisitMedia(
     id: displayId,
     visitId: asString(source.visitId),
     displayOrder: asNumber(source.displayOrder),
+    contentType: asString(source.contentType),
     ...(optionalString(source.caption) === undefined
       ? {}
       : { caption: optionalString(source.caption) }),
@@ -647,7 +649,9 @@ function isAllowedImageContentType(value: string): boolean {
     value === 'image/jpeg' ||
     value === 'image/png' ||
     value === 'image/webp' ||
-    value === 'image/gif'
+    value === 'image/gif' ||
+    value === 'video/mp4' ||
+    value === 'video/webm'
   );
 }
 

@@ -97,6 +97,41 @@
   padding-bottom: 0.75rem;
 }
 
+.catalog-intake-coordinate-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.catalog-intake-coordinate-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.catalog-intake-coordinate-row label,
+.catalog-intake-corrections label {
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.catalog-intake-owner-fields select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding-inline: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.catalog-intake-owner-fields details > label,
+.catalog-intake-owner-fields details > [data-slot='input'] {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
 .catalog-intake-preview-group {
   display: grid;
   min-width: 0;

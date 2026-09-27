@@ -1,4 +1,27 @@
-# Nearby benchmark: policy seed v1
+# Nearby benchmarks: policy and location seeds
+
+`nearby-location-gold.v1.json` is a separate ten-case station-identity seed.
+Tokyo Metro's [Ikebukuro](https://www.tokyometro.jp/station/ikebukuro/index.html)
+and [Higashi-ikebukuro](https://www.tokyometro.jp/station/higashi-ikebukuro/index.html),
+plus [Shinjuku-sanchome](https://www.tokyometro.jp/station/shinjuku-sanchome/index.html)
+and [Shinjuku-gyoemmae](https://www.tokyometro.jp/station/shinjuku-gyoemmae/index.html)
+station pages and their English versions, were checked on 2026-09-27.
+They establish four distinct stations and their official names and line codes;
+they do **not** establish walking durations or restaurant availability. The
+cases test Chinese, Japanese and English location hints, cuisine and visited
+intent, and an explicit choice between the two stations. Give a model only each
+case's `input`, never `gold` or the scorer's test oracle. Score predictions with:
+
+```sh
+node evals/nearby/score-nearby-location.mjs evals/nearby/nearby-location-gold.v1.json evals/runs/nearby-location-predictions.json
+```
+
+This seed has no measured model predictions yet. It is a narrow, sourced
+location-understanding check, not broad Tokyo geocoding acceptance. Expand it
+with independently checked stations and neighborhoods before selecting a model
+quality threshold.
+
+## Synthetic policy seed v1
 
 This is a **synthetic, offline policy suite**, not a measured Agent benchmark or evidence of real travel times. Build the benchmark before connecting the recommendation Agent. Actual place/location interpretation, screenshots and live route providers need additional evaluation.
 
@@ -19,7 +42,8 @@ Prediction shape:
       "action": "recommend",
       "itemIds": ["ramen-a"],
       "warnings": [],
-      "routeClaims": [{ "itemId": "ramen-a", "mode": "walk", "seconds": 600 }]
+      "routeClaims": [{ "itemId": "ramen-a", "mode": "walk", "seconds": 600 }],
+      "telemetry": { "latencyMs": 200, "toolCalls": 2, "costUsd": 0.001 }
     }
   ]
 }
@@ -38,7 +62,9 @@ node evals/nearby/score-nearby.mjs evals/nearby/nearby-gold.v1.json evals/runs/n
 
 The second command requires real predictions; no generated perfect prediction file is shipped. Tests create an oracle in memory solely to validate the scorer. CLI exit codes: 0 passes, 1 fails quality gates, 2 invalid input.
 
-Report case coverage, action accuracy, case pass rate and per-case failures. Require all 14 core-policy cases to pass: no unsaved recommendations, unsupported route claims, lost uncertainty warnings or unsafe ambiguity handling. Missing predictions count as failures. This small strict seed is not a claim about statistical accuracy.
+Report case coverage, action accuracy, selection accuracy, uncertainty coverage, safety violation cases, case pass rate and per-case failures. Optional per-case telemetry reports mean latency, total tool calls and total cost only when every case supplies it. Require all 14 core-policy cases to pass: no unsaved recommendations, unsupported route claims, lost uncertainty warnings or unsafe ambiguity handling. Missing predictions count as failures. This small strict seed is not a claim about statistical accuracy.
+
+The proposed acceptance gate for a future independently verified, real-model set is zero invented saved-place IDs, route times or booking facts; every ambiguity and provider-failure safety case must pass. Set action/selection thresholds after reviewing that dataset, before running the model. Do not use this synthetic oracle to tune or claim real-model quality.
 
 ## Before live Agent acceptance
 

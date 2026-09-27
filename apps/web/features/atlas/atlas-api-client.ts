@@ -11,6 +11,7 @@ import type {
 } from './model';
 import {
   chunkMediaSelection,
+  maxMediaFilesPerRequest,
   maxMediaFilesPerSelection,
 } from './media-constraints.ts';
 import {
@@ -226,10 +227,11 @@ export function createBrowserAtlasApplication(
         overallComment: item.overallComment ?? undefined,
       }));
     },
-    'catalog.update_item': ({ id, ...edit }) =>
-      requestJson(
+    'catalog.update_item': ({ id, ...edit }, mutationId) =>
+      requestMutationJson(
         transport,
         browserOperationPath('catalog.update_item', { id }),
+        mutationId,
         {
           method: browserOperationHttpCatalog['catalog.update_item'].method,
           body: JSON.stringify(edit),
@@ -563,12 +565,18 @@ async function uploadVisitMediaInBatches(
     );
   }
   if (uploadIds.length !== files.length) {
-    throw new TypeError('A stable ID is required for every image.');
+    throw new TypeError('A stable ID is required for every media file.');
   }
 
   const uploaded: VisitMediaRecord[] = [];
   let offset = 0;
-  for (const chunk of chunkMediaSelection(files)) {
+  // Keep each video in its own Worker request to bound body memory.
+  for (const chunk of chunkMediaSelection(
+    files,
+    files.some((file) => file.type.startsWith('video/'))
+      ? 1
+      : maxMediaFilesPerRequest,
+  )) {
     const body = new FormData();
     body.set('visitId', visitId);
     chunk.forEach((file, index) => {

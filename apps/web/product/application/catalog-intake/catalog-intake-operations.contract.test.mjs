@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -2546,6 +2547,133 @@ test('source access failure appears in preview instead of silently becoming miss
   assert.match(warning.message, /does not mean/u);
 });
 
+test('Shake Shack Shinjuku: a transient Google match can be completed with durable owner details after research fails', async () => {
+  const benchmark = JSON.parse(
+    await readFile(
+      new URL(
+        '../../../evals/place-enrichment/add-completion-gold.v1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(benchmark.schemaVersion, 1);
+  const scenario = benchmark.cases.find(
+    ({ caseId }) =>
+      caseId === 'shake-shack-shinjuku-google-match-research-unavailable',
+  );
+  assert.ok(scenario);
+  const publishes = [];
+  let geocoderCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture({
+      transientName: scenario.candidate.transientName,
+      transientAddress: scenario.candidate.transientAddress,
+    }),
+    durableGeocoderPort: {
+      async propose(input) {
+        geocoderCalls += 1;
+        if (!input.ownerDraft.address) {
+          return { ok: true, value: { status: 'no_match' } };
+        }
+        assert.equal(input.ownerDraft.title, scenario.ownerCompletion.title);
+        assert.equal(
+          input.ownerDraft.address,
+          scenario.ownerCompletion.address,
+        );
+        return {
+          ok: true,
+          value: {
+            status: 'resolved',
+            normalizedAddress: '東京都渋谷区代々木2-2-1',
+            latitude: 35.687,
+            longitude: 139.7,
+            provider: 'fixture-osm-geocoder',
+            sourceUrl: 'https://www.openstreetmap.org/node/123',
+            license: 'ODbL-1.0',
+            checkedAt: '2026-09-22T10:00:00.000Z',
+          },
+        };
+      },
+    },
+    webResearchPort: {
+      async research() {
+        return { kind: 'unavailable' };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish(input) {
+        publishes.push(input);
+        return {
+          status: 'committed_verified',
+          itemId: 'shake-shack-shinjuku',
+          receiptRef: 'receipt-shake-shack',
+          replayed: false,
+        };
+      },
+    },
+  });
+  const discovered = await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: scenario.query, requestToken: 'shake-shack-case' },
+  });
+  assert.equal(discovered.ok, true);
+  const first = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: discovered.value.sessionId,
+      expectedSessionVersion: discovered.value.sessionVersion,
+      ordinal: 1,
+      requestResearch: true,
+    },
+  });
+  assert.equal(first.ok, true);
+  assert.equal(
+    first.value.preview.locationEvidence.status,
+    scenario.expected.firstLocationStatus,
+  );
+  assert.equal(first.value.preview.ownerFields.address, undefined);
+  assert.equal('addressProposal' in first.value.preview, false);
+  const completed = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: first.value.sessionId,
+      expectedSessionVersion: first.value.sessionVersion,
+      ordinal: 1,
+      ownerFields: scenario.ownerCompletion,
+      requestResearch: true,
+    },
+  });
+  assert.equal(completed.ok, true);
+  assert.equal(
+    completed.value.preview.locationEvidence.status,
+    scenario.expected.completedLocationStatus,
+  );
+  assert.equal(
+    completed.value.preview.locationEvidence.provenance,
+    scenario.expected.completedLocationProvenance,
+  );
+  assert.deepEqual(
+    completed.value.preview.ownerFields.categories,
+    scenario.ownerCompletion.categories,
+  );
+  assert.equal(
+    completed.value.preview.unknownFields.includes('coordinates'),
+    false,
+  );
+  const confirmed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: {
+      sessionId: completed.value.sessionId,
+      expectedPreviewVersion: completed.value.preview.previewVersion,
+    },
+  });
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.value.status, scenario.expected.publicationStatus);
+  assert.equal(publishes.length, scenario.expected.publicationCount);
+  assert.ok(geocoderCalls >= 3);
+});
+
 async function discoverAndSelect(
   application,
   ownerFields = {},
@@ -2686,7 +2814,7 @@ function discoveryCandidate(options = {}) {
     },
     transientPresentation: {
       name: options.transientName ?? 'Transient Google name',
-      address: 'Transient Google address',
+      address: options.transientAddress ?? 'Transient Google address',
       attribution: {
         label: 'Google Maps',
         url: 'https://maps.google.com/',

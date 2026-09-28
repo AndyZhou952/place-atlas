@@ -18,6 +18,7 @@ interface VisitMediaRow {
   readonly byte_size: number;
   readonly content_sha256: string;
   readonly caption: string | null;
+  readonly score: number | null;
   readonly display_order: number;
   readonly created_at: string;
   readonly updated_at: string;
@@ -101,8 +102,8 @@ export class D1VisitMediaState implements VisitMediaRecordState {
           .prepare(
             `INSERT INTO visit_media
              (id, display_id, visit_id, item_id, object_key, original_filename, content_type,
-              byte_size, content_sha256, caption, display_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              byte_size, content_sha256, caption, score, display_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             media.id,
@@ -115,6 +116,7 @@ export class D1VisitMediaState implements VisitMediaRecordState {
             media.byteSize,
             media.contentSha256,
             media.caption ?? null,
+            media.score ?? null,
             media.displayOrder,
             media.createdAt,
             media.updatedAt,
@@ -151,9 +153,43 @@ export class D1VisitMediaState implements VisitMediaRecordState {
         `UPDATE visit_media SET caption = ?, updated_at = ? WHERE id = ?
          RETURNING id, display_id, visit_id, item_id, object_key, original_filename,
                    content_type, byte_size, content_sha256, caption,
-                   display_order, created_at, updated_at`,
+                   score, display_order, created_at, updated_at`,
       )
       .bind(caption ?? null, updatedAt, id)
+      .first<VisitMediaRow>();
+    return row ? toVisitMediaMetadata(row) : undefined;
+  }
+
+  async updateScore(
+    id: string,
+    score: number | undefined,
+    updatedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ) {
+    if (atomicCommit) {
+      const existing = await this.find(id);
+      if (!existing) return undefined;
+      await commitD1MutationAtomically(
+        this.#database,
+        [
+          this.#database
+            .prepare(
+              'UPDATE visit_media SET score = ?, updated_at = ? WHERE id = ?',
+            )
+            .bind(score ?? null, updatedAt, id),
+        ],
+        atomicCommit,
+      );
+      return { ...existing, score, updatedAt };
+    }
+    const row = await this.#database
+      .prepare(
+        `UPDATE visit_media SET score = ?, updated_at = ? WHERE id = ?
+         RETURNING id, display_id, visit_id, item_id, object_key, original_filename,
+                   content_type, byte_size, content_sha256, caption,
+                   score, display_order, created_at, updated_at`,
+      )
+      .bind(score ?? null, updatedAt, id)
       .first<VisitMediaRow>();
     return row ? toVisitMediaMetadata(row) : undefined;
   }
@@ -178,7 +214,7 @@ export class D1VisitMediaState implements VisitMediaRecordState {
         `DELETE FROM visit_media WHERE id = ?
          RETURNING id, display_id, visit_id, item_id, object_key, original_filename,
                    content_type, byte_size, content_sha256, caption,
-                   display_order, created_at, updated_at`,
+                   score, display_order, created_at, updated_at`,
       )
       .bind(id)
       .first<VisitMediaRow>();
@@ -198,6 +234,9 @@ function toVisitMediaMetadata(row: VisitMediaRow): VisitMediaMetadata {
     byteSize: row.byte_size,
     contentSha256: row.content_sha256,
     caption: row.caption ?? undefined,
+    ...(row.score === null || row.score === undefined
+      ? {}
+      : { score: row.score }),
     displayOrder: row.display_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -205,5 +244,5 @@ function toVisitMediaMetadata(row: VisitMediaRow): VisitMediaMetadata {
 }
 
 const selectVisitMediaSql = `SELECT id, display_id, visit_id, item_id, object_key,
-  original_filename, content_type, byte_size, content_sha256, caption,
+  original_filename, content_type, byte_size, content_sha256, caption, score,
   display_order, created_at, updated_at FROM visit_media`;

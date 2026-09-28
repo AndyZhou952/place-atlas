@@ -105,6 +105,10 @@ interface BrowserOperationMap {
     };
     readonly output: VisitMediaRecord;
   };
+  readonly 'media.score': {
+    readonly input: { readonly id: string; readonly score: number | null };
+    readonly output: VisitMediaRecord;
+  };
   readonly 'media.delete': {
     readonly input: { readonly id: string };
     readonly output: { readonly deleted: true };
@@ -297,6 +301,16 @@ export function createBrowserAtlasApplication(
         {
           method: browserOperationHttpCatalog['media.caption'].method,
           body: JSON.stringify({ caption: caption || null }),
+        },
+      ),
+    'media.score': ({ id, score }, mutationId) =>
+      requestMutationJson(
+        transport,
+        browserOperationPath('media.score', { id }),
+        mutationId,
+        {
+          method: browserOperationHttpCatalog['media.score'].method,
+          body: JSON.stringify({ score }),
         },
       ),
     'media.delete': ({ id }, mutationId) =>

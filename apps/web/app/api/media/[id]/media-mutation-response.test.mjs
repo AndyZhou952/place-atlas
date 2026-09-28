@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   deleteVisitMediaResponse,
   updateVisitMediaCaptionResponse,
+  updateVisitMediaScoreResponse,
 } from './media-mutation-response.ts';
 
 test('Media PATCH and DELETE emit mutation envelopes and receipt responses', async () => {
@@ -62,10 +63,42 @@ test('Media mutations reject invalid input or missing mutation IDs before coordi
     }),
     'media-1',
   );
+  const invalidScore = await updateVisitMediaScoreResponse(
+    fake,
+    mutationRequest('PATCH', 'score-1'),
+    'media-1',
+    { score: 5.1 },
+  );
+  const mixedFields = await updateVisitMediaScoreResponse(
+    fake,
+    mutationRequest('PATCH', 'score-2'),
+    'media-1',
+    { score: 4.2, caption: 'not in this mutation' },
+  );
 
   assert.equal(invalid.status, 400);
+  assert.equal(invalidScore.status, 400);
+  assert.equal(mixedFields.status, 400);
   assert.equal(missingId.status, 400);
   assert.equal(calls, 0);
+});
+
+test('Media score PATCH emits its own atomic operation and clear value', async () => {
+  const envelopes = [];
+  const fake = coordinator(async (input) => {
+    envelopes.push(input);
+    return okReceipt(input.mutationId, { id: 'media-1', score: 4.2 });
+  });
+  const response = await updateVisitMediaScoreResponse(
+    fake,
+    mutationRequest('PATCH', 'score-1'),
+    'media-1',
+    { score: 4.2 },
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).result.score, 4.2);
+  assert.equal(envelopes[0].operation, 'media.score');
+  assert.deepEqual(envelopes[0].input, { id: 'media-1', score: 4.2 });
 });
 
 function mutationRequest(method, mutationId) {

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
 import { matchesAtlasQuery } from './search';
+import { normalizeRating } from './rating';
 import type {
   AtlasItemEdit,
   AtlasKindFilter,
@@ -474,6 +475,37 @@ export function useAtlasViewModel() {
     [media],
   );
 
+  const saveMediaScore = useCallback(
+    async (id: string, value: number | null) => {
+      const previous = media.find((entry) => entry.id === id);
+      if (!previous) throw new Error('Media not found');
+      const score = value === null ? null : normalizeRating(value);
+      const optimistic = {
+        ...previous,
+        score: score === null ? undefined : score,
+      };
+      dispatch({ type: 'media.received', media: optimistic });
+      try {
+        const updated = await browserAtlasApplication.execute({
+          key: 'media.score',
+          input: { id, score },
+          mutationId: crypto.randomUUID(),
+        });
+        dispatch({ type: 'media.received', media: updated });
+        return updated;
+      } catch (error) {
+        dispatch({ type: 'media.received', media: previous });
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : 'Could not save media score.',
+        );
+        throw error;
+      }
+    },
+    [media],
+  );
+
   const removeMedia = useCallback(
     async (id: string) => {
       const previous = media.find((entry) => entry.id === id);
@@ -698,6 +730,7 @@ export function useAtlasViewModel() {
     removeVisit,
     saveAssessment,
     saveMediaCaption,
+    saveMediaScore,
     saveItemEdit,
     selectedItem,
     selectItem,

@@ -71,6 +71,14 @@ export class InMemoryVisitMediaState implements VisitMediaRecordState {
     return updated;
   }
 
+  async updateScore(id: string, score: number | undefined, updatedAt: string) {
+    const index = this.#records.findIndex((record) => record.id === id);
+    if (index < 0) return undefined;
+    const updated = { ...this.#records[index], score, updatedAt };
+    this.#records[index] = updated;
+    return updated;
+  }
+
   async delete(id: string) {
     const index = this.#records.findIndex((record) => record.id === id);
     if (index < 0) return undefined;

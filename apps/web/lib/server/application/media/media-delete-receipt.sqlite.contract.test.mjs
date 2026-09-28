@@ -26,6 +26,12 @@ void test('R2 delete failure leaves only an unreachable orphan while response-lo
     ),
   );
   sqlite.exec(
+    await readFile(
+      new URL('0011_visit_media_score.sql', migrationRoot),
+      'utf8',
+    ),
+  );
+  sqlite.exec(
     `INSERT INTO visit_media
      (id, display_id, visit_id, item_id, object_key, original_filename,
       content_type, byte_size, content_sha256, caption, display_order,

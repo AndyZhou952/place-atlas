@@ -145,6 +145,7 @@ test('the D1 adapter reads Visit ordering context and atomically inserts metadat
     123,
     'sha-1',
     '鮨',
+    null,
     3,
     '2026-09-12T08:00:00.000Z',
     '2026-09-12T08:00:00.000Z',
@@ -182,6 +183,36 @@ test('the D1 adapter updates a caption and returns the stored metadata', async (
   assert.deepEqual(calls[0].values, ['鮨 course', 'updated', 'media-1']);
   assert.equal(result.caption, '鮨 course');
   assert.equal(result.updatedAt, 'updated');
+});
+
+test('the D1 adapter updates and clears a media score without touching its caption', async () => {
+  const calls = [];
+  const database = {
+    prepare(sql) {
+      const call = { sql, values: [] };
+      calls.push(call);
+      return {
+        bind(...values) {
+          call.values = values;
+          return this;
+        },
+        async first() {
+          return { ...row, caption: '鮨 course', score: 4.2 };
+        },
+      };
+    },
+  };
+  const state = new D1VisitMediaState(database);
+  const scored = await state.updateScore('media-1', 4.2, 'updated');
+  assert.match(
+    calls[0].sql,
+    /UPDATE visit_media SET score = \?, updated_at = \?/u,
+  );
+  assert.deepEqual(calls[0].values, [4.2, 'updated', 'media-1']);
+  assert.equal(scored.score, 4.2);
+  assert.equal(scored.caption, '鮨 course');
+  await state.updateScore('media-1', undefined, 'cleared');
+  assert.deepEqual(calls[1].values, [null, 'cleared', 'media-1']);
 });
 
 test('the D1 adapter deletes metadata and returns its object identity in one statement', async () => {

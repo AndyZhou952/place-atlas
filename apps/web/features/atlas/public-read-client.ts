@@ -25,6 +25,7 @@ interface PublicMedia {
   readonly visitId: string;
   readonly displayOrder: number;
   readonly caption?: string;
+  readonly score?: number;
   readonly contentType: string;
   readonly displayUrl: string;
 }
@@ -374,6 +375,7 @@ export async function loadPublicMedia(
         originalFilename: 'Photo',
         contentType: media.contentType,
         caption: media.caption,
+        ...(media.score === undefined ? {} : { score: media.score }),
         displayOrder: media.displayOrder,
         contentUrl: media.displayUrl,
       })),

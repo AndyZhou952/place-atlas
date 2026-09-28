@@ -202,6 +202,16 @@ try {
     .getByLabel(`Caption for ${photos[0].name}`, { exact: true })
     .press('Enter');
   await captionSaved;
+  const mediaScoreSaved = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/media/') &&
+      response.request().method() === 'PATCH' &&
+      response.ok() &&
+      response.request().postDataJSON()?.score === 4.2,
+  );
+  await viewer.getByLabel(`Score for ${photos[0].name}`).fill('4.2');
+  await viewer.getByLabel(`Score for ${photos[0].name}`).press('Enter');
+  await mediaScoreSaved;
   await viewer
     .getByRole('button', { name: 'Close photo viewer', exact: true })
     .click();
@@ -257,6 +267,19 @@ try {
   ).json();
   assert.equal(media.length, photos.length);
   assert.ok(media.some((entry) => entry.caption === `${marker} caption`));
+  assert.equal(
+    media.find((entry) => entry.originalFilename === photos[0].name)?.score,
+    4.2,
+  );
+  assert.equal(
+    media.find((entry) => entry.originalFilename === photos[1].name)?.score,
+    undefined,
+  );
+  await row.getByLabel(`Score for ${photos[0].name}`).waitFor();
+  assert.equal(
+    await row.getByLabel(`Score for ${photos[0].name}`).inputValue(),
+    '4.2',
+  );
   for (const entry of media) {
     const image = await context.request.get(
       new URL(entry.contentUrl, base).href,
@@ -265,7 +288,7 @@ try {
     assert.ok((await image.body()).length > 0);
   }
   console.log(
-    'PASS Journal create, two real photos, caption viewer edit, date/note edit and reload',
+    'PASS Journal create, real photos, caption and per-media score edits, date/note edit and reload',
   );
   await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.getByLabel('Search Atlas items').fill(item.title);

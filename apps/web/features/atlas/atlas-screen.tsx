@@ -1352,6 +1352,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
+                      onSaveScore={vm.saveMediaScore}
                       onDeleteMedia={vm.removeMedia}
                       onDelete={() => setPendingVisitDelete(visit)}
                     />
@@ -1542,6 +1543,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
+                      onSaveScore={vm.saveMediaScore}
                       onDeleteMedia={vm.removeMedia}
                       onDelete={() => setPendingDelete(visit)}
                     />
@@ -1873,6 +1875,7 @@ function JournalVisitRow({
   onSave,
   onUpload,
   onSaveCaption,
+  onSaveScore,
   onDeleteMedia,
   onDelete,
 }: {
@@ -1886,6 +1889,7 @@ function JournalVisitRow({
   readonly onSave: AtlasViewModel['editVisit'];
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDeleteMedia: AtlasViewModel['removeMedia'];
   readonly onDelete: () => void;
 }) {
@@ -2047,6 +2051,7 @@ function JournalVisitRow({
           busy={mediaBusy}
           onUpload={onUpload}
           onSaveCaption={onSaveCaption}
+          onSaveScore={onSaveScore}
           onDelete={onDeleteMedia}
         />
       </div>
@@ -2078,6 +2083,7 @@ function VisitMediaEditor({
   busy,
   onUpload,
   onSaveCaption,
+  onSaveScore,
   onDelete,
 }: {
   readonly visitId: string;
@@ -2085,6 +2091,7 @@ function VisitMediaEditor({
   readonly busy: boolean;
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDelete: AtlasViewModel['removeMedia'];
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number>();
@@ -2109,6 +2116,7 @@ function VisitMediaEditor({
             key={`${entry.id}:${entry.caption ?? ''}`}
             media={entry}
             onSave={onSaveCaption}
+            onSaveScore={onSaveScore}
             onDelete={onDelete}
             onOpen={() => setLightboxIndex(index)}
           />
@@ -2135,6 +2143,7 @@ function VisitMediaEditor({
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(undefined)}
           onSaveCaption={onSaveCaption}
+          onSaveScore={onSaveScore}
           onDelete={async (id) => {
             if (media.length === 1) setLightboxIndex(undefined);
             return onDelete(id);
@@ -2163,11 +2172,13 @@ function MediaBrowseButton({
 function MediaCaptionEditor({
   media,
   onSave,
+  onSaveScore,
   onDelete,
   onOpen,
 }: {
   readonly media: VisitMediaRecord;
   readonly onSave: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDelete: AtlasViewModel['removeMedia'];
   readonly onOpen: () => void;
 }) {
@@ -2230,6 +2241,12 @@ function MediaCaptionEditor({
           <Trash2 aria-hidden="true" />
         </button>
       </div>
+      <MediaScoreEditor
+        key={`${media.id}:${media.score ?? ''}`}
+        media={media}
+        onSave={onSaveScore}
+        idPrefix="tile"
+      />
     </figure>
   );
 }
@@ -2239,12 +2256,14 @@ function PhotoLightbox({
   initialIndex,
   onClose,
   onSaveCaption,
+  onSaveScore,
   onDelete,
 }: {
   readonly media: readonly VisitMediaRecord[];
   readonly initialIndex: number;
   readonly onClose: () => void;
   readonly onSaveCaption?: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore?: AtlasViewModel['saveMediaScore'];
   readonly onDelete?: AtlasViewModel['removeMedia'];
 }) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
@@ -2394,6 +2413,20 @@ function PhotoLightbox({
           ) : (
             <span>No caption</span>
           )}
+          {onSaveScore ? (
+            <MediaScoreEditor
+              key={`${active.id}:${active.score ?? ''}`}
+              media={active}
+              onSave={onSaveScore}
+              idPrefix="viewer"
+            />
+          ) : (
+            <span>
+              {active.score === undefined
+                ? 'No media score'
+                : `Media score ${active.score}/5`}
+            </span>
+          )}
           {onDelete ? (
             <button
               className="photo-lightbox-delete"
@@ -2448,6 +2481,63 @@ function LightboxCaptionEditor({
         }
       }}
     />
+  );
+}
+
+function MediaScoreEditor({
+  media,
+  onSave,
+  idPrefix,
+}: {
+  readonly media: VisitMediaRecord;
+  readonly onSave: AtlasViewModel['saveMediaScore'];
+  readonly idPrefix: string;
+}) {
+  const [value, setValue] = useState(media.score?.toString() ?? '');
+
+  async function saveScore() {
+    const trimmed = value.trim();
+    const parsed = trimmed === '' ? null : Number(trimmed);
+    if (
+      parsed !== null &&
+      (!Number.isFinite(parsed) || parsed < 0 || parsed > 5)
+    ) {
+      setValue(media.score?.toString() ?? '');
+      return;
+    }
+    if (parsed === (media.score ?? null)) return;
+    try {
+      await onSave(media.id, parsed);
+    } catch {
+      setValue(media.score?.toString() ?? '');
+    }
+  }
+
+  return (
+    <label
+      className="media-score-editor"
+      htmlFor={`${idPrefix}-media-score-${media.id}`}
+    >
+      <span>Media score / 5</span>
+      <Input
+        id={`${idPrefix}-media-score-${media.id}`}
+        type="number"
+        min="0"
+        max="5"
+        step="0.1"
+        value={value}
+        placeholder="Optional"
+        aria-label={`Score for ${media.originalFilename}`}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => void saveScore()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </label>
   );
 }
 

@@ -164,6 +164,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     bodyKind: 'json',
     capability: { name: 'update_visit_media_caption' },
   },
+  'media.score': {
+    key: 'media.score',
+    method: 'PATCH',
+    path: '/api/media/{id}',
+    bodyKind: 'json',
+  },
   'media.delete': {
     key: 'media.delete',
     method: 'DELETE',

@@ -57,6 +57,14 @@
       "ownerQuery": "Yardbird Hong Kong",
       "region": "overseas",
       "queryIncludes": "Google Maps rating"
+    },
+    {
+      "id": "singapore-chinatown-not-mainland",
+      "name": "Maxwell Food Centre",
+      "address": "1 Kadayanallur Street, Chinatown, Singapore 069184",
+      "ownerQuery": "Maxwell Food Centre Singapore",
+      "region": "overseas",
+      "queryIncludes": "Google Maps rating"
     }
   ]
 }

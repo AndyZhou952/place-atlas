@@ -8,7 +8,7 @@ export function researchRegion(address: string): ResearchRegion {
   )
     return 'overseas';
   if (
-    /中国|china|beijing|北京市|shanghai|上海市|shenzhen|深圳市|guangzhou|广州市|廣州市|杭州|hangzhou/u.test(
+    /中国|\bchina\b|beijing|北京市|shanghai|上海市|shenzhen|深圳市|guangzhou|广州市|廣州市|杭州|hangzhou/u.test(
       normalized,
     )
   )

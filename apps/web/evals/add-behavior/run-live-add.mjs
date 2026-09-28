@@ -70,9 +70,10 @@ function score(sample, preview) {
     reservation:
       preview?.reservation?.status === 'known' &&
       preview.reservation.mode === sample.expectedReservationMode,
-    savedDuplicate: preview?.suspectedDuplicates?.some(
-      (item) => item.match === 'strong',
-    ),
+    savedDuplicate:
+      Boolean(
+        preview?.suspectedDuplicates?.some((item) => item.match === 'strong'),
+      ) === (sample.expectedSavedDuplicate ?? true),
   };
   return {
     pass: Object.values(checks).every(Boolean),

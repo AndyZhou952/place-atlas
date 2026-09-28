@@ -34,6 +34,15 @@
       "expectedTitleIncludes": "メンドコロ",
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
       "expectedReservationMode": "not_reservable"
+    },
+    {
+      "id": "fuglen-tokyo-new-preview",
+      "query": "FUGLEN TOKYO 富ヶ谷",
+      "candidateNameIncludes": "FUGLEN TOKYO",
+      "expectedTitleIncludes": "FUGLEN TOKYO",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1318/A131810/13141002/",
+      "expectedReservationMode": "not_reservable",
+      "expectedSavedDuplicate": false
     }
   ]
 }

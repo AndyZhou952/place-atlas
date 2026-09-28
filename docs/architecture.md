@@ -14,7 +14,7 @@ The model proposes facts; application code validates and commits them. Source te
 
 ## Storage and views
 
-Cloudflare D1 stores restaurant identity, coordinates, sources, personal ratings, visits, and media metadata. R2 stores uploaded images and videos. Personal ratings and external ratings are independent fields. Updating one must preserve the others.
+Cloudflare D1 stores restaurant identity, coordinates, sources, personal ratings, visits, and media metadata. R2 stores uploaded images and videos. Personal ratings and external ratings are independent fields. Updating one must preserve the others. A Google Places rating requested for a saved overseas place is read on demand from its persisted Place ID and returned only in a private, no-store response; it is not written by that read path.
 
 Nearby compares only saved restaurants. Coordinates permit a distance prefilter; an optional route provider supplies walking time. An unavailable route provider must not turn straight-line distance into a claimed travel time.
 
@@ -42,7 +42,7 @@ The application resolves identity and owns confirmation/persistence. The model p
 
 Only `search_web` is currently exposed to the research model. Its description specifies query examples, result shape and budget. The application can augment each search with one discovered Tabelog main listing: fixed HTTPS host/path, no redirects, five-second read timeout within the shared deadline, one MiB body cap, and only the matching Restaurant JSON-LD aggregate rating and address. Individual reviews are discarded. A general official-site reading tool is not implemented; the model does not receive full pages. Search failures are returned as tool outcomes so other supported facts survive; all searches failing remains unavailable. The model cannot confirm or write a restaurant. Existing authenticated application APIs perform writes only after owner confirmation.
 
-Source priority is currently a prompt instruction, not a deterministic proof of official-domain ownership. Code separately checks quoted evidence, branch anchors, score tokens, main-listing URLs, and the output schema. Live evaluation must establish the quality of the combined system. Track incomplete implementation and validation in `docs/status.md`.
+The first research query is selected by the candidate address region: Tabelog for Japan, Google Maps rating for other overseas locations, and official reservation evidence for mainland China. The model prompt guides later searches. Code separately checks quoted evidence, branch anchors, postal identity when available, score tokens, main-listing URLs, and the output schema. This does not prove that a site is official. A saved Google Place ID can also drive an owner-only, metered Google Places rating read; mainland China is skipped and Japan prefers an available Tabelog score. Live evaluation must establish the quality of the combined system. Track incomplete implementation and validation in `docs/status.md`.
 
 The relevant guidance from [the agent-book skills proposal](https://github.com/bojieli/ai-agent-book/pull/1137) is goal-oriented tools, bounded execution, untrusted-source isolation, explicit failure handling, and independent evaluation. The repository does not copy or depend on the 22 skill packages.
 

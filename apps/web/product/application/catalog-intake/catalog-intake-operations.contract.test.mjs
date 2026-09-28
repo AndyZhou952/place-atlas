@@ -23,6 +23,77 @@ const ownerConversation = {
   },
 };
 
+test('saved provider identity is disclosed in preview and confirm cannot publish it again', async () => {
+  let publications = 0;
+  const app = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    savedPlaceLookup: {
+      async list() {
+        return [
+          {
+            id: 'already-saved',
+            kind: 'food',
+            title: '日本語の店名',
+            address: '東京都新宿区新宿3-7-1',
+            latitude: 35.69,
+            longitude: 139.7,
+            sources: [],
+            intakeEvidence: {
+              candidateIdentity: {
+                providerNamespace: 'google-places',
+                placeId: 'place-1',
+              },
+            },
+          },
+        ];
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish() {
+        publications++;
+        throw new Error('A strong duplicate must never publish.');
+      },
+    },
+  });
+  await app.execute({
+    key: 'catalog.intake.discover',
+    input: { query: 'English restaurant name', requestToken: 'request-1' },
+  });
+  const selected = await app.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: 'session-1',
+      expectedSessionVersion: 1,
+      ordinal: 1,
+      ownerFields: {},
+      requestResearch: false,
+    },
+  });
+  assert.equal(selected.ok, true);
+  assert.equal(selected.value.status, 'preview_ready');
+  assert.deepEqual(selected.value.preview.suspectedDuplicates, [
+    {
+      itemId: 'already-saved',
+      title: '日本語の店名',
+      address: '東京都新宿区新宿3-7-1',
+      match: 'strong',
+    },
+  ]);
+  const confirmed = await app.execute({
+    key: 'catalog.intake.confirm',
+    input: {
+      sessionId: 'session-1',
+      expectedPreviewVersion: selected.value.preview.previewVersion,
+    },
+  });
+  assert.equal(confirmed.ok, true);
+  assert.deepEqual(confirmed.value, {
+    status: 'already_saved',
+    itemId: 'already-saved',
+  });
+  assert.equal(publications, 0);
+});
+
 test('complete sourced research yields map-ready preview without owner retyping; explicit owner title wins', async () => {
   const claim = (value) => ({
     value,
@@ -2835,6 +2906,9 @@ function createFixtureApplication(options) {
       : {}),
     ...(normalized.atlasCatalogIntakePort
       ? { atlasCatalogIntakePort: normalized.atlasCatalogIntakePort }
+      : {}),
+    ...(normalized.savedPlaceLookup
+      ? { savedPlaceLookup: normalized.savedPlaceLookup }
       : {}),
     ...(normalized.webResearchPort
       ? { webResearchPort: normalized.webResearchPort }

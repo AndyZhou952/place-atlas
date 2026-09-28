@@ -15,6 +15,12 @@ import {
   restaurantSearchDescription,
   isTabelogRestaurantListing,
 } from './research-instructions.ts';
+import { explicitReservationTiming } from './reservation-timing.ts';
+import {
+  isTableCheckBookingPage,
+  readTableCheckBookingPage,
+  type TableCheckBookingEvidence,
+} from './tablecheck-booking.ts';
 
 export interface AgentConfiguration {
   apiKey: string;
@@ -93,6 +99,7 @@ export function createPlaceResearchAgent(
       if (!('selectedSubject' in input)) return { kind: 'unavailable' };
       const signal = AbortSignal.timeout(35_000);
       const evidence: TabelogEvidence[] = [];
+      let bookingEvidence: TableCheckBookingEvidence | undefined;
       const messages: Record<string, unknown>[] = [
         { role: 'system', content: restaurantResearchPrompt },
         { role: 'user', content: JSON.stringify(input.selectedSubject) },
@@ -148,6 +155,32 @@ export function createPlaceResearchAgent(
             break;
         }
       };
+      const readSelectedBookingPage = async (sources: SearchEvidence[]) => {
+        if (bookingEvidence) return;
+        const index = sources.findIndex((source) =>
+          isTableCheckBookingPage(source.url),
+        );
+        if (index < 0) return;
+        const result = await readTableCheckBookingPage(
+          sources[index].url,
+          fetcher,
+          signal,
+        );
+        if (result.kind !== 'read') return;
+        const booking = result.evidence.booking;
+        if (
+          !matchesSelectedBranch(
+            `${booking.name} ${booking.address}`,
+            input.selectedSubject.transientName,
+            input.selectedSubject.transientAddress,
+            input.selectedSubject.ownerQuery,
+            booking.address,
+          )
+        )
+          return;
+        bookingEvidence = result.evidence;
+        sources[index] = result.evidence;
+      };
       try {
         const selectedListing =
           input.selectedSubject.providerNamespace === 'tabelog'
@@ -185,6 +218,7 @@ export function createPlaceResearchAgent(
           if (result.kind === 'results') {
             successfulSearches++;
             await readSelectedListing(result.sources);
+            await readSelectedBookingPage(result.sources);
             evidence.push(...result.sources);
           }
           messages.push({
@@ -195,6 +229,40 @@ export function createPlaceResearchAgent(
               remainingSearchCalls: 1,
               instruction:
                 'Use these source facts only if their branch matches the selected address. One search remains for missing details or a corrected branch. Do not invent translations of the selected name or address.',
+            }),
+          });
+        }
+        // A branch-matched listing can name its booking provider without
+        // giving the booking URL. Spend the remaining search on that provider
+        // so a generic model query cannot miss the primary booking rules.
+        const hintedListing = evidence.find(
+          (source) =>
+            source.restaurant?.bookingProviderHint === 'tablecheck' &&
+            matchesSelectedBranch(
+              `${source.restaurant.name} ${source.restaurant.aliases?.join(' ') ?? ''} ${source.restaurant.address}`,
+              input.selectedSubject.transientName,
+              input.selectedSubject.transientAddress,
+              input.selectedSubject.ownerQuery,
+              source.restaurant.address,
+            ),
+        );
+        if (hintedListing && !bookingEvidence && searches < 2) {
+          searches++;
+          const query = `${input.selectedSubject.transientName.slice(0, 200)} ${input.selectedSubject.ownerQuery.slice(0, 160)} TableCheck reservation`;
+          const result = await searchProvider.search(query, signal);
+          if (result.kind === 'results') {
+            successfulSearches++;
+            await readSelectedBookingPage(result.sources);
+            evidence.push(...result.sources);
+          }
+          messages.push({
+            role: 'user',
+            content: JSON.stringify({
+              applicationSearch: query,
+              sources: result.kind === 'results' ? result.sources : result,
+              remainingSearchCalls: 0,
+              instruction:
+                'The selected listing named TableCheck as its booking provider. Use only branch-matched, explicit booking rules; an unavailable page leaves timing unknown.',
             }),
           });
         }
@@ -277,6 +345,7 @@ export function createPlaceResearchAgent(
                 successfulSearches++;
                 if (config.readSourcePages !== false) {
                   await readSelectedListing(result.sources);
+                  await readSelectedBookingPage(result.sources);
                 }
                 evidence.push(...result.sources);
               }
@@ -310,7 +379,11 @@ export function createPlaceResearchAgent(
           );
           // The parsed main listing has its own branch check. Do not discard
           // those independently verified facts because the model is uncertain.
-          if (proposal.subjectMatch !== 'matched' && !matchedListing)
+          if (
+            proposal.subjectMatch !== 'matched' &&
+            !matchedListing &&
+            !bookingEvidence
+          )
             return {
               kind: 'observed',
               value: { tabelog: unknown, reservation: unknown },
@@ -362,22 +435,24 @@ export function createPlaceResearchAgent(
             const allowed =
               field === 'tabelog'
                 ? ['status', 'score', 'reviewCount', 'url']
-                : [
-                    'status',
-                    'mode',
-                    'label',
-                    'advanceDays',
-                    'bookingWindowLabel',
-                    'releaseNote',
-                    'channel',
-                    'url',
-                  ];
+                : ['status', 'mode', 'label', 'releaseNote', 'channel', 'url'];
+            const timing =
+              field === 'reservation' && value.mode !== 'not_reservable'
+                ? explicitReservationTiming(quote.quote)
+                : {};
             return {
               ...Object.fromEntries(
                 allowed
-                  .filter((key) => value[key] !== undefined)
+                  .filter(
+                    (key) =>
+                      value[key] !== undefined &&
+                      (!['releaseNote', 'channel'].includes(key) ||
+                        (typeof value[key] === 'string' &&
+                          quote.quote.includes(value[key]))),
+                  )
                   .map((key) => [key, value[key]]),
               ),
+              ...timing,
               provenance: 'agent_observed',
               observedAt,
               freshness: 'fresh',
@@ -511,12 +586,35 @@ export function createPlaceResearchAgent(
                   status: 'known',
                   mode,
                   label: policy.slice(0, 500),
+                  ...(mode === 'not_reservable'
+                    ? {}
+                    : explicitReservationTiming(policy)),
                   url: sourceUrl,
                   provenance: 'agent_observed',
                   observedAt,
                   freshness: 'fresh',
                 };
             }
+          }
+          if (bookingEvidence) {
+            const corroboratedPolicy =
+              reservation.status === 'known' &&
+              reservation.mode !== 'not_reservable'
+                ? reservation
+                : undefined;
+            reservation = {
+              status: 'known',
+              mode: corroboratedPolicy?.mode ?? 'reservable',
+              label: corroboratedPolicy?.label ?? '予約可',
+              bookingWindowLabel: bookingEvidence.booking.bookingWindowLabel,
+              ...(bookingEvidence.booking.advanceDays === undefined
+                ? {}
+                : { advanceDays: bookingEvidence.booking.advanceDays }),
+              url: bookingEvidence.url,
+              provenance: 'agent_observed',
+              observedAt,
+              freshness: 'fresh',
+            };
           }
           for (const key of Object.keys(profile)) {
             if (!validateEnrichedProfile({ [key]: profile[key] }))
@@ -713,7 +811,9 @@ function matchesSelectedBranch(
     .replace(/[^a-z]/gu, '');
   return Object.entries(aliasesByLocality).some(
     ([latin, japanese]) =>
-      latinAddress.includes(latin) && addressText.includes(normalize(japanese)),
+      latinAddress.includes(latin) &&
+      (addressText.includes(normalize(japanese)) ||
+        addressText.includes(latin)),
   );
 }
 

@@ -158,6 +158,22 @@ test('listing exposes sourced location, cuisine, official link and explicit rese
   assert.equal(missing.restaurant.reservation, undefined);
 });
 
+test('the listing remarks can identify TableCheck without inventing a booking window', () => {
+  const result = parseTabelogListing(
+    html(restaurant) +
+      '<table><tr><th>備考</th><td>公式InstagramのTable Checkから予約</td></tr></table>',
+    url,
+  );
+  assert.equal(result.restaurant.bookingProviderHint, 'tablecheck');
+  assert.equal(result.restaurant.reservation, undefined);
+  const absent = parseTabelogListing(
+    html(restaurant) +
+      '<table><tr><th>備考</th><td>予約が必要</td></tr></table>',
+    url,
+  );
+  assert.equal(absent.restaurant.bookingProviderHint, undefined);
+});
+
 test('wrong identities, review-only ratings, malformed and conflicting records provide no fact', () => {
   for (const record of [
     { ...restaurant, '@id': url.replace('13131643', '13131644') },

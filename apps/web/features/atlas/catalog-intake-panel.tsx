@@ -268,12 +268,14 @@ export function CatalogIntakePanel({
               complete the missing information.
             </p>
           ) : null}
-          <details className="catalog-intake-note">
-            <summary>Save details</summary>
-            <span className="catalog-intake-receipt">
-              Receipt {state.success?.receiptRef}
-            </span>
-          </details>
+          {state.success?.status !== 'already_saved' ? (
+            <details className="catalog-intake-note">
+              <summary>Save details</summary>
+              <span className="catalog-intake-receipt">
+                Receipt {state.success?.receiptRef}
+              </span>
+            </details>
+          ) : null}
         </output>
       ) : null}
     </section>
@@ -593,13 +595,19 @@ function PreviewStep({
         <h5 id="catalog-intake-preview-warnings">Warnings</h5>
         {presentation.duplicates.length ? (
           <div className="catalog-intake-state is-attention">
-            <strong>Possible duplicates</strong>
+            <strong>
+              {presentation.duplicates.some((item) => item.match === 'strong')
+                ? 'Already saved'
+                : 'Possible duplicates'}
+            </strong>
             <ul>
               {presentation.duplicates.map((duplicate) => (
                 <li key={duplicate.itemId}>
                   {duplicate.title}
                   {duplicate.address ? ` · ${duplicate.address}` : ''} ·{' '}
-                  {duplicate.match} match
+                  {duplicate.match === 'strong'
+                    ? 'same restaurant'
+                    : 'same location; check whether this is a different place'}
                 </li>
               ))}
             </ul>
@@ -826,16 +834,24 @@ function PreviewStep({
             the preview before saving.
           </p>
         ) : null}
+        {preview.suspectedDuplicates.some((item) => item.match === 'strong') ? (
+          <p>
+            This restaurant is already in your Atlas. Nothing new is needed.
+          </p>
+        ) : null}
         <Button
           type="button"
           onClick={() => void onConfirm()}
           disabled={
             busy ||
             intake.state.previewNeedsRefresh ||
-            preview.locationEvidence.status === 'unknown'
+            preview.locationEvidence.status === 'unknown' ||
+            preview.suspectedDuplicates.some((item) => item.match === 'strong')
           }
         >
-          {confirmLabel}
+          {preview.suspectedDuplicates.some((item) => item.match === 'strong')
+            ? 'Already saved'
+            : confirmLabel}
         </Button>
         <Button
           type="button"
@@ -916,6 +932,9 @@ function successMessage(
   }
   if (status === 'committed_needs_review') {
     return 'This legacy save is not map-ready. Retry Add.';
+  }
+  if (status === 'already_saved') {
+    return 'This restaurant is already saved. Nothing new was added.';
   }
   return 'Existing place reused; no duplicate was created.';
 }

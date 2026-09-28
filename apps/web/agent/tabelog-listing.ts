@@ -11,6 +11,7 @@ export interface TabelogEvidence extends SearchEvidence {
     coordinates?: { latitude: number; longitude: number };
     categories: string[];
     reservation?: string;
+    bookingProviderHint?: 'tablecheck';
     officialWebsite?: string;
     introduction?: string;
   };
@@ -166,6 +167,7 @@ export function parseTabelogListing(
         .slice(0, 3)
     : [];
   const reservation = clean(row('予約可否') ?? '').slice(0, 1000);
+  const remarks = clean(row('備考') ?? '').slice(0, 1000);
   const introduction = clean(
     row('お店のPR') ??
       /<p\b[^>]*class=["'][^"']*\bpr-comment\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/iu.exec(
@@ -206,6 +208,9 @@ export function parseTabelogListing(
     area: `${String(parts[1])}${String(parts[2]).split(/[0-9０-９]/u)[0]}`.trim(),
     ...(coordinates ? { coordinates } : {}),
     ...(reservation ? { reservation } : {}),
+    ...(/Table\s*Check/iu.test(remarks)
+      ? { bookingProviderHint: 'tablecheck' as const }
+      : {}),
     ...(introduction ? { introduction } : {}),
     ...(website ? { officialWebsite: clean(website) } : {}),
   };

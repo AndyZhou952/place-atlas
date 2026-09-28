@@ -184,6 +184,9 @@ export function createOwnerPocComposition(
       }
     : environmentResearchPort;
   const catalogIntakeModule = createCatalogIntakeModule({
+    savedPlaceLookup: {
+      list: () => catalogRead.list('verified_catalog'),
+    },
     discoveryPort: discovery,
     ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),
     ...(webResearchPort ? { webResearchPort } : {}),

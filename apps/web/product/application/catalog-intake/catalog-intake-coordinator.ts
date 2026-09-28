@@ -13,6 +13,10 @@ import {
   canonicalizeCatalogIntakeWarnings,
   type CatalogIntakeWarningCode,
 } from './catalog-intake-warning-policy.ts';
+import {
+  findSavedPlaceDuplicates,
+  type SavedPlace,
+} from './saved-place-duplicates.ts';
 
 export type AddErrorCode =
   | 'invalid_input'
@@ -472,6 +476,7 @@ export type CatalogIntakeConfirmOutput =
       readonly replayed: boolean;
     }
   | { readonly status: 'conflict'; readonly newPreview: CatalogIntakePreview }
+  | { readonly status: 'already_saved'; readonly itemId: string }
   | {
       readonly status: 'failed_no_write';
       readonly reason: 'validation' | 'dependency' | 'transaction';
@@ -682,6 +687,7 @@ export function createCatalogIntakeModule(options: {
   readonly webResearchPort?: WebResearchPort;
   readonly enrichmentPolicy?: 'disabled' | 'enrich_if_available';
   readonly atlasCatalogIntakePort?: AtlasCatalogIntakePort;
+  readonly savedPlaceLookup?: { list(): Promise<readonly SavedPlace[]> };
   readonly statePort: CatalogIntakeStatePort;
   readonly clock: { now(): Date };
   readonly idSource: { nextId(): string };
@@ -1225,7 +1231,21 @@ export function createCatalogIntakeModule(options: {
           locationEvidence,
           tabelog,
           reservation,
-          suspectedDuplicates: [] as const,
+          suspectedDuplicates: options.savedPlaceLookup
+            ? findSavedPlaceDuplicates(
+                {
+                  candidateIdentity: {
+                    providerNamespace: candidate.providerNamespace,
+                    placeId: candidate.placeId,
+                  },
+                  ownerFields,
+                  addressProposal,
+                  locationEvidence,
+                  tabelog,
+                },
+                await options.savedPlaceLookup.list(),
+              )
+            : ([] as const),
           unknownFields: [
             ...(!ownerFields.address && !addressProposal
               ? (['address'] as const)
@@ -1799,6 +1819,17 @@ export function createCatalogIntakeModule(options: {
           session = markedSession;
         }
         if (options.atlasCatalogIntakePort) {
+          if (options.savedPlaceLookup) {
+            const existing = findSavedPlaceDuplicates(
+              session.preview,
+              await options.savedPlaceLookup.list(),
+            ).find((duplicate) => duplicate.match === 'strong');
+            if (existing)
+              return success({
+                status: 'already_saved',
+                itemId: existing.itemId,
+              });
+          }
           // Incomplete research stays in Add, never a hidden review queue.
           if (!hasPublishableLocation(session.preview)) {
             return success({ status: 'failed_no_write', reason: 'validation' });

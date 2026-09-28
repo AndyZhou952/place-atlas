@@ -17,7 +17,7 @@ import type { CatalogIntakeConfirmOutput } from '../../product/application/catal
 
 type CommittedCatalogIntakeOutput = Exclude<
   CatalogIntakeConfirmOutput,
-  { readonly status: 'conflict' | 'failed_no_write' }
+  { readonly status: 'conflict' | 'failed_no_write' | 'already_saved' }
 >;
 
 export function useCatalogIntake(
@@ -168,7 +168,11 @@ export function useCatalogIntake(
         },
       });
       dispatch({ type: 'confirm_succeeded', output });
-      if (output.status !== 'conflict' && output.status !== 'failed_no_write') {
+      if (
+        output.status === 'committed_verified' ||
+        output.status === 'committed_needs_review' ||
+        output.status === 'reused_existing'
+      ) {
         onCommitted?.(output);
       }
     } catch (error) {

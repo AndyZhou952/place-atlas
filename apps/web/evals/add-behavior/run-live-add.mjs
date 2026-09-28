@@ -57,16 +57,19 @@ function score(sample, preview) {
     ),
     location:
       preview?.locationEvidence?.status === 'known' &&
-      preview.locationEvidence.provenance === 'agent_observed' &&
-      preview.locationEvidence.sourceUrl === sample.expectedTabelogUrl &&
+      preview.locationEvidence.provenance ===
+        (sample.expectedLocationProvenance ?? 'agent_observed') &&
+      (!sample.expectedTabelogUrl ||
+        preview.locationEvidence.sourceUrl === sample.expectedTabelogUrl) &&
       typeof preview.locationEvidence.latitude === 'number' &&
       typeof preview.locationEvidence.longitude === 'number',
     rating:
-      preview?.tabelog?.status === 'known' &&
-      preview.tabelog.url === sample.expectedTabelogUrl &&
-      preview.tabelog.provenance === 'agent_observed' &&
-      preview.tabelog.score >= 1 &&
-      preview.tabelog.score <= 5,
+      !sample.expectedTabelogUrl ||
+      (preview?.tabelog?.status === 'known' &&
+        preview.tabelog.url === sample.expectedTabelogUrl &&
+        preview.tabelog.provenance === 'agent_observed' &&
+        preview.tabelog.score >= 1 &&
+        preview.tabelog.score <= 5),
     reservation:
       preview?.reservation?.status === 'known' &&
       preview.reservation.mode === sample.expectedReservationMode,
@@ -75,6 +78,21 @@ function score(sample, preview) {
       preview?.reservation?.releaseNote?.includes(
         sample.expectedReleaseNoteIncludes,
       ),
+    category:
+      !sample.expectedCategoryIncludes ||
+      preview?.profile?.categories?.value?.some((category) =>
+        category
+          .toLowerCase()
+          .includes(sample.expectedCategoryIncludes.toLowerCase()),
+      ),
+    summary:
+      !sample.expectedSummaryPrefix ||
+      preview?.profile?.summary?.value?.startsWith(
+        sample.expectedSummaryPrefix,
+      ),
+    bookingLink:
+      !sample.expectedBookingLink ||
+      preview?.profile?.bookingLink?.value === sample.expectedBookingLink,
     savedDuplicate:
       Boolean(
         preview?.suspectedDuplicates?.some((item) => item.match === 'strong'),
@@ -89,6 +107,9 @@ function score(sample, preview) {
       tabelog: preview?.tabelog?.status,
       reservation: preview?.reservation?.mode ?? preview?.reservation?.status,
       releaseNote: preview?.reservation?.releaseNote,
+      categories: preview?.profile?.categories?.value,
+      summary: preview?.profile?.summary?.value,
+      bookingLink: preview?.profile?.bookingLink?.value,
       duplicate: preview?.suspectedDuplicates?.map((item) => item.match),
     },
   };
@@ -111,11 +132,12 @@ for (const sample of cases) {
     sessionVersion = discovered.body.sessionVersion;
     conversationId = discovered.conversationId;
     const candidates = discovered.body.candidates ?? [];
-    const matches = candidates.filter((candidate) =>
-      candidate.transientName
-        ?.toLowerCase()
-        .includes(sample.candidateNameIncludes.toLowerCase()),
-    );
+    const matches = candidates.filter((candidate) => {
+      const name = candidate.transientName?.toLowerCase();
+      return sample.candidateNameExact
+        ? name === sample.candidateNameExact.toLowerCase()
+        : name?.includes(sample.candidateNameIncludes.toLowerCase());
+    });
     if (discovered.status !== 200 || matches.length !== 1) {
       result = {
         pass: false,

@@ -12,7 +12,7 @@ const dataset = JSON.parse(
 );
 
 assert.equal(dataset.schemaVersion, 1);
-assert.equal(dataset.cases.length, 13);
+assert.equal(dataset.cases.length, 17);
 for (const entry of dataset.cases) {
   test(`Add presentation: ${entry.caseId}`, () => {
     const summary = composeRestaurantSummary(entry.input) ?? null;

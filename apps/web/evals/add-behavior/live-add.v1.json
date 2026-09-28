@@ -25,7 +25,8 @@
       "candidateNameIncludes": "Umibozu",
       "expectedTitleIncludes": "海坊厨",
       "expectedTabelogUrl": "https://tabelog.com/aomori/A0201/A020101/2000433/",
-      "expectedReservationMode": "reservable"
+      "expectedReservationMode": "reservable",
+      "expectedSummaryPrefix": "主营海鲜、西式料理"
     },
     {
       "id": "mendokoro-tenpo",
@@ -33,7 +34,8 @@
       "candidateNameIncludes": "メンドコロ天鳳",
       "expectedTitleIncludes": "メンドコロ",
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
-      "expectedReservationMode": "not_reservable"
+      "expectedReservationMode": "not_reservable",
+      "expectedSummaryPrefix": "主营拉面、无汤担担面"
     },
     {
       "id": "fuglen-tokyo-new-preview",
@@ -42,6 +44,7 @@
       "expectedTitleIncludes": "FUGLEN TOKYO",
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1318/A131810/13141002/",
       "expectedReservationMode": "not_reservable",
+      "expectedSummaryPrefix": "主营咖啡馆、酒吧",
       "expectedSavedDuplicate": false
     },
     {
@@ -51,7 +54,20 @@
       "expectedTitleIncludes": "小笠原伯爵邸",
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1305/A130504/13000998/",
       "expectedReservationMode": "reservation_required",
+      "expectedSummaryPrefix": "主营西班牙料理",
       "expectedReleaseNoteIncludes": "毎月1日",
+      "expectedSavedDuplicate": false
+    },
+    {
+      "id": "burnt-ends-dempsey-profile",
+      "query": "Burnt Ends Singapore Dempsey",
+      "candidateNameExact": "Burnt Ends",
+      "expectedTitleIncludes": "Burnt Ends",
+      "expectedLocationProvenance": "durable_geocoder_observed",
+      "expectedReservationMode": "reservable",
+      "expectedCategoryIncludes": "Australian barbecue",
+      "expectedSummaryPrefix": "主营澳式烧烤",
+      "expectedBookingLink": "https://burntends.com.sg/reservations/",
       "expectedSavedDuplicate": false
     }
   ]

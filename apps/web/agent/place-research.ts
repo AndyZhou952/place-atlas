@@ -3,7 +3,10 @@ import {
   validateEnrichedProfile,
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
-import { composeRestaurantSummary } from '../product/application/catalog-intake/restaurant-profile-presentation.ts';
+import {
+  compactRestaurantCategories,
+  composeRestaurantSummary,
+} from '../product/application/catalog-intake/restaurant-profile-presentation.ts';
 import { researchRegion } from '../product/application/catalog/research-region.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
 import type { RestaurantSourceReader } from './browser-source-reader.ts';
@@ -112,6 +115,9 @@ export function createPlaceResearchAgent(
       const signal = AbortSignal.timeout(35_000);
       const evidence: TabelogEvidence[] = [];
       let bookingEvidence: TableCheckBookingEvidence | undefined;
+      let officialCuisine:
+        | { readonly category: string; readonly sourceUrl: string }
+        | undefined;
       const messages: Record<string, unknown>[] = [
         { role: 'system', content: restaurantResearchPrompt },
         { role: 'user', content: JSON.stringify(input.selectedSubject) },
@@ -410,6 +416,11 @@ export function createPlaceResearchAgent(
                 : 'official_site_branch_mismatch',
           );
           if (branchSources.length) {
+            officialCuisine = verifiedOfficialCuisine(
+              officialSources,
+              input.selectedSubject,
+            );
+            if (officialCuisine) diagnostic('official_cuisine_verified');
             successfulSearches++;
             // The exact branch already has direct pages. Do not let a model
             // spend the 35-second window on the blocked public search fallback.
@@ -663,7 +674,8 @@ export function createPlaceResearchAgent(
           if (
             proposal.subjectMatch !== 'matched' &&
             !matchedListing &&
-            !bookingEvidence
+            !bookingEvidence &&
+            !officialCuisine
           ) {
             diagnostic('branch_gate_closed');
             return {
@@ -762,6 +774,24 @@ export function createPlaceResearchAgent(
             // identity quote; this exemption never applies to another source.
             const verifiedListingProof =
               matchedListing && proof?.url === matchedListing.url;
+            if (field === 'categories' && claim !== undefined) {
+              diagnostic(
+                !supported(proof, evidence)
+                  ? 'category_rejected_source_quote'
+                  : !verifiedListingProof &&
+                      !supportedIdentity(
+                        proof,
+                        {
+                          url: proof?.identityUrl ?? proof?.url,
+                          quote: proof?.identityQuote,
+                        },
+                        evidence,
+                        input.selectedSubject,
+                      )
+                    ? 'category_rejected_branch_identity'
+                    : 'category_evidence_supported',
+              );
+            }
             if (
               claim === undefined ||
               !supported(proof, evidence) ||
@@ -809,6 +839,29 @@ export function createPlaceResearchAgent(
                 };
               continue;
             }
+            if (field === 'categories' && Array.isArray(claim)) {
+              const normalizeCategory = (value: string) =>
+                value
+                  .normalize('NFKC')
+                  .toLowerCase()
+                  .replace(/[\p{P}\p{Z}\s]/gu, '');
+              const quote = normalizeCategory(proof.quote);
+              const categories = compactRestaurantCategories(
+                claim.filter(
+                  (category: unknown): category is string =>
+                    typeof category === 'string' &&
+                    normalizeCategory(category).length >= 3 &&
+                    quote.includes(normalizeCategory(category)),
+                ),
+              );
+              if (categories.length)
+                profile[field] = {
+                  value: categories,
+                  sourceUrl: proof.url,
+                  observedAt,
+                };
+              continue;
+            }
             const tokens = Array.isArray(claim)
               ? claim
               : field === 'googleRating' && claim && typeof claim === 'object'
@@ -825,8 +878,9 @@ export function createPlaceResearchAgent(
                   ? numericToken(proof.quote, token)
                   : typeof token === 'string' && proof.quote.includes(token),
               )
-            )
+            ) {
               continue;
+            }
             profile[field] = { value: claim, sourceUrl: proof.url, observedAt };
           }
           let reservation = fact('reservation');
@@ -906,6 +960,19 @@ export function createPlaceResearchAgent(
               provenance: 'agent_observed',
               observedAt,
               freshness: 'fresh',
+            };
+          }
+          if (officialCuisine) {
+            const existing = profile.categories as
+              | { value: readonly string[] }
+              | undefined;
+            profile.categories = {
+              value: compactRestaurantCategories([
+                officialCuisine.category,
+                ...(existing?.value ?? []),
+              ]),
+              sourceUrl: officialCuisine.sourceUrl,
+              observedAt,
             };
           }
           for (const key of Object.keys(profile)) {
@@ -1122,6 +1189,45 @@ function isGoogleMapsRatingUrl(value: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+/** Conservative official prose fallback when a model paraphrases cuisine. */
+function verifiedOfficialCuisine(
+  sources: SearchEvidence[],
+  subject: {
+    transientName: string;
+    transientAddress: string;
+    ownerQuery: string;
+  },
+): { category: string; sourceUrl: string } | undefined {
+  for (const page of sources) {
+    const cuisine =
+      /\bserv(?:es|ing)\s+((?:[a-z-]+\s+){0,4}(?:barbecue|bbq|cuisine|sushi|ramen|coffee|pizza|pasta))\b/iu.exec(
+        page.content,
+      )?.[1];
+    if (!cuisine) continue;
+    for (const identity of sources) {
+      if (identity.url === page.url) continue;
+      let start = identity.content.indexOf(subject.transientName);
+      for (let attempt = 0; start >= 0 && attempt < 12; attempt++) {
+        const quote = identity.content.slice(start, start + 180);
+        if (
+          supportedIdentity(
+            { url: page.url },
+            { url: identity.url, quote },
+            sources,
+            subject,
+          )
+        )
+          return { category: cuisine.trim(), sourceUrl: page.url };
+        start = identity.content.indexOf(
+          subject.transientName,
+          start + subject.transientName.length,
+        );
+      }
+    }
+  }
+  return undefined;
 }
 
 function matchesSelectedBranch(

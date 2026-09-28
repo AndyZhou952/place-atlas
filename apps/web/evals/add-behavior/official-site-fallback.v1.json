@@ -20,6 +20,14 @@
       "expectReleaseNote": true
     },
     {
+      "id": "restaurant-cuisine-survives-model-omission",
+      "identityUnit": "#01-02",
+      "modelCategories": false,
+      "expectCategory": true,
+      "expectBooking": true,
+      "expectReleaseNote": true
+    },
+    {
       "id": "bar-identity-cannot-authorize-restaurant-page-fact",
       "identityUnit": "#01-04",
       "expectCategory": false,

@@ -112,7 +112,7 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
       ],
       [
         'https://burntends.com.sg/contact/',
-        `<title>Contact</title><p>${identity}. ${barIdentity}.</p>`,
+        `<title>Contact</title><p>${row.identityUnit === '#01-02' ? identity : barIdentity}.</p>`,
       ],
       [
         'https://burntends.com.sg/reservations/',
@@ -139,7 +139,15 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
                   tabelog: { status: 'unknown' },
                   reservation: { status: 'unknown' },
                   profile: {
-                    categories: ['modern Australian barbecue'],
+                    ...(row.modelCategories === false
+                      ? {}
+                      : {
+                          categories: [
+                            'Modern Australian Barbecue',
+                            'barbecue',
+                            'invented cuisine',
+                          ],
+                        }),
                     bookingLink: 'https://burntends.com.sg/reservations/',
                   },
                   evidence: {
@@ -174,11 +182,14 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
         transientAddress: '7 Dempsey Rd, #01-02, Singapore 249671',
       },
     });
-    assert.equal(result.kind, 'observed');
+    assert.equal(result.kind, row.expectCategory ? 'observed' : 'unavailable');
+    if (result.kind !== 'observed') return;
     assert.equal(
       result.value.profile?.categories?.value?.[0],
-      row.expectCategory ? 'modern Australian barbecue' : undefined,
+      'modern Australian barbecue',
     );
+    assert.equal(result.value.profile?.categories?.value?.length, 1);
+    assert.equal(result.value.profile?.summary?.value, '主营澳式烧烤。');
     assert.equal(
       result.value.profile?.bookingLink?.value,
       row.expectBooking ? 'https://burntends.com.sg/reservations/' : undefined,

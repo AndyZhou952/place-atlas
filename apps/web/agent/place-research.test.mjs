@@ -102,7 +102,7 @@ test('research executes fixed search tool then produces validated sourced previe
   assert.match(requests[0].body.messages[0].content, /official website/u);
   assert.match(
     requests[0].body.tools[0].function.description,
-    /not full pages/u,
+    /never full pages/u,
   );
 });
 
@@ -382,6 +382,123 @@ test('discovered main listing supplies aggregate evidence missing from search sn
   assert.equal(reads, 1);
 });
 
+test('a branch-matched unrated listing retains its profile and leaves Tabelog score unknown', async () => {
+  const agent = createPlaceResearchAgent({
+    ...config,
+    readSourcePages: true,
+    sourceReader: async (target) => {
+      assert.equal(target, url);
+      return {
+        kind: 'read',
+        evidence: {
+          url,
+          title: 'アルデバラン',
+          content: 'アルデバラン 東京都港区麻布十番 ハンバーガー',
+          restaurant: {
+            name: 'アルデバラン',
+            address: '東京都港区麻布十番',
+            area: '港区麻布十番',
+            categories: ['ハンバーガー'],
+          },
+        },
+      };
+    },
+    fetch: async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                subjectMatch: 'matched',
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              }),
+            },
+          },
+        ],
+      }),
+  });
+  const result = await agent.research({
+    ...input,
+    selectedSubject: { ...subject, providerNamespace: 'tabelog', placeId: url },
+  });
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.value.tabelog.status, 'unknown');
+  assert.equal(result.value.profile.name.value, 'アルデバラン');
+  assert.deepEqual(result.value.profile.categories.value, ['ハンバーガー']);
+});
+
+test('English Tokyo ward address accepts the exact Japanese listing despite model uncertainty', async () => {
+  const tenhoUrl = 'https://tabelog.com/tokyo/A1319/A131903/13277105/';
+  const selectedSubject = {
+    ownerQuery: 'メンドコロ天鳳',
+    providerNamespace: 'google-places',
+    placeId: 'google-tenho',
+    transientName: 'メンドコロ天鳳',
+    transientAddress:
+      'Japan, 〒164-0011 Tokyo, Nakano City, Chūō, 2-chōme−30−５ ハイムタカラ',
+  };
+  for (const [sourceAddress, expectedKnown] of [
+    ['東京都中野区中央2-30-5 ハイムタカラ 1F', true],
+    ['東京都新宿区中央2-30-5 ハイムタカラ 1F', false],
+    ['東京都中野区中央2-30-6 ハイムタカラ 1F', false],
+  ]) {
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async () => ({
+        kind: 'read',
+        evidence: {
+          url: tenhoUrl,
+          title: 'メンドコロ 天鳳',
+          content: `メンドコロ 天鳳 ${sourceAddress}\nTabelog aggregate restaurant rating: 3.53`,
+          restaurant: {
+            name: 'メンドコロ 天鳳',
+            address: sourceAddress,
+            area: '中野区中央',
+            score: 3.53,
+            categories: ['ラーメン', '汁なし担々麺'],
+            coordinates: { latitude: 35.6979, longitude: 139.6792 },
+            reservation: '予約不可',
+          },
+        },
+      }),
+      fetch: async (endpoint) =>
+        endpoint === 'https://api.tavily.com/search'
+          ? Response.json({
+              results: [{ url: tenhoUrl, content: 'メンドコロ 天鳳' }],
+            })
+          : Response.json({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      subjectMatch: 'uncertain',
+                      tabelog: { status: 'unknown' },
+                      reservation: { status: 'unknown' },
+                    }),
+                  },
+                },
+              ],
+            }),
+    });
+    const result = await agent.research({ ...input, selectedSubject });
+    assert.equal(result.kind, 'observed');
+    assert.equal(
+      result.value.tabelog.status,
+      expectedKnown ? 'known' : 'unknown',
+      sourceAddress,
+    );
+    if (expectedKnown) {
+      assert.equal(result.value.tabelog.score, 3.53);
+      assert.equal(result.value.profile.address.value, sourceAddress);
+      assert.equal(result.value.reservation.mode, 'not_reservable');
+    } else {
+      assert.equal(result.value.profile, undefined);
+    }
+  }
+});
+
 test('selected-name lookup precedes the model and keeps relocated branches separate', async () => {
   const dataset = JSON.parse(
     readFileSync(
@@ -424,9 +541,9 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
       fetch: async (endpoint, init) => {
         if (endpoint === 'https://api.tavily.com/search') {
           calls.push('search');
-          assert.equal(
+          assert.match(
             JSON.parse(init.body).query,
-            'TONKATSU KEITA site:tabelog.com',
+            /^TONKATSU KEITA .*3-41-1 site:tabelog\.com$/u,
           );
           return Response.json({
             results: [{ url: listingUrl, content: 'Restaurant listing' }],
@@ -776,6 +893,18 @@ test('short selected Japanese names still require matching branch address', asyn
         ...input,
         selectedSubject: {
           ...selectedSubject,
+          transientName: 'Kabuto',
+        },
+      })
+    ).value.tabelog.score,
+    4.42,
+  );
+  assert.equal(
+    (
+      await agent.research({
+        ...input,
+        selectedSubject: {
+          ...selectedSubject,
           transientAddress: 'Tokyo Ikebukuro 2-53-3',
         },
       })
@@ -873,4 +1002,276 @@ test('Japanese branch evidence can match English Google address by alias and str
     },
   });
   assert.equal(sameNumbersDifferentCity.value.tabelog.status, 'unknown');
+});
+
+test('booking timing comes from the branch-matched source, not a model number', async () => {
+  for (const [sourceAddress, expectedKnown] of [
+    ['東京都港区麻布十番', true],
+    ['東京都新宿区西新宿', false],
+  ]) {
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async () => ({
+        kind: 'read',
+        evidence: {
+          url,
+          title: 'アルデバラン',
+          content: `アルデバラン ${sourceAddress}`,
+          restaurant: {
+            name: 'アルデバラン',
+            address: sourceAddress,
+            area: '麻布十番',
+            categories: ['ハンバーガー'],
+            reservation: '予約可。予約は30日前から受付。',
+          },
+        },
+      }),
+      fetch: async (endpoint) =>
+        endpoint === 'https://api.tavily.com/search'
+          ? Response.json({ results: [{ url, content: 'アルデバラン' }] })
+          : Response.json({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      subjectMatch: 'uncertain',
+                      tabelog: { status: 'unknown' },
+                      reservation: { status: 'unknown' },
+                    }),
+                  },
+                },
+              ],
+            }),
+    });
+    const result = await agent.research(input);
+    assert.equal(result.kind, 'observed');
+    assert.equal(
+      result.value.reservation.status,
+      expectedKnown ? 'known' : 'unknown',
+    );
+    if (expectedKnown) {
+      assert.equal(result.value.reservation.advanceDays, 30);
+      assert.equal(
+        result.value.reservation.bookingWindowLabel,
+        '30日前から受付',
+      );
+    }
+  }
+
+  const invented = structuredClone(proposal);
+  invented.reservation = {
+    status: 'known',
+    mode: 'reservable',
+    label: '予約可',
+    advanceDays: 30,
+    bookingWindowLabel: '30日前から受付',
+    url,
+  };
+  invented.evidence.reservation = {
+    url,
+    quote: '予約可です',
+    identityQuote: 'アルデバラン 東京都港区麻布十番1-1-1',
+  };
+  let turn = 0;
+  const inventedAgent = createPlaceResearchAgent({
+    ...config,
+    fetch: async (endpoint) =>
+      endpoint === 'https://api.tavily.com/search'
+        ? Response.json({
+            results: [
+              {
+                url,
+                content: 'アルデバラン 東京都港区麻布十番1-1-1 予約可です',
+              },
+            ],
+          })
+        : Response.json({
+            choices: [
+              {
+                message:
+                  turn++ === 0
+                    ? { tool_calls: [tool] }
+                    : { content: JSON.stringify(invented) },
+              },
+            ],
+          }),
+  });
+  const result = await inventedAgent.research({
+    ...input,
+    selectedSubject: {
+      ...subject,
+      transientAddress: '東京都港区麻布十番1-1-1',
+    },
+  });
+  assert.equal(result.value.reservation.status, 'known');
+  assert.equal(result.value.reservation.advanceDays, undefined);
+  assert.equal(result.value.reservation.bookingWindowLabel, undefined);
+});
+
+test('bounded TableCheck read supplies a verified booking window without model invention', async () => {
+  const tableUrl =
+    'https://www.tablecheck.com/en/koffee-mameya-kakeru/reserve/landing';
+  const listingUrl = 'https://tabelog.com/tokyo/A1313/A131303/13255632/';
+  const bookingHtml = `<!doctype html><title>KOFFEE MAMEYA -Kakeru- - TableCheck</title>
+    <span data-testid="Processed Markup">【Address】</span><br>Hirano 2-16-14, Koto-ku, Tokyo, Japan<br>
+    Reservations can be made up to two month in advance.<br>`;
+  const selectedSubject = {
+    ownerQuery: 'KOFFEE MAMEYA Kakeru Kiyosumi Shirakawa',
+    providerNamespace: 'google-places',
+    placeId: 'google-kakeru',
+    transientName: 'KOFFEE MAMEYA Kakeru',
+    transientAddress: '2-chōme-16-14 Hirano, Koto City, Tokyo',
+  };
+  for (const [page, expectedKnown] of [
+    [bookingHtml, true],
+    [bookingHtml.replace('Koto-ku', 'Minato-ku'), false],
+  ]) {
+    let searches = 0;
+    let modelTurns = 0;
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async () => ({
+        kind: 'read',
+        evidence: {
+          url: listingUrl,
+          title: 'KOFFEE MAMEYA Kakeru',
+          content: 'KOFFEE MAMEYA Kakeru 東京都江東区平野2-16-14',
+          restaurant: {
+            name: 'KOFFEE MAMEYA Kakeru',
+            address: '東京都江東区平野2-16-14',
+            area: '江東区平野',
+            categories: ['カフェ'],
+            score: 3.51,
+          },
+        },
+      }),
+      fetch: async (endpoint) => {
+        if (endpoint === tableUrl)
+          return new Response(page, {
+            headers: { 'content-type': 'text/html' },
+          });
+        if (endpoint === 'https://api.tavily.com/search')
+          return Response.json({
+            results:
+              searches++ === 0
+                ? [{ url: listingUrl, content: 'KOFFEE MAMEYA Kakeru' }]
+                : [{ url: tableUrl, content: 'KOFFEE MAMEYA -Kakeru-' }],
+          });
+        return Response.json({
+          choices: [
+            {
+              message:
+                modelTurns++ === 0
+                  ? { tool_calls: [tool] }
+                  : {
+                      content: JSON.stringify({
+                        subjectMatch: 'uncertain',
+                        tabelog: { status: 'unknown' },
+                        reservation: { status: 'unknown' },
+                      }),
+                    },
+            },
+          ],
+        });
+      },
+    });
+    const result = await agent.research({ ...input, selectedSubject });
+    assert.equal(result.kind, 'observed');
+    assert.equal(result.value.tabelog.score, 3.51);
+    assert.equal(
+      result.value.reservation.status,
+      expectedKnown ? 'known' : 'unknown',
+    );
+    if (expectedKnown) {
+      assert.equal(
+        result.value.reservation.bookingWindowLabel,
+        'up to two month in advance',
+      );
+      assert.equal(result.value.reservation.advanceDays, undefined);
+      assert.equal(result.value.reservation.url, tableUrl);
+    }
+  }
+});
+
+test('a branch-matched TableCheck hint directs the second search before the model can miss it', async () => {
+  const tableUrl =
+    'https://www.tablecheck.com/en/koffee-mameya-kakeru/reserve/landing';
+  const listingUrl = 'https://tabelog.com/tokyo/A1313/A131303/13255632/';
+  const selectedSubject = {
+    ownerQuery: 'KOFFEE MAMEYA Kakeru Kiyosumi Shirakawa',
+    providerNamespace: 'google-places',
+    placeId: 'google-kakeru',
+    transientName: 'KOFFEE MAMEYA Kakeru',
+    transientAddress: '2-chōme-16-14 Hirano, Koto City, Tokyo',
+  };
+  const queries = [];
+  let modelCalls = 0;
+  const agent = createPlaceResearchAgent({
+    ...config,
+    readSourcePages: true,
+    sourceReader: async () => ({
+      kind: 'read',
+      evidence: {
+        url: listingUrl,
+        title: 'KOFFEE MAMEYA Kakeru',
+        content: 'KOFFEE MAMEYA Kakeru 東京都江東区平野2-16-14',
+        restaurant: {
+          name: 'KOFFEE MAMEYA Kakeru',
+          address: '東京都江東区平野2-16-14',
+          area: '江東区平野',
+          categories: ['カフェ'],
+          score: 3.51,
+          reservation: '完全予約制 予約優先',
+          bookingProviderHint: 'tablecheck',
+        },
+      },
+    }),
+    fetch: async (endpoint, request) => {
+      if (endpoint === tableUrl)
+        return new Response(
+          '<!doctype html><title>KOFFEE MAMEYA -Kakeru- - TableCheck</title><span>【Address】</span><br>Hirano 2-16-14, Koto-ku, Tokyo, Japan<br>Reservations can be made up to two month in advance.',
+          { headers: { 'content-type': 'text/html' } },
+        );
+      if (endpoint === 'https://api.tavily.com/search') {
+        const query = JSON.parse(request.body).query;
+        queries.push(query);
+        return Response.json({
+          results: [
+            {
+              url: queries.length === 1 ? listingUrl : tableUrl,
+              content: 'KOFFEE MAMEYA Kakeru',
+            },
+          ],
+        });
+      }
+      modelCalls++;
+      assert.equal(JSON.parse(request.body).tools, undefined);
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                subjectMatch: 'uncertain',
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              }),
+            },
+          },
+        ],
+      });
+    },
+  });
+  const result = await agent.research({ ...input, selectedSubject });
+  assert.equal(queries.length, 2);
+  assert.match(queries[1], /TableCheck reservation/u);
+  assert.equal(modelCalls, 1);
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.value.reservation.mode, 'reservation_required');
+  assert.equal(result.value.reservation.label, '完全予約制 予約優先');
+  assert.equal(
+    result.value.reservation.bookingWindowLabel,
+    'up to two month in advance',
+  );
 });

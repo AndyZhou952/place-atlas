@@ -65,7 +65,8 @@ export interface CatalogIntakeUiState {
       readonly status:
         | 'committed_verified'
         | 'committed_needs_review'
-        | 'reused_existing';
+        | 'reused_existing'
+        | 'already_saved';
     }
   >;
   readonly focusRevision: number;
@@ -147,6 +148,12 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
         'Clarification is required before the preview can be built.'
       );
     case 'preview':
+      if (
+        state.preview?.suspectedDuplicates.some(
+          (item) => item.match === 'strong',
+        )
+      )
+        return 'This restaurant is already in your Atlas. Open the saved place or cancel.';
       if (state.preview?.locationEvidence.status === 'unknown') {
         return 'Research incomplete. We could not verify this restaurant’s location. Nothing has been saved.';
       }
@@ -161,6 +168,9 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
       }
       if (state.success?.status === 'committed_needs_review') {
         return 'This legacy save is not map-ready. Retry Add.';
+      }
+      if (state.success?.status === 'already_saved') {
+        return 'This restaurant is already saved. Nothing new was added.';
       }
       return 'Existing place reused; no duplicate was created.';
   }

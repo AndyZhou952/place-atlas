@@ -19,3 +19,29 @@ void test('non-public v1 GET routes are owner guarded before application composi
     );
   }
 });
+
+void test('Google rating read is owner guarded before the provider service runs', async () => {
+  const source = await readFile(
+    new URL('./items/[id]/google-rating/route.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /export const GET = withOwnerReadAuth/u);
+  assert.ok(
+    source.indexOf('withOwnerReadAuth(async function GET') <
+      source.indexOf('getSavedPlaceGoogleRating(id)'),
+  );
+});
+
+void test('preview Google rating read is owner guarded and scoped to an owner conversation', async () => {
+  const source = await readFile(
+    new URL('./catalog-intake/google-rating/route.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /export const GET = withOwnerReadAuth/u);
+  assert.match(source, /getOwnerWebConversationId\(request\)/u);
+  assert.ok(
+    source.indexOf('withOwnerReadAuth(async function GET') <
+      source.indexOf('getPreviewGoogleRating(sessionId, conversationId)'),
+  );
+  assert.match(source, /private, no-store/u);
+});

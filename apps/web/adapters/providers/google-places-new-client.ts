@@ -10,7 +10,8 @@ const timeoutMs = 8_000;
 
 export type GooglePlacesUsageSku =
   | 'places.search_text.requests'
-  | 'places.details.requests';
+  | 'places.details.requests'
+  | 'places.details_rating.requests';
 
 export interface GooglePlacesUsagePort {
   reserve(input: {
@@ -102,11 +103,140 @@ export function createGooglePlacesNewClient(options: {
   };
 }
 
+/** Rating content is request scoped. Only the place ID may be retained. */
+export function createGooglePlaceRatingClient(options: {
+  readonly apiKey?: string;
+  readonly usage?: GooglePlacesUsagePort;
+  readonly fetch?: typeof fetch;
+}) {
+  const apiKey = normalizeSecret(options.apiKey);
+  const fetchImpl = options.fetch ?? fetch;
+  return {
+    async getRating(placeId: string) {
+      if (!apiKey || !options.usage || !validText(placeId, 1, 500))
+        return unavailable();
+      const reserved = await options.usage.reserve({
+        providerId: 'google-places-new',
+        sku: 'places.details_rating.requests',
+        units: 1,
+        requests: 1,
+        costUsd: 0.02,
+        hardRequestLimit: 1000,
+        hardUnitLimit: 1000,
+        hardCostLimitUsd: 20,
+      });
+      if (reserved !== 'reserved') return unavailable();
+      const response = await fetchBoundedJson(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'id,rating,userRatingCount,googleMapsUri',
+          },
+        },
+        { fetch: fetchImpl, timeoutMs, maximumBytes: maximumResponseBytes },
+      );
+      if (!response.ok || !isRecord(response.value)) return unavailable();
+      const value = response.value;
+      if (
+        value.id !== placeId ||
+        typeof value.rating !== 'number' ||
+        !Number.isFinite(value.rating) ||
+        value.rating < 0 ||
+        value.rating > 5 ||
+        (value.userRatingCount !== undefined &&
+          (typeof value.userRatingCount !== 'number' ||
+            !Number.isSafeInteger(value.userRatingCount) ||
+            value.userRatingCount < 0)) ||
+        typeof value.googleMapsUri !== 'string' ||
+        !isGoogleMapsLink(value.googleMapsUri)
+      )
+        return unavailable();
+      return {
+        ok: true as const,
+        value: {
+          score: value.rating,
+          ...(value.userRatingCount === undefined
+            ? {}
+            : { reviewCount: value.userRatingCount }),
+          url: value.googleMapsUri,
+        },
+      };
+    },
+    async getWebsiteUri(placeId: string) {
+      if (!apiKey || !options.usage || !validText(placeId, 1, 500))
+        return unavailable();
+      const reserved = await options.usage.reserve({
+        providerId: 'google-places-new',
+        // Both websiteUri and rating are Place Details Enterprise fields.
+        sku: 'places.details_rating.requests',
+        units: 1,
+        requests: 1,
+        costUsd: 0.02,
+        hardRequestLimit: 1000,
+        hardUnitLimit: 1000,
+        hardCostLimitUsd: 20,
+      });
+      if (reserved !== 'reserved') return unavailable();
+      const response = await fetchBoundedJson(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'id,websiteUri',
+          },
+        },
+        { fetch: fetchImpl, timeoutMs, maximumBytes: maximumResponseBytes },
+      );
+      if (!response.ok || !isRecord(response.value)) return unavailable();
+      const value = response.value;
+      return value.id === placeId && isPublicWebsite(value.websiteUri)
+        ? { ok: true as const, value: value.websiteUri }
+        : unavailable();
+    },
+  };
+}
+
+function isPublicWebsite(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 1000) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      /^(?!\d)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/iu.test(url.hostname) &&
+      !/(?:^|\.)(?:localhost|local|internal|test|invalid)$/iu.test(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isGoogleMapsLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      ((url.hostname === 'www.google.com' &&
+        url.pathname.startsWith('/maps/')) ||
+        url.hostname === 'maps.google.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
 function mapSearchResponse(value: unknown) {
-  if (!isRecord(value) || !Array.isArray(value.places)) {
+  if (!isRecord(value)) {
     return undefined;
   }
-  const providerPlaces = value.places;
+  // Google omits the repeated `places` field when a valid search has no hits.
+  const providerPlaces = value.places === undefined ? [] : value.places;
+  if (!Array.isArray(providerPlaces)) return undefined;
   if (providerPlaces.length > 4) return undefined;
   const places = providerPlaces.map((place, index) =>
     mapPlace(place, providerPlaces.length - index),

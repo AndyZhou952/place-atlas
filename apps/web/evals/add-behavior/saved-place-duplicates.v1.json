@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "purpose": "Detect an already saved selected restaurant before publication without merging nearby branches",
+  "cases": [
+    {
+      "id": "same-google-place-japanese-to-english",
+      "candidate": {
+        "name": "KOFFEE MAMEYA Kakeru",
+        "address": "2-16-14 Hirano, Koto City, Tokyo",
+        "latitude": 35.67648,
+        "longitude": 139.80419,
+        "provider": "google-places",
+        "placeId": "google-kakeru"
+      },
+      "saved": {
+        "title": "コーヒー マメヤ カケル",
+        "address": "東京都江東区平野2-16-14",
+        "latitude": 35.67648,
+        "longitude": 139.80419,
+        "provider": "google-places",
+        "placeId": "google-kakeru"
+      },
+      "expected": "strong"
+    },
+    {
+      "id": "same-google-place-chinese-to-japanese",
+      "candidate": {
+        "name": "魯珈咖喱",
+        "address": "東京都新宿区百人町1-24-7",
+        "latitude": 35.701,
+        "longitude": 139.699,
+        "provider": "google-places",
+        "placeId": "google-roka"
+      },
+      "saved": {
+        "title": "SPICY CURRY 魯珈",
+        "address": "東京都新宿区百人町1-24-7",
+        "latitude": 35.701,
+        "longitude": 139.699,
+        "provider": "google-places",
+        "placeId": "google-roka"
+      },
+      "expected": "strong"
+    },
+    {
+      "id": "same-tabelog-listing-across-provider-and-language",
+      "candidate": {
+        "name": "KOFFEE MAMEYA Kakeru",
+        "address": "2-16-14 Hirano, Koto City, Tokyo",
+        "latitude": 35.67648,
+        "longitude": 139.80419,
+        "provider": "google-places",
+        "placeId": "google-kakeru",
+        "tabelogUrl": "https://tabelog.com/en/tokyo/A1313/A131303/13255632/"
+      },
+      "saved": {
+        "title": "コーヒー マメヤ カケル",
+        "address": "東京都江東区平野2-16-14",
+        "latitude": 35.67648,
+        "longitude": 139.80419,
+        "tabelogUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/"
+      },
+      "expected": "strong"
+    },
+    {
+      "id": "same-address-and-coordinates-untranslated-name",
+      "candidate": {
+        "name": "月森 Tea House",
+        "address": "大阪府大阪市中央区瓦屋町1-6-10",
+        "latitude": 34.672,
+        "longitude": 135.511,
+        "provider": "google-places",
+        "placeId": "new-identity"
+      },
+      "saved": {
+        "title": "喫茶 月森",
+        "address": "大阪府大阪市中央区瓦屋町1-6-10",
+        "latitude": 34.672,
+        "longitude": 135.511
+      },
+      "expected": "weak"
+    },
+    {
+      "id": "english-chome-and-japanese-address-without-stable-id",
+      "candidate": {
+        "name": "Cafe Tsukimori",
+        "address": "1-chōme-6-10 Kawarayamachi, Osaka",
+        "latitude": 34.672,
+        "longitude": 135.511,
+        "provider": "google-places",
+        "placeId": "new-cafe"
+      },
+      "saved": {
+        "title": "喫茶 月森",
+        "address": "大阪府大阪市中央区瓦屋町1丁目6番10号",
+        "latitude": 34.672,
+        "longitude": 135.511
+      },
+      "expected": "weak"
+    },
+    {
+      "id": "same-building-different-shop-is-only-weak",
+      "candidate": {
+        "name": "Second Floor Cafe",
+        "address": "東京都新宿区新宿3-7-1",
+        "latitude": 35.691,
+        "longitude": 139.704,
+        "provider": "google-places",
+        "placeId": "second-floor"
+      },
+      "saved": {
+        "title": "Ground Floor Curry",
+        "address": "東京都新宿区新宿3-7-1",
+        "latitude": 35.691,
+        "longitude": 139.704
+      },
+      "expected": "weak"
+    },
+    {
+      "id": "same-chain-different-branch",
+      "candidate": {
+        "name": "シェイク シャック 新宿サザンテラス",
+        "address": "東京都渋谷区代々木2-2-1",
+        "latitude": 35.688,
+        "longitude": 139.701,
+        "provider": "google-places",
+        "placeId": "shinjuku"
+      },
+      "saved": {
+        "title": "SHAKE SHACK 恵比寿",
+        "address": "東京都渋谷区恵比寿1-6-1",
+        "latitude": 35.647,
+        "longitude": 139.711,
+        "provider": "google-places",
+        "placeId": "ebisu"
+      },
+      "expected": "none"
+    },
+    {
+      "id": "same-name-different-street",
+      "candidate": {
+        "name": "鳥貴族",
+        "address": "東京都新宿区西新宿1-3-1",
+        "latitude": 35.692,
+        "longitude": 139.697,
+        "provider": "google-places",
+        "placeId": "west"
+      },
+      "saved": {
+        "title": "鳥貴族",
+        "address": "東京都新宿区西新宿7-3-1",
+        "latitude": 35.699,
+        "longitude": 139.697,
+        "provider": "google-places",
+        "placeId": "east"
+      },
+      "expected": "none"
+    },
+    {
+      "id": "same-coordinates-different-street-number",
+      "candidate": {
+        "name": "A",
+        "address": "東京都渋谷区神宮前4-5-6",
+        "latitude": 35.669,
+        "longitude": 139.709,
+        "provider": "google-places",
+        "placeId": "a"
+      },
+      "saved": {
+        "title": "B",
+        "address": "東京都渋谷区神宮前4-5-7",
+        "latitude": 35.669,
+        "longitude": 139.709
+      },
+      "expected": "none"
+    },
+    {
+      "id": "same-address-but-distant-coordinates",
+      "candidate": {
+        "name": "A",
+        "address": "東京都中央区銀座4-5-6",
+        "latitude": 35.671,
+        "longitude": 139.765,
+        "provider": "google-places",
+        "placeId": "a"
+      },
+      "saved": {
+        "title": "B",
+        "address": "東京都中央区銀座4-5-6",
+        "latitude": 35.681,
+        "longitude": 139.765
+      },
+      "expected": "none"
+    }
+  ]
+}

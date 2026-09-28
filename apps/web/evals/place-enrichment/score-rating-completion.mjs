@@ -31,8 +31,8 @@ export function validateRatingBenchmark(benchmark) {
   assert(
     Array.isArray(benchmark.cases) &&
       benchmark.cases.length >= 5 &&
-      benchmark.cases.length <= 8,
-    'benchmark must contain 5-8 cases',
+      benchmark.cases.length <= 12,
+    'benchmark must contain 5-12 cases',
   );
   const ids = new Set();
   for (const entry of benchmark.cases) {

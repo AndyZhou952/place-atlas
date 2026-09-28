@@ -35,5 +35,5 @@ test('runtime instructions expose source precedence, limitations and confirmatio
     /populate them only from explicit source rules/u,
   );
   assert.match(restaurantResearchPrompt, /owner confirms separately/u);
-  assert.match(restaurantSearchDescription, /not full pages/u);
+  assert.match(restaurantSearchDescription, /never full pages/u);
 });

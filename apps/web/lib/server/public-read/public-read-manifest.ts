@@ -159,6 +159,7 @@ export interface PublicVisitMediaV1 {
   readonly visitId: string;
   readonly displayOrder: number;
   readonly caption?: string;
+  readonly score?: number;
   readonly contentType: string;
   readonly displayUrl: string;
 }
@@ -465,6 +466,7 @@ function projectVisitMedia(
     ...(optionalString(source.caption) === undefined
       ? {}
       : { caption: optionalString(source.caption) }),
+    ...(source.score === undefined ? {} : { score: asNumber(source.score) }),
     displayUrl: `/api/media/${encodeURIComponent(displayId)}/content`,
   };
 }

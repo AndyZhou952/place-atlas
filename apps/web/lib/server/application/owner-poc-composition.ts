@@ -11,12 +11,18 @@ import { createOperationalNearbyDiagnosticRecorder } from '../../../route-sideca
 import { createRouteSidecarNearbyAdapter } from '../../../route-sidecar/route-sidecar-nearby-adapter.ts';
 import { D1ProviderUsage } from '../../../adapters/agent/d1-provider-usage.ts';
 import { createGooglePlaceDiscoveryAdapter } from '../../../adapters/providers/google-place-discovery.ts';
-import { createGooglePlacesNewClient } from '../../../adapters/providers/google-places-new-client.ts';
+import {
+  createGooglePlaceRatingClient,
+  createGooglePlacesNewClient,
+} from '../../../adapters/providers/google-places-new-client.ts';
 import { createTabelogPlaceDiscoveryPort } from '../../../adapters/providers/tabelog-place-discovery.ts';
 import { createNominatimDurableGeocoderAdapter } from '../../../adapters/providers/nominatim-durable-geocoder.ts';
 import { createNominatimFixedEndpointTransport } from '../../../adapters/providers/nominatim-fixed-endpoint-transport.ts';
 import { createConfiguredPlaceResearchAgent } from '../../../agent/place-research.ts';
+import { recordCatalogResearchDiagnostic } from '../../../agent/research-diagnostic.ts';
 import { createFirecrawlRestaurantReader } from '../../../agent/firecrawl-source-reader.ts';
+import { withSameListingFallback } from '../../../agent/tabelog-source-fallback.ts';
+import { readTabelogListingResult } from '../../../agent/tabelog-listing.ts';
 import {
   createRestaurantSourceReader,
   type BrowserContentBinding,
@@ -66,10 +72,15 @@ export function createOwnerPocComposition(
   const clock = intakeOptions.clock ?? { now: () => new Date() };
   const sourceReader =
     intakeOptions.sourceReaderProvider === 'firecrawl'
-      ? createFirecrawlRestaurantReader({
-          apiKey: intakeOptions.firecrawlApiKey,
-          fetch: intakeOptions.fetch,
-        })
+      ? withSameListingFallback(
+          createFirecrawlRestaurantReader({
+            apiKey: intakeOptions.firecrawlApiKey,
+            fetch: intakeOptions.fetch,
+          }),
+          (url, signal) =>
+            readTabelogListingResult(url, intakeOptions.fetch ?? fetch, signal),
+          recordCatalogResearchDiagnostic,
+        )
       : intakeOptions.browser
         ? createRestaurantSourceReader(
             intakeOptions.browser,
@@ -154,6 +165,20 @@ export function createOwnerPocComposition(
   const researchOptions = {
     ...intakeOptions,
     ...(sourceReader ? { sourceReader } : {}),
+    onDiagnostic: recordCatalogResearchDiagnostic,
+    ...(providerModes.googlePlaces === 'enabled' &&
+    intakeOptions.googlePlacesApiKey
+      ? {
+          officialWebsiteForPlaceId: async (placeId: string) => {
+            const result = await createGooglePlaceRatingClient({
+              apiKey: intakeOptions.googlePlacesApiKey,
+              usage,
+              ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+            }).getWebsiteUri(placeId);
+            return result.ok ? result.value : undefined;
+          },
+        }
+      : {}),
   };
   const environmentResearchPort =
     createConfiguredPlaceResearchAgent(researchOptions);
@@ -184,6 +209,9 @@ export function createOwnerPocComposition(
       }
     : environmentResearchPort;
   const catalogIntakeModule = createCatalogIntakeModule({
+    savedPlaceLookup: {
+      list: () => catalogRead.list('verified_catalog'),
+    },
     discoveryPort: discovery,
     ...(durableGeocoder ? { durableGeocoderPort: durableGeocoder } : {}),
     ...(webResearchPort ? { webResearchPort } : {}),

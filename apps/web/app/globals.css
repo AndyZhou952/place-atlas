@@ -1750,6 +1750,36 @@
   height: 0.9rem;
 }
 
+.media-score-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.media-score-editor input {
+  width: 4.25rem;
+  height: 2rem;
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+
+.photo-lightbox-panel > footer .media-score-editor {
+  flex: 0 0 auto;
+  margin: 0;
+  color: rgb(255 255 255 / 72%);
+}
+
+.photo-lightbox-panel > footer .media-score-editor span {
+  flex: 0 0 auto;
+}
+
+.photo-lightbox-panel > footer .media-score-editor input {
+  flex: 0 0 4.25rem;
+}
+
 .media-upload-control {
   display: inline-flex;
   width: fit-content;

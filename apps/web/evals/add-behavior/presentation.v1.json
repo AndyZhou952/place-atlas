@@ -52,6 +52,29 @@
       }
     },
     {
+      "caseId": "burnt-ends-overlapping-barbecue-labels",
+      "input": {
+        "categories": ["modern barbecue", "Australian barbecue"],
+        "dishes": [],
+        "area": ""
+      },
+      "expected": {
+        "summary": "主营澳式烧烤。",
+        "tags": ["Australian barbecue"]
+      }
+    },
+    {
+      "caseId": "burnt-ends-generic-barbecue-after-specific-label",
+      "input": {
+        "categories": ["modern Australian barbecue", "barbecue"],
+        "dishes": []
+      },
+      "expected": {
+        "summary": "主营澳式烧烤。",
+        "tags": ["modern Australian barbecue"]
+      }
+    },
+    {
       "caseId": "yakitori-category-is-not-a-signature-dish",
       "input": {
         "categories": ["焼き鳥", "やきとり"],
@@ -110,6 +133,46 @@
       "expected": {
         "summary": "主营寿司。招牌菜包括大トロ、ウニ、玉子。",
         "tags": ["寿司", "大トロ", "ウニ"]
+      }
+    },
+    {
+      "caseId": "aomori-seafood-intro-keeps-chinese-cuisine",
+      "input": {
+        "categories": ["海鮮", "洋食", "居酒屋"],
+        "dishes": ["お刺身盛り合せ"],
+        "area": "青森市古川"
+      },
+      "expected": {
+        "summary": "主营海鲜、西式料理。位于青森市古川。招牌菜包括お刺身盛り合せ。",
+        "tags": ["海鮮", "洋食", "お刺身盛り合せ"]
+      }
+    },
+    {
+      "caseId": "spanish-cuisine-intro-keeps-chinese-cuisine",
+      "input": {
+        "categories": ["スペイン料理"],
+        "dishes": [],
+        "area": "新宿区河田町"
+      },
+      "expected": {
+        "summary": "主营西班牙料理。位于新宿区河田町。",
+        "tags": ["スペイン料理"]
+      }
+    },
+    {
+      "caseId": "cafe-and-bar-intro-keeps-chinese-cuisine",
+      "input": { "categories": ["カフェ", "バー", "パン"], "dishes": [] },
+      "expected": {
+        "summary": "主营咖啡馆、酒吧。",
+        "tags": ["カフェ", "バー"]
+      }
+    },
+    {
+      "caseId": "no-soup-tantanmen-intro-keeps-chinese-cuisine",
+      "input": { "categories": ["ラーメン", "汁なし担々麺"], "dishes": [] },
+      "expected": {
+        "summary": "主营拉面、无汤担担面。",
+        "tags": ["ラーメン", "汁なし担々麺"]
       }
     }
   ]

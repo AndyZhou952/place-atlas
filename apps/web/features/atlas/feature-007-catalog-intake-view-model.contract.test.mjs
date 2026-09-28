@@ -97,6 +97,23 @@ test('Feature 007 ViewModel announces each Add outcome and names pending work', 
   assert.match(
     catalogIntakeLiveMessage({
       ...preview,
+      preview: {
+        ...preview.preview,
+        suspectedDuplicates: [
+          {
+            itemId: 'saved-shake-shack',
+            title: 'シェイク シャック 新宿サザンテラス',
+            match: 'strong',
+            reason: 'same_listing',
+          },
+        ],
+      },
+    }),
+    /already in your Atlas/u,
+  );
+  assert.match(
+    catalogIntakeLiveMessage({
+      ...preview,
       preview: { ...preview.preview, locationEvidence: { status: 'known' } },
     }),
     /Preview ready/u,

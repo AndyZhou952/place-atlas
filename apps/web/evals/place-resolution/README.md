@@ -6,12 +6,14 @@ It does not evaluate ratings, reservation rules, signature dishes, or long-form 
 
 ## Contents
 
-- `place-resolution-gold.v1.json`: 39 independently curated cases and 12 reusable real-place identities.
+- `place-resolution-gold.v1.json`: 40 independently curated cases and 13 reusable real-place identities.
 - `place-resolution-gold.schema.json`: the portable JSON Schema for the gold dataset.
 - `place-resolution-predictions.example.v1.json`: a perfect offline prediction fixture and an integration contract example.
 - `place-resolution-predictions.schema.json`: the portable JSON Schema for resolver output.
 - `score-place-resolution.mjs`: a dependency-free validator and scorer.
 - `score-place-resolution.test.mjs`: offline tests, including a regression test that rejects arbitrary chain-branch selection.
+- `run-live-discovery.mjs`: opt-in runner that sends only the query to the deployed discover endpoint, cancels each transient session, and stores raw output under ignored `evals/runs/`.
+- `score-live-discovery.mjs`: independently checks branch identity from name/address signatures, ambiguous candidate counts, and no-match results. It measures retrieval only; it does not claim the selected-place research or publication succeeded.
 
 The metadata, documentation, and runner output are English. Queries intentionally preserve Chinese, Japanese, English, and romanized user input because multilingual resolution is the behavior under test.
 
@@ -35,6 +37,8 @@ node evals/place-resolution/score-place-resolution.mjs \
 ```
 
 Both commands are fully offline. They do not invoke Google Maps, an LLM, a search engine, or any paid API. A production resolver should write a prediction file in the documented shape during a separately authorized live evaluation; CI should only score a checked-in fixture.
+
+For an explicitly authorized live discovery run, set `ALLOW_ADD_LIVE_EVAL=yes`, `OWNER_TEST_PASSWORD`, and optionally `ATLAS_BASE_URL`, then run `node evals/place-resolution/run-live-discovery.mjs`. Score the captured output with `node evals/place-resolution/score-live-discovery.mjs evals/place-resolution/place-resolution-gold.v1.json evals/runs/place-resolution-live-discovery.json`. The runner creates and cancels short-lived Add sessions but never selects or publishes a restaurant. Keep the raw output in the ignored runs directory.
 
 The scorer exits with status `0` when every gate passes, `1` when valid predictions miss a quality gate, and `2` for invalid input or usage.
 

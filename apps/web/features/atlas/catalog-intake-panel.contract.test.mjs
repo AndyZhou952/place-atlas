@@ -152,7 +152,7 @@ test('a committed Add refreshes the saved catalog', async () => {
   assert.match(hook, /onCommitted\?\.\(output\)/u);
   assert.match(
     screen,
-    /<CatalogIntakePanel onCommitted=\{vm\.reloadCatalogViews\} \/>/u,
+    /<CatalogIntakePanel\s+onCommitted=\{vm\.reloadCatalogViews\}\s+onOpenSaved=\{vm\.selectItem\}\s*\/>/u,
   );
   assert.match(viewModel, /key: 'catalog\.list'/u);
   assert.match(viewModel, /reloadCatalogViews/u);

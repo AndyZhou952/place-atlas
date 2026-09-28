@@ -106,6 +106,42 @@ test('Nominatim uses the selected Google candidate address without persisting it
   );
 });
 
+test('overseas location lookup does not combine a restaurant name with an already complete street address', async () => {
+  const requests = [];
+  const clock = { now: () => new Date('2026-09-28T00:00:00.000Z') };
+  const adapter = createNominatimDurableGeocoderAdapter({
+    endpoint: 'https://nominatim.openstreetmap.org/search',
+    identifyingUserAgent: 'JapanAtlasOwnerPoC/1.0 (owner@example.test)',
+    referer: 'https://japan-atlas.example.test/',
+    transport: {
+      async search(request) {
+        requests.push(request);
+        return { ok: true, value: [] };
+      },
+    },
+    cache: createInMemoryDurableGeocoderCache(),
+    rateGate: createNominatimApplicationRateGate(clock),
+    clock,
+  });
+  await adapter.propose({
+    trigger: 'owner_intake_select',
+    dataClassification: 'public_place_query',
+    ownerQuery: 'Burnt Ends Singapore Dempsey',
+    ownerDraft: {},
+    selectedSubject: {
+      ownerQuery: 'Burnt Ends Singapore Dempsey',
+      providerNamespace: 'google-places',
+      placeId: 'selected-burnt-ends',
+      transientName: 'Burnt Ends',
+      transientAddress: '7 Dempsey Rd, #01-02, Singapore 249671',
+    },
+  });
+  assert.equal(
+    new URL(requests[0].url).searchParams.get('q'),
+    '7 Dempsey Rd, #01-02, Singapore 249671',
+  );
+});
+
 test('Nominatim retries a failed Google candidate using the owner-entered address alone', async () => {
   const requests = [];
   const clock = { now: () => new Date('2026-09-22T10:00:00.000Z') };

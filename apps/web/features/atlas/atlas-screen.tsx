@@ -43,6 +43,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { isEffectivelyVisited } from '@/product/application/assessments/effective-visited';
+import { researchRegion } from '@/product/application/catalog/research-region';
 
 import type {
   AtlasItem,
@@ -259,7 +260,10 @@ function MapWorkspace({
             </Button>
           </div>
 
-          <CatalogIntakePanel onCommitted={vm.reloadCatalogViews} />
+          <CatalogIntakePanel
+            onCommitted={vm.reloadCatalogViews}
+            onOpenSaved={vm.selectItem}
+          />
 
           <div className="search-field">
             <Search aria-hidden="true" />
@@ -1102,6 +1106,48 @@ function OverallCommentEditor({
 
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const item = vm.selectedItem!;
+  const storedGoogleRating =
+    researchRegion(item.address) === 'mainland_china'
+      ? undefined
+      : item.googleRating;
+  const [liveGoogleRating, setLiveGoogleRating] = useState<{
+    score: number;
+    reviewCount?: number;
+    url: string;
+  }>();
+  useEffect(() => {
+    if (item.kind !== 'food') return;
+    const controller = new AbortController();
+    void fetch(`/api/items/${encodeURIComponent(item.id)}/google-rating`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then((response) =>
+        response.ok && response.status === 200 ? response.json() : undefined,
+      )
+      .then((value: unknown) => {
+        if (
+          !controller.signal.aborted &&
+          value !== null &&
+          typeof value === 'object' &&
+          'score' in value &&
+          'url' in value &&
+          typeof value.score === 'number' &&
+          (!('reviewCount' in value) ||
+            typeof value.reviewCount === 'number') &&
+          typeof value.url === 'string'
+        )
+          setLiveGoogleRating({
+            score: value.score,
+            ...('reviewCount' in value
+              ? { reviewCount: value.reviewCount as number }
+              : {}),
+            url: value.url,
+          });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [item.id, item.kind]);
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
   const overallCheckedAt = [
     item.verifiedAt,
@@ -1188,7 +1234,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               size="sm"
               onClick={() => setEditing(true)}
             >
-              <Pencil data-icon="inline-start" /> Edit
+              <Pencil data-icon="inline-start" /> Edit place
             </Button>
           </div>
         </div>
@@ -1276,15 +1322,17 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                   </small>
                 </a>
               ) : null}
-              {item.googleRating ? (
+              {(liveGoogleRating ?? storedGoogleRating) ? (
                 <a
                   className="rating-strip-item"
-                  href={item.googleRating.url}
+                  href={(liveGoogleRating ?? storedGoogleRating)!.url}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <span>Google</span>
-                  <strong>{item.googleRating.score.toFixed(1)}</strong>
+                  <span translate="no">Google Maps</span>
+                  <strong>
+                    {(liveGoogleRating ?? storedGoogleRating)!.score.toFixed(1)}
+                  </strong>
                 </a>
               ) : null}
               <span className="rating-visit-count">
@@ -1352,6 +1400,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
+                      onSaveScore={vm.saveMediaScore}
                       onDeleteMedia={vm.removeMedia}
                       onDelete={() => setPendingVisitDelete(visit)}
                     />
@@ -1542,6 +1591,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
+                      onSaveScore={vm.saveMediaScore}
                       onDeleteMedia={vm.removeMedia}
                       onDelete={() => setPendingDelete(visit)}
                     />
@@ -1617,6 +1667,10 @@ function VisitComposer({
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
   const submitting = useRef(false);
   const [savedVisitId, setSavedVisitId] = useState<string>();
+  const [retryUpload, setRetryUpload] = useState<{
+    readonly files: readonly File[];
+    readonly attemptId: string;
+  }>();
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1644,11 +1698,13 @@ function VisitComposer({
       setNote('');
       setVisitPhotos([]);
       if (submittedPhotos.length) {
+        const attemptId = crypto.randomUUID();
         try {
-          await vm.addVisitMedia(result.visit.id, submittedPhotos);
+          await vm.addVisitMedia(result.visit.id, submittedPhotos, attemptId);
         } catch {
+          setRetryUpload({ files: submittedPhotos, attemptId });
           setFormError(
-            'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
+            'The visit was saved, but some media did not upload. Retry below; this will not create another visit.',
           );
           setStatus('success');
           return;
@@ -1665,6 +1721,26 @@ function VisitComposer({
 
   const feedbackId = `${idPrefix}-visit-feedback`;
   const busy = status === 'saving' || vm.journalBusy || Boolean(savedVisitId);
+
+  async function retrySavedUpload() {
+    if (!savedVisitId || !retryUpload || status === 'saving') return;
+    setStatus('saving');
+    setFormError('');
+    try {
+      await vm.addVisitMedia(
+        savedVisitId,
+        retryUpload.files,
+        retryUpload.attemptId,
+      );
+      setRetryUpload(undefined);
+      setStatus('success');
+    } catch {
+      setFormError(
+        'Upload still failed. The visit is saved; retry the media upload.',
+      );
+      setStatus('success');
+    }
+  }
 
   return (
     <form
@@ -1800,6 +1876,16 @@ function VisitComposer({
             ? 'Visit saved'
             : 'Save visit'}
       </Button>
+      {savedVisitId && retryUpload ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={status === 'saving' || vm.journalBusy}
+          onClick={() => void retrySavedUpload()}
+        >
+          {status === 'saving' ? 'Retrying upload…' : 'Retry media upload'}
+        </Button>
+      ) : null}
       {savedVisitId ? (
         <Button
           type="button"
@@ -1809,6 +1895,7 @@ function VisitComposer({
             setSavedVisitId(undefined);
             setStatus('idle');
             setFormError('');
+            setRetryUpload(undefined);
             setVisitedAt(localVisitDate());
             setRating(selectedItem?.personalRating?.toString() ?? '');
           }}
@@ -1836,6 +1923,7 @@ function JournalVisitRow({
   onSave,
   onUpload,
   onSaveCaption,
+  onSaveScore,
   onDeleteMedia,
   onDelete,
 }: {
@@ -1849,6 +1937,7 @@ function JournalVisitRow({
   readonly onSave: AtlasViewModel['editVisit'];
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDeleteMedia: AtlasViewModel['removeMedia'];
   readonly onDelete: () => void;
 }) {
@@ -1883,7 +1972,6 @@ function JournalVisitRow({
       return;
     }
 
-    setEditing(false);
     try {
       await onSave(visit.id, {
         itemId,
@@ -1893,8 +1981,8 @@ function JournalVisitRow({
           ? { rating: normalizedRating ?? null }
           : {}),
       });
+      setEditing(false);
     } catch {
-      setEditing(true);
       // The view model restores the previous record and presents the error.
     }
   }
@@ -1971,7 +2059,7 @@ function JournalVisitRow({
           ) : null}
           <div className="form-actions">
             <Button type="submit" disabled={busy || !visitedAt}>
-              Save
+              {busy ? 'Saving…' : 'Save'}
             </Button>
             <Button
               type="button"
@@ -2011,6 +2099,7 @@ function JournalVisitRow({
           busy={mediaBusy}
           onUpload={onUpload}
           onSaveCaption={onSaveCaption}
+          onSaveScore={onSaveScore}
           onDelete={onDeleteMedia}
         />
       </div>
@@ -2042,6 +2131,7 @@ function VisitMediaEditor({
   busy,
   onUpload,
   onSaveCaption,
+  onSaveScore,
   onDelete,
 }: {
   readonly visitId: string;
@@ -2049,6 +2139,7 @@ function VisitMediaEditor({
   readonly busy: boolean;
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDelete: AtlasViewModel['removeMedia'];
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number>();
@@ -2073,6 +2164,7 @@ function VisitMediaEditor({
             key={`${entry.id}:${entry.caption ?? ''}`}
             media={entry}
             onSave={onSaveCaption}
+            onSaveScore={onSaveScore}
             onDelete={onDelete}
             onOpen={() => setLightboxIndex(index)}
           />
@@ -2099,6 +2191,7 @@ function VisitMediaEditor({
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(undefined)}
           onSaveCaption={onSaveCaption}
+          onSaveScore={onSaveScore}
           onDelete={async (id) => {
             if (media.length === 1) setLightboxIndex(undefined);
             return onDelete(id);
@@ -2127,11 +2220,13 @@ function MediaBrowseButton({
 function MediaCaptionEditor({
   media,
   onSave,
+  onSaveScore,
   onDelete,
   onOpen,
 }: {
   readonly media: VisitMediaRecord;
   readonly onSave: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore: AtlasViewModel['saveMediaScore'];
   readonly onDelete: AtlasViewModel['removeMedia'];
   readonly onOpen: () => void;
 }) {
@@ -2194,6 +2289,12 @@ function MediaCaptionEditor({
           <Trash2 aria-hidden="true" />
         </button>
       </div>
+      <MediaScoreEditor
+        key={`${media.id}:${media.score ?? ''}`}
+        media={media}
+        onSave={onSaveScore}
+        idPrefix="tile"
+      />
     </figure>
   );
 }
@@ -2203,12 +2304,14 @@ function PhotoLightbox({
   initialIndex,
   onClose,
   onSaveCaption,
+  onSaveScore,
   onDelete,
 }: {
   readonly media: readonly VisitMediaRecord[];
   readonly initialIndex: number;
   readonly onClose: () => void;
   readonly onSaveCaption?: AtlasViewModel['saveMediaCaption'];
+  readonly onSaveScore?: AtlasViewModel['saveMediaScore'];
   readonly onDelete?: AtlasViewModel['removeMedia'];
 }) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
@@ -2358,6 +2461,20 @@ function PhotoLightbox({
           ) : (
             <span>No caption</span>
           )}
+          {onSaveScore ? (
+            <MediaScoreEditor
+              key={`${active.id}:${active.score ?? ''}`}
+              media={active}
+              onSave={onSaveScore}
+              idPrefix="viewer"
+            />
+          ) : (
+            <span>
+              {active.score === undefined
+                ? 'No media score'
+                : `Media score ${active.score}/5`}
+            </span>
+          )}
           {onDelete ? (
             <button
               className="photo-lightbox-delete"
@@ -2412,6 +2529,63 @@ function LightboxCaptionEditor({
         }
       }}
     />
+  );
+}
+
+function MediaScoreEditor({
+  media,
+  onSave,
+  idPrefix,
+}: {
+  readonly media: VisitMediaRecord;
+  readonly onSave: AtlasViewModel['saveMediaScore'];
+  readonly idPrefix: string;
+}) {
+  const [value, setValue] = useState(media.score?.toString() ?? '');
+
+  async function saveScore() {
+    const trimmed = value.trim();
+    const parsed = trimmed === '' ? null : Number(trimmed);
+    if (
+      parsed !== null &&
+      (!Number.isFinite(parsed) || parsed < 0 || parsed > 5)
+    ) {
+      setValue(media.score?.toString() ?? '');
+      return;
+    }
+    if (parsed === (media.score ?? null)) return;
+    try {
+      await onSave(media.id, parsed);
+    } catch {
+      setValue(media.score?.toString() ?? '');
+    }
+  }
+
+  return (
+    <label
+      className="media-score-editor"
+      htmlFor={`${idPrefix}-media-score-${media.id}`}
+    >
+      <span>Media score / 5</span>
+      <Input
+        id={`${idPrefix}-media-score-${media.id}`}
+        type="number"
+        min="0"
+        max="5"
+        step="0.1"
+        value={value}
+        placeholder="Optional"
+        aria-label={`Score for ${media.originalFilename}`}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => void saveScore()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </label>
   );
 }
 

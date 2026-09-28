@@ -76,6 +76,7 @@ export const visitMedia = sqliteTable(
     byteSize: integer('byte_size').notNull(),
     contentSha256: text('content_sha256').notNull(),
     caption: text('caption'),
+    score: real('score'),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

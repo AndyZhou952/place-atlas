@@ -22,6 +22,12 @@ export interface VisitMediaRecordState {
     updatedAt: string,
     atomicCommit?: AtomicMutationCommit,
   ): Promise<VisitMediaMetadata | undefined>;
+  updateScore(
+    id: string,
+    score: number | undefined,
+    updatedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<VisitMediaMetadata | undefined>;
   /** Removes metadata before returning the object identity needed for cleanup. */
   delete(
     id: string,

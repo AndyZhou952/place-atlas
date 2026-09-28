@@ -24,8 +24,10 @@ import './catalog-intake-panel.css';
 
 export function CatalogIntakePanel({
   onCommitted,
+  onOpenSaved,
 }: {
   readonly onCommitted?: () => void;
+  readonly onOpenSaved: (itemId: string) => void;
 }) {
   const intake = useCatalogIntake(onCommitted);
   const { state } = intake;
@@ -140,7 +142,10 @@ export function CatalogIntakePanel({
       {busy && state.lastOperation === 'select' ? <ResearchProgress /> : null}
 
       {state.stage === 'preview' &&
-      state.preview?.locationEvidence.status === 'unknown' ? (
+      state.preview?.locationEvidence.status === 'unknown' &&
+      !state.preview.suspectedDuplicates.some(
+        (item) => item.match === 'strong',
+      ) ? (
         <div className="catalog-intake-state is-attention" role="alert">
           <p>
             The research did not produce a verified address and coordinates.
@@ -222,6 +227,7 @@ export function CatalogIntakePanel({
           preview={state.preview}
           onConfirm={intake.confirm}
           onCancel={intake.cancel}
+          onOpenSaved={onOpenSaved}
           busy={confirmInProgress}
           confirmLabel={
             confirmInProgress ? 'Confirming and saving…' : 'Confirm and save'
@@ -242,6 +248,7 @@ export function CatalogIntakePanel({
             preview={state.preview}
             onConfirm={intake.confirm}
             onCancel={intake.cancel}
+            onOpenSaved={onOpenSaved}
             confirmLabel="Review changed preview and confirm again"
           />
         </div>
@@ -268,12 +275,14 @@ export function CatalogIntakePanel({
               complete the missing information.
             </p>
           ) : null}
-          <details className="catalog-intake-note">
-            <summary>Save details</summary>
-            <span className="catalog-intake-receipt">
-              Receipt {state.success?.receiptRef}
-            </span>
-          </details>
+          {state.success?.status !== 'already_saved' ? (
+            <details className="catalog-intake-note">
+              <summary>Save details</summary>
+              <span className="catalog-intake-receipt">
+                Receipt {state.success?.receiptRef}
+              </span>
+            </details>
+          ) : null}
         </output>
       ) : null}
     </section>
@@ -436,6 +445,7 @@ function PreviewStep({
   preview,
   onConfirm,
   onCancel,
+  onOpenSaved,
   confirmLabel = 'Confirm and save',
   busy = false,
 }: {
@@ -443,11 +453,65 @@ function PreviewStep({
   readonly preview: NonNullable<IntakeController['state']['preview']>;
   readonly onConfirm: () => Promise<void>;
   readonly onCancel: () => Promise<void>;
+  readonly onOpenSaved: (itemId: string) => void;
   readonly confirmLabel?: string;
   readonly busy?: boolean;
 }) {
   const presentation = presentCatalogIntakePreview(preview);
+  const previewKey = `${preview.sessionId}:${preview.previewVersion}`;
+  const hasStrongDuplicate = preview.suspectedDuplicates.some(
+    (item) => item.match === 'strong',
+  );
+  const [fetchedGoogleRating, setFetchedGoogleRating] = useState<{
+    readonly previewKey: string;
+    readonly score: number;
+    readonly reviewCount?: number;
+    readonly url: string;
+  }>();
+  const liveGoogleRating =
+    fetchedGoogleRating?.previewKey === previewKey
+      ? fetchedGoogleRating
+      : undefined;
+  useEffect(() => {
+    if (hasStrongDuplicate) return;
+    const controller = new AbortController();
+    void fetch(
+      `/api/catalog-intake/google-rating?sessionId=${encodeURIComponent(preview.sessionId)}`,
+      {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok || response.status === 204) return;
+        const rating: unknown = await response.json();
+        if (
+          rating &&
+          typeof rating === 'object' &&
+          'score' in rating &&
+          typeof rating.score === 'number' &&
+          'url' in rating &&
+          typeof rating.url === 'string'
+        )
+          setFetchedGoogleRating({
+            previewKey,
+            ...(rating as {
+              readonly score: number;
+              readonly reviewCount?: number;
+              readonly url: string;
+            }),
+          });
+      })
+      .catch(() => {
+        // A provider failure must not change the Add preview or its save gate.
+      });
+    return () => controller.abort();
+  }, [preview.sessionId, previewKey, hasStrongDuplicate]);
   const manualError = catalogIntakeManualCompletionError(intake.state);
+  const alreadySaved = presentation.duplicates.find(
+    (item) => item.match === 'strong',
+  );
   const hasManualInput = Boolean(
     intake.state.title.trim() ||
     intake.state.area.trim() ||
@@ -478,10 +542,43 @@ function PreviewStep({
       keys: ['tabelog', 'reservation'],
     },
   ] as const;
+  if (alreadySaved) {
+    return (
+      <div className="catalog-intake-preview">
+        <div className="catalog-intake-state is-attention">
+          <strong>Already saved</strong>
+          <p>
+            {alreadySaved.title}
+            {alreadySaved.address ? ` · ${alreadySaved.address}` : ''} is
+            already in your Atlas.
+          </p>
+          <Button
+            type="button"
+            onClick={() => {
+              onOpenSaved(alreadySaved.itemId);
+              void onCancel();
+            }}
+            disabled={busy}
+          >
+            View saved place
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void onCancel()}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
-      {preview.profile ||
+      {liveGoogleRating ||
+      preview.profile ||
       preview.ownerFields.categories ||
       preview.ownerFields.signatureDishes ||
       preview.ownerFields.summary ? (
@@ -516,7 +613,17 @@ function PreviewStep({
               ).join(', ')}
             </p>
           ) : null}
-          {preview.profile?.googleRating ? (
+          {liveGoogleRating ? (
+            <p>
+              <a href={liveGoogleRating.url} target="_blank" rel="noreferrer">
+                <span translate="no">Google Maps</span>
+              </a>{' '}
+              {liveGoogleRating.score.toFixed(1)}
+              {liveGoogleRating.reviewCount === undefined
+                ? ''
+                : ` (${liveGoogleRating.reviewCount} reviews)`}
+            </p>
+          ) : preview.profile?.googleRating ? (
             <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
           ) : null}
           {preview.profile?.officialWebsite ? (
@@ -593,13 +700,19 @@ function PreviewStep({
         <h5 id="catalog-intake-preview-warnings">Warnings</h5>
         {presentation.duplicates.length ? (
           <div className="catalog-intake-state is-attention">
-            <strong>Possible duplicates</strong>
+            <strong>
+              {presentation.duplicates.some((item) => item.match === 'strong')
+                ? 'Already saved'
+                : 'Possible duplicates'}
+            </strong>
             <ul>
               {presentation.duplicates.map((duplicate) => (
                 <li key={duplicate.itemId}>
                   {duplicate.title}
                   {duplicate.address ? ` · ${duplicate.address}` : ''} ·{' '}
-                  {duplicate.match} match
+                  {duplicate.match === 'strong'
+                    ? 'same restaurant'
+                    : 'same location; check whether this is a different place'}
                 </li>
               ))}
             </ul>
@@ -826,16 +939,24 @@ function PreviewStep({
             the preview before saving.
           </p>
         ) : null}
+        {preview.suspectedDuplicates.some((item) => item.match === 'strong') ? (
+          <p>
+            This restaurant is already in your Atlas. Nothing new is needed.
+          </p>
+        ) : null}
         <Button
           type="button"
           onClick={() => void onConfirm()}
           disabled={
             busy ||
             intake.state.previewNeedsRefresh ||
-            preview.locationEvidence.status === 'unknown'
+            preview.locationEvidence.status === 'unknown' ||
+            preview.suspectedDuplicates.some((item) => item.match === 'strong')
           }
         >
-          {confirmLabel}
+          {preview.suspectedDuplicates.some((item) => item.match === 'strong')
+            ? 'Already saved'
+            : confirmLabel}
         </Button>
         <Button
           type="button"
@@ -916,6 +1037,9 @@ function successMessage(
   }
   if (status === 'committed_needs_review') {
     return 'This legacy save is not map-ready. Retry Add.';
+  }
+  if (status === 'already_saved') {
+    return 'This restaurant is already saved. Nothing new was added.';
   }
   return 'Existing place reused; no duplicate was created.';
 }

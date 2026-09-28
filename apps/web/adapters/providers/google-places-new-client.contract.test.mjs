@@ -1,7 +1,137 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createGooglePlacesNewClient } from './google-places-new-client.ts';
+import {
+  createGooglePlaceRatingClient,
+  createGooglePlacesNewClient,
+} from './google-places-new-client.ts';
+
+test('Google rating details use Enterprise fields, exact selected ID, quota, and no cache', async () => {
+  const calls = [];
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve(value) {
+        calls.push(value);
+        return 'reserved';
+      },
+    },
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return Response.json({
+        id: 'ChIJ1234567890',
+        rating: 4.6,
+        userRatingCount: 1200,
+        googleMapsUri: 'https://www.google.com/maps/place/example',
+      });
+    },
+  });
+  const result = await client.getRating('ChIJ1234567890');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, {
+    score: 4.6,
+    reviewCount: 1200,
+    url: 'https://www.google.com/maps/place/example',
+  });
+  assert.equal(calls[0].sku, 'places.details_rating.requests');
+  assert.equal(
+    calls[1].init.headers['X-Goog-FieldMask'],
+    'id,rating,userRatingCount,googleMapsUri',
+  );
+  assert.equal(calls[1].init.method, 'GET');
+  assert.equal(calls[1].init.redirect, 'manual');
+});
+
+test('Google rating details reject another branch and unsupported URL', async () => {
+  for (const value of [
+    {
+      id: 'wrong-branch',
+      rating: 4.6,
+      userRatingCount: 100,
+      googleMapsUri: 'https://www.google.com/maps/place/example',
+    },
+    {
+      id: 'ChIJ1234567890',
+      rating: 4.6,
+      userRatingCount: 100,
+      googleMapsUri: 'https://evil.example/maps',
+    },
+  ]) {
+    const client = createGooglePlaceRatingClient({
+      apiKey: 'fixture-secret',
+      usage: {
+        async reserve() {
+          return 'reserved';
+        },
+      },
+      fetch: async () => Response.json(value),
+    });
+    assert.equal((await client.getRating('ChIJ1234567890')).ok, false);
+  }
+});
+
+test('Google rating remains usable when review count is absent', async () => {
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve() {
+        return 'reserved';
+      },
+    },
+    fetch: async () =>
+      Response.json({
+        id: 'ChIJ1234567890',
+        rating: 4.1,
+        googleMapsUri: 'https://maps.google.com/?cid=123',
+      }),
+  });
+  assert.deepEqual((await client.getRating('ChIJ1234567890')).value, {
+    score: 4.1,
+    url: 'https://maps.google.com/?cid=123',
+  });
+});
+
+test('selected Place ID discovers only a request-scoped public official website', async () => {
+  const calls = [];
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve(value) {
+        calls.push(value);
+        return 'reserved';
+      },
+    },
+    fetch: async (_url, init) => {
+      calls.push(init);
+      return Response.json({
+        id: 'ChIJ1234567890',
+        websiteUri: 'https://burntends.com.sg/',
+      });
+    },
+  });
+  assert.equal(
+    (await client.getWebsiteUri('ChIJ1234567890')).value,
+    'https://burntends.com.sg/',
+  );
+  assert.equal(calls[0].sku, 'places.details_rating.requests');
+  assert.equal(calls[1].headers['X-Goog-FieldMask'], 'id,websiteUri');
+  for (const websiteUri of [
+    'http://burntends.com.sg/',
+    'https://127.0.0.1/',
+    'https://internal.test/',
+  ]) {
+    const rejected = createGooglePlaceRatingClient({
+      apiKey: 'fixture-secret',
+      usage: {
+        async reserve() {
+          return 'reserved';
+        },
+      },
+      fetch: async () => Response.json({ id: 'ChIJ1234567890', websiteUri }),
+    });
+    assert.equal((await rejected.getWebsiteUri('ChIJ1234567890')).ok, false);
+  }
+});
 
 test('Places New uses fixed Pro field masks, a server header secret, and one bounded page', async () => {
   const requests = [];
@@ -131,6 +261,23 @@ test('Places New missing secret fails before quota or fetch', async () => {
   const result = await client.searchText({ query: '銀座' });
   assert.equal(result.ok, false);
   assert.equal(calls, 0);
+});
+
+test('a successful empty Places response is no match, not provider failure', async () => {
+  const client = createGooglePlacesNewClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve() {
+        return 'reserved';
+      },
+    },
+    fetch: async () => Response.json({}),
+  });
+  const result = await client.searchText({ query: 'unmatched place' });
+  assert.deepEqual(result, {
+    ok: true,
+    value: { places: [], hasMore: false },
+  });
 });
 
 function place(id, name, address) {

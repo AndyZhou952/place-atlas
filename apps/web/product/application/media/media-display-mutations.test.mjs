@@ -41,6 +41,28 @@ void test('owner caption and delete resolve an opaque display ID to the internal
   assert.equal(captioned.value.id, metadata.id);
   assert.equal(captioned.value.caption, 'owner note');
 
+  const scored = await application.execute({
+    key: 'media.score',
+    input: { id: metadata.displayId, score: 4.26 },
+  });
+  assert.equal(scored.ok, true);
+  assert.equal(scored.value.score, 4.3);
+  assert.equal(scored.value.caption, 'owner note');
+
+  const cleared = await application.execute({
+    key: 'media.score',
+    input: { id: metadata.displayId, score: null },
+  });
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.value.score, undefined);
+  assert.equal((await state.find(metadata.id)).caption, 'owner note');
+
+  const invalid = await application.execute({
+    key: 'media.score',
+    input: { id: metadata.displayId, score: 5.1 },
+  });
+  assert.equal(invalid.ok, false);
+
   const deleted = await application.execute({
     key: 'media.delete',
     input: { id: metadata.displayId },

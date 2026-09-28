@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "benchmarkId": "place-rating-completion-v1-2026-09-26",
-  "checkedAt": "2026-09-26",
+  "checkedAt": "2026-09-28",
   "policy": {
     "metric": "tabelog aggregate rating from the branch's main listing",
     "reviewerScoresAreNotAggregate": true,
@@ -20,10 +20,10 @@
       "evidence": {
         "provider": "tabelog",
         "sourceUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
-        "observedAt": "2026-09-26T00:50:05.390Z",
-        "sourceMethod": "direct_public_html_jsonld",
+        "observedAt": "2026-09-28T01:27:00.000Z",
+        "sourceMethod": "public_main_listing_display",
         "branchLabel": "かつれつ四谷たけだ - 四ツ谷",
-        "snippet": "Direct listing JSON-LD Restaurant.aggregateRating showed 3.71."
+        "snippet": "The public main listing showed the restaurant-level 3.71."
       }
     },
     {
@@ -38,10 +38,10 @@
       "evidence": {
         "provider": "tabelog",
         "sourceUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
-        "observedAt": "2026-09-26T00:50:06.490Z",
-        "sourceMethod": "direct_public_html_jsonld",
+        "observedAt": "2026-09-28T01:27:00.000Z",
+        "sourceMethod": "public_main_listing_display",
         "branchLabel": "かぶと - 池袋",
-        "snippet": "Direct listing JSON-LD Restaurant.aggregateRating showed 4.42."
+        "snippet": "The public main listing showed the restaurant-level 4.42."
       }
     },
     {
@@ -56,10 +56,29 @@
       "evidence": {
         "provider": "tabelog",
         "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13004352/",
-        "observedAt": "2026-09-26T00:50:07.148Z",
-        "sourceMethod": "direct_public_html_jsonld",
+        "observedAt": "2026-09-28T01:27:00.000Z",
+        "sourceMethod": "public_main_listing_display",
         "branchLabel": "讃岐うどん大使 東京麺通団 - 新宿西口",
-        "snippet": "Direct listing JSON-LD Restaurant.aggregateRating showed 3.54; cached search text differed and was not used."
+        "snippet": "The public main listing showed the restaurant-level 3.54; cached search text was not used."
+      }
+    },
+    {
+      "caseId": "rating-live-mendokoro-tenho-no-space-positive",
+      "identityId": "mendokoro-tenho-nakano-sakaue",
+      "branchId": "nakano-sakaue",
+      "canonicalName": "メンドコロ 天鳳",
+      "query": "メンドコロ天鳳",
+      "address": "東京都中野区中央2-30-5 ハイムタカラ 1F",
+      "scenario": "accessible_positive",
+      "mode": "live_verified",
+      "expected": { "aggregateScore": 3.53 },
+      "evidence": {
+        "provider": "tabelog",
+        "sourceUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+        "observedAt": "2026-09-28T01:42:00.000Z",
+        "sourceMethod": "public_main_listing_display",
+        "branchLabel": "メンドコロ 天鳳 - 中野坂上",
+        "snippet": "The public main listing showed the restaurant-level 3.53 and address 2-30-5; owner query omits the space."
       }
     },
     {

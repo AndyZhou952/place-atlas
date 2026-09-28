@@ -164,6 +164,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     bodyKind: 'json',
     capability: { name: 'update_visit_media_caption' },
   },
+  'media.score': {
+    key: 'media.score',
+    method: 'PATCH',
+    path: '/api/media/{id}',
+    bodyKind: 'json',
+  },
   'media.delete': {
     key: 'media.delete',
     method: 'DELETE',
@@ -229,7 +235,7 @@ export function createAgentCapabilitiesDocument() {
   );
   return {
     service: 'Japan Atlas',
-    version: '0.6',
+    version: '0.7',
     intakeAuthentication: {
       type: 'owner_session_cookie',
       loginPath: '/api/auth/owner',
@@ -237,7 +243,15 @@ export function createAgentCapabilitiesDocument() {
       conversationHeader: 'x-atlas-web-conversation-id',
       conversationInstruction:
         'Read the conversation header returned by discover and echo it on select, confirm, and cancel using the same owner session.',
-      note: 'Model provider keys are not application credentials. External agent token authentication is not implemented.',
+      note: 'Model provider keys are not application credentials.',
+    },
+    externalAgentIntakeAuthentication: {
+      type: 'bearer_token',
+      endpoint: '/api/agent/catalog-intake',
+      scope: 'catalog_intake_only',
+      conversationHeader: 'x-atlas-agent-conversation-id',
+      instruction:
+        'Send {operation,input} with the dedicated Add Agent token. Echo the conversation header from discover on select, confirm and cancel. Confirm only after reviewing the current preview and version.',
     },
     operations,
   } as const;

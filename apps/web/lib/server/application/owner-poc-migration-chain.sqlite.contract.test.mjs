@@ -15,9 +15,10 @@ const migrations = [
   '0008_catalog_intake_publication.sql',
   '0009_catalog_intake_research_allowances.sql',
   '0010_owner_agent_settings.sql',
+  '0011_visit_media_score.sql',
 ];
 
-test('owner-poc append-only 0001-0010 chain replays from two empty databases', async () => {
+test('owner-poc append-only 0001-0011 chain replays from two empty databases', async () => {
   for (let run = 0; run < 2; run += 1) {
     const database = new DatabaseSync(':memory:');
     for (const migration of migrations) {
@@ -51,5 +52,51 @@ test('owner-poc append-only 0001-0010 chain replays from two empty databases', a
         .get().revision_number,
       1,
     );
+    assert.ok(
+      database
+        .prepare('PRAGMA table_info(visit_media)')
+        .all()
+        .some((column) => column.name === 'score'),
+    );
   }
+});
+
+test('media score migration preserves existing rows and rejects out-of-range values', async () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(
+    await readFile(new URL('0001_owner_poc_schema.sql', root), 'utf8'),
+  );
+  database.exec(
+    await readFile(new URL('0005_public_media_display_id.sql', root), 'utf8'),
+  );
+  database.exec(`INSERT INTO visit_media
+    (id, display_id, visit_id, item_id, object_key, original_filename,
+     content_type, byte_size, content_sha256, caption, display_order,
+     created_at, updated_at)
+    VALUES ('old', 'pm_opaque_old', 'visit', 'place', 'visits/visit/old',
+            'old.jpg', 'image/jpeg', 3, 'hash', 'caption', 0, 'created', 'created')`);
+  database.exec(
+    await readFile(new URL('0011_visit_media_score.sql', root), 'utf8'),
+  );
+  const oldMedia = database
+    .prepare('SELECT caption, score FROM visit_media WHERE id = ?')
+    .get('old');
+  assert.equal(oldMedia.caption, 'caption');
+  assert.equal(oldMedia.score, null);
+  database
+    .prepare('UPDATE visit_media SET score = ? WHERE id = ?')
+    .run(4.3, 'old');
+  assert.equal(
+    database.prepare('SELECT score FROM visit_media WHERE id = ?').get('old')
+      .score,
+    4.3,
+  );
+  assert.throws(
+    () =>
+      database
+        .prepare('UPDATE visit_media SET score = 5.1 WHERE id = ?')
+        .run('old'),
+    /CHECK constraint failed/u,
+  );
+  database.close();
 });

@@ -730,7 +730,9 @@ test('D1 Atlas Catalog serializes concurrent confirms for one mutation into one 
   ]);
 
   assert.deepEqual(
-    results.map(({ status, replayed }) => ({ status, replayed })),
+    results
+      .map(({ status, replayed }) => ({ status, replayed }))
+      .sort((a, b) => Number(a.replayed) - Number(b.replayed)),
     [
       { status: 'committed_needs_review', replayed: false },
       { status: 'committed_needs_review', replayed: true },

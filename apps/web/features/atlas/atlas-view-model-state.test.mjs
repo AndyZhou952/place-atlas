@@ -189,6 +189,21 @@ test('optimistic Visit removal rolls back its Visit and media without inventing 
   assert.equal(state.items[0].hasVisited, true);
 });
 
+test('replaying a completed media batch replaces the same IDs without duplicate thumbnails', () => {
+  const first = { id: 'media-1', visitId: 'visit-1', itemId: item.id };
+  const second = { id: 'media-2', visitId: 'visit-1', itemId: item.id };
+  let state = createAtlasViewModelState({ items: [item] });
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.appended',
+    media: [first],
+  });
+  state = reduceAtlasViewModelState(state, {
+    type: 'media.appended',
+    media: [first, second],
+  });
+  assert.deepEqual(state.media, [first, second]);
+});
+
 test('an item mutation success rejects an older read but a newer refresh still converges', () => {
   let state = createAtlasViewModelState({ items: [item] });
   state = reduceAtlasViewModelState(state, {

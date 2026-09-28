@@ -3,6 +3,12 @@
   "datasetId": "place-resolution-v1",
   "predictions": [
     {
+      "caseId": "jp-mendokoro-tenho-no-space",
+      "action": "resolve",
+      "selectedIdentityId": "mendokoro-tenho-nakano-sakaue",
+      "candidateIdentityIds": ["mendokoro-tenho-nakano-sakaue"]
+    },
+    {
       "caseId": "jp-exact-tokyo-mentsudan",
       "action": "resolve",
       "selectedIdentityId": "tokyo-mentsudan-shinjuku",

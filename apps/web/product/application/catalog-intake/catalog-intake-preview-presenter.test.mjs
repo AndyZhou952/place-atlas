@@ -62,6 +62,20 @@ test('closed preview presentation exposes every persisted fact and its evidence 
   }
 });
 
+test('overseas preview omits inapplicable Tabelog from fields and warnings', () => {
+  const preview = fullPreview();
+  preview.ownerFields = { address: '7 Dempsey Road, Singapore 249671' };
+  preview.tabelog = { status: 'unknown' };
+  preview.unknownFields = ['tabelog', 'reservation'];
+  const presentation = presentCatalogIntakePreview(preview);
+  assert.equal(
+    presentation.fields.some((field) => field.key === 'tabelog'),
+    false,
+  );
+  assert.deepEqual(presentation.unknownFields, ['reservation']);
+  assert.doesNotMatch(presentCatalogIntakePreviewText(preview), /^Tabelog:/mu);
+});
+
 function fullPreview() {
   return {
     sessionId: 'session-1',

@@ -6,11 +6,13 @@ export interface TabelogEvidence extends SearchEvidence {
     name: string;
     aliases?: string[];
     address: string;
+    postalCode?: string;
     area: string;
-    score: number;
+    score?: number;
     coordinates?: { latitude: number; longitude: number };
     categories: string[];
     reservation?: string;
+    bookingProviderHint?: 'tablecheck';
     officialWebsite?: string;
     introduction?: string;
   };
@@ -110,6 +112,11 @@ export function parseTabelogListing(
   if (matches.length !== 1) return undefined;
   const record = matches[0];
   const address = record.address as Record<string, unknown> | undefined;
+  const postalCode =
+    typeof address?.postalCode === 'string' &&
+    /^\d{7}$/u.test(address.postalCode)
+      ? address.postalCode
+      : undefined;
   const rating = record.aggregateRating as Record<string, unknown> | undefined;
   const name = typeof record.name === 'string' ? record.name.trim() : '';
   const parts = ['addressRegion', 'addressLocality', 'streetAddress'].map(
@@ -123,15 +130,20 @@ export function parseTabelogListing(
     )
   )
     return undefined;
-  if (rating?.['@type'] !== 'AggregateRating') return undefined;
-  const rawScore = rating.ratingValue;
-  if (
-    !['number', 'string'].includes(typeof rawScore) ||
-    !/^\d(?:\.\d{1,2})?$/u.test(String(rawScore))
-  )
-    return undefined;
-  const score = Number(rawScore);
-  if (score < 1 || score > 5) return undefined;
+  // A new listing can have a verified identity and address before it has an
+  // aggregate score. Review-level ratings must never fill that gap.
+  let score: number | undefined;
+  if (rating !== undefined) {
+    if (rating['@type'] !== 'AggregateRating') return undefined;
+    const rawScore = rating.ratingValue;
+    if (
+      !['number', 'string'].includes(typeof rawScore) ||
+      !/^\d(?:\.\d{1,2})?$/u.test(String(rawScore))
+    )
+      return undefined;
+    score = Number(rawScore);
+    if (score < 1 || score > 5) return undefined;
+  }
   const clean = (text: string) =>
     text
       .replace(/<[^>]*>/gu, ' ')
@@ -161,6 +173,7 @@ export function parseTabelogListing(
         .slice(0, 3)
     : [];
   const reservation = clean(row('予約可否') ?? '').slice(0, 1000);
+  const remarks = clean(row('備考') ?? '').slice(0, 1000);
   const introduction = clean(
     row('お店のPR') ??
       /<p\b[^>]*class=["'][^"']*\bpr-comment\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/iu.exec(
@@ -196,18 +209,22 @@ export function parseTabelogListing(
     name,
     aliases,
     address: parts.join(''),
-    score,
+    ...(postalCode ? { postalCode } : {}),
+    ...(score === undefined ? {} : { score }),
     categories,
     area: `${String(parts[1])}${String(parts[2]).split(/[0-9０-９]/u)[0]}`.trim(),
     ...(coordinates ? { coordinates } : {}),
     ...(reservation ? { reservation } : {}),
+    ...(/Table\s*Check/iu.test(remarks)
+      ? { bookingProviderHint: 'tablecheck' as const }
+      : {}),
     ...(introduction ? { introduction } : {}),
     ...(website ? { officialWebsite: clean(website) } : {}),
   };
   return {
     url: sourceUrl,
     title: name,
-    content: `${[name, ...aliases, parts.join('')].join(' ')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
+    content: `${[name, ...aliases, parts.join('')].join(' ')}${score === undefined ? '' : `\nTabelog aggregate restaurant rating: ${score.toFixed(2)}`}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
     restaurant,
   };
 }

@@ -27,6 +27,7 @@ const restaurant = {
     addressRegion: 'Tokyo',
     addressLocality: 'Shinjuku',
     streetAddress: '1-4-2',
+    postalCode: '1600004',
   },
   aggregateRating: { '@type': 'AggregateRating', ratingValue: '3.71' },
   review: [
@@ -101,11 +102,22 @@ test('structured listing exposes aggregate and branch identity, never reviews', 
   const result = parseTabelogListing(html(restaurant), url);
   assert.match(result.content, /Example Restaurant TokyoShinjuku1-4-2/u);
   assert.match(result.content, /aggregate restaurant rating: 3.71/u);
+  assert.equal(result.restaurant.postalCode, '1600004');
   assert.doesNotMatch(result.content, /4.99|Ignore instructions/u);
   assert.equal(
     parseTabelogListing(html({ '@graph': [restaurant] }), url).content,
     result.content,
   );
+});
+
+test('a rating-free restaurant listing can support identity without borrowing a review score', () => {
+  const unrated = parseTabelogListing(
+    html({ ...restaurant, aggregateRating: undefined }),
+    url,
+  );
+  assert.equal(unrated.restaurant.name, 'Example Restaurant');
+  assert.equal(unrated.restaurant.score, undefined);
+  assert.doesNotMatch(unrated.content, /aggregate restaurant rating|4\.99/u);
 });
 
 test('restaurant introduction supports the current pr-comment markup without reading reviews', () => {
@@ -148,11 +160,26 @@ test('listing exposes sourced location, cuisine, official link and explicit rese
   assert.equal(missing.restaurant.reservation, undefined);
 });
 
+test('the listing remarks can identify TableCheck without inventing a booking window', () => {
+  const result = parseTabelogListing(
+    html(restaurant) +
+      '<table><tr><th>備考</th><td>公式InstagramのTable Checkから予約</td></tr></table>',
+    url,
+  );
+  assert.equal(result.restaurant.bookingProviderHint, 'tablecheck');
+  assert.equal(result.restaurant.reservation, undefined);
+  const absent = parseTabelogListing(
+    html(restaurant) +
+      '<table><tr><th>備考</th><td>予約が必要</td></tr></table>',
+    url,
+  );
+  assert.equal(absent.restaurant.bookingProviderHint, undefined);
+});
+
 test('wrong identities, review-only ratings, malformed and conflicting records provide no fact', () => {
   for (const record of [
     { ...restaurant, '@id': url.replace('13131643', '13131644') },
     { ...restaurant, '@type': 'Review' },
-    { ...restaurant, aggregateRating: undefined },
     {
       ...restaurant,
       aggregateRating: { '@type': 'AggregateRating', ratingValue: '9.99' },

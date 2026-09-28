@@ -19,7 +19,7 @@ import {
 import { explicitReservationTiming } from './reservation-timing.ts';
 import { readOfficialSite } from './official-site-reader.ts';
 import {
-  isTableCheckBookingPage,
+  canonicalTableCheckBookingUrl,
   readTableCheckBookingPage,
   type TableCheckBookingEvidence,
 } from './tablecheck-booking.ts';
@@ -171,31 +171,76 @@ export function createPlaceResearchAgent(
       };
       const readSelectedBookingPage = async (sources: SearchEvidence[]) => {
         if (bookingEvidence) return;
-        const index = sources.findIndex((source) =>
-          isTableCheckBookingPage(source.url),
-        );
-        if (index < 0) return;
-        const result = await readTableCheckBookingPage(
-          sources[index].url,
-          fetcher,
-          signal,
-        );
-        if (result.kind !== 'read') return;
-        const booking = result.evidence.booking;
-        if (
-          !matchesSelectedBranch(
-            `${booking.name} ${booking.address}`,
-            input.selectedSubject.transientName,
-            input.selectedSubject.transientAddress,
-            input.selectedSubject.ownerQuery,
-            booking.address,
-            undefined,
-            booking.name,
-          )
-        )
-          return;
-        bookingEvidence = result.evidence;
-        sources[index] = result.evidence;
+        let candidates = 0;
+        for (const [index, source] of sources.entries()) {
+          const bookingUrl = canonicalTableCheckBookingUrl(source.url);
+          if (!bookingUrl) continue;
+          candidates++;
+          const result = await readTableCheckBookingPage(
+            bookingUrl,
+            fetcher,
+            signal,
+          );
+          diagnostic(`tablecheck_read_${result.kind}`);
+          if (result.kind !== 'read') continue;
+          const booking = result.evidence.booking;
+          const selected = input.selectedSubject;
+          const directBranch = booking.address
+            ? matchesSelectedBranch(
+                `${booking.name} ${booking.address}`,
+                selected.transientName,
+                selected.transientAddress,
+                selected.ownerQuery,
+                booking.address,
+                undefined,
+                booking.name,
+              )
+            : false;
+          // Modern merchant pages omit their street address. Require the same
+          // distinctive title and official website as a selected-branch listing.
+          const modernBranch = [...sources, ...evidence].some((item) => {
+            const listing = (item as TabelogEvidence).restaurant;
+            if (!listing?.officialWebsite || !booking.officialWebsiteHost)
+              return false;
+            let officialHost: string;
+            try {
+              officialHost = new URL(listing.officialWebsite).hostname.replace(
+                /^www\./u,
+                '',
+              );
+            } catch {
+              return false;
+            }
+            const normalizedName = (value: string) =>
+              value
+                .normalize('NFKC')
+                .toLowerCase()
+                .replace(/[\p{P}\p{Z}\s]/gu, '');
+            return (
+              normalizedName(booking.name).length >= 4 &&
+              normalizedName(booking.name) === normalizedName(listing.name) &&
+              officialHost === booking.officialWebsiteHost &&
+              matchesSelectedBranch(
+                `${listing.name} ${listing.aliases?.join(' ') ?? ''} ${listing.address}`,
+                selected.transientName,
+                selected.transientAddress,
+                selected.ownerQuery,
+                listing.address,
+                listing.postalCode,
+                listing.name,
+              )
+            );
+          });
+          if (!directBranch && !modernBranch) {
+            diagnostic('tablecheck_branch_mismatch');
+            continue;
+          }
+          diagnostic('tablecheck_branch_match');
+          bookingEvidence = result.evidence;
+          sources[index] = result.evidence;
+          break;
+        }
+        if (!candidates) diagnostic('tablecheck_no_candidate');
       };
       const verifiedListingFallback = () => {
         const selected = input.selectedSubject;
@@ -258,7 +303,7 @@ export function createPlaceResearchAgent(
             : /予約可/u.test(policy ?? '')
               ? 'reservable'
               : undefined;
-        const reservation =
+        const baseReservation =
           policy && mode
             ? {
                 status: 'known' as const,
@@ -273,6 +318,31 @@ export function createPlaceResearchAgent(
                 freshness: 'fresh' as const,
               }
             : { status: 'unknown' as const };
+        const reservation = bookingEvidence
+          ? {
+              status: 'known' as const,
+              mode:
+                baseReservation.status === 'known' &&
+                baseReservation.mode !== 'not_reservable'
+                  ? baseReservation.mode
+                  : ('reservable' as const),
+              label:
+                baseReservation.status === 'known'
+                  ? baseReservation.label
+                  : '予約可',
+              bookingWindowLabel: bookingEvidence.booking.bookingWindowLabel,
+              ...(bookingEvidence.booking.advanceDays === undefined
+                ? {}
+                : { advanceDays: bookingEvidence.booking.advanceDays }),
+              ...(bookingEvidence.booking.releaseNote
+                ? { releaseNote: bookingEvidence.booking.releaseNote }
+                : {}),
+              url: bookingEvidence.url,
+              provenance: 'agent_observed' as const,
+              observedAt,
+              freshness: 'fresh' as const,
+            }
+          : baseReservation;
         const tabelog =
           region === 'japan' && details.score !== undefined
             ? {
@@ -393,6 +463,9 @@ export function createPlaceResearchAgent(
           const query = initialResearchQuery(input.selectedSubject);
           const result = await searchProvider.search(query, signal);
           diagnostic(
+            `booking_search_${result.kind === 'results' ? 'results' : result.reason}`,
+          );
+          diagnostic(
             `initial_search_${result.kind === 'results' ? 'results' : result.reason}`,
           );
           if (result.kind === 'results') {
@@ -415,9 +488,13 @@ export function createPlaceResearchAgent(
         // A branch-matched listing can name its booking provider without
         // giving the booking URL. Spend the remaining search on that provider
         // so a generic model query cannot miss the primary booking rules.
-        const hintedListing = evidence.find(
+        const bookingSearchListing = evidence.find(
           (source) =>
-            source.restaurant?.bookingProviderHint === 'tablecheck' &&
+            (source.restaurant?.bookingProviderHint === 'tablecheck' ||
+              (/完全予約制|予約必須|要予約/u.test(
+                source.restaurant?.reservation ?? '',
+              ) &&
+                source.restaurant?.officialWebsite)) &&
             matchesSelectedBranch(
               `${source.restaurant.name} ${source.restaurant.aliases?.join(' ') ?? ''} ${source.restaurant.address}`,
               input.selectedSubject.transientName,
@@ -428,9 +505,15 @@ export function createPlaceResearchAgent(
               source.restaurant.name,
             ),
         );
-        if (hintedListing && !bookingEvidence && searches < 2) {
+        if (
+          bookingSearchListing?.restaurant &&
+          !bookingEvidence &&
+          searches < 2
+        ) {
           searches++;
-          const query = `${input.selectedSubject.transientName.slice(0, 200)} ${input.selectedSubject.ownerQuery.slice(0, 160)} TableCheck reservation`;
+          // The listing already fixed the branch; adding its long address can
+          // crowd the merchant page out of a three-result booking search.
+          const query = `${bookingSearchListing.restaurant.name} TableCheck reservation 予約`;
           const result = await searchProvider.search(query, signal);
           if (result.kind === 'results') {
             successfulSearches++;
@@ -444,7 +527,7 @@ export function createPlaceResearchAgent(
               sources: result.kind === 'results' ? result.sources : result,
               remainingSearchCalls: 0,
               instruction:
-                'The selected listing named TableCheck as its booking provider. Use only branch-matched, explicit booking rules; an unavailable page leaves timing unknown.',
+                'The selected listing confirms a reservation policy. Use only branch-matched, explicit booking rules; an unavailable page leaves timing unknown.',
             }),
           });
         }
@@ -1099,21 +1182,28 @@ function matchesSelectedBranch(
     value
       .normalize('NFKC')
       .toLowerCase()
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
       .replace(/ch[ōo]me|丁目|番地|番|号/gu, '-')
       .replace(/[\s‐‑‒–—−ー]/gu, '-')
       .replace(/-+/gu, '-')
-      .match(/\d{1,4}-\d{1,4}-\d{1,4}/gu) ?? [];
+      .match(/\d{1,4}-\d{1,4}(?:-\d{1,4})?/gu) ?? [];
   const selectedNumbers = streetNumbers(address);
-  if (
-    !selectedNumbers.some((numbers) =>
-      streetNumbers(sourceAddress ?? quote).includes(numbers),
-    )
-  )
-    return false;
+  const sourceNumbers = streetNumbers(sourceAddress ?? quote);
+  const matchingNumbers = selectedNumbers.filter((numbers) =>
+    sourceNumbers.includes(numbers),
+  );
+  if (!matchingNumbers.length) return false;
   const selectedPostalCode = address
     .normalize('NFKC')
     .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
     ?.replace(/\D/gu, '');
+  // A two-part number is common in central Tokyo but less distinctive than a
+  // three-part Japanese block address. Require the exact postal code too.
+  if (
+    matchingNumbers.every((numbers) => numbers.split('-').length === 2) &&
+    (!selectedPostalCode || selectedPostalCode !== sourcePostalCode)
+  )
+    return false;
   if (selectedPostalCode && sourcePostalCode) {
     if (selectedPostalCode === sourcePostalCode) return true;
     // Google can report a building's dedicated postal code while a listing

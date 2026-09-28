@@ -70,6 +70,11 @@ function score(sample, preview) {
     reservation:
       preview?.reservation?.status === 'known' &&
       preview.reservation.mode === sample.expectedReservationMode,
+    releaseClock:
+      !sample.expectedReleaseNoteIncludes ||
+      preview?.reservation?.releaseNote?.includes(
+        sample.expectedReleaseNoteIncludes,
+      ),
     savedDuplicate:
       Boolean(
         preview?.suspectedDuplicates?.some((item) => item.match === 'strong'),
@@ -83,6 +88,7 @@ function score(sample, preview) {
       location: preview?.locationEvidence?.status,
       tabelog: preview?.tabelog?.status,
       reservation: preview?.reservation?.mode ?? preview?.reservation?.status,
+      releaseNote: preview?.reservation?.releaseNote,
       duplicate: preview?.suspectedDuplicates?.map((item) => item.match),
     },
   };
@@ -117,6 +123,7 @@ for (const sample of cases) {
         status: discovered.status,
         candidateCount: candidates.length,
         matchingCandidateCount: matches.length,
+        candidateNames: candidates.map((candidate) => candidate.transientName),
       };
     } else {
       const selected = await call(
@@ -131,7 +138,11 @@ for (const sample of cases) {
       sessionVersion = selected.body.sessionVersion ?? sessionVersion;
       result =
         selected.status === 200 && selected.body.status === 'preview_ready'
-          ? { stage: 'select', ...score(sample, selected.body.preview) }
+          ? {
+              stage: 'select',
+              candidateAddress: matches[0].transientAddress,
+              ...score(sample, selected.body.preview),
+            }
           : {
               pass: false,
               stage: 'select',

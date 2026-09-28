@@ -43,6 +43,16 @@
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1318/A131810/13141002/",
       "expectedReservationMode": "not_reservable",
       "expectedSavedDuplicate": false
+    },
+    {
+      "id": "ogasawaratei-release-clock",
+      "query": "小笠原伯爵邸 若松河田",
+      "candidateNameIncludes": "Ogasawara",
+      "expectedTitleIncludes": "小笠原伯爵邸",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1305/A130504/13000998/",
+      "expectedReservationMode": "reservation_required",
+      "expectedReleaseNoteIncludes": "毎月1日",
+      "expectedSavedDuplicate": false
     }
   ]
 }

@@ -47,6 +47,22 @@
       "expect": "unavailable"
     },
     {
+      "id": "ogasawaratei-two-part-street-postcode",
+      "restaurant": "ogasawara",
+      "source": "exact",
+      "model": "empty_valid",
+      "provider": "google-places",
+      "expect": "observed"
+    },
+    {
+      "id": "ogasawaratei-two-part-wrong-street",
+      "restaurant": "ogasawara",
+      "source": "wrong_street",
+      "model": "invalid_json",
+      "provider": "google-places",
+      "expect": "unavailable"
+    },
+    {
       "id": "model-service-error",
       "source": "exact",
       "model": "http_error",

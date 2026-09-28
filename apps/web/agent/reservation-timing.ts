@@ -38,6 +38,25 @@ export function explicitReservationTiming(
     releaseMatch && bookingContext(releaseMatch.index, releaseMatch[0].length)
       ? { releaseNote: releaseMatch[0].trim() }
       : {};
+  const merchantMonth =
+    /毎月\s*\d{1,2}日\s*に\s*翌月末日\s*までの\s*ご?予約を承ります/u.exec(text);
+  if (merchantMonth) {
+    const releaseClock =
+      /(?:公式HP|オンライン|WEB)\s*[:：]\s*(毎月\s*\d{1,2}日(?:の)?\s*深夜\s*\d{1,2}時(?:[0-5]?\d分)?\s*より)/iu.exec(
+        text,
+      );
+    const hasReleaseHeading =
+      releaseClock &&
+      /予約受付開始時間/u.test(
+        text.slice(Math.max(0, releaseClock.index - 60), releaseClock.index),
+      );
+    return {
+      bookingWindowLabel: merchantMonth[0].trim(),
+      ...(hasReleaseHeading
+        ? { releaseNote: releaseClock[1].trim() }
+        : releaseNote),
+    };
+  }
   const day =
     /(?<!\d)(\d{1,3})\s*日前\s*(?:から|より)(?:\s*(?:予約|受付))?/u.exec(text);
   if (day && bookingContext(day.index, day[0].length)) {

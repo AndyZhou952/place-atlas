@@ -4,7 +4,8 @@ import { readBoundedText, type SearchEvidence } from './web-search.ts';
 export interface TableCheckBookingEvidence extends SearchEvidence {
   readonly booking: {
     readonly name: string;
-    readonly address: string;
+    readonly address?: string;
+    readonly officialWebsiteHost?: string;
     readonly bookingWindowLabel: string;
     readonly advanceDays?: number;
     readonly releaseNote?: string;
@@ -15,26 +16,41 @@ export type TableCheckReadResult =
   | { readonly kind: 'read'; readonly evidence: TableCheckBookingEvidence }
   | { readonly kind: 'blocked' | 'unavailable' | 'invalid_source' };
 
-/** A single public merchant booking page; no arbitrary URL, cookies or redirects. */
-export function isTableCheckBookingPage(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
+/** Drop search-result tracking and category filters before opening a merchant page. */
+export function canonicalTableCheckBookingUrl(
+  value: unknown,
+): string | undefined {
+  if (typeof value !== 'string') return undefined;
   try {
     const url = new URL(value);
-    return (
+    if (
       url.protocol === 'https:' &&
       ['tablecheck.com', 'www.tablecheck.com'].includes(url.hostname) &&
       !url.username &&
       !url.password &&
       !url.port &&
-      !url.search &&
-      !url.hash &&
-      /^\/(?:[a-z]{2}\/)?[a-z0-9-]{3,120}\/reserve\/landing\/?$/u.test(
+      (/^\/(?:[a-z]{2}\/)?[a-z0-9-]{3,120}\/reserve\/landing\/?$/u.test(
         url.pathname,
-      )
-    );
+      ) ||
+        /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shops\/[a-z0-9-]{3,120}\/reserve\/?$/iu.test(
+          url.pathname,
+        ))
+    ) {
+      url.search = '';
+      url.hash = '';
+      return url.href;
+    }
   } catch {
-    return false;
+    return undefined;
   }
+  return undefined;
+}
+
+/** A single public merchant booking page; no arbitrary URL, cookies or redirects. */
+export function isTableCheckBookingPage(value: unknown): value is string {
+  return (
+    typeof value === 'string' && canonicalTableCheckBookingUrl(value) === value
+  );
 }
 
 export async function readTableCheckBookingPage(
@@ -77,11 +93,58 @@ export function parseTableCheckBookingPage(
 ): TableCheckBookingEvidence | undefined {
   if (!isTableCheckBookingPage(sourceUrl)) return undefined;
   const title = /<title\b[^>]*>([\s\S]{1,300}?)<\/title>/iu.exec(html)?.[1];
-  if (!title || !/\s[-–]\sTableCheck\s*$/iu.test(decode(title).trim()))
+  if (
+    !title ||
+    !/\s[-–]\sTableCheck(?:\s*\(テーブルチェック\))?\s*$/iu.test(
+      decode(title).trim(),
+    )
+  )
     return undefined;
   const name = decode(title)
-    .replace(/\s[-–]\sTableCheck\s*$/iu, '')
+    .replace(/\s[-–]\sTableCheck(?:\s*\(テーブルチェック\))?\s*$/iu, '')
     .trim();
+  const modern = /\/shops\//u.test(new URL(sourceUrl).pathname);
+  if (modern) {
+    const heading =
+      /<h3\b[^>]*class=["'][^"']*panel-title[^"']*["'][^>]*>([^<]{3,200})を予約する<\/h3>/iu.exec(
+        html,
+      )?.[1];
+    const policy =
+      /<div\b[^>]*class=["'][^"']*reserveform-bookingpolicy-text[^"']*["'][^>]*>([\s\S]{1,12000}?)<\/div>/iu.exec(
+        html,
+      )?.[1];
+    if (!heading || decode(heading).trim() !== name || !policy)
+      return undefined;
+    const policyText = decode(policy.replace(/<[^>]*>/gu, ' ')).replace(
+      /\s+/gu,
+      ' ',
+    );
+    const timing = explicitReservationTiming(policyText);
+    if (!timing.bookingWindowLabel || !timing.releaseNote) return undefined;
+    const officialWebsiteHost = [
+      ...policy.matchAll(/\bhref=["'](https:\/\/[^"']+)["']/giu),
+    ]
+      .map((match) => {
+        try {
+          return new URL(decode(match[1])).hostname.replace(/^www\./u, '');
+        } catch {
+          return undefined;
+        }
+      })
+      .find((host) => host && host !== 'tablecheck.com');
+    if (!officialWebsiteHost) return undefined;
+    return {
+      url: sourceUrl,
+      title: name,
+      content: `${name}\n${timing.bookingWindowLabel}\n${timing.releaseNote}`,
+      booking: {
+        name,
+        officialWebsiteHost,
+        bookingWindowLabel: timing.bookingWindowLabel,
+        releaseNote: timing.releaseNote,
+      },
+    };
+  }
   const text = decode(
     html
       .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/giu, ' ')

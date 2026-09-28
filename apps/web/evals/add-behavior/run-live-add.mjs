@@ -90,6 +90,15 @@ function score(sample, preview) {
       preview?.profile?.summary?.value?.startsWith(
         sample.expectedSummaryPrefix,
       ),
+    summaryDetail:
+      !sample.expectedSummaryIncludes ||
+      preview?.profile?.summary?.value?.includes(
+        sample.expectedSummaryIncludes,
+      ),
+    dishes:
+      !sample.expectedDishesMin ||
+      (preview?.profile?.signatureDishes?.value?.length ?? 0) >=
+        sample.expectedDishesMin,
     bookingLink:
       !sample.expectedBookingLink ||
       preview?.profile?.bookingLink?.value === sample.expectedBookingLink,
@@ -108,6 +117,7 @@ function score(sample, preview) {
       reservation: preview?.reservation?.mode ?? preview?.reservation?.status,
       releaseNote: preview?.reservation?.releaseNote,
       categories: preview?.profile?.categories?.value,
+      dishes: preview?.profile?.signatureDishes?.value,
       summary: preview?.profile?.summary?.value,
       bookingLink: preview?.profile?.bookingLink?.value,
       duplicate: preview?.suspectedDuplicates?.map((item) => item.match),

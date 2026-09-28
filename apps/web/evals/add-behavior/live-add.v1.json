@@ -69,6 +69,18 @@
       "expectedSummaryPrefix": "主营澳式烧烤",
       "expectedBookingLink": "https://burntends.com.sg/reservations/",
       "expectedSavedDuplicate": false
+    },
+    {
+      "id": "tonkatsu-keita-grounded-dishes",
+      "query": "TONKATSU KEITA 松庵",
+      "candidateNameExact": "TONKATSU KEITA",
+      "expectedTitleIncludes": "TONKATSU KEITA",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131907/13304076/",
+      "expectedReservationMode": "reservation_required",
+      "expectedCategoryIncludes": "とんかつ",
+      "expectedSummaryPrefix": "主营炸猪排",
+      "expectedSummaryIncludes": "招牌菜包括",
+      "expectedDishesMin": 2
     }
   ]
 }

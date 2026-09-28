@@ -38,6 +38,10 @@ const chineseCuisineNames: Readonly<Record<string, string>> = {
   american: '美式料理',
   americancuisine: '美式料理',
   'fast food': '快餐',
+  modernbarbecue: '现代烧烤',
+  australianbarbecue: '澳式烧烤',
+  modernaustralianbarbecue: '澳式烧烤',
+  barbecue: '烧烤',
   italian: '意式料理',
   french: '法式料理',
   chinese: '中式料理',
@@ -73,12 +77,28 @@ export function compactRestaurantCategories(
     (value) => !isAreaLabel(value, area),
   );
   const hasYakitori = labels.some((value) => categoryKey(value) === 'yakitori');
+  const barbecuePriority: Readonly<Record<string, number>> = {
+    barbecue: 0,
+    modernbarbecue: 1,
+    australianbarbecue: 2,
+    modernaustralianbarbecue: 3,
+  };
+  const bestBarbecue = labels
+    .map(categoryKey)
+    .filter((key) => Object.hasOwn(barbecuePriority, key))
+    .sort((left, right) => barbecuePriority[right] - barbecuePriority[left])[0];
   const seen = new Set<string>();
   return labels.filter((value) => {
     const key = categoryKey(value);
     // Bird cuisine and generic skewers can describe a yakitori shop, but they
     // remain distinct categories when no explicit yakitori label is present.
     if (hasYakitori && (key === 'chicken-cuisine' || key === 'skewers'))
+      return false;
+    if (
+      bestBarbecue &&
+      Object.hasOwn(barbecuePriority, key) &&
+      key !== bestBarbecue
+    )
       return false;
     if (seen.has(key) || seen.size >= limit) return false;
     seen.add(key);

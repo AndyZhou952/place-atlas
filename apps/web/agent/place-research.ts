@@ -17,6 +17,7 @@ import {
   isTabelogRestaurantListing,
 } from './research-instructions.ts';
 import { explicitReservationTiming } from './reservation-timing.ts';
+import { readOfficialSite } from './official-site-reader.ts';
 import {
   isTableCheckBookingPage,
   readTableCheckBookingPage,
@@ -31,6 +32,8 @@ export interface AgentConfiguration {
   fetch?: typeof fetch;
   readSourcePages?: boolean;
   sourceReader?: RestaurantSourceReader;
+  onDiagnostic?: (code: string) => void;
+  officialWebsiteForPlaceId?: (placeId: string) => Promise<string | undefined>;
 }
 
 type Evidence = SearchEvidence;
@@ -40,6 +43,8 @@ export function createConfiguredPlaceResearchAgent(options: {
   agentModel?: string;
   searchApiKey?: string;
   sourceReader?: RestaurantSourceReader;
+  onDiagnostic?: (code: string) => void;
+  officialWebsiteForPlaceId?: (placeId: string) => Promise<string | undefined>;
   fetch?: typeof fetch;
 }): WebResearchPort | undefined {
   if (
@@ -63,6 +68,10 @@ export function createConfiguredPlaceResearchAgent(options: {
       ...(options.searchApiKey ? { searchApiKey: options.searchApiKey } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),
       ...(options.sourceReader ? { sourceReader: options.sourceReader } : {}),
+      ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {}),
+      ...(options.officialWebsiteForPlaceId
+        ? { officialWebsiteForPlaceId: options.officialWebsiteForPlaceId }
+        : {}),
     });
   } catch {
     return {
@@ -95,6 +104,7 @@ export function createPlaceResearchAgent(
     ...(config.searchApiKey ? { apiKey: config.searchApiKey } : {}),
     fetch: fetcher,
   });
+  const diagnostic = config.onDiagnostic ?? (() => {});
   return {
     async research(input) {
       if (!('selectedSubject' in input)) return { kind: 'unavailable' };
@@ -185,6 +195,49 @@ export function createPlaceResearchAgent(
         sources[index] = result.evidence;
       };
       try {
+        if (
+          region === 'overseas' &&
+          input.selectedSubject.providerNamespace === 'google-places' &&
+          config.officialWebsiteForPlaceId &&
+          config.readSourcePages !== false
+        ) {
+          const website = await config.officialWebsiteForPlaceId(
+            input.selectedSubject.placeId,
+          );
+          const officialSources = website
+            ? await readOfficialSite(website, signal, fetcher)
+            : [];
+          const branchSources = officialSources.filter((source) =>
+            matchesSelectedBranch(
+              source.content,
+              input.selectedSubject.transientName,
+              input.selectedSubject.transientAddress,
+              input.selectedSubject.ownerQuery,
+            ),
+          );
+          diagnostic(
+            !officialSources.length
+              ? 'official_site_unavailable'
+              : branchSources.length
+                ? 'official_site_read'
+                : 'official_site_branch_mismatch',
+          );
+          if (branchSources.length) {
+            successfulSearches++;
+            // The exact branch already has direct pages. Do not let a model
+            // spend the 35-second window on the blocked public search fallback.
+            searches = 2;
+            evidence.push(...officialSources);
+            messages.push({
+              role: 'user',
+              content: JSON.stringify({
+                discoveredOfficialSources: officialSources,
+                instruction:
+                  'The application read these public pages from the selected Place ID website. A contact page may identify the selected unit while a separately titled branch page describes its food. For cross-page facts, provide identityUrl as well as identityQuote, and quote the fact from the branch page. Never transfer bar or other-unit facts to the restaurant. The website hint itself is not evidence.',
+              }),
+            });
+          }
+        }
         const selectedListing =
           input.selectedSubject.providerNamespace === 'tabelog'
             ? input.selectedSubject.placeId
@@ -214,10 +267,17 @@ export function createPlaceResearchAgent(
         // Anchor discovery in the provider's selected name before the model can
         // mistranslate a neighborhood or spend both searches on irrelevant pages.
         // This consumes the same two-search budget, never an extra hidden retry.
-        if (!selectedListing && config.readSourcePages !== false) {
+        if (
+          !selectedListing &&
+          successfulSearches === 0 &&
+          config.readSourcePages !== false
+        ) {
           searches++;
           const query = initialResearchQuery(input.selectedSubject);
           const result = await searchProvider.search(query, signal);
+          diagnostic(
+            `initial_search_${result.kind === 'results' ? 'results' : result.reason}`,
+          );
           if (result.kind === 'results') {
             successfulSearches++;
             await readSelectedListing(result.sources);
@@ -309,10 +369,13 @@ export function createPlaceResearchAgent(
                 : { response_format: { type: 'json_object' } }),
             }),
           });
+          diagnostic(`model_http_${response.status}`);
           const modelResult = await readJson(response, 32_768);
           const message = modelResult?.choices?.[0]?.message;
-          if (!message || typeof message !== 'object')
+          if (!message || typeof message !== 'object') {
+            diagnostic('model_invalid_message');
             return { kind: 'unavailable' };
+          }
           if (Array.isArray(message.tool_calls) && message.tool_calls.length) {
             if (message.tool_calls.length > 2 - searches)
               return { kind: 'unavailable' };
@@ -363,9 +426,20 @@ export function createPlaceResearchAgent(
             }
             continue;
           }
-          if (typeof message.content !== 'string' || successfulSearches === 0)
+          if (typeof message.content !== 'string' || successfulSearches === 0) {
+            diagnostic(
+              successfulSearches === 0
+                ? 'no_successful_search'
+                : 'model_missing_content',
+            );
             return { kind: 'unavailable' };
+          }
           const proposal = JSON.parse(message.content);
+          diagnostic(
+            proposal.subjectMatch === 'matched'
+              ? 'model_branch_matched'
+              : 'model_branch_unmatched',
+          );
           const unknown = { status: 'unknown' as const };
           const matchedListing = evidence.find(
             (source) =>
@@ -388,12 +462,14 @@ export function createPlaceResearchAgent(
             proposal.subjectMatch !== 'matched' &&
             !matchedListing &&
             !bookingEvidence
-          )
+          ) {
+            diagnostic('branch_gate_closed');
             return {
               kind: 'observed',
               value: { tabelog: unknown, reservation: unknown },
               ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
             };
+          }
           const observedAt = new Date().toISOString();
           const fact = (
             field: 'tabelog' | 'reservation',
@@ -402,20 +478,20 @@ export function createPlaceResearchAgent(
             const quote = proposal.evidence?.[field];
             const identityQuote =
               typeof quote?.identityQuote === 'string'
-                ? { url: quote.url, quote: quote.identityQuote }
+                ? {
+                    url: quote.identityUrl ?? quote.url,
+                    quote: quote.identityQuote,
+                  }
                 : proposal.evidence?.identity;
-            const identity =
-              supported(identityQuote, evidence) &&
-              matchesSelectedBranch(
-                identityQuote.quote,
-                input.selectedSubject.transientName,
-                input.selectedSubject.transientAddress,
-                input.selectedSubject.ownerQuery,
-              );
+            const identity = supportedIdentity(
+              quote,
+              identityQuote,
+              evidence,
+              input.selectedSubject,
+            );
             if (
               !identity ||
               value?.status !== 'known' ||
-              value.url !== identityQuote.url ||
               quote?.url !== value.url ||
               !supported(quote, evidence)
             )
@@ -477,6 +553,8 @@ export function createPlaceResearchAgent(
             const claim = proposal.profile?.[field];
             const proof =
               proposal.evidence?.[field] ?? proposal.profile?.evidence?.[field];
+            if (claim !== undefined)
+              diagnostic(`model_claim_${field.toLowerCase()}`);
             // A parsed listing already passed the selected-branch check. Do not
             // discard a quoted dish merely because the model omitted a redundant
             // identity quote; this exemption never applies to another source.
@@ -492,17 +570,15 @@ export function createPlaceResearchAgent(
                     proof.quote,
                   ))) ||
               (!verifiedListingProof &&
-                (typeof proof?.identityQuote !== 'string' ||
-                  !supported(
-                    { url: proof.url, quote: proof.identityQuote },
-                    evidence,
-                  ) ||
-                  !matchesSelectedBranch(
-                    proof.identityQuote,
-                    input.selectedSubject.transientName,
-                    input.selectedSubject.transientAddress,
-                    input.selectedSubject.ownerQuery,
-                  )))
+                !supportedIdentity(
+                  proof,
+                  {
+                    url: proof?.identityUrl ?? proof?.url,
+                    quote: proof?.identityQuote,
+                  },
+                  evidence,
+                  input.selectedSubject,
+                ))
             )
               continue;
             // Exact factual values must occur in evidence; only a description may paraphrase.
@@ -632,6 +708,44 @@ export function createPlaceResearchAgent(
               delete profile[key];
           }
           const checkedProfile = validateEnrichedProfile(profile);
+          diagnostic(`profile_fields_${Object.keys(profile).length}`);
+          for (const field of Object.keys(profile))
+            diagnostic(`profile_accept_${field.toLowerCase()}`);
+          diagnostic(
+            reservation.status === 'known'
+              ? 'reservation_known'
+              : 'reservation_unknown',
+          );
+          if (
+            region === 'overseas' &&
+            reservation.status === 'unknown' &&
+            checkedProfile?.bookingLink
+          ) {
+            const bookingLink = checkedProfile.bookingLink;
+            const branchPage = evidence.find(
+              (source) => source.url === bookingLink.sourceUrl,
+            );
+            if (
+              branchPage &&
+              [
+                `Reserve Now: ${bookingLink.value}`,
+                `Reservations: ${bookingLink.value}`,
+                `Book a table: ${bookingLink.value}`,
+                `Book Now: ${bookingLink.value}`,
+              ].some((line) => branchPage.content.includes(line))
+            ) {
+              reservation = {
+                status: 'known',
+                mode: 'reservable',
+                label: 'Reserve Now',
+                url: branchPage.url,
+                provenance: 'agent_observed',
+                observedAt,
+                freshness: 'fresh',
+              };
+              diagnostic('reservation_official_link');
+            }
+          }
           if (checkedProfile) {
             // Constrain prose to validated facts rather than trusting a citation as
             // proof for arbitrary model-generated claims (awards, popularity, etc.).
@@ -669,6 +783,7 @@ export function createPlaceResearchAgent(
             : { kind: 'unavailable' };
         }
       } catch {
+        diagnostic(signal.aborted ? 'deadline' : 'exception');
         return { kind: 'unavailable' };
       }
       return { kind: 'unavailable' };
@@ -688,6 +803,61 @@ function supported(value: unknown, sources: Evidence[]): boolean {
         source.content.includes(record.quote as string),
     )
   );
+}
+
+function supportedIdentity(
+  proof: { url?: unknown } | undefined,
+  identity: unknown,
+  sources: Evidence[],
+  subject: {
+    transientName: string;
+    transientAddress: string;
+    ownerQuery: string;
+  },
+): boolean {
+  if (
+    !supported(identity, sources) ||
+    !identity ||
+    typeof identity !== 'object'
+  )
+    return false;
+  const record = identity as { url: string; quote: string };
+  if (
+    !matchesSelectedBranch(
+      record.quote,
+      subject.transientName,
+      subject.transientAddress,
+      subject.ownerQuery,
+    )
+  )
+    return false;
+  if (record.url === proof?.url) return true;
+  if (typeof proof?.url !== 'string') return false;
+  const factSource = sources.find((source) => source.url === proof.url);
+  if (!factSource) return false;
+  try {
+    if (new URL(record.url).origin !== new URL(proof.url).origin) return false;
+  } catch {
+    return false;
+  }
+  // A cross-page identity is safe only when the fact page is explicitly named
+  // for that branch. A generic menu/reservations page can contain other units.
+  const selectedName = branchKey(subject.transientName);
+  const beforeStreet = record.quote.split(/(?<!\d)\d{1,4}\s+[A-Za-z]/u)[0];
+  const label = branchKey(beforeStreet ?? '');
+  return (
+    label.includes(selectedName) &&
+    label.length >= selectedName.length + 4 &&
+    branchKey(factSource.title).includes(label) &&
+    branchKey(factSource.content).includes(label)
+  );
+}
+
+function branchKey(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\p{P}\p{Z}\s]/gu, '');
 }
 
 function canonicalListingUrl(value: string): string | undefined {
@@ -724,9 +894,9 @@ export function initialResearchQuery(subject: {
   }
   const region = researchRegion(subject.transientAddress);
   if (region === 'japan') return `${parts.join(' ')} site:tabelog.com`;
-  // The selected address, not a translated guess, anchors non-Japan results.
-  const branch = subject.transientAddress.slice(0, 160).trim();
-  return `${name} ${branch} ${region === 'mainland_china' ? 'official reservation' : 'Google Maps rating'}`.trim();
+  // The app can read Google rating by selected Place ID. Spend the limited
+  // search budget on official branch facts that the Place ID cannot supply.
+  return `${parts.join(' ')} official reservation`.trim();
 }
 
 function isGoogleMapsRatingUrl(value: unknown): boolean {
@@ -760,6 +930,9 @@ function matchesSelectedBranch(
     value
       .normalize('NFKC')
       .toLowerCase()
+      .replace(/\brd\b/gu, 'road')
+      .replace(/\bst\b/gu, 'street')
+      .replace(/\bave\b/gu, 'avenue')
       .replace(/[\p{P}\p{Z}\s]/gu, '');
   const text = normalize(quote);
   const selectedName = normalize(name);

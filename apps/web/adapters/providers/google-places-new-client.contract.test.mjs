@@ -91,6 +91,48 @@ test('Google rating remains usable when review count is absent', async () => {
   });
 });
 
+test('selected Place ID discovers only a request-scoped public official website', async () => {
+  const calls = [];
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve(value) {
+        calls.push(value);
+        return 'reserved';
+      },
+    },
+    fetch: async (_url, init) => {
+      calls.push(init);
+      return Response.json({
+        id: 'ChIJ1234567890',
+        websiteUri: 'https://burntends.com.sg/',
+      });
+    },
+  });
+  assert.equal(
+    (await client.getWebsiteUri('ChIJ1234567890')).value,
+    'https://burntends.com.sg/',
+  );
+  assert.equal(calls[0].sku, 'places.details_rating.requests');
+  assert.equal(calls[1].headers['X-Goog-FieldMask'], 'id,websiteUri');
+  for (const websiteUri of [
+    'http://burntends.com.sg/',
+    'https://127.0.0.1/',
+    'https://internal.test/',
+  ]) {
+    const rejected = createGooglePlaceRatingClient({
+      apiKey: 'fixture-secret',
+      usage: {
+        async reserve() {
+          return 'reserved';
+        },
+      },
+      fetch: async () => Response.json({ id: 'ChIJ1234567890', websiteUri }),
+    });
+    assert.equal((await rejected.getWebsiteUri('ChIJ1234567890')).ok, false);
+  }
+});
+
 test('Places New uses fixed Pro field masks, a server header secret, and one bounded page', async () => {
   const requests = [];
   const client = createGooglePlacesNewClient({

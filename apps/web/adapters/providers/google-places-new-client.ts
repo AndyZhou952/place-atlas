@@ -164,7 +164,56 @@ export function createGooglePlaceRatingClient(options: {
         },
       };
     },
+    async getWebsiteUri(placeId: string) {
+      if (!apiKey || !options.usage || !validText(placeId, 1, 500))
+        return unavailable();
+      const reserved = await options.usage.reserve({
+        providerId: 'google-places-new',
+        // Both websiteUri and rating are Place Details Enterprise fields.
+        sku: 'places.details_rating.requests',
+        units: 1,
+        requests: 1,
+        costUsd: 0.02,
+        hardRequestLimit: 1000,
+        hardUnitLimit: 1000,
+        hardCostLimitUsd: 20,
+      });
+      if (reserved !== 'reserved') return unavailable();
+      const response = await fetchBoundedJson(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'id,websiteUri',
+          },
+        },
+        { fetch: fetchImpl, timeoutMs, maximumBytes: maximumResponseBytes },
+      );
+      if (!response.ok || !isRecord(response.value)) return unavailable();
+      const value = response.value;
+      return value.id === placeId && isPublicWebsite(value.websiteUri)
+        ? { ok: true as const, value: value.websiteUri }
+        : unavailable();
+    },
   };
+}
+
+function isPublicWebsite(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 1000) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      /^(?!\d)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/iu.test(url.hostname) &&
+      !/(?:^|\.)(?:localhost|local|internal|test|invalid)$/iu.test(url.hostname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isGoogleMapsLink(value: string): boolean {

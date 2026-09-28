@@ -568,7 +568,7 @@ function PreviewStep({
           {liveGoogleRating ? (
             <p>
               <a href={liveGoogleRating.url} target="_blank" rel="noreferrer">
-                Google Maps
+                <span translate="no">Google Maps</span>
               </a>{' '}
               {liveGoogleRating.score.toFixed(1)}
               {liveGoogleRating.reviewCount === undefined

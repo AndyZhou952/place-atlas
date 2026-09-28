@@ -94,7 +94,7 @@ test('production research accepts exact-branch Google Maps rating outside Japan'
     score: 4.6,
     reviewCount: 1200,
   });
-  assert.match(queries[0], /Google Maps rating/u);
+  assert.match(queries[0], /official reservation/u);
   assert.doesNotMatch(queries[0], /tabelog/u);
 });
 

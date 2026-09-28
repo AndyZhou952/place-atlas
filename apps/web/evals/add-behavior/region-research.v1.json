@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "purpose": "Select the first source search without wasting a bounded research call on an inapplicable rating provider.",
+  "purpose": "Select the first source search for missing branch facts; the selected Google Place ID supplies an independent, request-scoped overseas rating read.",
   "cases": [
     {
       "id": "japanese-google-selection",
@@ -24,7 +24,7 @@
       "address": "23rd Street and Madison Avenue, New York, NY 10010, United States",
       "ownerQuery": "Shake Shack New York",
       "region": "overseas",
-      "queryIncludes": "Google Maps rating"
+      "queryIncludes": "official reservation"
     },
     {
       "id": "aomori-native-address",
@@ -40,7 +40,7 @@
       "address": "7 Dempsey Road, Singapore 249671",
       "ownerQuery": "Burnt Ends Singapore",
       "region": "overseas",
-      "queryIncludes": "Google Maps rating"
+      "queryIncludes": "official reservation"
     },
     {
       "id": "mainland-china-selection",
@@ -56,7 +56,7 @@
       "address": "154-158 Wing Lok Street, Sheung Wan, Hong Kong, China",
       "ownerQuery": "Yardbird Hong Kong",
       "region": "overseas",
-      "queryIncludes": "Google Maps rating"
+      "queryIncludes": "official reservation"
     },
     {
       "id": "singapore-chinatown-not-mainland",
@@ -64,7 +64,7 @@
       "address": "1 Kadayanallur Street, Chinatown, Singapore 069184",
       "ownerQuery": "Maxwell Food Centre Singapore",
       "region": "overseas",
-      "queryIncludes": "Google Maps rating"
+      "queryIncludes": "official reservation"
     }
   ]
 }

@@ -52,6 +52,29 @@
       }
     },
     {
+      "caseId": "burnt-ends-overlapping-barbecue-labels",
+      "input": {
+        "categories": ["modern barbecue", "Australian barbecue"],
+        "dishes": [],
+        "area": ""
+      },
+      "expected": {
+        "summary": "主营澳式烧烤。",
+        "tags": ["Australian barbecue"]
+      }
+    },
+    {
+      "caseId": "burnt-ends-generic-barbecue-after-specific-label",
+      "input": {
+        "categories": ["modern Australian barbecue", "barbecue"],
+        "dishes": []
+      },
+      "expected": {
+        "summary": "主营澳式烧烤。",
+        "tags": ["modern Australian barbecue"]
+      }
+    },
+    {
       "caseId": "yakitori-category-is-not-a-signature-dish",
       "input": {
         "categories": ["焼き鳥", "やきとり"],

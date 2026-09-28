@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "captureClass": "live_production_acceptance",
+  "purpose": "Run the deployed Add discover/select/cancel harness with the configured real model and source providers. Scores are separate from controlled fixtures and may fail when a live dependency is unavailable.",
+  "cases": [
+    {
+      "id": "shake-shack-shinjuku",
+      "query": "Shake Shack Shinjuku Southern Terrace",
+      "candidateNameIncludes": "SHAKE SHACK",
+      "expectedTitleIncludes": "シェイクシャック",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+      "expectedReservationMode": "not_reservable"
+    },
+    {
+      "id": "cafe-tsukimori-osaka",
+      "query": "喫茶 月森 大阪 松屋町",
+      "candidateNameIncludes": "Tsukimori",
+      "expectedTitleIncludes": "喫茶 月森",
+      "expectedTabelogUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+      "expectedReservationMode": "reservable"
+    },
+    {
+      "id": "aomori-haibochu",
+      "query": "海坊厨 青森",
+      "candidateNameIncludes": "Umibozu",
+      "expectedTitleIncludes": "海坊厨",
+      "expectedTabelogUrl": "https://tabelog.com/aomori/A0201/A020101/2000433/",
+      "expectedReservationMode": "reservable"
+    },
+    {
+      "id": "mendokoro-tenpo",
+      "query": "メンドコロ天鳳",
+      "candidateNameIncludes": "メンドコロ天鳳",
+      "expectedTitleIncludes": "メンドコロ",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+      "expectedReservationMode": "not_reservable"
+    }
+  ]
+}

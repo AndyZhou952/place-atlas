@@ -22,6 +22,7 @@
     "test": "node --experimental-strip-types --test",
     "test:evals": "node --experimental-strip-types --test evals/run-add-enrichment.test.mjs evals/place-resolution/score-place-resolution.test.mjs evals/place-enrichment/score-place-enrichment.test.mjs evals/place-enrichment/score-rating-completion.test.mjs evals/nearby/score-nearby.test.mjs evals/nearby/score-nearby-location.test.mjs",
     "eval:add-behavior": "node --experimental-strip-types --test evals/add-behavior/*.test.mjs product/application/catalog-intake/catalog-intake-operations.contract.test.mjs",
+    "eval:add-live": "node evals/add-behavior/run-live-add.mjs",
     "eval:place-resolution": "node evals/place-resolution/score-place-resolution.mjs evals/place-resolution/place-resolution-gold.v1.json evals/place-resolution/place-resolution-predictions.example.v1.json",
     "eval:place-enrichment": "node evals/place-enrichment/score-place-enrichment.mjs evals/place-enrichment/place-enrichment-gold.v1.json evals/place-enrichment/place-enrichment-predictions.example.v1.json",
     "migration:check": "node --experimental-strip-types scripts/migration-packaging.ts --candidate-site-version 17",

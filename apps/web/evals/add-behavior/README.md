@@ -24,6 +24,8 @@ The benchmark input sent to the model stub contains only the selected Google can
 
 These 66 controlled cases gate deterministic safety and presentation behavior. They do **not** measure how often the live search provider, Tabelog reader, Nominatim, or DeepSeek returns enough evidence. The browser journey remains a separate acceptance check: verify candidate identity, review, confirm, then refresh and read the saved catalog. Record availability, model failures, latency, and first failed stage separately for each live run. Do not pool controlled cases, frozen evidence extraction, and live journeys into one pass rate.
 
+`live-add.v1.json` is a separate deployed-harness acceptance set for Shake Shack Shinjuku, 喫茶 月森, 海坊厨, and メンドコロ天鳳. From `apps/web`, set `ATLAS_ADD_AGENT_URL` to the deployed HTTPS `/api/agent/catalog-intake` endpoint, then run `npm run eval:add-live`; it reads `ATLAS_ADD_AGENT_TOKEN` from the environment or the ignored `.wrangler/add-agent-token` file. An optional case ID runs one case. Each run sends only the owner query to discovery, selects the expected candidate, checks independently specified branch listing, location, aggregate rating, reservation, and duplicate status, then cancels the transient session. It never confirms or saves a restaurant. This opt-in live suite is not part of CI because external sources and model availability vary; report its pass rate separately.
+
 ## Production harness
 
 1. `catalog.intake.discover` asks Google Places for transient candidates. It stores durable provider IDs, not Google's display fields.

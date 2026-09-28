@@ -31,6 +31,22 @@
       "expect": "unavailable"
     },
     {
+      "id": "cafe-tsukimori-owner-japanese-name-google-romanized",
+      "restaurant": "tsukimori",
+      "source": "exact",
+      "model": "empty_valid",
+      "provider": "google-places",
+      "expect": "observed"
+    },
+    {
+      "id": "cafe-tsukimori-same-owner-name-wrong-street",
+      "restaurant": "tsukimori",
+      "source": "wrong_street",
+      "model": "invalid_json",
+      "provider": "google-places",
+      "expect": "unavailable"
+    },
+    {
       "id": "model-service-error",
       "source": "exact",
       "model": "http_error",

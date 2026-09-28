@@ -163,6 +163,7 @@ export function createPlaceResearchAgent(
               subject.ownerQuery,
               page.restaurant.address,
               page.restaurant.postalCode,
+              page.restaurant.name,
             )
           )
             break;
@@ -188,6 +189,8 @@ export function createPlaceResearchAgent(
             input.selectedSubject.transientAddress,
             input.selectedSubject.ownerQuery,
             booking.address,
+            undefined,
+            booking.name,
           )
         )
           return;
@@ -209,6 +212,7 @@ export function createPlaceResearchAgent(
                   selected.ownerQuery,
                   source.restaurant.address,
                   source.restaurant.postalCode,
+                  source.restaurant.name,
                 )),
         );
         if (!listing?.restaurant) return { kind: 'unavailable' as const };
@@ -421,6 +425,7 @@ export function createPlaceResearchAgent(
               input.selectedSubject.ownerQuery,
               source.restaurant.address,
               source.restaurant.postalCode,
+              source.restaurant.name,
             ),
         );
         if (hintedListing && !bookingEvidence && searches < 2) {
@@ -567,6 +572,7 @@ export function createPlaceResearchAgent(
                     input.selectedSubject.ownerQuery,
                     source.restaurant.address,
                     source.restaurant.postalCode,
+                    source.restaurant.name,
                   )),
           );
           // The parsed main listing has its own branch check. Do not discard
@@ -1042,6 +1048,7 @@ function matchesSelectedBranch(
   ownerQuery: string,
   sourceAddress?: string,
   sourcePostalCode?: string,
+  sourceName?: string,
 ): boolean {
   const normalize = (value: string) =>
     value
@@ -1061,8 +1068,18 @@ function matchesSelectedBranch(
     // A neighborhood in the query is location context, not proof that a
     // different business with that neighborhood in its name is the match.
     .filter((alias) => !sourceAddress || !addressText.includes(alias));
+  const selectedOwnerName = normalize(ownerQuery);
+  const listedName = sourceName ? normalize(sourceName) : '';
   const nameMatches =
     (selectedName.length >= 2 && text.includes(selectedName)) ||
+    // A selected Google name can be romanized while the exact Japanese shop
+    // name was supplied by the owner. Require the full listed name at the
+    // start of that query; two-character fragments alone remain insufficient.
+    (listedName.length >= 4 &&
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+        listedName,
+      ) &&
+      selectedOwnerName.startsWith(listedName)) ||
     aliases.some(
       (alias) =>
         (alias.length >= 4 ||

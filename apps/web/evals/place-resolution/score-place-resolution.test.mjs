@@ -22,10 +22,10 @@ test('the curated offline fixture passes every threshold', async () => {
   );
   const report = scorePlaceResolution(gold, predictions);
 
-  assert.equal(report.counts.total, 39);
+  assert.equal(report.counts.total, 40);
   assert.deepEqual(report.counts, {
-    total: 39,
-    resolve: 27,
+    total: 40,
+    resolve: 28,
     clarify: 9,
     noMatch: 3,
   });
@@ -34,7 +34,7 @@ test('the curated offline fixture passes every threshold', async () => {
   assert.equal(report.metrics.top3TargetRecall, 1);
   assert.equal(report.metrics.clarificationUxAccuracy, 1);
   assert.equal(report.metrics.unsafeAutoResolveRate, 0);
-  assert.deepEqual(report.byTag['short-message'], { count: 9, accuracy: 1 });
+  assert.deepEqual(report.byTag['short-message'], { count: 10, accuracy: 1 });
   assert.deepEqual(report.failures, []);
 
   const shortResolveCases = gold.cases.filter(
@@ -42,7 +42,7 @@ test('the curated offline fixture passes every threshold', async () => {
       entry.tags.includes('short-message') &&
       entry.gold.expectedAction === 'resolve',
   );
-  assert.equal(shortResolveCases.length, 5);
+  assert.equal(shortResolveCases.length, 6);
   assert.equal(
     shortResolveCases.every((entry) => entry.gold.curationNote.length > 0),
     true,

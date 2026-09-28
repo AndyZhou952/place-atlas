@@ -133,6 +133,23 @@ test('Places New missing secret fails before quota or fetch', async () => {
   assert.equal(calls, 0);
 });
 
+test('a successful empty Places response is no match, not provider failure', async () => {
+  const client = createGooglePlacesNewClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve() {
+        return 'reserved';
+      },
+    },
+    fetch: async () => Response.json({}),
+  });
+  const result = await client.searchText({ query: 'unmatched place' });
+  assert.deepEqual(result, {
+    ok: true,
+    value: { places: [], hasMore: false },
+  });
+});
+
 function place(id, name, address) {
   return { id, displayName: { text: name }, formattedAddress: address };
 }

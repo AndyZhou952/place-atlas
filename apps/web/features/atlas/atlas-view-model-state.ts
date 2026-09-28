@@ -211,7 +211,13 @@ export function reduceAtlasViewModelState(
     case 'media.appended':
       return {
         ...invalidateLoad(state, 'media'),
-        media: [...state.media, ...action.media],
+        media: [
+          ...state.media.filter(
+            (entry) =>
+              !action.media.some((received) => received.id === entry.id),
+          ),
+          ...action.media,
+        ],
       };
     case 'media.received':
       return {

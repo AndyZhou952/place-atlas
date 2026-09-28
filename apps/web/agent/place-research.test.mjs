@@ -382,6 +382,123 @@ test('discovered main listing supplies aggregate evidence missing from search sn
   assert.equal(reads, 1);
 });
 
+test('a branch-matched unrated listing retains its profile and leaves Tabelog score unknown', async () => {
+  const agent = createPlaceResearchAgent({
+    ...config,
+    readSourcePages: true,
+    sourceReader: async (target) => {
+      assert.equal(target, url);
+      return {
+        kind: 'read',
+        evidence: {
+          url,
+          title: 'アルデバラン',
+          content: 'アルデバラン 東京都港区麻布十番 ハンバーガー',
+          restaurant: {
+            name: 'アルデバラン',
+            address: '東京都港区麻布十番',
+            area: '港区麻布十番',
+            categories: ['ハンバーガー'],
+          },
+        },
+      };
+    },
+    fetch: async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                subjectMatch: 'matched',
+                tabelog: { status: 'unknown' },
+                reservation: { status: 'unknown' },
+              }),
+            },
+          },
+        ],
+      }),
+  });
+  const result = await agent.research({
+    ...input,
+    selectedSubject: { ...subject, providerNamespace: 'tabelog', placeId: url },
+  });
+  assert.equal(result.kind, 'observed');
+  assert.equal(result.value.tabelog.status, 'unknown');
+  assert.equal(result.value.profile.name.value, 'アルデバラン');
+  assert.deepEqual(result.value.profile.categories.value, ['ハンバーガー']);
+});
+
+test('English Tokyo ward address accepts the exact Japanese listing despite model uncertainty', async () => {
+  const tenhoUrl = 'https://tabelog.com/tokyo/A1319/A131903/13277105/';
+  const selectedSubject = {
+    ownerQuery: 'メンドコロ天鳳',
+    providerNamespace: 'google-places',
+    placeId: 'google-tenho',
+    transientName: 'メンドコロ天鳳',
+    transientAddress:
+      'Japan, 〒164-0011 Tokyo, Nakano City, Chūō, 2-chōme−30−５ ハイムタカラ',
+  };
+  for (const [sourceAddress, expectedKnown] of [
+    ['東京都中野区中央2-30-5 ハイムタカラ 1F', true],
+    ['東京都新宿区中央2-30-5 ハイムタカラ 1F', false],
+    ['東京都中野区中央2-30-6 ハイムタカラ 1F', false],
+  ]) {
+    const agent = createPlaceResearchAgent({
+      ...config,
+      readSourcePages: true,
+      sourceReader: async () => ({
+        kind: 'read',
+        evidence: {
+          url: tenhoUrl,
+          title: 'メンドコロ 天鳳',
+          content: `メンドコロ 天鳳 ${sourceAddress}\nTabelog aggregate restaurant rating: 3.53`,
+          restaurant: {
+            name: 'メンドコロ 天鳳',
+            address: sourceAddress,
+            area: '中野区中央',
+            score: 3.53,
+            categories: ['ラーメン', '汁なし担々麺'],
+            coordinates: { latitude: 35.6979, longitude: 139.6792 },
+            reservation: '予約不可',
+          },
+        },
+      }),
+      fetch: async (endpoint) =>
+        endpoint === 'https://api.tavily.com/search'
+          ? Response.json({
+              results: [{ url: tenhoUrl, content: 'メンドコロ 天鳳' }],
+            })
+          : Response.json({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      subjectMatch: 'uncertain',
+                      tabelog: { status: 'unknown' },
+                      reservation: { status: 'unknown' },
+                    }),
+                  },
+                },
+              ],
+            }),
+    });
+    const result = await agent.research({ ...input, selectedSubject });
+    assert.equal(result.kind, 'observed');
+    assert.equal(
+      result.value.tabelog.status,
+      expectedKnown ? 'known' : 'unknown',
+      sourceAddress,
+    );
+    if (expectedKnown) {
+      assert.equal(result.value.tabelog.score, 3.53);
+      assert.equal(result.value.profile.address.value, sourceAddress);
+      assert.equal(result.value.reservation.mode, 'not_reservable');
+    } else {
+      assert.equal(result.value.profile, undefined);
+    }
+  }
+});
+
 test('selected-name lookup precedes the model and keeps relocated branches separate', async () => {
   const dataset = JSON.parse(
     readFileSync(
@@ -424,9 +541,9 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
       fetch: async (endpoint, init) => {
         if (endpoint === 'https://api.tavily.com/search') {
           calls.push('search');
-          assert.equal(
+          assert.match(
             JSON.parse(init.body).query,
-            'TONKATSU KEITA site:tabelog.com',
+            /^TONKATSU KEITA .*3-41-1 site:tabelog\.com$/u,
           );
           return Response.json({
             results: [{ url: listingUrl, content: 'Restaurant listing' }],
@@ -768,6 +885,18 @@ test('short selected Japanese names still require matching branch address', asyn
   };
   assert.equal(
     (await agent.research({ ...input, selectedSubject })).value.tabelog.score,
+    4.42,
+  );
+  assert.equal(
+    (
+      await agent.research({
+        ...input,
+        selectedSubject: {
+          ...selectedSubject,
+          transientName: 'Kabuto',
+        },
+      })
+    ).value.tabelog.score,
     4.42,
   );
   assert.equal(

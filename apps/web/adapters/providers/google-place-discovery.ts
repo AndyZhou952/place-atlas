@@ -42,13 +42,15 @@ export function createGooglePlaceDiscoveryAdapter(
           'Google place discovery returned an invalid response.',
         );
       }
-      const ordered = [...result.value.places].sort((left, right) => {
-        const relevance = right.relevance - left.relevance;
-        if (relevance !== 0) return relevance;
-        const leftId = left.placeId.normalize('NFC');
-        const rightId = right.placeId.normalize('NFC');
-        return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
-      });
+      const ordered = result.value.places
+        .filter((place) => candidateMatchesQueryAnchors(query, place))
+        .sort((left, right) => {
+          const relevance = right.relevance - left.relevance;
+          if (relevance !== 0) return relevance;
+          const leftId = left.placeId.normalize('NFC');
+          const rightId = right.placeId.normalize('NFC');
+          return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+        });
       return {
         ok: true,
         value: {
@@ -77,6 +79,38 @@ export function createGooglePlaceDiscoveryAdapter(
       return { ok: true, value: toCandidate(result.value, 1) };
     },
   };
+}
+
+/** A provider's fuzzy hit cannot override an explicit address or long name. */
+function candidateMatchesQueryAnchors(
+  query: string,
+  place: GooglePlacesTransientPlace,
+): boolean {
+  const foldedQuery = foldForMatch(query);
+  const foldedCandidate = foldForMatch(`${place.name} ${place.address}`);
+  const numbers = foldedQuery.match(/\d{3,}/gu) ?? [];
+  if (numbers.some((number) => !foldedCandidate.includes(number))) {
+    return false;
+  }
+  const words = foldedQuery.match(/[a-z]{2,}/gu) ?? [];
+  const significantWords = words.filter((word) => word.length >= 4);
+  // A mixed-script or short query still needs at least one of its explicit
+  // Latin anchors in the returned identity/address. Google can otherwise
+  // return an unrelated local business for a faraway area name.
+  if (
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(query) &&
+    significantWords.length > 0 &&
+    significantWords.every((word) => !foldedCandidate.includes(word))
+  ) {
+    return false;
+  }
+  if (words.length < 4) return true;
+  const matched = words.filter((word) => foldedCandidate.includes(word)).length;
+  return matched / words.length >= 0.6;
+}
+
+function foldForMatch(value: string): string {
+  return value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
 function validSearchResult(value: unknown): value is {

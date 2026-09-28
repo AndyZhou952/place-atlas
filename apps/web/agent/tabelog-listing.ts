@@ -7,7 +7,7 @@ export interface TabelogEvidence extends SearchEvidence {
     aliases?: string[];
     address: string;
     area: string;
-    score: number;
+    score?: number;
     coordinates?: { latitude: number; longitude: number };
     categories: string[];
     reservation?: string;
@@ -123,15 +123,20 @@ export function parseTabelogListing(
     )
   )
     return undefined;
-  if (rating?.['@type'] !== 'AggregateRating') return undefined;
-  const rawScore = rating.ratingValue;
-  if (
-    !['number', 'string'].includes(typeof rawScore) ||
-    !/^\d(?:\.\d{1,2})?$/u.test(String(rawScore))
-  )
-    return undefined;
-  const score = Number(rawScore);
-  if (score < 1 || score > 5) return undefined;
+  // A new listing can have a verified identity and address before it has an
+  // aggregate score. Review-level ratings must never fill that gap.
+  let score: number | undefined;
+  if (rating !== undefined) {
+    if (rating['@type'] !== 'AggregateRating') return undefined;
+    const rawScore = rating.ratingValue;
+    if (
+      !['number', 'string'].includes(typeof rawScore) ||
+      !/^\d(?:\.\d{1,2})?$/u.test(String(rawScore))
+    )
+      return undefined;
+    score = Number(rawScore);
+    if (score < 1 || score > 5) return undefined;
+  }
   const clean = (text: string) =>
     text
       .replace(/<[^>]*>/gu, ' ')
@@ -196,7 +201,7 @@ export function parseTabelogListing(
     name,
     aliases,
     address: parts.join(''),
-    score,
+    ...(score === undefined ? {} : { score }),
     categories,
     area: `${String(parts[1])}${String(parts[2]).split(/[0-9０-９]/u)[0]}`.trim(),
     ...(coordinates ? { coordinates } : {}),
@@ -207,7 +212,7 @@ export function parseTabelogListing(
   return {
     url: sourceUrl,
     title: name,
-    content: `${[name, ...aliases, parts.join('')].join(' ')}\nTabelog aggregate restaurant rating: ${score.toFixed(2)}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
+    content: `${[name, ...aliases, parts.join('')].join(' ')}${score === undefined ? '' : `\nTabelog aggregate restaurant rating: ${score.toFixed(2)}`}\nRestaurant facts: ${JSON.stringify(restaurant)}`,
     restaurant,
   };
 }

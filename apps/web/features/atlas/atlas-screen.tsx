@@ -1188,7 +1188,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               size="sm"
               onClick={() => setEditing(true)}
             >
-              <Pencil data-icon="inline-start" /> Edit
+              <Pencil data-icon="inline-start" /> Edit place
             </Button>
           </div>
         </div>
@@ -1617,6 +1617,10 @@ function VisitComposer({
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
   const submitting = useRef(false);
   const [savedVisitId, setSavedVisitId] = useState<string>();
+  const [retryUpload, setRetryUpload] = useState<{
+    readonly files: readonly File[];
+    readonly attemptId: string;
+  }>();
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1644,11 +1648,13 @@ function VisitComposer({
       setNote('');
       setVisitPhotos([]);
       if (submittedPhotos.length) {
+        const attemptId = crypto.randomUUID();
         try {
-          await vm.addVisitMedia(result.visit.id, submittedPhotos);
+          await vm.addVisitMedia(result.visit.id, submittedPhotos, attemptId);
         } catch {
+          setRetryUpload({ files: submittedPhotos, attemptId });
           setFormError(
-            'The visit was saved, but some photos did not upload. Add them again from the saved visit.',
+            'The visit was saved, but some media did not upload. Retry below; this will not create another visit.',
           );
           setStatus('success');
           return;
@@ -1665,6 +1671,26 @@ function VisitComposer({
 
   const feedbackId = `${idPrefix}-visit-feedback`;
   const busy = status === 'saving' || vm.journalBusy || Boolean(savedVisitId);
+
+  async function retrySavedUpload() {
+    if (!savedVisitId || !retryUpload || status === 'saving') return;
+    setStatus('saving');
+    setFormError('');
+    try {
+      await vm.addVisitMedia(
+        savedVisitId,
+        retryUpload.files,
+        retryUpload.attemptId,
+      );
+      setRetryUpload(undefined);
+      setStatus('success');
+    } catch {
+      setFormError(
+        'Upload still failed. The visit is saved; retry the media upload.',
+      );
+      setStatus('success');
+    }
+  }
 
   return (
     <form
@@ -1800,6 +1826,16 @@ function VisitComposer({
             ? 'Visit saved'
             : 'Save visit'}
       </Button>
+      {savedVisitId && retryUpload ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={status === 'saving' || vm.journalBusy}
+          onClick={() => void retrySavedUpload()}
+        >
+          {status === 'saving' ? 'Retrying upload…' : 'Retry media upload'}
+        </Button>
+      ) : null}
       {savedVisitId ? (
         <Button
           type="button"
@@ -1809,6 +1845,7 @@ function VisitComposer({
             setSavedVisitId(undefined);
             setStatus('idle');
             setFormError('');
+            setRetryUpload(undefined);
             setVisitedAt(localVisitDate());
             setRating(selectedItem?.personalRating?.toString() ?? '');
           }}
@@ -1883,7 +1920,6 @@ function JournalVisitRow({
       return;
     }
 
-    setEditing(false);
     try {
       await onSave(visit.id, {
         itemId,
@@ -1893,8 +1929,8 @@ function JournalVisitRow({
           ? { rating: normalizedRating ?? null }
           : {}),
       });
+      setEditing(false);
     } catch {
-      setEditing(true);
       // The view model restores the previous record and presents the error.
     }
   }
@@ -1971,7 +2007,7 @@ function JournalVisitRow({
           ) : null}
           <div className="form-actions">
             <Button type="submit" disabled={busy || !visitedAt}>
-              Save
+              {busy ? 'Saving…' : 'Save'}
             </Button>
             <Button
               type="button"

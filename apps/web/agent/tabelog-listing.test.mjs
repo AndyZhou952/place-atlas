@@ -108,6 +108,16 @@ test('structured listing exposes aggregate and branch identity, never reviews', 
   );
 });
 
+test('a rating-free restaurant listing can support identity without borrowing a review score', () => {
+  const unrated = parseTabelogListing(
+    html({ ...restaurant, aggregateRating: undefined }),
+    url,
+  );
+  assert.equal(unrated.restaurant.name, 'Example Restaurant');
+  assert.equal(unrated.restaurant.score, undefined);
+  assert.doesNotMatch(unrated.content, /aggregate restaurant rating|4\.99/u);
+});
+
 test('restaurant introduction supports the current pr-comment markup without reading reviews', () => {
   const result = parseTabelogListing(
     html(restaurant) +
@@ -152,7 +162,6 @@ test('wrong identities, review-only ratings, malformed and conflicting records p
   for (const record of [
     { ...restaurant, '@id': url.replace('13131643', '13131644') },
     { ...restaurant, '@type': 'Review' },
-    { ...restaurant, aggregateRating: undefined },
     {
       ...restaurant,
       aggregateRating: { '@type': 'AggregateRating', ratingValue: '9.99' },

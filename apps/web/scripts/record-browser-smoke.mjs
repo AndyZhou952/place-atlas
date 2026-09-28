@@ -1,5 +1,6 @@
 // Explicitly opt in: creates temporary Visits/photos and deletes only those IDs.
 // npm package `playwright` must be available, or set PLAYWRIGHT_MODULE to its entry.
+// RECORD_FAIL_SECOND_MEDIA=yes verifies retry after one successful upload batch.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
@@ -15,7 +16,7 @@ const { chromium } = await import(
 const base = process.env.ATLAS_BASE_URL || 'http://localhost:3000';
 const marker = `record-smoke-${randomUUID()}`;
 const browser = await chromium.launch({
-  channel: 'chromium',
+  channel: process.env.PLAYWRIGHT_CHANNEL || 'chromium',
   headless: true,
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
 });
@@ -26,12 +27,15 @@ const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
   'base64',
 );
-const photos = [1, 2].map((n) => ({
+const injectMediaFailure = process.env.RECORD_FAIL_SECOND_MEDIA === 'yes';
+const photos = (injectMediaFailure ? [1, 2, 3, 4, 5] : [1, 2]).map((n) => ({
   name: `${marker}-${n}.png`,
   mimeType: 'image/png',
   buffer: png,
 }));
 let item;
+let initialAssessment;
+let ratingRestorationRequired = false;
 try {
   assert.equal(
     (
@@ -46,10 +50,11 @@ try {
   const items = Array.isArray(catalog) ? catalog : catalog.items;
   item = items.find((entry) => entry.kind === 'food' && entry.tabelog);
   assert.ok(item, 'Need an existing restaurant with an external rating');
-  const initialAssessment = await (
+  initialAssessment = await (
     await context.request.get(`${base}/api/items/${item.id}/personal`)
   ).json();
   const page = await context.newPage();
+  const journalReads = [];
   page.on('pageerror', (error) => console.log('Page error:', error.message));
   page.on('requestfailed', (request) => {
     if (request.url().includes('/api/'))
@@ -67,6 +72,18 @@ try {
         response.status(),
       );
   });
+  page.on('response', async (response) => {
+    if (
+      response.url() === `${base}/api/journal` &&
+      response.request().method() === 'GET' &&
+      response.ok()
+    ) {
+      journalReads.push({
+        status: response.status(),
+        ids: (await response.json()).map((entry) => entry.id),
+      });
+    }
+  });
   page.setDefaultTimeout(45000);
   if (process.env.RECORD_API_BRIDGE === 'yes') {
     // Optional CI fallback: real authenticated endpoints, no mocked responses.
@@ -78,6 +95,16 @@ try {
     console.log(
       'CI API bridge enabled: requests forwarded to real production endpoints',
     );
+  }
+  if (injectMediaFailure) {
+    let mediaPosts = 0;
+    await page.route('**/api/media', async (route) => {
+      if (route.request().method() === 'POST' && ++mediaPosts === 2) {
+        await route.fulfill({ status: 503, body: 'Injected upload failure' });
+        return;
+      }
+      await route.fallback();
+    });
   }
   // Map tiles are irrelevant to Record and expensive in constrained CI.
   await page.route(/tile\.openstreetmap\.org/, (route) => route.abort());
@@ -93,32 +120,47 @@ try {
     }
   });
   await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Journal', exact: true }).click();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.getByRole('button', { name: 'Journal', exact: true }).click();
+    try {
+      await page.locator('#journal-visit-place').waitFor({ timeout: 10000 });
+      break;
+    } catch (error) {
+      if (attempt === 2) throw error;
+    }
+  }
   console.log(
     'Journal loaded',
     JSON.stringify({
       target: item.id,
-      options: await page
+      optionCount: await page.locator('#journal-visit-place option').count(),
+      targetAvailable: await page
         .locator('#journal-visit-place option')
-        .evaluateAll((options) =>
-          options.map((o) => ({ value: o.value, label: o.textContent })),
+        .evaluateAll(
+          (options, id) => options.some((option) => option.value === id),
+          item.id,
         ),
       notice: await page.locator('.notice-bar').allTextContents(),
     }),
   );
-  await page
-    .locator('#journal-visit-place')
-    .selectOption(item.id, { timeout: 180000 });
+  await page.locator('#journal-visit-place').selectOption(item.id);
   await page.locator('#journal-visit-rating').fill('');
   await page.locator('#journal-visited-at').fill('2026-09-20');
   await page.locator('#journal-visit-note').fill(marker);
   await page.locator('.visit-composer input[type=file]').setInputFiles(photos);
   await page.getByRole('button', { name: 'Save visit', exact: true }).click();
-  await page
-    .getByText('Visit saved. You can edit it in the history below.', {
-      exact: true,
-    })
-    .waitFor();
+  if (injectMediaFailure) {
+    await page
+      .getByRole('alert')
+      .getByText(/some media did not upload/)
+      .waitFor();
+  } else {
+    await page
+      .getByText('Visit saved. You can edit it in the history below.', {
+        exact: true,
+      })
+      .waitFor();
+  }
   assert.equal(
     await page
       .getByRole('button', { name: 'Visit saved', exact: true })
@@ -127,6 +169,21 @@ try {
   );
   assert.equal(visitIds.size, 1);
   const visitId = [...visitIds][0];
+  if (injectMediaFailure) {
+    assert.equal(
+      await page
+        .getByRole('button', { name: 'Visit saved', exact: true })
+        .isDisabled(),
+      true,
+    );
+    await page.getByRole('button', { name: 'Retry media upload' }).click();
+    await page
+      .getByText('Visit saved. You can edit it in the history below.', {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(visitIds.size, 1, 'retry must not create a second Visit');
+  }
   let row = page.locator('.journal-visit').filter({ hasText: marker });
   await row
     .getByRole('button', { name: `Open ${photos[0].name}`, exact: true })
@@ -151,22 +208,54 @@ try {
   await row.getByRole('button', { name: /Edit visit/ }).click();
   await page.locator(`#visit-date-${visitId}`).fill('2026-09-21');
   await page.locator(`#visit-note-${visitId}`).fill(`${marker} edited`);
+  const visitEditSaved = page.waitForResponse(
+    (response) =>
+      response.url() === `${base}/api/journal/${visitId}` &&
+      response.request().method() === 'PATCH' &&
+      response.ok(),
+  );
   await page
     .locator('.journal-visit-form')
     .getByRole('button', { name: 'Save', exact: true })
     .click();
+  await visitEditSaved;
   await page.getByText(`${marker} edited`, { exact: true }).waitFor();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Journal', exact: true }).click();
+  await page.locator('#journal-visit-place').waitFor();
   row = page.locator('.journal-visit').filter({ hasText: `${marker} edited` });
-  await row
-    .getByRole('button', { name: `Open ${marker} caption`, exact: true })
-    .waitFor();
+  try {
+    await row
+      .getByRole('button', { name: `Open ${marker} caption`, exact: true })
+      .waitFor();
+  } catch (error) {
+    console.log(
+      'Reload diagnostic',
+      JSON.stringify({
+        journalRows: await page.locator('.journal-visit').count(),
+        rowText: await row.allTextContents(),
+        notices: await page.locator('.notice-bar').allTextContents(),
+        journalReads,
+        pageJournalIds: await page.evaluate(async () =>
+          (
+            await (await fetch('/api/journal', { cache: 'no-store' })).json()
+          ).map((entry) => entry.id),
+        ),
+        requestJournalIds: (
+          await (await context.request.get(`${base}/api/journal`)).json()
+        ).map((entry) => entry.id),
+        media: await (
+          await context.request.get(`${base}/api/media?visitId=${visitId}`)
+        ).json(),
+      }),
+    );
+    throw error;
+  }
   assert.match(await row.innerText(), /2026-09-21/);
   const media = await (
     await context.request.get(`${base}/api/media?visitId=${visitId}`)
   ).json();
-  assert.equal(media.length, 2);
+  assert.equal(media.length, photos.length);
   assert.ok(media.some((entry) => entry.caption === `${marker} caption`));
   for (const entry of media) {
     const image = await context.request.get(
@@ -206,7 +295,77 @@ try {
     initialAssessment.personalRating,
   );
   console.log('PASS external and personal scores unchanged');
+
+  const changedRating = initialAssessment.personalRating === 4.5 ? 3.5 : 4.5;
+  ratingRestorationRequired = true;
+  await page.locator('.detail-card .personal-rating-inline').click();
+  const ratingSaved = page.waitForResponse(
+    (response) =>
+      response.url() === `${base}/api/items/${item.id}/personal` &&
+      response.request().method() === 'PATCH' &&
+      response.ok(),
+  );
+  await page
+    .getByLabel('マイスコア', { exact: true })
+    .fill(String(changedRating));
+  await page.getByLabel('マイスコア', { exact: true }).press('Enter');
+  await ratingSaved;
+  assert.equal(
+    (
+      await (
+        await context.request.get(`${base}/api/items/${item.id}/personal`)
+      ).json()
+    ).personalRating,
+    changedRating,
+  );
+  const catalogAfterRating = await (
+    await context.request.get(`${base}/api/items`)
+  ).json();
+  const ratedItem = (
+    Array.isArray(catalogAfterRating)
+      ? catalogAfterRating
+      : catalogAfterRating.items
+  ).find((entry) => entry.id === item.id);
+  assert.deepEqual(ratedItem.tabelog, item.tabelog);
+  assert.deepEqual(ratedItem.googleRating, item.googleRating);
+  const visitAfterRating = await (
+    await context.request.get(`${base}/api/journal/${visitId}`)
+  ).json();
+  assert.equal(visitAfterRating.displayNote, `${marker} edited`);
+  console.log('PASS browser rating edit preserves external scores and Visit');
+
+  await page.locator('.detail-card .personal-rating-inline').click();
+  const ratingRestored = page.waitForResponse(
+    (response) =>
+      response.url() === `${base}/api/items/${item.id}/personal` &&
+      response.request().method() === 'PATCH' &&
+      response.ok(),
+  );
+  await page
+    .getByLabel('マイスコア', { exact: true })
+    .fill(initialAssessment.personalRating?.toString() ?? '');
+  await page.getByLabel('マイスコア', { exact: true }).press('Enter');
+  await ratingRestored;
+  assert.equal(
+    (
+      await (
+        await context.request.get(`${base}/api/items/${item.id}/personal`)
+      ).json()
+    ).personalRating,
+    initialAssessment.personalRating,
+  );
+  ratingRestorationRequired = false;
 } finally {
+  if (ratingRestorationRequired && item && initialAssessment) {
+    const restored = await context.request.patch(
+      `${base}/api/items/${item.id}/personal`,
+      {
+        headers: headers(),
+        data: { overallRating: initialAssessment.personalRating ?? null },
+      },
+    );
+    assert.ok(restored.ok(), 'Personal score restoration failed');
+  }
   for (const id of visitIds) {
     const response = await context.request.delete(
       `${base}/api/journal/${encodeURIComponent(id)}`,

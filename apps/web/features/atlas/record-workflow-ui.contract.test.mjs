@@ -57,7 +57,7 @@ test('Visit composition exposes progress and durable success feedback', () => {
   assert.match(screenSource, /aria-live="polite"/u);
   assert.match(
     screenSource,
-    /The visit was saved, but some photos did not upload/u,
+    /The visit was saved, but some media did not upload/u,
   );
 });
 

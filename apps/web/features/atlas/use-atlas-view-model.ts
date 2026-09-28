@@ -413,8 +413,11 @@ export function useAtlasViewModel() {
   );
 
   const addVisitMedia = useCallback(
-    async (visitId: string, files: readonly File[]) => {
-      const mutationId = crypto.randomUUID();
+    async (
+      visitId: string,
+      files: readonly File[],
+      attemptId = crypto.randomUUID(),
+    ) => {
       setMediaVisitPending(visitId, true);
       setNotice('');
       try {
@@ -424,13 +427,13 @@ export function useAtlasViewModel() {
             visitId,
             files,
             uploadIds: files.map(
-              (_file, index) => `${mutationId}:media:${index}`,
+              (_file, index) => `${attemptId}:media:${index}`,
             ),
             onBatchCompleted: (completed) => {
               dispatch({ type: 'media.appended', media: completed });
             },
           },
-          mutationId,
+          mutationId: attemptId,
         });
         return uploaded;
       } catch (error) {

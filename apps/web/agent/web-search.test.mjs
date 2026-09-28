@@ -55,6 +55,48 @@ test('Japanese research uses a bounded public Yahoo search without forwarding cr
   );
 });
 
+test('Japanese research falls back to bounded DuckDuckGo evidence when Yahoo is blocked', async () => {
+  const calls = [];
+  const search = createWebSearch({
+    fetch: async (endpoint, init) => {
+      calls.push(new URL(endpoint).origin);
+      assert.equal(init.redirect, 'manual');
+      assert.equal(init.headers.Authorization, undefined);
+      return new URL(endpoint).hostname === 'search.yahoo.co.jp'
+        ? new Response('', { status: 403 })
+        : new Response(fixture);
+    },
+  });
+  const result = await search.search(
+    'アルデバラン site:tabelog.com',
+    AbortSignal.timeout(1000),
+  );
+  assert.equal(result.kind, 'results');
+  assert.equal(result.sources[0].url, url);
+  assert.deepEqual(calls, [
+    'https://search.yahoo.co.jp',
+    'https://html.duckduckgo.com',
+  ]);
+});
+
+test('two blocked no-key sources remain unavailable and cannot invent a listing', async () => {
+  let calls = 0;
+  const search = createWebSearch({
+    fetch: async () => {
+      calls++;
+      return new Response('', { status: 403 });
+    },
+  });
+  assert.deepEqual(
+    await search.search(
+      '東京麺通団 site:tabelog.com',
+      AbortSignal.timeout(1000),
+    ),
+    { kind: 'unavailable', reason: 'blocked' },
+  );
+  assert.equal(calls, 2);
+});
+
 test('no-key search uses one fixed endpoint and rejects challenge without retrying', async () => {
   const requests = [];
   const search = createWebSearch({

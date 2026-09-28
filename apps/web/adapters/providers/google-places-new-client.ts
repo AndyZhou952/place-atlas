@@ -103,10 +103,12 @@ export function createGooglePlacesNewClient(options: {
 }
 
 function mapSearchResponse(value: unknown) {
-  if (!isRecord(value) || !Array.isArray(value.places)) {
+  if (!isRecord(value)) {
     return undefined;
   }
-  const providerPlaces = value.places;
+  // Google omits the repeated `places` field when a valid search has no hits.
+  const providerPlaces = value.places === undefined ? [] : value.places;
+  if (!Array.isArray(providerPlaces)) return undefined;
   if (providerPlaces.length > 4) return undefined;
   const places = providerPlaces.map((place, index) =>
     mapPlace(place, providerPlaces.length - index),

@@ -26,7 +26,7 @@ function perfectPredictions() {
             evidence: {
               provider: entry.evidence.provider,
               sourceUrl: entry.evidence.sourceUrl,
-              observedAt: '2026-09-26',
+              observedAt: entry.evidence.observedAt,
             },
           }
         : { caseId: entry.caseId, state: 'unknown' },
@@ -34,10 +34,10 @@ function perfectPredictions() {
   };
 }
 
-test('curated benchmark has 5-8 cases and perfect fixture passes', () => {
+test('curated benchmark has 5-12 cases and perfect fixture passes', () => {
   const report = scoreRatingCompletion(benchmark, perfectPredictions());
-  assert.equal(benchmark.cases.length, 8);
-  assert.equal(report.counts.accessiblePositives, 4);
+  assert.equal(benchmark.cases.length, 9);
+  assert.equal(report.counts.accessiblePositives, 5);
   assert.equal(report.metrics.completionCoverage, 1);
   assert.equal(report.metrics.exactClaimAccuracy, 1);
   assert.equal(report.metrics.provenanceCompleteness, 1);

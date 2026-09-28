@@ -180,7 +180,7 @@ export function createPlaceResearchAgent(
         // This consumes the same two-search budget, never an extra hidden retry.
         if (!selectedListing && config.readSourcePages !== false) {
           searches++;
-          const query = `${input.selectedSubject.transientName.slice(0, 450)} site:tabelog.com`;
+          const query = selectedListingSearchQuery(input.selectedSubject);
           const result = await searchProvider.search(query, signal);
           if (result.kind === 'results') {
             successfulSearches++;
@@ -294,13 +294,6 @@ export function createPlaceResearchAgent(
             return { kind: 'unavailable' };
           const proposal = JSON.parse(message.content);
           const unknown = { status: 'unknown' as const };
-          if (proposal.subjectMatch !== 'matched')
-            return {
-              kind: 'observed',
-              value: { tabelog: unknown, reservation: unknown },
-              ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
-            };
-          const observedAt = new Date().toISOString();
           const matchedListing = evidence.find(
             (source) =>
               source.restaurant &&
@@ -315,6 +308,15 @@ export function createPlaceResearchAgent(
                     source.restaurant.address,
                   )),
           );
+          // The parsed main listing has its own branch check. Do not discard
+          // those independently verified facts because the model is uncertain.
+          if (proposal.subjectMatch !== 'matched' && !matchedListing)
+            return {
+              kind: 'observed',
+              value: { tabelog: unknown, reservation: unknown },
+              ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
+            };
+          const observedAt = new Date().toISOString();
           const fact = (
             field: 'tabelog' | 'reservation',
           ): Record<string, unknown> => {
@@ -483,14 +485,16 @@ export function createPlaceResearchAgent(
               )
                 profile[field] = { value, sourceUrl, observedAt };
             }
-            tabelog = {
-              status: 'known',
-              score: details.score,
-              url: sourceUrl,
-              provenance: 'agent_observed',
-              observedAt,
-              freshness: 'fresh',
-            };
+            if (details.score !== undefined) {
+              tabelog = {
+                status: 'known',
+                score: details.score,
+                url: sourceUrl,
+                provenance: 'agent_observed',
+                observedAt,
+                freshness: 'fresh',
+              };
+            }
             // Absence of a policy is unknown, never "known/not_stated". An explicit
             // refusal is a policy but says nothing about seats, queues or opening now.
             const policy = details.reservation;
@@ -586,6 +590,30 @@ function canonicalListingUrl(value: string): string | undefined {
   return url.href;
 }
 
+function selectedListingSearchQuery(subject: {
+  readonly transientName: string;
+  readonly transientAddress: string;
+  readonly ownerQuery: string;
+}): string {
+  const name = subject.transientName.slice(0, 200).trim();
+  const ownerHint = subject.ownerQuery.slice(0, 160).trim();
+  const addressHint = subject.transientAddress
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/ch[ōo]me|丁目|番地|番|号/gu, '-')
+    .replace(/[\s‐‑‒–—−ー]/gu, '-')
+    .replace(/-+/gu, '-')
+    .match(/\d{1,4}-\d{1,4}-\d{1,4}/u)?.[0];
+  const parts = [name];
+  if (ownerHint && !name.toLowerCase().includes(ownerHint.toLowerCase())) {
+    parts.push(ownerHint);
+  }
+  if (addressHint && !parts.some((part) => part.includes(addressHint))) {
+    parts.push(addressHint);
+  }
+  return `${parts.join(' ')} site:tabelog.com`;
+}
+
 function matchesSelectedBranch(
   quote: string,
   name: string,
@@ -613,7 +641,10 @@ function matchesSelectedBranch(
     aliases.some(
       (alias) =>
         (alias.length >= 4 ||
-          (alias.length >= 3 && /\p{Script=Han}/u.test(alias))) &&
+          (alias.length >= 3 &&
+            /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+              alias,
+            ))) &&
         !/\d/u.test(alias) &&
         text.includes(alias),
     );
@@ -645,21 +676,33 @@ function matchesSelectedBranch(
   // Common bilingual ward/neighborhood aliases are corroboration, never identity
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
   const aliasesByLocality: Record<string, string> = {
-    shinjuku: '新宿',
+    // Google commonly renders Tokyo wards as English "City" while Japanese
+    // listings use 区. Street number plus selected name are also required above.
+    adachi: '足立区',
+    arakawa: '荒川区',
+    bunkyo: '文京区',
+    chiyoda: '千代田区',
+    chuo: '中央区',
+    edogawa: '江戸川区',
+    itabashi: '板橋区',
+    katsushika: '葛飾区',
+    kita: '北区',
+    koto: '江東区',
+    meguro: '目黒区',
+    minato: '港区',
+    nakano: '中野区',
+    nerima: '練馬区',
+    ota: '大田区',
+    setagaya: '世田谷区',
+    shibuya: '渋谷区',
+    shinagawa: '品川区',
+    shinjuku: '新宿区',
+    suginami: '杉並区',
+    sumida: '墨田区',
+    taito: '台東区',
+    toshima: '豊島区',
     nishishinjuku: '西新宿',
     ikebukuro: '池袋',
-    toshima: '豊島',
-    minato: '港区',
-    shibuya: '渋谷',
-    bunkyo: '文京',
-    koto: '江東',
-    sumida: '墨田',
-    taito: '台東',
-    chiyoda: '千代田',
-    setagaya: '世田谷',
-    suginami: '杉並',
-    meguro: '目黒',
-    shinagawa: '品川',
     ginza: '銀座',
     azabujuban: '麻布十番',
   };

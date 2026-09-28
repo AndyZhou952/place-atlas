@@ -62,41 +62,66 @@ export function createWebSearch(options: {
           return { kind: 'results', sources };
         }
         if (/[\u3040-\u30ff\u3400-\u9fff]|tabelog/iu.test(query)) {
-          const endpoint = new URL('https://search.yahoo.co.jp/search');
-          endpoint.searchParams.set('p', query);
-          const response = await fetcher(endpoint.href, {
-            redirect: 'manual',
-            signal,
-            headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
-          });
-          if ([202, 403, 429].includes(response.status))
-            return { kind: 'unavailable', reason: 'blocked' };
-          if (!response.ok)
-            return { kind: 'unavailable', reason: 'provider_failure' };
-          return parseYahooJapanHtml(await readBoundedText(response, 262_144));
+          const primary = await searchYahooJapan(fetcher, query, signal);
+          if (primary.kind === 'results' && primary.sources.length) {
+            return primary;
+          }
+          const fallback = await searchDuckDuckGo(fetcher, query, signal);
+          return fallback.kind === 'results' ? fallback : primary;
         }
-        const endpoint = new URL('https://html.duckduckgo.com/html');
-        endpoint.searchParams.set('q', query);
-        endpoint.searchParams.set('kp', '-1');
-        const response = await fetcher(endpoint.href, {
-          redirect: 'manual',
-          signal,
-          headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
-        });
-        if (
-          response.status === 202 ||
-          response.status === 403 ||
-          response.status === 429
-        )
-          return { kind: 'unavailable', reason: 'blocked' };
-        if (!response.ok)
-          return { kind: 'unavailable', reason: 'provider_failure' };
-        return parseDuckDuckGoHtml(await readBoundedText(response, 262_144));
+        return searchDuckDuckGo(fetcher, query, signal);
       } catch {
         return { kind: 'unavailable', reason: 'provider_failure' };
       }
     },
   };
+}
+
+async function searchYahooJapan(
+  fetcher: typeof fetch,
+  query: string,
+  signal: AbortSignal,
+): Promise<SearchOutcome> {
+  try {
+    const endpoint = new URL('https://search.yahoo.co.jp/search');
+    endpoint.searchParams.set('p', query);
+    const response = await fetcher(endpoint.href, {
+      redirect: 'manual',
+      signal,
+      headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
+    });
+    if ([202, 403, 429].includes(response.status))
+      return { kind: 'unavailable', reason: 'blocked' };
+    if (!response.ok)
+      return { kind: 'unavailable', reason: 'provider_failure' };
+    return parseYahooJapanHtml(await readBoundedText(response, 262_144));
+  } catch {
+    return { kind: 'unavailable', reason: 'provider_failure' };
+  }
+}
+
+async function searchDuckDuckGo(
+  fetcher: typeof fetch,
+  query: string,
+  signal: AbortSignal,
+): Promise<SearchOutcome> {
+  try {
+    const endpoint = new URL('https://html.duckduckgo.com/html');
+    endpoint.searchParams.set('q', query);
+    endpoint.searchParams.set('kp', '-1');
+    const response = await fetcher(endpoint.href, {
+      redirect: 'manual',
+      signal,
+      headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
+    });
+    if ([202, 403, 429].includes(response.status))
+      return { kind: 'unavailable', reason: 'blocked' };
+    if (!response.ok)
+      return { kind: 'unavailable', reason: 'provider_failure' };
+    return parseDuckDuckGoHtml(await readBoundedText(response, 262_144));
+  } catch {
+    return { kind: 'unavailable', reason: 'provider_failure' };
+  }
 }
 
 export function parseYahooJapanHtml(html: string): SearchOutcome {

@@ -2,8 +2,18 @@
   "schemaVersion": 1,
   "datasetId": "place-resolution-v1",
   "description": "Curated place-identity and branch-resolution cases for Japan Atlas Add. Ratings and other volatile enrichment fields are intentionally out of scope.",
-  "checkedAt": "2026-09-25",
+  "checkedAt": "2026-09-28",
   "entities": {
+    "mendokoro-tenho-nakano-sakaue": {
+      "canonicalName": "メンドコロ 天鳳",
+      "branchId": "nakano-sakaue",
+      "branchName": "Nakano-Sakaue",
+      "countryCode": "JP",
+      "locality": "Nakano City, Tokyo",
+      "address": "東京都中野区中央2-30-5 ハイムタカラ 1F",
+      "sourceUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+      "checkedAt": "2026-09-28"
+    },
     "tokyo-mentsudan-shinjuku": {
       "canonicalName": "讃岐うどん大使 東京麺通団",
       "branchId": "shinjuku-west-exit",
@@ -725,6 +735,19 @@
         },
         "sourceUrls": ["https://store.starbucks.co.jp/"],
         "checkedAt": "2026-09-25"
+      }
+    },
+    {
+      "caseId": "jp-mendokoro-tenho-no-space",
+      "query": "メンドコロ天鳳",
+      "tags": ["japanese", "short-message", "no-space-alias", "japan"],
+      "gold": {
+        "expectedAction": "resolve",
+        "identityId": "mendokoro-tenho-nakano-sakaue",
+        "branchId": "nakano-sakaue",
+        "curationNote": "The no-space owner spelling identifies this distinctive restaurant name; the verified main listing supplies the same name with a space and one matching Nakano-Sakaue address.",
+        "sourceUrls": ["https://tabelog.com/tokyo/A1319/A131903/13277105/"],
+        "checkedAt": "2026-09-28"
       }
     }
   ]

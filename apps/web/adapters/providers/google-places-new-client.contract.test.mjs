@@ -70,6 +70,27 @@ test('Google rating details reject another branch and unsupported URL', async ()
   }
 });
 
+test('Google rating remains usable when review count is absent', async () => {
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve() {
+        return 'reserved';
+      },
+    },
+    fetch: async () =>
+      Response.json({
+        id: 'ChIJ1234567890',
+        rating: 4.1,
+        googleMapsUri: 'https://maps.google.com/?cid=123',
+      }),
+  });
+  assert.deepEqual((await client.getRating('ChIJ1234567890')).value, {
+    score: 4.1,
+    url: 'https://maps.google.com/?cid=123',
+  });
+});
+
 test('Places New uses fixed Pro field masks, a server header secret, and one bounded page', async () => {
   const requests = [];
   const client = createGooglePlacesNewClient({

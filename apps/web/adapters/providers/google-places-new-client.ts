@@ -145,9 +145,10 @@ export function createGooglePlaceRatingClient(options: {
         !Number.isFinite(value.rating) ||
         value.rating < 0 ||
         value.rating > 5 ||
-        typeof value.userRatingCount !== 'number' ||
-        !Number.isSafeInteger(value.userRatingCount) ||
-        value.userRatingCount < 0 ||
+        (value.userRatingCount !== undefined &&
+          (typeof value.userRatingCount !== 'number' ||
+            !Number.isSafeInteger(value.userRatingCount) ||
+            value.userRatingCount < 0)) ||
         typeof value.googleMapsUri !== 'string' ||
         !isGoogleMapsLink(value.googleMapsUri)
       )
@@ -156,7 +157,9 @@ export function createGooglePlaceRatingClient(options: {
         ok: true as const,
         value: {
           score: value.rating,
-          reviewCount: value.userRatingCount,
+          ...(value.userRatingCount === undefined
+            ? {}
+            : { reviewCount: value.userRatingCount }),
           url: value.googleMapsUri,
         },
       };

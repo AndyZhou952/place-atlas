@@ -1109,7 +1109,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
       : item.googleRating;
   const [liveGoogleRating, setLiveGoogleRating] = useState<{
     score: number;
-    reviewCount: number;
+    reviewCount?: number;
     url: string;
   }>();
   useEffect(() => {
@@ -1128,15 +1128,17 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
           value !== null &&
           typeof value === 'object' &&
           'score' in value &&
-          'reviewCount' in value &&
           'url' in value &&
           typeof value.score === 'number' &&
-          typeof value.reviewCount === 'number' &&
+          (!('reviewCount' in value) ||
+            typeof value.reviewCount === 'number') &&
           typeof value.url === 'string'
         )
           setLiveGoogleRating({
             score: value.score,
-            reviewCount: value.reviewCount,
+            ...('reviewCount' in value
+              ? { reviewCount: value.reviewCount as number }
+              : {}),
             url: value.url,
           });
       })

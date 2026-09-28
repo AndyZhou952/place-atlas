@@ -449,6 +449,52 @@ function PreviewStep({
   readonly busy?: boolean;
 }) {
   const presentation = presentCatalogIntakePreview(preview);
+  const previewKey = `${preview.sessionId}:${preview.previewVersion}`;
+  const [fetchedGoogleRating, setFetchedGoogleRating] = useState<{
+    readonly previewKey: string;
+    readonly score: number;
+    readonly reviewCount?: number;
+    readonly url: string;
+  }>();
+  const liveGoogleRating =
+    fetchedGoogleRating?.previewKey === previewKey
+      ? fetchedGoogleRating
+      : undefined;
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(
+      `/api/catalog-intake/google-rating?sessionId=${encodeURIComponent(preview.sessionId)}`,
+      {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal,
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok || response.status === 204) return;
+        const rating: unknown = await response.json();
+        if (
+          rating &&
+          typeof rating === 'object' &&
+          'score' in rating &&
+          typeof rating.score === 'number' &&
+          'url' in rating &&
+          typeof rating.url === 'string'
+        )
+          setFetchedGoogleRating({
+            previewKey,
+            ...(rating as {
+              readonly score: number;
+              readonly reviewCount?: number;
+              readonly url: string;
+            }),
+          });
+      })
+      .catch(() => {
+        // A provider failure must not change the Add preview or its save gate.
+      });
+    return () => controller.abort();
+  }, [preview.sessionId, previewKey]);
   const manualError = catalogIntakeManualCompletionError(intake.state);
   const hasManualInput = Boolean(
     intake.state.title.trim() ||
@@ -483,7 +529,8 @@ function PreviewStep({
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
-      {preview.profile ||
+      {liveGoogleRating ||
+      preview.profile ||
       preview.ownerFields.categories ||
       preview.ownerFields.signatureDishes ||
       preview.ownerFields.summary ? (
@@ -518,7 +565,17 @@ function PreviewStep({
               ).join(', ')}
             </p>
           ) : null}
-          {preview.profile?.googleRating ? (
+          {liveGoogleRating ? (
+            <p>
+              <a href={liveGoogleRating.url} target="_blank" rel="noreferrer">
+                Google Maps
+              </a>{' '}
+              {liveGoogleRating.score.toFixed(1)}
+              {liveGoogleRating.reviewCount === undefined
+                ? ''
+                : ` (${liveGoogleRating.reviewCount} reviews)`}
+            </p>
+          ) : preview.profile?.googleRating ? (
             <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
           ) : null}
           {preview.profile?.officialWebsite ? (

@@ -4,6 +4,7 @@ import type {
 } from '../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { validateDurableGeocoderProposal } from '../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { failure, type Result } from '../../product/application/result.ts';
+import { researchRegion } from '../../product/application/catalog/research-region.ts';
 
 interface NominatimSearchRequest {
   readonly url: string;
@@ -169,6 +170,14 @@ function buildQuery(
   if (ownerDraft.address) {
     return normalizeText(ownerDraft.address, 1, 500);
   }
+  // Nominatim's free-form geocoder often rejects a business name prefixed to
+  // a complete overseas street address. Resolve that address through OSM;
+  // the Google candidate's transient text is never itself persisted.
+  if (
+    selectedSubject.transientAddress &&
+    researchRegion(selectedSubject.transientAddress) === 'overseas'
+  )
+    return normalizeText(selectedSubject.transientAddress, 1, 500);
   const selected = [
     ownerDraft.title ?? selectedSubject.transientName ?? ownerQuery,
     selectedSubject.transientAddress,

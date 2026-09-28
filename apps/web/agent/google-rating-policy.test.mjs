@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ratingPlaceId } from './google-rating-policy.ts';
+import { previewRatingPlaceId, ratingPlaceId } from './google-rating-policy.ts';
 
 const identity = {
   providerNamespace: 'google-places',
@@ -12,6 +12,72 @@ const item = (address, tabelog, candidateIdentity = identity) => ({
   address,
   ...(tabelog ? { tabelog: { score: 3.4 } } : {}),
   intakeEvidence: { candidateIdentity },
+});
+
+test('preview Google rating uses only a current selected Place ID and respects regional policy', () => {
+  const previewSession = (query, address, tabelogStatus = 'unknown') => ({
+    state: 'preview_ready',
+    ownerQuery: query,
+    preview: {
+      expiresAt: '2026-10-01T00:00:00.000Z',
+      candidateIdentity: identity,
+      ownerFields: { address },
+      tabelog: { status: tabelogStatus },
+    },
+  });
+  const now = new Date('2026-09-28T00:00:00.000Z');
+  assert.equal(
+    previewRatingPlaceId(previewSession('Burnt Ends Singapore', ''), now),
+    identity.placeId,
+  );
+  assert.equal(
+    previewRatingPlaceId(
+      previewSession('Verve Coffee 六本木', 'Tokyo, Japan'),
+      now,
+    ),
+    identity.placeId,
+  );
+  assert.equal(
+    previewRatingPlaceId(
+      previewSession('青森 海坊厨', '青森県青森市', 'known'),
+      now,
+    ),
+    undefined,
+  );
+  assert.equal(
+    previewRatingPlaceId(previewSession('海底捞 上海', '上海市'), now),
+    undefined,
+  );
+  assert.equal(
+    previewRatingPlaceId(previewSession('Hong Kong, China', ''), now),
+    identity.placeId,
+  );
+  assert.equal(
+    previewRatingPlaceId(
+      {
+        ...previewSession('Burnt Ends Singapore', ''),
+        preview: {
+          ...previewSession('Burnt Ends Singapore', '').preview,
+          expiresAt: '2026-09-27T00:00:00.000Z',
+        },
+      },
+      now,
+    ),
+    undefined,
+  );
+  assert.equal(
+    previewRatingPlaceId(
+      {
+        ...previewSession('Burnt Ends Singapore', ''),
+        preview: {
+          ...previewSession('Burnt Ends Singapore', '').preview,
+          candidateIdentity: { ...identity, placeId: 'another/id' },
+        },
+      },
+      now,
+    ),
+    undefined,
+  );
 });
 
 test('Google rating uses a saved place ID overseas and only fills Japan without Tabelog', () => {

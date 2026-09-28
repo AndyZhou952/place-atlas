@@ -4,6 +4,7 @@ import {
   type WebResearchPort,
 } from '../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { composeRestaurantSummary } from '../product/application/catalog-intake/restaurant-profile-presentation.ts';
+import { researchRegion } from '../product/application/catalog/research-region.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
 import type { RestaurantSourceReader } from './browser-source-reader.ts';
 import {
@@ -97,6 +98,7 @@ export function createPlaceResearchAgent(
   return {
     async research(input) {
       if (!('selectedSubject' in input)) return { kind: 'unavailable' };
+      const region = researchRegion(input.selectedSubject.transientAddress);
       const signal = AbortSignal.timeout(35_000);
       const evidence: TabelogEvidence[] = [];
       let bookingEvidence: TableCheckBookingEvidence | undefined;
@@ -150,6 +152,7 @@ export function createPlaceResearchAgent(
               subject.transientAddress,
               subject.ownerQuery,
               page.restaurant.address,
+              page.restaurant.postalCode,
             )
           )
             break;
@@ -213,7 +216,7 @@ export function createPlaceResearchAgent(
         // This consumes the same two-search budget, never an extra hidden retry.
         if (!selectedListing && config.readSourcePages !== false) {
           searches++;
-          const query = selectedListingSearchQuery(input.selectedSubject);
+          const query = initialResearchQuery(input.selectedSubject);
           const result = await searchProvider.search(query, signal);
           if (result.kind === 'results') {
             successfulSearches++;
@@ -228,7 +231,7 @@ export function createPlaceResearchAgent(
               sources: result.kind === 'results' ? result.sources : result,
               remainingSearchCalls: 1,
               instruction:
-                'Use these source facts only if their branch matches the selected address. One search remains for missing details or a corrected branch. Do not invent translations of the selected name or address.',
+                'Use these source facts only if their branch matches the selected address. One search remains for missing details or a corrected branch. Do not invent translations of the selected name or address. Apply the selected country’s rating policy.',
             }),
           });
         }
@@ -244,6 +247,7 @@ export function createPlaceResearchAgent(
               input.selectedSubject.transientAddress,
               input.selectedSubject.ownerQuery,
               source.restaurant.address,
+              source.restaurant.postalCode,
             ),
         );
         if (hintedListing && !bookingEvidence && searches < 2) {
@@ -375,6 +379,7 @@ export function createPlaceResearchAgent(
                     input.selectedSubject.transientAddress,
                     input.selectedSubject.ownerQuery,
                     source.restaurant.address,
+                    source.restaurant.postalCode,
                   )),
           );
           // The parsed main listing has its own branch check. Do not discard
@@ -480,6 +485,12 @@ export function createPlaceResearchAgent(
             if (
               claim === undefined ||
               !supported(proof, evidence) ||
+              (field === 'googleRating' &&
+                (region === 'mainland_china' ||
+                  !isGoogleMapsRatingUrl(proof.url) ||
+                  !/Google|rating|reviews?|評分|评分|評価/iu.test(
+                    proof.quote,
+                  ))) ||
               (!verifiedListingProof &&
                 (typeof proof?.identityQuote !== 'string' ||
                   !supported(
@@ -541,7 +552,7 @@ export function createPlaceResearchAgent(
             profile[field] = { value: claim, sourceUrl: proof.url, observedAt };
           }
           let reservation = fact('reservation');
-          let tabelog = fact('tabelog');
+          let tabelog = region === 'japan' ? fact('tabelog') : unknown;
           if (matchedListing?.restaurant) {
             const details = matchedListing.restaurant;
             const sourceUrl = matchedListing.url;
@@ -560,7 +571,7 @@ export function createPlaceResearchAgent(
               )
                 profile[field] = { value, sourceUrl, observedAt };
             }
-            if (details.score !== undefined) {
+            if (region === 'japan' && details.score !== undefined) {
               tabelog = {
                 status: 'known',
                 score: details.score,
@@ -688,7 +699,9 @@ function canonicalListingUrl(value: string): string | undefined {
   return url.href;
 }
 
-function selectedListingSearchQuery(subject: {
+export { researchRegion } from '../product/application/catalog/research-region.ts';
+
+export function initialResearchQuery(subject: {
   readonly transientName: string;
   readonly transientAddress: string;
   readonly ownerQuery: string;
@@ -709,7 +722,30 @@ function selectedListingSearchQuery(subject: {
   if (addressHint && !parts.some((part) => part.includes(addressHint))) {
     parts.push(addressHint);
   }
-  return `${parts.join(' ')} site:tabelog.com`;
+  const region = researchRegion(subject.transientAddress);
+  if (region === 'japan') return `${parts.join(' ')} site:tabelog.com`;
+  // The selected address, not a translated guess, anchors non-Japan results.
+  const branch = subject.transientAddress.slice(0, 160).trim();
+  return `${name} ${branch} ${region === 'mainland_china' ? 'official reservation' : 'Google Maps rating'}`.trim();
+}
+
+function isGoogleMapsRatingUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      ((url.hostname === 'maps.google.com' &&
+        url.pathname.startsWith('/maps')) ||
+        ((url.hostname === 'google.com' || url.hostname === 'www.google.com') &&
+          url.pathname.startsWith('/maps')))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function matchesSelectedBranch(
@@ -718,6 +754,7 @@ function matchesSelectedBranch(
   address: string,
   ownerQuery: string,
   sourceAddress?: string,
+  sourcePostalCode?: string,
 ): boolean {
   const normalize = (value: string) =>
     value
@@ -766,11 +803,12 @@ function matchesSelectedBranch(
     )
   )
     return false;
-  const locality =
-    address.normalize('NFKC').match(/[\p{Script=Han}ぁ-んァ-ヶ]+[区市郡]/gu) ??
-    [];
-  if (locality.length)
-    return locality.some((part) => addressText.includes(normalize(part)));
+  const selectedPostalCode = address
+    .normalize('NFKC')
+    .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
+    ?.replace(/\D/gu, '');
+  if (selectedPostalCode && sourcePostalCode)
+    return selectedPostalCode === sourcePostalCode;
   // Common bilingual ward/neighborhood aliases are corroboration, never identity
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
   const aliasesByLocality: Record<string, string> = {
@@ -809,6 +847,35 @@ function matchesSelectedBranch(
     .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z]/gu, '');
+  const selectedCity = address
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .match(/\b([a-z]+) city\b/u)?.[1];
+  if (
+    selectedCity &&
+    aliasesByLocality[selectedCity] &&
+    !addressText.includes(normalize(aliasesByLocality[selectedCity])) &&
+    !addressText.includes(`${selectedCity}ku`) &&
+    !addressText.includes(`${selectedCity}city`)
+  )
+    return false;
+  const ownerLocality = ownerQuery
+    .split(/\s+/u)
+    .map(normalize)
+    .filter(
+      (token) =>
+        token.length >= 2 &&
+        /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(token) &&
+        !selectedName.includes(token) &&
+        addressText.includes(token),
+    );
+  if (ownerLocality.length) return true;
+  const locality =
+    address.normalize('NFKC').match(/[\p{Script=Han}ぁ-んァ-ヶ]+[区市郡]/gu) ??
+    [];
+  if (locality.length)
+    return locality.some((part) => addressText.includes(normalize(part)));
   return Object.entries(aliasesByLocality).some(
     ([latin, japanese]) =>
       latinAddress.includes(latin) &&

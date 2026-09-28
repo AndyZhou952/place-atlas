@@ -27,6 +27,7 @@ const restaurant = {
     addressRegion: 'Tokyo',
     addressLocality: 'Shinjuku',
     streetAddress: '1-4-2',
+    postalCode: '1600004',
   },
   aggregateRating: { '@type': 'AggregateRating', ratingValue: '3.71' },
   review: [
@@ -101,6 +102,7 @@ test('structured listing exposes aggregate and branch identity, never reviews', 
   const result = parseTabelogListing(html(restaurant), url);
   assert.match(result.content, /Example Restaurant TokyoShinjuku1-4-2/u);
   assert.match(result.content, /aggregate restaurant rating: 3.71/u);
+  assert.equal(result.restaurant.postalCode, '1600004');
   assert.doesNotMatch(result.content, /4.99|Ignore instructions/u);
   assert.equal(
     parseTabelogListing(html({ '@graph': [restaurant] }), url).content,

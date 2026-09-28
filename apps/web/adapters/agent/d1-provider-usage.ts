@@ -4,7 +4,8 @@ export type ProviderUsageSku =
   | 'geocoding.requests'
   | 'walking_matrix.elements'
   | 'places.search_text.requests'
-  | 'places.details.requests';
+  | 'places.details.requests'
+  | 'places.details_rating.requests';
 
 export class D1ProviderUsage implements ProviderUsagePort {
   private readonly database: D1Database;

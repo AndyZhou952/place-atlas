@@ -1,7 +1,74 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createGooglePlacesNewClient } from './google-places-new-client.ts';
+import {
+  createGooglePlaceRatingClient,
+  createGooglePlacesNewClient,
+} from './google-places-new-client.ts';
+
+test('Google rating details use Enterprise fields, exact selected ID, quota, and no cache', async () => {
+  const calls = [];
+  const client = createGooglePlaceRatingClient({
+    apiKey: 'fixture-secret',
+    usage: {
+      async reserve(value) {
+        calls.push(value);
+        return 'reserved';
+      },
+    },
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return Response.json({
+        id: 'ChIJ1234567890',
+        rating: 4.6,
+        userRatingCount: 1200,
+        googleMapsUri: 'https://www.google.com/maps/place/example',
+      });
+    },
+  });
+  const result = await client.getRating('ChIJ1234567890');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, {
+    score: 4.6,
+    reviewCount: 1200,
+    url: 'https://www.google.com/maps/place/example',
+  });
+  assert.equal(calls[0].sku, 'places.details_rating.requests');
+  assert.equal(
+    calls[1].init.headers['X-Goog-FieldMask'],
+    'id,rating,userRatingCount,googleMapsUri',
+  );
+  assert.equal(calls[1].init.method, 'GET');
+  assert.equal(calls[1].init.redirect, 'manual');
+});
+
+test('Google rating details reject another branch and unsupported URL', async () => {
+  for (const value of [
+    {
+      id: 'wrong-branch',
+      rating: 4.6,
+      userRatingCount: 100,
+      googleMapsUri: 'https://www.google.com/maps/place/example',
+    },
+    {
+      id: 'ChIJ1234567890',
+      rating: 4.6,
+      userRatingCount: 100,
+      googleMapsUri: 'https://evil.example/maps',
+    },
+  ]) {
+    const client = createGooglePlaceRatingClient({
+      apiKey: 'fixture-secret',
+      usage: {
+        async reserve() {
+          return 'reserved';
+        },
+      },
+      fetch: async () => Response.json(value),
+    });
+    assert.equal((await client.getRating('ChIJ1234567890')).ok, false);
+  }
+});
 
 test('Places New uses fixed Pro field masks, a server header secret, and one bounded page', async () => {
   const requests = [];

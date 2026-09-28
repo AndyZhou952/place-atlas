@@ -43,6 +43,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { isEffectivelyVisited } from '@/product/application/assessments/effective-visited';
+import { researchRegion } from '@/product/application/catalog/research-region';
 
 import type {
   AtlasItem,
@@ -1102,6 +1103,46 @@ function OverallCommentEditor({
 
 function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   const item = vm.selectedItem!;
+  const storedGoogleRating =
+    researchRegion(item.address) === 'mainland_china'
+      ? undefined
+      : item.googleRating;
+  const [liveGoogleRating, setLiveGoogleRating] = useState<{
+    score: number;
+    reviewCount: number;
+    url: string;
+  }>();
+  useEffect(() => {
+    if (item.kind !== 'food') return;
+    const controller = new AbortController();
+    void fetch(`/api/items/${encodeURIComponent(item.id)}/google-rating`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then((response) =>
+        response.ok && response.status === 200 ? response.json() : undefined,
+      )
+      .then((value: unknown) => {
+        if (
+          !controller.signal.aborted &&
+          value !== null &&
+          typeof value === 'object' &&
+          'score' in value &&
+          'reviewCount' in value &&
+          'url' in value &&
+          typeof value.score === 'number' &&
+          typeof value.reviewCount === 'number' &&
+          typeof value.url === 'string'
+        )
+          setLiveGoogleRating({
+            score: value.score,
+            reviewCount: value.reviewCount,
+            url: value.url,
+          });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [item.id, item.kind]);
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
   const overallCheckedAt = [
     item.verifiedAt,
@@ -1276,15 +1317,17 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                   </small>
                 </a>
               ) : null}
-              {item.googleRating ? (
+              {(liveGoogleRating ?? storedGoogleRating) ? (
                 <a
                   className="rating-strip-item"
-                  href={item.googleRating.url}
+                  href={(liveGoogleRating ?? storedGoogleRating)!.url}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <span>Google</span>
-                  <strong>{item.googleRating.score.toFixed(1)}</strong>
+                  <span translate="no">Google Maps</span>
+                  <strong>
+                    {(liveGoogleRating ?? storedGoogleRating)!.score.toFixed(1)}
+                  </strong>
                 </a>
               ) : null}
               <span className="rating-visit-count">

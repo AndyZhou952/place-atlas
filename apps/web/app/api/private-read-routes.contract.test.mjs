@@ -19,3 +19,15 @@ void test('non-public v1 GET routes are owner guarded before application composi
     );
   }
 });
+
+void test('Google rating read is owner guarded before the provider service runs', async () => {
+  const source = await readFile(
+    new URL('./items/[id]/google-rating/route.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /export const GET = withOwnerReadAuth/u);
+  assert.ok(
+    source.indexOf('withOwnerReadAuth(async function GET') <
+      source.indexOf('getSavedPlaceGoogleRating(id)'),
+  );
+});

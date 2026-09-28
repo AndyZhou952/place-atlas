@@ -10,7 +10,8 @@ const timeoutMs = 8_000;
 
 export type GooglePlacesUsageSku =
   | 'places.search_text.requests'
-  | 'places.details.requests';
+  | 'places.details.requests'
+  | 'places.details_rating.requests';
 
 export interface GooglePlacesUsagePort {
   reserve(input: {
@@ -100,6 +101,81 @@ export function createGooglePlacesNewClient(options: {
         : unavailable();
     },
   };
+}
+
+/** Rating content is request scoped. Only the place ID may be retained. */
+export function createGooglePlaceRatingClient(options: {
+  readonly apiKey?: string;
+  readonly usage?: GooglePlacesUsagePort;
+  readonly fetch?: typeof fetch;
+}) {
+  const apiKey = normalizeSecret(options.apiKey);
+  const fetchImpl = options.fetch ?? fetch;
+  return {
+    async getRating(placeId: string) {
+      if (!apiKey || !options.usage || !validText(placeId, 1, 500))
+        return unavailable();
+      const reserved = await options.usage.reserve({
+        providerId: 'google-places-new',
+        sku: 'places.details_rating.requests',
+        units: 1,
+        requests: 1,
+        costUsd: 0.02,
+        hardRequestLimit: 1000,
+        hardUnitLimit: 1000,
+        hardCostLimitUsd: 20,
+      });
+      if (reserved !== 'reserved') return unavailable();
+      const response = await fetchBoundedJson(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'id,rating,userRatingCount,googleMapsUri',
+          },
+        },
+        { fetch: fetchImpl, timeoutMs, maximumBytes: maximumResponseBytes },
+      );
+      if (!response.ok || !isRecord(response.value)) return unavailable();
+      const value = response.value;
+      if (
+        value.id !== placeId ||
+        typeof value.rating !== 'number' ||
+        !Number.isFinite(value.rating) ||
+        value.rating < 0 ||
+        value.rating > 5 ||
+        typeof value.userRatingCount !== 'number' ||
+        !Number.isSafeInteger(value.userRatingCount) ||
+        value.userRatingCount < 0 ||
+        typeof value.googleMapsUri !== 'string' ||
+        !isGoogleMapsLink(value.googleMapsUri)
+      )
+        return unavailable();
+      return {
+        ok: true as const,
+        value: {
+          score: value.rating,
+          reviewCount: value.userRatingCount,
+          url: value.googleMapsUri,
+        },
+      };
+    },
+  };
+}
+
+function isGoogleMapsLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      ((url.hostname === 'www.google.com' &&
+        url.pathname.startsWith('/maps/')) ||
+        url.hostname === 'maps.google.com')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function mapSearchResponse(value: unknown) {

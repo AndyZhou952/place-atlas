@@ -6,6 +6,7 @@ export interface TabelogEvidence extends SearchEvidence {
     name: string;
     aliases?: string[];
     address: string;
+    postalCode?: string;
     area: string;
     score?: number;
     coordinates?: { latitude: number; longitude: number };
@@ -111,6 +112,11 @@ export function parseTabelogListing(
   if (matches.length !== 1) return undefined;
   const record = matches[0];
   const address = record.address as Record<string, unknown> | undefined;
+  const postalCode =
+    typeof address?.postalCode === 'string' &&
+    /^\d{7}$/u.test(address.postalCode)
+      ? address.postalCode
+      : undefined;
   const rating = record.aggregateRating as Record<string, unknown> | undefined;
   const name = typeof record.name === 'string' ? record.name.trim() : '';
   const parts = ['addressRegion', 'addressLocality', 'streetAddress'].map(
@@ -203,6 +209,7 @@ export function parseTabelogListing(
     name,
     aliases,
     address: parts.join(''),
+    ...(postalCode ? { postalCode } : {}),
     ...(score === undefined ? {} : { score }),
     categories,
     area: `${String(parts[1])}${String(parts[2]).split(/[0-9０-９]/u)[0]}`.trim(),

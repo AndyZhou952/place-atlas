@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "incident": "海坊厨 in Aomori returned an all-unknown preview after Google selected the same restaurant under its romanized name Umibozu.",
+  "source": {
+    "url": "https://tabelog.com/aomori/A0201/A020101/2000433/",
+    "checkedDate": "2026-09-28",
+    "name": "海坊厨",
+    "address": "青森県青森市古川1-13-12",
+    "aggregateScoreSnapshot": 3.57,
+    "postalCode": "0300862",
+    "reservation": "予約可"
+  },
+  "selected": {
+    "name": "Umibozu",
+    "address": "1-chōme-13-12 Furukawa, Aomori, 030-0862, Japan"
+  },
+  "cases": [
+    {
+      "id": "aomori-owner-locality",
+      "ownerQuery": "海坊厨 青森",
+      "sourceAddress": "青森県青森市古川1-13-12",
+      "sourcePostalCode": "0300862",
+      "expectKnown": true
+    },
+    {
+      "id": "aomori-address-locality",
+      "ownerQuery": "海坊厨",
+      "sourceAddress": "青森県青森市古川1-13-12",
+      "sourcePostalCode": "0300862",
+      "expectKnown": true
+    },
+    {
+      "id": "different-city-same-street-number",
+      "ownerQuery": "海坊厨 青森",
+      "sourceAddress": "宮城県仙台市古川1-13-12",
+      "sourcePostalCode": "9800000",
+      "expectKnown": false,
+      "synthetic": true
+    },
+    {
+      "id": "different-street-same-city",
+      "ownerQuery": "海坊厨 青森",
+      "sourceAddress": "青森県青森市古川1-13-99",
+      "sourcePostalCode": "0300862",
+      "expectKnown": false,
+      "synthetic": true
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Select the first source search without wasting a bounded research call on an inapplicable rating provider.",
+  "cases": [
+    {
+      "id": "japanese-google-selection",
+      "name": "SPICY CURRY 魯珈",
+      "address": "Japan, Tokyo, Shinjuku City, Hyakunincho, 1 Chome-24-8",
+      "ownerQuery": "spicy curry 魯珈",
+      "region": "japan",
+      "queryIncludes": "site:tabelog.com"
+    },
+    {
+      "id": "japanese-native-selection",
+      "name": "メンドコロ 天鳳",
+      "address": "東京都中野区中央2-30-5",
+      "ownerQuery": "メンドコロ天鳳",
+      "region": "japan",
+      "queryIncludes": "site:tabelog.com"
+    },
+    {
+      "id": "overseas-english-selection",
+      "name": "Shake Shack Madison Square Park",
+      "address": "23rd Street and Madison Avenue, New York, NY 10010, United States",
+      "ownerQuery": "Shake Shack New York",
+      "region": "overseas",
+      "queryIncludes": "Google Maps rating"
+    },
+    {
+      "id": "aomori-native-address",
+      "name": "海坊厨",
+      "address": "青森県青森市古川1-13-12",
+      "ownerQuery": "海坊厨 青森",
+      "region": "japan",
+      "queryIncludes": "site:tabelog.com"
+    },
+    {
+      "id": "overseas-asia-selection",
+      "name": "Burnt Ends",
+      "address": "7 Dempsey Road, Singapore 249671",
+      "ownerQuery": "Burnt Ends Singapore",
+      "region": "overseas",
+      "queryIncludes": "Google Maps rating"
+    },
+    {
+      "id": "mainland-china-selection",
+      "name": "天目里咖啡",
+      "address": "中国浙江省杭州市西湖区天目山路398号",
+      "ownerQuery": "天目里咖啡 杭州",
+      "region": "mainland_china",
+      "queryIncludes": "official reservation"
+    },
+    {
+      "id": "hong-kong-not-mainland",
+      "name": "Yardbird",
+      "address": "154-158 Wing Lok Street, Sheung Wan, Hong Kong, China",
+      "ownerQuery": "Yardbird Hong Kong",
+      "region": "overseas",
+      "queryIncludes": "Google Maps rating"
+    }
+  ]
+}

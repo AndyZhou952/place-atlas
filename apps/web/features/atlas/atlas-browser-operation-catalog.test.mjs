@@ -8,14 +8,25 @@ import {
 } from './atlas-browser-operation-catalog.ts';
 
 test('agent capabilities preserve their HTTP surface and are generated from the Browser mapping', () => {
-  const { intakeAuthentication, ...document } =
-    createAgentCapabilitiesDocument();
+  const {
+    intakeAuthentication,
+    externalAgentIntakeAuthentication,
+    ...document
+  } = createAgentCapabilitiesDocument();
   assert.equal(intakeAuthentication.type, 'owner_session_cookie');
   assert.equal(intakeAuthentication.sameOriginRequired, true);
   assert.equal(
     intakeAuthentication.conversationHeader,
     'x-atlas-web-conversation-id',
   );
+  assert.deepEqual(externalAgentIntakeAuthentication, {
+    type: 'bearer_token',
+    endpoint: '/api/agent/catalog-intake',
+    scope: 'catalog_intake_only',
+    conversationHeader: 'x-atlas-agent-conversation-id',
+    instruction:
+      'Send {operation,input} with the dedicated Add Agent token. Echo the conversation header from discover on select, confirm and cancel. Confirm only after reviewing the current preview and version.',
+  });
   assert.deepEqual(
     {
       ...document,
@@ -25,7 +36,7 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
     },
     {
       service: 'Japan Atlas',
-      version: '0.6',
+      version: '0.7',
       operations: [
         { name: 'list_atlas_items', method: 'GET', path: '/api/items' },
         {

@@ -52,6 +52,43 @@
       "id": "reservation-accepted-with-no-timing",
       "sourceText": "予約可",
       "expected": {}
+    },
+    {
+      "id": "japanese-monthly-release-day-and-clock",
+      "sourceText": "翌月分のご予約は毎月1日10:00から受付開始。",
+      "expected": { "releaseNote": "毎月1日10:00から受付開始" }
+    },
+    {
+      "id": "japanese-monthly-release-clock-before-reservation",
+      "sourceText": "毎月1日の午前10時より翌月分の予約受付を開始します。",
+      "expected": {
+        "releaseNote": "毎月1日の午前10時より翌月分の予約受付を開始"
+      }
+    },
+    {
+      "id": "japanese-window-and-release-both-survive",
+      "sourceText": "予約は1か月前から。毎月1日10:00から翌月分の予約受付を開始。",
+      "expected": {
+        "bookingWindowLabel": "1か月前から",
+        "releaseNote": "毎月1日10:00から翌月分の予約受付を開始"
+      }
+    },
+    {
+      "id": "english-monthly-release",
+      "sourceText": "Reservations for the following month open at 10:00 on the 1st of each month.",
+      "expected": {
+        "releaseNote": "Reservations for the following month open at 10:00 on the 1st of each month"
+      }
+    },
+    {
+      "id": "restaurant-opening-hours-not-booking-release",
+      "sourceText": "営業時間は毎月1日10:00から変更。予約は可能です。",
+      "expected": {}
+    },
+    {
+      "id": "booking-deadline-clock-not-release",
+      "sourceText": "ご予約は毎月1日の10:00までにお願いします。",
+      "expected": {}
     }
   ]
 }

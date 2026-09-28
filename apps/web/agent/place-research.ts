@@ -194,6 +194,119 @@ export function createPlaceResearchAgent(
         bookingEvidence = result.evidence;
         sources[index] = result.evidence;
       };
+      const verifiedListingFallback = () => {
+        const selected = input.selectedSubject;
+        const listing = evidence.find(
+          (source) =>
+            source.restaurant &&
+            (selected.providerNamespace === 'tabelog'
+              ? source.url.replace(/\/$/u, '') ===
+                selected.placeId.replace(/\/$/u, '')
+              : matchesSelectedBranch(
+                  `${source.restaurant.name} ${source.restaurant.aliases?.join(' ') ?? ''} ${source.restaurant.address}`,
+                  selected.transientName,
+                  selected.transientAddress,
+                  selected.ownerQuery,
+                  source.restaurant.address,
+                  source.restaurant.postalCode,
+                )),
+        );
+        if (!listing?.restaurant) return { kind: 'unavailable' as const };
+        const details = listing.restaurant;
+        const observedAt = new Date().toISOString();
+        const profile: Record<string, unknown> = {};
+        for (const field of [
+          'name',
+          'address',
+          'area',
+          'coordinates',
+          'categories',
+          'officialWebsite',
+        ] as const) {
+          const value = details[field];
+          if (value !== undefined && (!Array.isArray(value) || value.length))
+            profile[field] = {
+              value,
+              sourceUrl: listing.url,
+              observedAt,
+            };
+        }
+        for (const key of Object.keys(profile)) {
+          if (!validateEnrichedProfile({ [key]: profile[key] }))
+            delete profile[key];
+        }
+        const checkedProfile = validateEnrichedProfile(profile);
+        const summary = composeRestaurantSummary({
+          categories: checkedProfile?.categories?.value,
+          area: checkedProfile?.area?.value,
+        });
+        if (summary && (checkedProfile?.categories || checkedProfile?.area))
+          profile.summary = {
+            value: summary,
+            sourceUrl: listing.url,
+            observedAt,
+          };
+        const policy = details.reservation;
+        const mode = /予約不可/u.test(policy ?? '')
+          ? 'not_reservable'
+          : /完全予約制|予約必須|要予約/u.test(policy ?? '')
+            ? 'reservation_required'
+            : /予約可/u.test(policy ?? '')
+              ? 'reservable'
+              : undefined;
+        const reservation =
+          policy && mode
+            ? {
+                status: 'known' as const,
+                mode,
+                label: policy.slice(0, 500),
+                ...(mode === 'not_reservable'
+                  ? {}
+                  : explicitReservationTiming(policy)),
+                url: listing.url,
+                provenance: 'agent_observed' as const,
+                observedAt,
+                freshness: 'fresh' as const,
+              }
+            : { status: 'unknown' as const };
+        const tabelog =
+          region === 'japan' && details.score !== undefined
+            ? {
+                status: 'known' as const,
+                score: details.score,
+                url: listing.url,
+                provenance: 'agent_observed' as const,
+                observedAt,
+                freshness: 'fresh' as const,
+              }
+            : { status: 'unknown' as const };
+        const value = validateWebResearchOutput(
+          {
+            tabelog,
+            reservation,
+            ...(Object.keys(profile).length ? { profile } : {}),
+          },
+          {
+            tabelog: { status: 'unknown' },
+            reservation: { status: 'unknown' },
+          },
+        );
+        if (!value) return { kind: 'unavailable' as const };
+        diagnostic('verified_listing_fallback');
+        return {
+          kind: 'observed' as const,
+          value,
+          ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
+        };
+      };
+      const recoverVerifiedListing = () => {
+        try {
+          return verifiedListingFallback();
+        } catch {
+          diagnostic('verified_listing_fallback_failed');
+          return { kind: 'unavailable' as const };
+        }
+      };
       try {
         if (
           region === 'overseas' &&
@@ -374,11 +487,11 @@ export function createPlaceResearchAgent(
           const message = modelResult?.choices?.[0]?.message;
           if (!message || typeof message !== 'object') {
             diagnostic('model_invalid_message');
-            return { kind: 'unavailable' };
+            return recoverVerifiedListing();
           }
           if (Array.isArray(message.tool_calls) && message.tool_calls.length) {
             if (message.tool_calls.length > 2 - searches)
-              return { kind: 'unavailable' };
+              return recoverVerifiedListing();
             const batch: { id: string; query: string }[] = [];
             // Validate the whole batch before executing any external search.
             for (const call of message.tool_calls) {
@@ -389,14 +502,14 @@ export function createPlaceResearchAgent(
                 usedCallIds.has(call.id) ||
                 batch.some((item) => item.id === call.id)
               )
-                return { kind: 'unavailable' };
+                return recoverVerifiedListing();
               const args = JSON.parse(call.function.arguments);
               if (
                 typeof args?.query !== 'string' ||
                 !args.query.trim() ||
                 args.query.length > 500
               )
-                return { kind: 'unavailable' };
+                return recoverVerifiedListing();
               batch.push({ id: call.id, query: args.query });
             }
             messages.push({
@@ -432,7 +545,7 @@ export function createPlaceResearchAgent(
                 ? 'no_successful_search'
                 : 'model_missing_content',
             );
-            return { kind: 'unavailable' };
+            return recoverVerifiedListing();
           }
           const proposal = JSON.parse(message.content);
           diagnostic(
@@ -697,6 +810,9 @@ export function createPlaceResearchAgent(
               ...(bookingEvidence.booking.advanceDays === undefined
                 ? {}
                 : { advanceDays: bookingEvidence.booking.advanceDays }),
+              ...(bookingEvidence.booking.releaseNote
+                ? { releaseNote: bookingEvidence.booking.releaseNote }
+                : {}),
               url: bookingEvidence.url,
               provenance: 'agent_observed',
               observedAt,
@@ -738,6 +854,7 @@ export function createPlaceResearchAgent(
                 status: 'known',
                 mode: 'reservable',
                 label: 'Reserve Now',
+                ...explicitReservationTiming(branchPage.content),
                 url: branchPage.url,
                 provenance: 'agent_observed',
                 observedAt,
@@ -784,7 +901,7 @@ export function createPlaceResearchAgent(
         }
       } catch {
         diagnostic(signal.aborted ? 'deadline' : 'exception');
-        return { kind: 'unavailable' };
+        return recoverVerifiedListing();
       }
       return { kind: 'unavailable' };
     },
@@ -980,8 +1097,22 @@ function matchesSelectedBranch(
     .normalize('NFKC')
     .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
     ?.replace(/\D/gu, '');
-  if (selectedPostalCode && sourcePostalCode)
-    return selectedPostalCode === sourcePostalCode;
+  if (selectedPostalCode && sourcePostalCode) {
+    if (selectedPostalCode === sourcePostalCode) return true;
+    // Google can report a building's dedicated postal code while a listing
+    // uses the neighborhood code. Only override the mismatch when the same
+    // street number, brand, and distinctive Japanese building name agree.
+    const selectedBuildingNames =
+      address.match(
+        /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{6,}/gu,
+      ) ?? [];
+    if (
+      !selectedBuildingNames.some((name) =>
+        addressText.includes(normalize(name.replace(/[内階]+$/gu, ''))),
+      )
+    )
+      return false;
+  }
   // Common bilingual ward/neighborhood aliases are corroboration, never identity
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
   const aliasesByLocality: Record<string, string> = {

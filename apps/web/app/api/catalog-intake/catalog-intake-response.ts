@@ -20,11 +20,19 @@ type IntakeExecute = (
 ) => Promise<Result<unknown, AddError>>;
 
 export async function catalogIntakeResponse(options: {
-  readonly application: unknown;
+  readonly application?: unknown;
+  readonly getApplication?: () => unknown;
   readonly request: Request;
   readonly operation: CatalogIntakeHttpOperation;
   readonly serverConversationId?: string;
+  readonly channel?: 'web' | 'external_agent';
+  readonly conversationHeader?: string;
+  readonly parsedBody?: { readonly input: unknown };
 }): Promise<Response> {
+  const conversationHeader =
+    options.conversationHeader ?? webConversationHeader;
+  const conversationName =
+    options.channel === 'external_agent' ? 'Agent' : 'Web';
   const suppliedConversation = options.request.headers.get(conversationHeader);
   const serverConversationId = isConversationId(options.serverConversationId)
     ? options.serverConversationId
@@ -32,7 +40,7 @@ export async function catalogIntakeResponse(options: {
   if (!serverConversationId) {
     return errorResponse(
       'unexpected_failure',
-      'The Web catalog intake conversation is unavailable.',
+      `The ${conversationName} catalog intake conversation is unavailable.`,
       500,
       false,
     );
@@ -46,12 +54,14 @@ export async function catalogIntakeResponse(options: {
   if (!conversationId) {
     return errorResponse(
       'invalid_input',
-      'The Web catalog intake conversation is invalid.',
+      `The ${conversationName} catalog intake conversation is invalid.`,
       400,
     );
   }
 
-  const input = await readInput(options.request);
+  const input = options.parsedBody
+    ? { ok: true as const, value: options.parsedBody.input }
+    : await readInput(options.request);
   if (!input.ok) {
     return errorResponse(
       'invalid_input',
@@ -59,9 +69,12 @@ export async function catalogIntakeResponse(options: {
       400,
       undefined,
       conversationId,
+      conversationHeader,
     );
   }
-  const execute = readExecute(options.application);
+  const execute = readExecute(
+    options.getApplication ? options.getApplication() : options.application,
+  );
   if (!execute) {
     return errorResponse(
       'unexpected_failure',
@@ -69,6 +82,7 @@ export async function catalogIntakeResponse(options: {
       500,
       false,
       conversationId,
+      conversationHeader,
     );
   }
   const result = await execute(
@@ -76,13 +90,13 @@ export async function catalogIntakeResponse(options: {
     {
       invocation: {
         ownerId: 'owner',
-        channel: 'web',
+        channel: options.channel ?? 'web',
         conversationId,
       },
     },
   );
   if (result.ok) {
-    return jsonResponse(result.value, 200, conversationId);
+    return jsonResponse(result.value, 200, conversationId, conversationHeader);
   }
   const code = isAddErrorCode(result.error.code)
     ? result.error.code
@@ -99,10 +113,11 @@ export async function catalogIntakeResponse(options: {
       ? result.error.retryable
       : undefined,
     conversationId,
+    conversationHeader,
   );
 }
 
-const conversationHeader = 'x-atlas-web-conversation-id';
+const webConversationHeader = 'x-atlas-web-conversation-id';
 const errorStatus: Readonly<Record<AddErrorCode, number>> = {
   invalid_input: 400,
   unauthorized: 401,
@@ -155,11 +170,13 @@ function errorResponse(
   status: number,
   retryable?: boolean,
   conversationId?: string,
+  conversationHeader = webConversationHeader,
 ): Response {
   return jsonResponse(
     { code, message, ...(retryable === undefined ? {} : { retryable }) },
     status,
     conversationId,
+    conversationHeader,
   );
 }
 
@@ -167,6 +184,7 @@ function jsonResponse(
   value: unknown,
   status: number,
   conversationId?: string,
+  conversationHeader = webConversationHeader,
 ): Response {
   const headers = new Headers({
     'cache-control': 'no-store',

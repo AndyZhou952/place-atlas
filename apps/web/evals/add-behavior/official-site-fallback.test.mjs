@@ -99,6 +99,8 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
     const barIdentity = `Burnt Ends Cocktail Bar 7 Dempsey Road #01-04 Singapore 249671`;
     const fact = 'Burnt Ends Restaurant serves modern Australian barbecue.';
     const booking = 'Reserve Now: https://burntends.com.sg/reservations/';
+    const release =
+      'Reservations for the following month open at 10:00 on the 1st of each month';
     const pages = new Map([
       [
         'https://burntends.com.sg/',
@@ -106,7 +108,7 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
       ],
       [
         'https://burntends.com.sg/burnt-ends-restaurant/',
-        `<title>Burnt Ends Restaurant - Burnt Ends</title><p>${fact}</p><a href="/reservations/">Reserve Now</a>`,
+        `<title>Burnt Ends Restaurant - Burnt Ends</title><p>${fact}</p><p>${release}.</p><a href="/reservations/">Reserve Now</a>`,
       ],
       [
         'https://burntends.com.sg/contact/',
@@ -184,6 +186,10 @@ for (const row of dataset.cases.filter((candidate) => candidate.identityUnit)) {
     assert.equal(
       result.value.reservation.status,
       row.expectBooking ? 'known' : 'unknown',
+    );
+    assert.equal(
+      result.value.reservation.releaseNote,
+      row.expectReleaseNote ? release : undefined,
     );
   });
 }

@@ -16,13 +16,15 @@
       "id": "restaurant-page-fact-contact-page-identity",
       "identityUnit": "#01-02",
       "expectCategory": true,
-      "expectBooking": true
+      "expectBooking": true,
+      "expectReleaseNote": true
     },
     {
       "id": "bar-identity-cannot-authorize-restaurant-page-fact",
       "identityUnit": "#01-04",
       "expectCategory": false,
-      "expectBooking": false
+      "expectBooking": false,
+      "expectReleaseNote": false
     }
   ]
 }

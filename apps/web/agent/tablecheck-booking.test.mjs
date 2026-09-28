@@ -41,6 +41,26 @@ test('TableCheck parser binds policy to the nearest address on the same page', (
   );
 });
 
+test('TableCheck keeps an explicit release clock alongside its booking window', () => {
+  const release = '毎月1日10:00から翌月分の予約受付を開始';
+  const result = parseTableCheckBookingPage(
+    html.replace(
+      'Reservations can be made up to two month in advance.<br>',
+      `Reservations can be made up to two month in advance.<br>${release}。<br>`,
+    ),
+    url,
+  );
+  assert.equal(
+    result?.booking.bookingWindowLabel,
+    'up to two month in advance',
+  );
+  assert.equal(result?.booking.releaseNote, release);
+  assert.match(
+    result?.content ?? '',
+    /毎月1日10:00から翌月分の予約受付を開始/u,
+  );
+});
+
 test('TableCheck read distinguishes denied, invalid and supported pages', async () => {
   const signal = new AbortController().signal;
   const read = await readTableCheckBookingPage(

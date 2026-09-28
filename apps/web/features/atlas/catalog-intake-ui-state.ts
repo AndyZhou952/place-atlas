@@ -148,6 +148,12 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
         'Clarification is required before the preview can be built.'
       );
     case 'preview':
+      if (
+        state.preview?.suspectedDuplicates.some(
+          (item) => item.match === 'strong',
+        )
+      )
+        return 'This restaurant is already in your Atlas. Open the saved place or cancel.';
       if (state.preview?.locationEvidence.status === 'unknown') {
         return 'Research incomplete. We could not verify this restaurant’s location. Nothing has been saved.';
       }

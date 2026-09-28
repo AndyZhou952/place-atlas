@@ -21,6 +21,8 @@ import { createNominatimFixedEndpointTransport } from '../../../adapters/provide
 import { createConfiguredPlaceResearchAgent } from '../../../agent/place-research.ts';
 import { recordCatalogResearchDiagnostic } from '../../../agent/research-diagnostic.ts';
 import { createFirecrawlRestaurantReader } from '../../../agent/firecrawl-source-reader.ts';
+import { withSameListingFallback } from '../../../agent/tabelog-source-fallback.ts';
+import { readTabelogListingResult } from '../../../agent/tabelog-listing.ts';
 import {
   createRestaurantSourceReader,
   type BrowserContentBinding,
@@ -70,10 +72,15 @@ export function createOwnerPocComposition(
   const clock = intakeOptions.clock ?? { now: () => new Date() };
   const sourceReader =
     intakeOptions.sourceReaderProvider === 'firecrawl'
-      ? createFirecrawlRestaurantReader({
-          apiKey: intakeOptions.firecrawlApiKey,
-          fetch: intakeOptions.fetch,
-        })
+      ? withSameListingFallback(
+          createFirecrawlRestaurantReader({
+            apiKey: intakeOptions.firecrawlApiKey,
+            fetch: intakeOptions.fetch,
+          }),
+          (url, signal) =>
+            readTabelogListingResult(url, intakeOptions.fetch ?? fetch, signal),
+          recordCatalogResearchDiagnostic,
+        )
       : intakeOptions.browser
         ? createRestaurantSourceReader(
             intakeOptions.browser,

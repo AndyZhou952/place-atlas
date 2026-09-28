@@ -7,6 +7,7 @@ export interface TableCheckBookingEvidence extends SearchEvidence {
     readonly address: string;
     readonly bookingWindowLabel: string;
     readonly advanceDays?: number;
+    readonly releaseNote?: string;
   };
 }
 
@@ -107,7 +108,7 @@ export function parseTableCheckBookingPage(
     )?.[1];
   if (!address) return undefined;
   const cleanAddress = decode(address).replace(/\s+/gu, ' ').trim();
-  const content = `${name} ${cleanAddress}\n${timing.bookingWindowLabel}`;
+  const content = `${name} ${cleanAddress}\n${timing.bookingWindowLabel}${timing.releaseNote ? `\n${timing.releaseNote}` : ''}`;
   return {
     url: sourceUrl,
     title: name,
@@ -119,6 +120,7 @@ export function parseTableCheckBookingPage(
       ...(timing.advanceDays === undefined
         ? {}
         : { advanceDays: timing.advanceDays }),
+      ...(timing.releaseNote ? { releaseNote: timing.releaseNote } : {}),
     },
   };
 }

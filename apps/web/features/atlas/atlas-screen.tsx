@@ -260,7 +260,10 @@ function MapWorkspace({
             </Button>
           </div>
 
-          <CatalogIntakePanel onCommitted={vm.reloadCatalogViews} />
+          <CatalogIntakePanel
+            onCommitted={vm.reloadCatalogViews}
+            onOpenSaved={vm.selectItem}
+          />
 
           <div className="search-field">
             <Search aria-hidden="true" />

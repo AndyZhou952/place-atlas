@@ -24,8 +24,10 @@ import './catalog-intake-panel.css';
 
 export function CatalogIntakePanel({
   onCommitted,
+  onOpenSaved,
 }: {
   readonly onCommitted?: () => void;
+  readonly onOpenSaved: (itemId: string) => void;
 }) {
   const intake = useCatalogIntake(onCommitted);
   const { state } = intake;
@@ -140,7 +142,10 @@ export function CatalogIntakePanel({
       {busy && state.lastOperation === 'select' ? <ResearchProgress /> : null}
 
       {state.stage === 'preview' &&
-      state.preview?.locationEvidence.status === 'unknown' ? (
+      state.preview?.locationEvidence.status === 'unknown' &&
+      !state.preview.suspectedDuplicates.some(
+        (item) => item.match === 'strong',
+      ) ? (
         <div className="catalog-intake-state is-attention" role="alert">
           <p>
             The research did not produce a verified address and coordinates.
@@ -222,6 +227,7 @@ export function CatalogIntakePanel({
           preview={state.preview}
           onConfirm={intake.confirm}
           onCancel={intake.cancel}
+          onOpenSaved={onOpenSaved}
           busy={confirmInProgress}
           confirmLabel={
             confirmInProgress ? 'Confirming and saving…' : 'Confirm and save'
@@ -242,6 +248,7 @@ export function CatalogIntakePanel({
             preview={state.preview}
             onConfirm={intake.confirm}
             onCancel={intake.cancel}
+            onOpenSaved={onOpenSaved}
             confirmLabel="Review changed preview and confirm again"
           />
         </div>
@@ -438,6 +445,7 @@ function PreviewStep({
   preview,
   onConfirm,
   onCancel,
+  onOpenSaved,
   confirmLabel = 'Confirm and save',
   busy = false,
 }: {
@@ -445,11 +453,15 @@ function PreviewStep({
   readonly preview: NonNullable<IntakeController['state']['preview']>;
   readonly onConfirm: () => Promise<void>;
   readonly onCancel: () => Promise<void>;
+  readonly onOpenSaved: (itemId: string) => void;
   readonly confirmLabel?: string;
   readonly busy?: boolean;
 }) {
   const presentation = presentCatalogIntakePreview(preview);
   const previewKey = `${preview.sessionId}:${preview.previewVersion}`;
+  const hasStrongDuplicate = preview.suspectedDuplicates.some(
+    (item) => item.match === 'strong',
+  );
   const [fetchedGoogleRating, setFetchedGoogleRating] = useState<{
     readonly previewKey: string;
     readonly score: number;
@@ -461,6 +473,7 @@ function PreviewStep({
       ? fetchedGoogleRating
       : undefined;
   useEffect(() => {
+    if (hasStrongDuplicate) return;
     const controller = new AbortController();
     void fetch(
       `/api/catalog-intake/google-rating?sessionId=${encodeURIComponent(preview.sessionId)}`,
@@ -494,8 +507,11 @@ function PreviewStep({
         // A provider failure must not change the Add preview or its save gate.
       });
     return () => controller.abort();
-  }, [preview.sessionId, previewKey]);
+  }, [preview.sessionId, previewKey, hasStrongDuplicate]);
   const manualError = catalogIntakeManualCompletionError(intake.state);
+  const alreadySaved = presentation.duplicates.find(
+    (item) => item.match === 'strong',
+  );
   const hasManualInput = Boolean(
     intake.state.title.trim() ||
     intake.state.area.trim() ||
@@ -526,6 +542,38 @@ function PreviewStep({
       keys: ['tabelog', 'reservation'],
     },
   ] as const;
+  if (alreadySaved) {
+    return (
+      <div className="catalog-intake-preview">
+        <div className="catalog-intake-state is-attention">
+          <strong>Already saved</strong>
+          <p>
+            {alreadySaved.title}
+            {alreadySaved.address ? ` · ${alreadySaved.address}` : ''} is
+            already in your Atlas.
+          </p>
+          <Button
+            type="button"
+            onClick={() => {
+              onOpenSaved(alreadySaved.itemId);
+              void onCancel();
+            }}
+            disabled={busy}
+          >
+            View saved place
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void onCancel()}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>

@@ -9,6 +9,7 @@ const apiRoot = fileURLToPath(new URL('../../../app/api/', import.meta.url));
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const closedRouteSurface = [
+  route('agent/catalog-intake/route.ts', ['POST'], 'add_agent_token'),
   route('auth/owner/route.ts', ['DELETE', 'POST'], 'owner_auth'),
   route('catalog-intake/cancel/route.ts', ['POST'], 'owner_cookie'),
   route('catalog-intake/confirm/route.ts', ['POST'], 'owner_cookie'),
@@ -25,6 +26,11 @@ const closedRouteSurface = [
 ];
 
 const ownerPocBusinessWriteSurface = [
+  ownerPocRoute(
+    'agent/catalog-intake/route.ts',
+    ['POST'],
+    'add_agent_operation',
+  ),
   ownerPocRoute(
     'catalog-intake/cancel/route.ts',
     ['POST'],
@@ -86,6 +92,14 @@ void test('the complete unsafe route surface is closed over owner-cookie and exp
       ),
       `${expected.filename} is an explicit non-cookie exception.`,
     );
+    if (expected.policy === 'add_agent_token') {
+      assert.match(candidate.source, /addAgentIntakeResponse/u);
+      assert.match(
+        candidate.source,
+        /getApplication: getServerAtlasApplication/u,
+      );
+      continue;
+    }
     assert.match(candidate.source, /ownerLoginResponse/u);
     assert.match(candidate.source, /ownerLogoutResponse/u);
   }
@@ -117,6 +131,14 @@ void test('every owner business write is coordinated or fails closed before lega
         ({ method }) => method === methodName,
       );
       assert.ok(method, `${expected.filename} ${methodName}`);
+      if (expected.ownerPocPolicy === 'add_agent_operation') {
+        assert.match(candidate.source, /addAgentIntakeResponse/u);
+        assert.match(
+          candidate.source,
+          /getApplication: getServerAtlasApplication/u,
+        );
+        continue;
+      }
       const handler = method.handlerStatements.join('\n');
       if (
         expected.filename === 'items/[id]/route.ts' &&

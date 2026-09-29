@@ -1243,6 +1243,11 @@ function matchesSelectedBranch(
     value
       .normalize('NFKC')
       .toLowerCase()
+      // A shop may write a common word in katakana on Google and hiragana
+      // on Tabelog (牛タン / 牛たん). Keep the whole-name and address gates below.
+      .replace(/[ァ-ヶ]/gu, (char) =>
+        String.fromCharCode(char.charCodeAt(0) - 0x60),
+      )
       .replace(/\brd\b/gu, 'road')
       .replace(/\bst\b/gu, 'street')
       .replace(/\bave\b/gu, 'avenue')
@@ -1268,17 +1273,32 @@ function matchesSelectedBranch(
       /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
         listedName,
       ) &&
-      selectedOwnerName.startsWith(listedName)) ||
+      (selectedOwnerName.startsWith(listedName) ||
+        // The owner may omit a suffix such as 西口店 while still supplying a
+        // distinctive business name and area. Street and postcode must agree.
+        (selectedOwnerName.length >= 5 &&
+          listedName.startsWith(selectedOwnerName)))) ||
     aliases.some(
       (alias) =>
-        (alias.length >= 4 ||
-          (alias.length >= 3 &&
+        ((alias.length >= 4 && /^[a-z]+$/u.test(alias)) ||
+          (!sourceName &&
+            alias.length >= 3 &&
             /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
               alias,
             ))) &&
         !/\d/u.test(alias) &&
         text.includes(alias),
-    );
+    ) ||
+    (aliases.length > 0 &&
+      aliases.every(
+        (alias) =>
+          alias.length >= 3 &&
+          /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+            alias,
+          ) &&
+          !/\d/u.test(alias) &&
+          text.includes(alias),
+      ));
   if (!nameMatches) return false;
   if (selectedAddress.length >= 8 && addressText.includes(selectedAddress))
     return true;

@@ -50,6 +50,21 @@ export function matchesAtlasQuery(item: AtlasItem, query: string): boolean {
   });
 }
 
+export function matchesAtlasNameQuery(
+  item: Pick<AtlasItem, 'title' | 'alternateTitle'>,
+  query: string,
+): boolean {
+  const tokens = query.trim().split(/\s+/u).filter(Boolean);
+  if (!tokens.length) return true;
+  const names = [item.title, item.alternateTitle ?? ''].map(
+    normalizeSearchText,
+  );
+  return tokens.every((rawToken) => {
+    const token = normalizeSearchText(rawToken);
+    return !token || names.some((name) => name.includes(token));
+  });
+}
+
 export function normalizeSearchText(value: string): string {
   return value
     .normalize('NFKC')

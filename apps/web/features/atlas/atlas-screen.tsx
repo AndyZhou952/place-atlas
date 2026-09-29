@@ -62,7 +62,7 @@ import {
   type JournalSort,
 } from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
-import { searchSavedPlacesByName } from '@/product/application/decision/search-policy';
+import { searchCatalogRestaurantsByName } from '@/product/application/decision/search-policy';
 import { useAtlasViewModel } from './use-atlas-view-model';
 import { CatalogIntakePanel } from './catalog-intake-panel';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
@@ -1655,7 +1655,7 @@ function PlaceNamePicker({
   readonly onChange: (id: string) => void;
 }) {
   const [query, setQuery] = useState(initialName);
-  const matches = searchSavedPlacesByName(items, query);
+  const matches = searchCatalogRestaurantsByName(items, query);
   const visibleMatches = matches.slice(0, 12);
 
   return (
@@ -1701,10 +1701,10 @@ function PlaceNamePicker({
             ) : null}
           </>
         ) : (
-          <small>No saved restaurant matches this name.</small>
+          <small>No restaurant matches this name.</small>
         )
       ) : (
-        <small>Type a name to find a saved restaurant.</small>
+        <small>Type a name to find a restaurant on your map.</small>
       )}
     </div>
   );

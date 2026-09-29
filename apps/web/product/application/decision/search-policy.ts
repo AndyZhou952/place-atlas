@@ -1,11 +1,11 @@
 import type { AtlasItem } from '../catalog/atlas-item.ts';
 
-type SearchableSavedPlace = Pick<
+type SearchableRestaurant = Pick<
   AtlasItem,
-  'kind' | 'title' | 'alternateTitle' | 'verificationStatus' | 'personalState'
+  'kind' | 'title' | 'alternateTitle' | 'verificationStatus'
 >;
 
-export function searchSavedPlacesByName<T extends SearchableSavedPlace>(
+export function searchCatalogRestaurantsByName<T extends SearchableRestaurant>(
   items: readonly T[],
   query: string,
 ): T[] {
@@ -15,7 +15,6 @@ export function searchSavedPlacesByName<T extends SearchableSavedPlace>(
     (item) =>
       item.kind === 'food' &&
       item.verificationStatus === 'verified' &&
-      item.personalState !== 'candidate' &&
       (item.title.normalize('NFKC').toLowerCase().includes(needle) ||
         (item.alternateTitle
           ?.normalize('NFKC')

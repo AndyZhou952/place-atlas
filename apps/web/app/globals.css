@@ -2636,6 +2636,7 @@ button.personal-rating-inline:focus-visible {
 .place-name-picker {
   display: grid;
   gap: 0.35rem;
+  position: relative;
 }
 
 .place-name-picker > label {
@@ -2644,14 +2645,84 @@ button.personal-rating-inline:focus-visible {
   font-weight: 650;
 }
 
-.place-name-picker > select {
+.place-name-picker-control {
+  position: relative;
+}
+
+.place-name-picker-control > input {
   width: 100%;
-  padding: 0.62rem 0.7rem;
+  padding: 0.62rem 0.7rem 0.62rem 2.7rem;
   border: 1px solid var(--input);
   border-radius: 0.45rem;
   color: var(--ink);
   background: var(--paper-raised);
   font-size: 0.82rem;
+}
+
+.place-name-picker-browse {
+  position: absolute;
+  top: 50%;
+  left: 0.15rem;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  transform: translateY(-50%);
+  border-radius: 0.35rem;
+  color: var(--ink-soft);
+}
+
+.place-name-picker-browse svg {
+  width: 1rem;
+  height: 1rem;
+  transform: rotate(90deg);
+}
+
+.place-name-picker-browse:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: -2px;
+}
+
+.place-name-picker-options {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.2rem);
+  left: 0;
+  width: 100%;
+  max-height: 17rem;
+  margin: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--input);
+  border-radius: 0.45rem;
+  background: var(--paper-raised);
+  box-shadow: 0 0.5rem 1.25rem rgb(31 33 29 / 16%);
+}
+
+.place-name-picker-options > li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.place-name-picker-options > li.is-active,
+.place-name-picker-options > li:hover,
+.place-name-picker-options > li[aria-selected='true'] {
+  background: var(--paper);
+}
+
+.place-name-picker-options small {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+}
+
+.place-name-picker-options > .place-name-picker-empty {
+  color: var(--ink-soft);
+  cursor: default;
 }
 
 .place-name-picker > small {

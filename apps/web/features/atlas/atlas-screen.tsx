@@ -62,6 +62,7 @@ import {
   type JournalSort,
 } from './journal-filter';
 import { normalizeRating, parseOptionalRating } from './rating';
+import { searchSavedPlacesByName } from '@/product/application/decision/search-policy';
 import { useAtlasViewModel } from './use-atlas-view-model';
 import { CatalogIntakePanel } from './catalog-intake-panel';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
@@ -265,18 +266,6 @@ function MapWorkspace({
             onOpenSaved={vm.selectItem}
           />
 
-          <div className="search-field">
-            <Search aria-hidden="true" />
-            <Input
-              type="search"
-              value={vm.query}
-              onChange={(event) => vm.setQuery(event.target.value)}
-              placeholder="Search name, area, description, or tag"
-              aria-label="Search Atlas items"
-              tabIndex={listOpen ? 0 : -1}
-            />
-          </div>
-
           <NearbySearch vm={vm} />
 
           <div className="summary-row">
@@ -368,6 +357,18 @@ function MapWorkspace({
             <a className="nearby-jump" href="#nearby-location">
               <LocateFixed aria-hidden="true" /> Nearby
             </a>
+          </div>
+
+          <div className="search-field">
+            <Search aria-hidden="true" />
+            <Input
+              type="search"
+              value={vm.query}
+              onChange={(event) => vm.setQuery(event.target.value)}
+              placeholder="Search name, area, description, or tag"
+              aria-label="Search Atlas items"
+              tabIndex={listOpen ? 0 : -1}
+            />
           </div>
 
           <div className="place-list" aria-live="polite">
@@ -1636,6 +1637,79 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
+function PlaceNamePicker({
+  id,
+  label,
+  items,
+  value,
+  initialName = '',
+  disabled = false,
+  onChange,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly items: readonly AtlasItem[];
+  readonly value: string;
+  readonly initialName?: string;
+  readonly disabled?: boolean;
+  readonly onChange: (id: string) => void;
+}) {
+  const [query, setQuery] = useState(initialName);
+  const matches = searchSavedPlacesByName(items, query);
+  const visibleMatches = matches.slice(0, 12);
+
+  return (
+    <div className="place-name-picker">
+      <label htmlFor={`${id}-search`}>{label}</label>
+      <Input
+        id={`${id}-search`}
+        type="search"
+        value={query}
+        disabled={disabled}
+        placeholder="Type a restaurant name"
+        autoComplete="off"
+        onChange={(event) => {
+          setQuery(event.target.value);
+          onChange('');
+        }}
+      />
+      {query.trim() ? (
+        matches.length ? (
+          <>
+            <select
+              id={id}
+              aria-label={`Matches for ${label}`}
+              value={value}
+              disabled={disabled}
+              onChange={(event) => {
+                const next = items.find(
+                  (item) => item.id === event.target.value,
+                );
+                onChange(event.target.value);
+                if (next) setQuery(next.title);
+              }}
+            >
+              <option value="">Choose a matching place</option>
+              {visibleMatches.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+            {matches.length > visibleMatches.length ? (
+              <small>More matches found. Type more of the name.</small>
+            ) : null}
+          </>
+        ) : (
+          <small>No saved restaurant matches this name.</small>
+        )
+      ) : (
+        <small>Type a name to find a saved restaurant.</small>
+      )}
+    </div>
+  );
+}
+
 function VisitComposer({
   vm,
   itemId: fixedItemId,
@@ -1647,15 +1721,8 @@ function VisitComposer({
   readonly idPrefix: string;
   readonly compact?: boolean;
 }) {
-  const [selectedItemId, setSelectedItemId] = useState(
-    fixedItemId ?? vm.selectedItem?.id ?? vm.items[0]?.id ?? '',
-  );
-  const effectiveItemId =
-    fixedItemId ||
-    selectedItemId ||
-    vm.selectedItem?.id ||
-    vm.items[0]?.id ||
-    '';
+  const [selectedItemId, setSelectedItemId] = useState(fixedItemId ?? '');
+  const effectiveItemId = fixedItemId || selectedItemId;
   const selectedItem = vm.items.find((item) => item.id === effectiveItemId);
   const [visitedAt, setVisitedAt] = useState(localVisitDate());
   const [rating, setRating] = useState(
@@ -1671,6 +1738,25 @@ function VisitComposer({
     readonly files: readonly File[];
     readonly attemptId: string;
   }>();
+
+  function readyForAnotherVisit() {
+    setSavedVisitId(undefined);
+    setStatus('idle');
+    setFormError('');
+    setRetryUpload(undefined);
+    setVisitedAt(localVisitDate());
+  }
+
+  useEffect(() => {
+    if (!savedVisitId || status !== 'success' || retryUpload || formError)
+      return;
+    const timer = window.setTimeout(() => {
+      setSavedVisitId(undefined);
+      setStatus('idle');
+      setVisitedAt(localVisitDate());
+    }, 1700);
+    return () => window.clearTimeout(timer);
+  }, [savedVisitId, status, retryUpload, formError]);
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1752,27 +1838,18 @@ function VisitComposer({
       }
     >
       {!fixedItemId ? (
-        <label htmlFor={`${idPrefix}-visit-place`}>
-          Place
-          <select
-            id={`${idPrefix}-visit-place`}
-            value={effectiveItemId}
-            disabled={busy}
-            onChange={(event) => {
-              const nextItemId = event.target.value;
-              const nextItem = vm.items.find((item) => item.id === nextItemId);
-              setSelectedItemId(nextItemId);
-              setRating(nextItem?.personalRating?.toString() ?? '');
-              setStatus('idle');
-            }}
-          >
-            {vm.items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PlaceNamePicker
+          id={`${idPrefix}-visit-place`}
+          label="Place"
+          items={vm.items}
+          value={effectiveItemId}
+          disabled={busy}
+          onChange={(nextItemId) => {
+            const nextItem = vm.items.find((item) => item.id === nextItemId);
+            setSelectedItemId(nextItemId);
+            setRating(nextItem?.personalRating?.toString() ?? '');
+          }}
+        />
       ) : null}
       <div className="form-pair">
         <label htmlFor={`${idPrefix}-visited-at`}>
@@ -1863,11 +1940,14 @@ function VisitComposer({
           {formError}
         </small>
       ) : null}
-      {status === 'success' && !formError ? (
-        <output id={feedbackId} className="form-success" aria-live="polite">
-          Visit saved. You can edit it in the history below.
-        </output>
-      ) : null}
+      {status === 'success' && !formError && typeof document !== 'undefined'
+        ? createPortal(
+            <output id={feedbackId} className="visit-saved-toast">
+              Visit saved
+            </output>,
+            document.body,
+          )
+        : null}
       <Button type="submit" disabled={busy || !effectiveItemId || !visitedAt}>
         <NotebookPen data-icon="inline-start" />
         {status === 'saving'
@@ -1886,21 +1966,14 @@ function VisitComposer({
           {status === 'saving' ? 'Retrying upload…' : 'Retry media upload'}
         </Button>
       ) : null}
-      {savedVisitId ? (
+      {savedVisitId && retryUpload ? (
         <Button
           type="button"
           variant="outline"
           disabled={status === 'saving' || vm.journalBusy}
-          onClick={() => {
-            setSavedVisitId(undefined);
-            setStatus('idle');
-            setFormError('');
-            setRetryUpload(undefined);
-            setVisitedAt(localVisitDate());
-            setRating(selectedItem?.personalRating?.toString() ?? '');
-          }}
+          onClick={readyForAnotherVisit}
         >
-          Record another visit
+          Continue without remaining media
         </Button>
       ) : null}
     </form>
@@ -1991,28 +2064,16 @@ function JournalVisitRow({
     return (
       <li className="journal-visit is-editing">
         <form className="journal-visit-form" onSubmit={submit} noValidate>
-          <label htmlFor={`visit-place-${visit.id}`}>
-            Restaurant for this visit
-            <select
-              id={`visit-place-${visit.id}`}
-              value={itemId}
-              onChange={(event) => setItemId(event.target.value)}
-              disabled={busy}
-            >
-              {items
-                .filter(
-                  (candidate) =>
-                    candidate.verificationStatus === 'verified' &&
-                    candidate.personalState !== 'candidate',
-                )
-                .map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {itemId !== visit.itemId ? (
+          <PlaceNamePicker
+            id={`visit-place-${visit.id}`}
+            label="Restaurant for this visit"
+            items={items}
+            value={itemId}
+            initialName={item.title}
+            disabled={busy}
+            onChange={setItemId}
+          />
+          {itemId && itemId !== visit.itemId ? (
             <small>
               The note and media will move with this visit. Overall restaurant
               scores stay where they are.
@@ -2058,7 +2119,7 @@ function JournalVisitRow({
             </small>
           ) : null}
           <div className="form-actions">
-            <Button type="submit" disabled={busy || !visitedAt}>
+            <Button type="submit" disabled={busy || !visitedAt || !itemId}>
               {busy ? 'Saving…' : 'Save'}
             </Button>
             <Button
@@ -2243,26 +2304,42 @@ function MediaCaptionEditor({
 
   return (
     <figure>
-      <button
-        className="media-thumbnail-button"
-        type="button"
-        aria-label={`Open ${media.caption || media.originalFilename}`}
-        onClick={onOpen}
-      >
-        {media.contentType.startsWith('video/') ? (
-          <span className="media-video-tile">▶ Video</span>
-        ) : (
-          <Image
-            src={media.contentUrl}
-            alt={media.caption || media.originalFilename}
-            width={640}
-            height={480}
-            sizes="(max-width: 600px) 50vw, 180px"
-            unoptimized
-            loading="lazy"
-          />
-        )}
-      </button>
+      <div className="media-thumbnail-frame">
+        <button
+          className="media-thumbnail-button"
+          type="button"
+          aria-label={`Open ${media.caption || media.originalFilename}`}
+          onClick={onOpen}
+        >
+          {media.contentType.startsWith('video/') ? (
+            <span className="media-video-tile">▶ Video</span>
+          ) : (
+            <Image
+              src={media.contentUrl}
+              alt={media.caption || media.originalFilename}
+              width={640}
+              height={480}
+              sizes="(max-width: 600px) 50vw, 180px"
+              unoptimized
+              loading="lazy"
+            />
+          )}
+        </button>
+        <button
+          className="media-thumbnail-delete"
+          type="button"
+          aria-label={`Delete ${media.originalFilename}`}
+          title="Delete media"
+          onClick={() => {
+            const kind = media.contentType.startsWith('video/')
+              ? 'video'
+              : 'photo';
+            if (window.confirm(`Delete this ${kind}?`)) void onDelete(media.id);
+          }}
+        >
+          <X aria-hidden="true" />
+        </button>
+      </div>
       <div className="media-caption-row">
         <Input
           value={caption}
@@ -2278,16 +2355,6 @@ function MediaCaptionEditor({
             }
           }}
         />
-        <button
-          type="button"
-          aria-label={`Delete ${media.originalFilename}`}
-          title="Delete photo"
-          onClick={() => {
-            if (window.confirm('Delete this photo?')) void onDelete(media.id);
-          }}
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
       </div>
       <MediaScoreEditor
         key={`${media.id}:${media.score ?? ''}`}

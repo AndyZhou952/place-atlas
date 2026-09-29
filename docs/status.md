@@ -64,6 +64,11 @@ Updated: 2026-09-28. This is the sole development progress checklist. Architectu
 
 ## 2. Record — deterministic personal history, no Agent required
 
+- [ ] **Visit save flow:** replace the persistent saved state and extra reset button with a brief top-right confirmation, then automatically ready the form for another Visit while preserving duplicate-submit and failed-media recovery.
+- [ ] **Media delete control:** put a compact remove button on the media thumbnail's upper-right corner on hover/focus, keep it usable on touch, and confirm before deletion.
+- [ ] **Journal score contrast:** make the overall score badge legible on desktop and mobile.
+- [ ] **Saved-place name search:** make Journal Visit creation and restaurant correction searchable by typed name, and put the existing map search next to the place results. Keep this first version literal and deterministic; Agent suggestions can follow later.
+
 - [x] **Date-only/photo-first recording:** both HTTP and application validation accept a dated Visit without a rating/note, so photos can be attached after creation. Default date uses the browser's local calendar date.
 - [x] **Submission feedback and duplicate-click guard:** synchronous in-flight guard plus a saved-record lock. After a photo failure, the Visit remains saved; another Visit requires an explicit new-record action. This does not claim exactly-once behavior across unrelated browser sessions.
 - [x] **Overall-score wording:** create/edit forms explicitly label the restaurant-level personal score; no per-Visit rating storage was added.

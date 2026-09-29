@@ -1,5 +1,30 @@
 import type { AtlasItem } from '../catalog/atlas-item.ts';
 
+type SearchableSavedPlace = Pick<
+  AtlasItem,
+  'kind' | 'title' | 'alternateTitle' | 'verificationStatus' | 'personalState'
+>;
+
+export function searchSavedPlacesByName<T extends SearchableSavedPlace>(
+  items: readonly T[],
+  query: string,
+): T[] {
+  const needle = query.trim().normalize('NFKC').toLowerCase();
+  if (!needle) return [];
+  return items.filter(
+    (item) =>
+      item.kind === 'food' &&
+      item.verificationStatus === 'verified' &&
+      item.personalState !== 'candidate' &&
+      (item.title.normalize('NFKC').toLowerCase().includes(needle) ||
+        (item.alternateTitle
+          ?.normalize('NFKC')
+          .toLowerCase()
+          .includes(needle) ??
+          false)),
+  );
+}
+
 export function matchesAtlasQuery(item: AtlasItem, query: string): boolean {
   const rawTokens = query.trim().split(/\s+/u).filter(Boolean);
   if (!rawTokens.length) return true;

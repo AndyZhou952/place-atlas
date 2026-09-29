@@ -131,18 +131,28 @@ try {
       if (attempt === 2) throw error;
     }
   }
-  assert.equal(await page.locator('#journal-visit-place option').count(), 0);
+  await page.locator('#journal-visit-place-search').focus();
+  assert.ok(
+    (await page
+      .locator('#journal-visit-place-options [role="option"]')
+      .count()) > 0,
+    'The same control must let the owner browse the full restaurant list',
+  );
   await page.locator('#journal-visit-place-search').fill(item.title);
   assert.ok(
     await page
-      .locator('#journal-visit-place option')
+      .locator('#journal-visit-place-options [role="option"]')
       .evaluateAll(
-        (options, id) => options.some((option) => option.value === id),
+        (options, id) =>
+          options.some((option) => option.dataset.placeId === id),
         item.id,
       ),
     'The typed restaurant name must reveal its saved match',
   );
-  await page.locator('#journal-visit-place').selectOption(item.id);
+  await page
+    .locator('#journal-visit-place-options [role="option"]')
+    .filter({ hasText: item.title })
+    .click();
   await page.locator('#journal-visit-rating').fill('');
   await page.locator('#journal-visited-at').fill('2026-09-20');
   await page.locator('#journal-visit-note').fill(marker);
@@ -227,6 +237,15 @@ try {
     .getByRole('button', { name: 'Close photo viewer', exact: true })
     .click();
   await row.getByRole('button', { name: /Edit visit/ }).click();
+  const editForm = page.locator('.journal-visit-form');
+  await editForm
+    .getByRole('button', { name: 'Browse all restaurants' })
+    .click();
+  assert.ok(
+    (await editForm.locator('[role="option"]').count()) > 0,
+    'Restaurant correction must offer the browseable place list',
+  );
+  await editForm.locator(`[role="option"][data-place-id="${item.id}"]`).click();
   await page.locator(`#visit-date-${visitId}`).fill('2026-09-21');
   await page.locator(`#visit-note-${visitId}`).fill(`${marker} edited`);
   const visitEditSaved = page.waitForResponse(

@@ -10,12 +10,12 @@ export function searchCatalogRestaurantsByName<T extends SearchableRestaurant>(
   query: string,
 ): T[] {
   const needle = query.trim().normalize('NFKC').toLowerCase();
-  if (!needle) return [];
   return items.filter(
     (item) =>
       item.kind === 'food' &&
       item.verificationStatus === 'verified' &&
-      (item.title.normalize('NFKC').toLowerCase().includes(needle) ||
+      (!needle ||
+        item.title.normalize('NFKC').toLowerCase().includes(needle) ||
         (item.alternateTitle
           ?.normalize('NFKC')
           .toLowerCase()
@@ -42,9 +42,10 @@ export function matchesAtlasQuery(item: AtlasItem, query: string): boolean {
     if (!token) return true;
     return fields.some(
       (field) =>
-        field.includes(token) ||
-        token.includes(field) ||
-        (token.length >= 3 && bigramSimilarity(field, token) >= 0.5),
+        Boolean(field) &&
+        (field.includes(token) ||
+          token.includes(field) ||
+          (token.length >= 3 && bigramSimilarity(field, token) >= 0.5)),
     );
   });
 }

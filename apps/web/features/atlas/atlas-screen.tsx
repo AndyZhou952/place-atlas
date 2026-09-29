@@ -1637,6 +1637,9 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
+// The input handles keyboard navigation for this ARIA combobox; native select
+// and datalist cannot provide both full-list browsing and unambiguous filtering.
+/* oxlint-disable jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-to-interactive-role, jsx-a11y/click-events-have-key-events */
 function PlaceNamePicker({
   id,
   label,
@@ -1655,61 +1658,144 @@ function PlaceNamePicker({
   readonly onChange: (id: string) => void;
 }) {
   const [query, setQuery] = useState(initialName);
-  const matches = searchCatalogRestaurantsByName(items, query);
-  const visibleMatches = matches.slice(0, 12);
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const matches = searchCatalogRestaurantsByName(items, showAll ? '' : query);
+  const listId = `${id}-options`;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: globalThis.PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && activeIndex >= 0) {
+      document
+        .getElementById(`${id}-option-${activeIndex}`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex, id, open]);
+
+  function choose(item: AtlasItem) {
+    onChange(item.id);
+    setQuery(item.title);
+    setShowAll(false);
+    setOpen(false);
+  }
 
   return (
-    <div className="place-name-picker">
+    <div className="place-name-picker" ref={pickerRef}>
       <label htmlFor={`${id}-search`}>{label}</label>
-      <Input
-        id={`${id}-search`}
-        type="search"
-        value={query}
-        disabled={disabled}
-        placeholder="Type a restaurant name"
-        autoComplete="off"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          onChange('');
-        }}
-      />
-      {query.trim() ? (
-        matches.length ? (
-          <>
-            <select
-              id={id}
-              aria-label={`Matches for ${label}`}
-              value={value}
-              disabled={disabled}
-              onChange={(event) => {
-                const next = items.find(
-                  (item) => item.id === event.target.value,
-                );
-                onChange(event.target.value);
-                if (next) setQuery(next.title);
-              }}
-            >
-              <option value="">Choose a matching place</option>
-              {visibleMatches.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
-            {matches.length > visibleMatches.length ? (
-              <small>More matches found. Type more of the name.</small>
-            ) : null}
-          </>
-        ) : (
-          <small>No restaurant matches this name.</small>
-        )
-      ) : (
-        <small>Type a name to find a restaurant on your map.</small>
-      )}
+      <div className="place-name-picker-control">
+        <Input
+          role="combobox"
+          ref={inputRef}
+          id={`${id}-search`}
+          type="search"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          aria-activedescendant={
+            open && activeIndex >= 0 && matches[activeIndex]
+              ? `${id}-option-${activeIndex}`
+              : undefined
+          }
+          value={query}
+          disabled={disabled}
+          placeholder="Select or type a restaurant name"
+          autoComplete="off"
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setShowAll(false);
+            setActiveIndex(-1);
+            setOpen(true);
+            onChange('');
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setOpen(false);
+              return;
+            }
+            if (event.key === 'Tab') {
+              setOpen(false);
+              return;
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              setOpen(true);
+              setActiveIndex((current) =>
+                event.key === 'ArrowDown'
+                  ? Math.min(current + 1, matches.length - 1)
+                  : current < 0
+                    ? matches.length - 1
+                    : Math.max(current - 1, 0),
+              );
+            }
+            if (event.key === 'Enter' && open) {
+              event.preventDefault();
+              const selected = matches[activeIndex];
+              if (selected) choose(selected);
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="place-name-picker-browse"
+          aria-label="Browse all restaurants"
+          aria-expanded={open && showAll}
+          aria-controls={open ? listId : undefined}
+          disabled={disabled}
+          onClick={() => {
+            setShowAll(true);
+            setActiveIndex(-1);
+            setOpen(true);
+            inputRef.current?.focus();
+          }}
+        >
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </div>
+      {open && !disabled ? (
+        <ul id={listId} className="place-name-picker-options" role="listbox">
+          {matches.length ? (
+            matches.map((item, index) => (
+              <li
+                role="option"
+                key={item.id}
+                id={`${id}-option-${index}`}
+                data-place-id={item.id}
+                aria-selected={value === item.id}
+                className={cn(index === activeIndex && 'is-active')}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(item)}
+              >
+                <span>{item.title}</span>
+                {item.area ? <small>{item.area}</small> : null}
+              </li>
+            ))
+          ) : (
+            <li className="place-name-picker-empty">No matching restaurant</li>
+          )}
+        </ul>
+      ) : null}
+      {!value && query.trim() && !open ? (
+        <small>Select a restaurant from the matching list.</small>
+      ) : null}
     </div>
   );
 }
 
+/* oxlint-enable jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-to-interactive-role, jsx-a11y/click-events-have-key-events */
 function VisitComposer({
   vm,
   itemId: fixedItemId,

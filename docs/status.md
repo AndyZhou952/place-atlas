@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-09-28. This is the sole development progress checklist. Architecture and operating boundaries are in `docs/architecture.md`.
+Updated: 2026-09-29. This is the sole development progress checklist. Architecture and operating boundaries are in `docs/architecture.md`.
 
 - [x] means the stated implementation or verification is complete.
 - [ ] means implementation, integration, or acceptance is still pending; the note identifies which.
@@ -64,13 +64,13 @@ Updated: 2026-09-28. This is the sole development progress checklist. Architectu
 
 ## 2. Record — deterministic personal history, no Agent required
 
-- [ ] **Visit save flow:** replace the persistent saved state and extra reset button with a brief top-right confirmation, then automatically ready the form for another Visit while preserving duplicate-submit and failed-media recovery.
-- [ ] **Media delete control:** put a compact remove button on the media thumbnail's upper-right corner on hover/focus, keep it usable on touch, and confirm before deletion.
-- [ ] **Journal score contrast:** make the overall score badge legible on desktop and mobile.
-- [ ] **Saved-place name search:** make Journal Visit creation and restaurant correction searchable by typed name, and put the existing map search next to the place results. Keep this first version literal and deterministic; Agent suggestions can follow later.
+- [x] **Visit save flow:** a top-right confirmation appears for about 1.7 seconds, then the composer automatically unlocks for another Visit. The duplicate-submit guard and partial-media retry path remain. An authenticated browser saved two consecutive Visits without a reset click, observed the toast and automatic unlock, then removed both temporary local records.
+- [x] **Media delete control:** a compact X overlays the media thumbnail on hover/focus and remains usable on touch; deletion still asks for confirmation. Deployed Chrome opened the confirmation and cancelled it, leaving both existing photos intact.
+- [x] **Journal score contrast:** the overall score badge now uses light text on a dark indigo background. Deployed Chrome confirmed the computed colors.
+- [x] **Saved-place name search:** Journal Visit creation and restaurant correction filter by typed name, while the existing map search sits beside the place results. The literal search also matches alternate titles and verified candidate restaurants; deployed Chrome found 海坊厨 in both Journal pickers and narrowed the map results by name. Agent suggestions remain a later enhancement.
 
 - [x] **Date-only/photo-first recording:** both HTTP and application validation accept a dated Visit without a rating/note, so photos can be attached after creation. Default date uses the browser's local calendar date.
-- [x] **Submission feedback and duplicate-click guard:** synchronous in-flight guard plus a saved-record lock. After a photo failure, the Visit remains saved; another Visit requires an explicit new-record action. This does not claim exactly-once behavior across unrelated browser sessions.
+- [x] **Submission feedback and duplicate-click guard:** synchronous in-flight guard plus a short saved-record lock that automatically clears after successful completion. After a photo failure, the Visit remains saved and media can be retried or skipped before the lock clears. This does not claim exactly-once behavior across unrelated browser sessions.
 - [x] **Overall-score wording:** create/edit forms explicitly label the restaurant-level personal score; no per-Visit rating storage was added.
 - [x] **Deployed Record API smoke:** real date-only creation, identical-mutation replay, two R2-backed photo uploads, caption/date/note edits, fresh reads, single-photo deletion, anonymous-write rejection and test-record cleanup passed. See `apps/web/scripts/record-api-smoke.mjs` (explicit write opt-in required).
 - [x] **Personal-score API regression:** temporarily changing the overall score through a test Visit preserved both external-rating fields; the original personal score and effective visited state were restored after cleanup. Deployed browser rating independence passed below. Local Record/API/media/state coverage passed 81 tests, typecheck and lint.

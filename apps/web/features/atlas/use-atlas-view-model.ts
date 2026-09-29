@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
 import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
-import { matchesAtlasQuery } from './search';
+import { matchesAtlasNameQuery } from '@/product/application/decision/search-policy';
 import { normalizeRating } from './rating';
 import type {
   AtlasItemEdit,
@@ -146,7 +146,9 @@ export function useAtlasViewModel() {
         personalFilter,
         favoriteOnly,
       );
-      return matchesKind && matchesPersonal && matchesAtlasQuery(item, query);
+      return (
+        matchesKind && matchesPersonal && matchesAtlasNameQuery(item, query)
+      );
     });
 
     return [...filtered].sort((left, right) => {

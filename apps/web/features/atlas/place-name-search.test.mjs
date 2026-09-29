@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  matchesAtlasQuery,
+  matchesAtlasNameQuery,
   searchCatalogRestaurantsByName,
 } from '../../product/application/decision/search-policy.ts';
 
@@ -45,23 +45,32 @@ test('empty input lets the owner browse every verified restaurant', () => {
   assert.deepEqual(searchCatalogRestaurantsByName(places, '海坊'), [places[0]]);
 });
 
-test('map search never treats missing catalog fields as a match', () => {
+test('map search filters by restaurant name instead of area, address, or tags', () => {
   const unrelated = {
     title: 'マクドナルド 池袋LABI前店',
     alternateTitle: '',
-    area: '池袋',
-    address: '',
-    description: '',
-    tags: [],
+    area: '新宿',
+    address: '東京都新宿区',
+    description: '新宿で食事',
+    tags: ['新宿'],
   };
   const shinjuku = {
     ...unrelated,
     title: 'シェイク シャック 新宿サザンテラス',
-    area: '新宿',
   };
-  assert.equal(matchesAtlasQuery(unrelated, '新宿'), false);
-  assert.equal(matchesAtlasQuery(shinjuku, '新宿'), true);
-  assert.equal(matchesAtlasQuery(unrelated, ''), true);
+  assert.equal(matchesAtlasNameQuery(unrelated, '新宿'), false);
+  assert.equal(matchesAtlasNameQuery(shinjuku, '新宿'), true);
+  assert.equal(matchesAtlasNameQuery(shinjuku, 'シャック 新宿'), true);
+  assert.equal(matchesAtlasNameQuery(shinjuku, '渋谷'), false);
+  assert.equal(matchesAtlasNameQuery(shinjuku, '新宿店'), false);
+  assert.equal(
+    matchesAtlasNameQuery(
+      { ...unrelated, alternateTitle: 'Shake Shack Shinjuku' },
+      'SHAKE shinjuku',
+    ),
+    true,
+  );
+  assert.equal(matchesAtlasNameQuery(unrelated, ''), true);
 });
 
 test('a verified restaurant remains selectable before its personal state is saved', () => {

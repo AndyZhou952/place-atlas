@@ -81,6 +81,16 @@
       "expectedSummaryPrefix": "主营炸猪排",
       "expectedSummaryIncludes": "招牌菜包括",
       "expectedDishesMin": 2
+    },
+    {
+      "id": "gyutan-ara-shinjuku-variant",
+      "query": "牛タン 荒 新宿",
+      "candidateNameIncludes": "Gyutan Ara",
+      "expectedTitleIncludes": "牛たん 荒",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+      "expectedReservationMode": "reservable",
+      "expectedCategoryIncludes": "牛タン",
+      "expectedSavedDuplicate": true
     }
   ]
 }

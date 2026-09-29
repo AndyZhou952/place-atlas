@@ -365,7 +365,7 @@ function MapWorkspace({
               type="search"
               value={vm.query}
               onChange={(event) => vm.setQuery(event.target.value)}
-              placeholder="Search name, area, description, or tag"
+              placeholder="Search place name"
               aria-label="Search Atlas items"
               tabIndex={listOpen ? 0 : -1}
             />
@@ -1659,11 +1659,14 @@ function PlaceNamePicker({
 }) {
   const [query, setQuery] = useState(initialName);
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const pickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const matches = searchCatalogRestaurantsByName(items, showAll ? '' : query);
+  const matches = searchCatalogRestaurantsByName(
+    items,
+    value && !filtering ? '' : query,
+  );
   const listId = `${id}-options`;
 
   useEffect(() => {
@@ -1686,7 +1689,8 @@ function PlaceNamePicker({
   function choose(item: AtlasItem) {
     onChange(item.id);
     setQuery(item.title);
-    setShowAll(false);
+    setFiltering(false);
+    setActiveIndex(-1);
     setOpen(false);
   }
 
@@ -1709,13 +1713,21 @@ function PlaceNamePicker({
           }
           value={query}
           disabled={disabled}
-          placeholder="Select or type a restaurant name"
+          placeholder="Choose or type a name"
           autoComplete="off"
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
+          onFocus={() => {
+            setFiltering(!value && Boolean(query.trim()));
+            setActiveIndex(-1);
+            setOpen(true);
+            if (value) inputRef.current?.select();
+          }}
+          onClick={() => {
+            setOpen(true);
+            if (value) inputRef.current?.select();
+          }}
           onChange={(event) => {
             setQuery(event.target.value);
-            setShowAll(false);
+            setFiltering(true);
             setActiveIndex(-1);
             setOpen(true);
             onChange('');
@@ -1747,22 +1759,7 @@ function PlaceNamePicker({
             }
           }}
         />
-        <button
-          type="button"
-          className="place-name-picker-browse"
-          aria-label="Browse all restaurants"
-          aria-expanded={open && showAll}
-          aria-controls={open ? listId : undefined}
-          disabled={disabled}
-          onClick={() => {
-            setShowAll(true);
-            setActiveIndex(-1);
-            setOpen(true);
-            inputRef.current?.focus();
-          }}
-        >
-          <ChevronRight aria-hidden="true" />
-        </button>
+        <ChevronRight aria-hidden="true" />
       </div>
       {open && !disabled ? (
         <ul id={listId} className="place-name-picker-options" role="listbox">

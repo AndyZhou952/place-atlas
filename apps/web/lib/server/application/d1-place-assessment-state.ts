@@ -8,12 +8,12 @@ import type { AtomicMutationCommit } from '@/product/application/atlas-applicati
 import { commitD1MutationAtomically } from './d1-mutation-receipt-state.ts';
 
 interface AssessmentRow {
-  readonly item_id: string;
+  readonly item_id: string | null;
   readonly overall_rating: number | null;
-  readonly is_favorite: number;
-  readonly has_visited: number;
+  readonly is_favorite: number | null;
+  readonly has_visited: number | null;
   readonly summary: string | null;
-  readonly updated_at: string;
+  readonly updated_at: string | null;
 }
 
 interface VisitCountRow {
@@ -28,32 +28,30 @@ export class D1PlaceAssessmentState implements PlaceAssessmentRecordState {
   }
 
   async read(itemId: string): Promise<PlaceAssessmentContext> {
-    const [assessmentRow, visitCountRow] = await Promise.all([
-      this.#database
-        .prepare(
-          `SELECT item_id, overall_rating, is_favorite, has_visited, summary, updated_at
-           FROM place_assessments WHERE item_id = ?`,
-        )
-        .bind(itemId)
-        .first<AssessmentRow>(),
-      this.#database
-        .prepare('SELECT COUNT(*) AS visit_count FROM visits WHERE item_id = ?')
-        .bind(itemId)
-        .first<VisitCountRow>(),
-    ]);
+    const row = await this.#database
+      .prepare(
+        `SELECT assessment.item_id, assessment.overall_rating,
+                assessment.is_favorite, assessment.has_visited,
+                assessment.summary, assessment.updated_at,
+                (SELECT COUNT(*) FROM visits WHERE item_id = ?) AS visit_count
+         FROM (SELECT 1) AS one_row
+         LEFT JOIN place_assessments AS assessment ON assessment.item_id = ?`,
+      )
+      .bind(itemId, itemId)
+      .first<AssessmentRow & VisitCountRow>();
 
     return {
-      assessment: assessmentRow
+      assessment: row?.item_id
         ? {
-            itemId: assessmentRow.item_id,
-            overallRating: assessmentRow.overall_rating ?? undefined,
-            isFavorite: Boolean(assessmentRow.is_favorite),
-            manualVisited: Boolean(assessmentRow.has_visited),
-            summary: assessmentRow.summary ?? undefined,
-            updatedAt: assessmentRow.updated_at,
+            itemId: row.item_id,
+            overallRating: row.overall_rating ?? undefined,
+            isFavorite: Boolean(row.is_favorite),
+            manualVisited: Boolean(row.has_visited),
+            summary: row.summary ?? undefined,
+            updatedAt: row.updated_at ?? '',
           }
         : undefined,
-      visitCount: visitCountRow?.visit_count ?? 0,
+      visitCount: row?.visit_count ?? 0,
     };
   }
 

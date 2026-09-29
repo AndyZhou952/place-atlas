@@ -123,25 +123,24 @@ try {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.getByRole('button', { name: 'Journal', exact: true }).click();
     try {
-      await page.locator('#journal-visit-place').waitFor({ timeout: 10000 });
+      await page
+        .locator('#journal-visit-place-search')
+        .waitFor({ timeout: 10000 });
       break;
     } catch (error) {
       if (attempt === 2) throw error;
     }
   }
-  console.log(
-    'Journal loaded',
-    JSON.stringify({
-      target: item.id,
-      optionCount: await page.locator('#journal-visit-place option').count(),
-      targetAvailable: await page
-        .locator('#journal-visit-place option')
-        .evaluateAll(
-          (options, id) => options.some((option) => option.value === id),
-          item.id,
-        ),
-      notice: await page.locator('.notice-bar').allTextContents(),
-    }),
+  assert.equal(await page.locator('#journal-visit-place option').count(), 0);
+  await page.locator('#journal-visit-place-search').fill(item.title);
+  assert.ok(
+    await page
+      .locator('#journal-visit-place option')
+      .evaluateAll(
+        (options, id) => options.some((option) => option.value === id),
+        item.id,
+      ),
+    'The typed restaurant name must reveal its saved match',
   );
   await page.locator('#journal-visit-place').selectOption(item.id);
   await page.locator('#journal-visit-rating').fill('');
@@ -155,11 +154,7 @@ try {
       .getByText(/some media did not upload/)
       .waitFor();
   } else {
-    await page
-      .getByText('Visit saved. You can edit it in the history below.', {
-        exact: true,
-      })
-      .waitFor();
+    await page.getByRole('status').getByText('Visit saved').waitFor();
   }
   assert.equal(
     await page
@@ -177,14 +172,30 @@ try {
       true,
     );
     await page.getByRole('button', { name: 'Retry media upload' }).click();
-    await page
-      .getByText('Visit saved. You can edit it in the history below.', {
-        exact: true,
-      })
-      .waitFor();
+    await page.getByRole('status').getByText('Visit saved').waitFor();
     assert.equal(visitIds.size, 1, 'retry must not create a second Visit');
   }
+  await page
+    .getByRole('status')
+    .getByText('Visit saved')
+    .waitFor({ state: 'hidden' });
+  assert.equal(
+    await page
+      .getByRole('button', { name: 'Save visit', exact: true })
+      .isEnabled(),
+    true,
+    'The form must become ready again without another button',
+  );
+  assert.equal(visitIds.size, 1, 'unlocking must not save another Visit');
   let row = page.locator('.journal-visit').filter({ hasText: marker });
+  await row.locator('.media-thumbnail-frame').first().hover();
+  const thumbnailDelete = row.getByRole('button', {
+    name: `Delete ${photos[0].name}`,
+  });
+  assert.equal(await thumbnailDelete.isVisible(), true);
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await thumbnailDelete.click();
+  assert.equal(visitIds.size, 1, 'cancelled media removal keeps the Visit');
   await row
     .getByRole('button', { name: `Open ${photos[0].name}`, exact: true })
     .click();
@@ -232,7 +243,7 @@ try {
   await page.getByText(`${marker} edited`, { exact: true }).waitFor();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Journal', exact: true }).click();
-  await page.locator('#journal-visit-place').waitFor();
+  await page.locator('#journal-visit-place-search').waitFor();
   row = page.locator('.journal-visit').filter({ hasText: `${marker} edited` });
   try {
     await row

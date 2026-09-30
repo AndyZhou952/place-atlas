@@ -146,7 +146,11 @@ function currentRoute(
   now: Date,
 ): boolean {
   if (route.status !== 'fresh' || !route.checkedAt) return false;
-  const age = now.getTime() - Date.parse(route.checkedAt);
+  return recentTimestamp(route.checkedAt, now);
+}
+
+function recentTimestamp(value: string, now: Date): boolean {
+  const age = now.getTime() - Date.parse(value);
   return Number.isFinite(age) && age >= 0 && age <= 5 * 60 * 1000;
 }
 
@@ -377,50 +381,78 @@ export function createRecommendConversationService(
                   distances.find((distance) => distance.itemId === item.id)
                     ?.meters ?? Infinity,
               }))
-              .sort((a, b) => a.meters - b.meters)
-              .slice(0, 5);
-            await Promise.all(
-              shortlist.map(async ({ item }) => {
-                try {
-                  const route =
-                    await dependencies.transitRouteProvider!.transit(point, {
-                      latitude: item.latitude,
-                      longitude: item.longitude,
+              .sort(
+                (a, b) =>
+                  (intent.visited === 'prefer_unvisited' && a.item.hasVisited
+                    ? 1
+                    : 0) -
+                    (intent.visited === 'prefer_unvisited' && b.item.hasVisited
+                      ? 1
+                      : 0) || a.meters - b.meters,
+              );
+            let foundDirectRoute = false;
+            for (
+              let offset = 0;
+              offset < Math.min(shortlist.length, 10) && !foundDirectRoute;
+              offset += 5
+            ) {
+              const batch = shortlist.slice(offset, offset + 5);
+              const batchMatches = await Promise.all(
+                batch.map(async ({ item }) => {
+                  try {
+                    const route =
+                      await dependencies.transitRouteProvider!.transit(point, {
+                        latitude: item.latitude,
+                        longitude: item.longitude,
+                      });
+                    const fresh =
+                      currentRoute(route, now) &&
+                      route.status === 'fresh' &&
+                      Number.isFinite(route.durationSeconds) &&
+                      route.durationSeconds >= 0;
+                    if (
+                      route.status === 'unavailable' ||
+                      route.status === 'stale' ||
+                      (route.status === 'no_direct_route' &&
+                        !recentTimestamp(route.checkedAt, now))
+                    )
+                      routeState = 'unavailable';
+                    routes.push({
+                      itemId: item.id,
+                      mode: 'transit',
+                      seconds:
+                        route.status === 'fresh' ? route.durationSeconds : null,
+                      status: fresh ? 'fresh' : 'unavailable',
+                      transfers:
+                        route.status === 'fresh'
+                          ? route.transferCount
+                          : undefined,
+                      doorToDoor:
+                        route.status === 'fresh' && route.boardingCount >= 1,
                     });
-                  const fresh =
-                    currentRoute(route, now) &&
-                    route.status === 'fresh' &&
-                    Number.isFinite(route.durationSeconds) &&
-                    route.durationSeconds >= 0;
-                  if (
-                    route.status === 'unavailable' ||
-                    route.status === 'stale'
-                  )
+                    if (fresh)
+                      routeSources.set(`${item.id}:transit`, {
+                        seconds: route.durationSeconds,
+                        checkedAt: route.checkedAt,
+                        source: route.attribution,
+                      });
+                    return (
+                      fresh &&
+                      route.status === 'fresh' &&
+                      route.transferCount === 0 &&
+                      route.boardingCount === 1 &&
+                      route.durationSeconds <= (intent.maxMinutes ?? 15) * 60
+                    );
+                  } catch {
                     routeState = 'unavailable';
-                  routes.push({
-                    itemId: item.id,
-                    mode: 'transit',
-                    seconds:
-                      route.status === 'fresh' ? route.durationSeconds : null,
-                    status: fresh ? 'fresh' : 'unavailable',
-                    transfers:
-                      route.status === 'fresh'
-                        ? route.transferCount
-                        : undefined,
-                    doorToDoor:
-                      route.status === 'fresh' && route.boardingCount >= 1,
-                  });
-                  if (fresh)
-                    routeSources.set(`${item.id}:transit`, {
-                      seconds: route.durationSeconds,
-                      checkedAt: route.checkedAt,
-                      source: route.attribution,
-                    });
-                } catch {
-                  routeState = 'unavailable';
-                }
-              }),
-            );
+                    return false;
+                  }
+                }),
+              );
+              foundDirectRoute = batchMatches.some(Boolean);
+            }
+            if (!foundDirectRoute && shortlist.length > 10)
+              routeState = 'unavailable';
           }
         }
       }

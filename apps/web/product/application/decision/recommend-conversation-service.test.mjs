@@ -291,6 +291,110 @@ test('a verified absent direct train is distinct from a transit provider outage'
   assert.equal((await recommend.ask(request)).status, 'no_results');
   transit.status = 'unavailable';
   assert.equal((await recommend.ask(request)).status, 'unavailable');
+  transit.status = 'no_direct_route';
+  transit.checkedAt = '2026-09-29T23:00:00.000Z';
+  assert.equal((await recommend.ask(request)).status, 'unavailable');
+});
+
+test('transit search continues beyond the first nearby group when no direct route exists', async () => {
+  const candidates = Array.from({ length: 6 }, (_, index) =>
+    item(
+      `ramen-${index}`,
+      `麺 ${index}`,
+      '新宿',
+      ['ラーメン'],
+      35.691 + index * 0.001,
+    ),
+  );
+  let calls = 0;
+  let directEnabled = true;
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return candidates;
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'transit',
+          maxMinutes: 20,
+          visited: 'any',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve() {
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: '新宿駅',
+            point: { latitude: 35.69, longitude: 139.7 },
+          },
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('unexpected');
+      },
+    },
+    transitRouteProvider: {
+      async transit(_origin, destination) {
+        calls += 1;
+        return directEnabled && destination.latitude === candidates[5].latitude
+          ? {
+              status: 'fresh',
+              durationSeconds: 1100,
+              boardingCount: 1,
+              transferCount: 0,
+              lineIdentities: ['Line A'],
+              checkedAt: now,
+              attribution: {
+                label: 'Google Maps',
+                url: 'https://google.com/maps',
+              },
+            }
+          : { status: 'no_direct_route', checkedAt: now };
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const result = await recommend.ask({
+    query: '新宿駅から電車20分以内のラーメン',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'ramen-5');
+  assert.equal(calls, 6);
+  directEnabled = false;
+  candidates.push(
+    ...Array.from({ length: 5 }, (_, index) =>
+      item(
+        `ramen-${index + 6}`,
+        `麺 ${index + 6}`,
+        '新宿',
+        ['ラーメン'],
+        35.697 + index * 0.001,
+      ),
+    ),
+  );
+  calls = 0;
+  assert.equal(
+    (
+      await recommend.ask({
+        query: '新宿駅から電車20分以内のラーメン',
+        replies: [],
+      })
+    ).status,
+    'unavailable',
+  );
+  assert.equal(calls, 10);
 });
 
 test('interpreter failure stays unavailable and does not suggest unsaved restaurants', async () => {

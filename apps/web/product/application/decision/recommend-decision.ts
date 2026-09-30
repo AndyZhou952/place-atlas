@@ -52,6 +52,7 @@ export interface RecommendDecisionInput {
   readonly distances: readonly RecommendDistanceObservation[];
   readonly routeState?: 'unavailable';
   readonly entryState?: 'unknown';
+  readonly defaultNearbyFallback?: boolean;
 }
 
 export type RecommendReasonFact =
@@ -232,6 +233,10 @@ export function decideRecommend(
   }
 
   const maxSeconds = (input.intent.maxMinutes ?? 15) * 60;
+  const defaultNearbyFallback =
+    input.defaultNearbyFallback === true &&
+    input.intent.travelMode === 'walk' &&
+    input.intent.maxMinutes === 15;
   const eligible = items.flatMap((item) => {
     const route = input.routes
       .filter(
@@ -239,9 +244,13 @@ export function decideRecommend(
           candidate.itemId === item.id &&
           candidate.status === 'fresh' &&
           candidate.seconds !== null &&
-          candidate.seconds <= maxSeconds &&
+          candidate.seconds <=
+            (defaultNearbyFallback && candidate.mode === 'transit'
+              ? 20 * 60
+              : maxSeconds) &&
           (input.intent.travelMode === 'either' ||
-            candidate.mode === input.intent.travelMode) &&
+            candidate.mode === input.intent.travelMode ||
+            (defaultNearbyFallback && candidate.mode === 'transit')) &&
           (candidate.mode === 'walk' ||
             (candidate.transfers === 0 && candidate.doorToDoor === true)),
       )
@@ -287,7 +296,7 @@ export function decideRecommend(
     };
   }
 
-  if (input.intent.travelMode === 'either') {
+  if (input.intent.travelMode === 'either' || defaultNearbyFallback) {
     const fallback = items
       .flatMap((item) => {
         const meters = input.distances.find(

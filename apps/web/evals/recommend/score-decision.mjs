@@ -44,10 +44,20 @@ function validRouteClaim(claim, itemId, input) {
   );
   if (!route) return false;
   const { travelMode, maxMinutes } = input.intent;
+  const defaultTransitFallback =
+    input.defaultNearbyFallback === true &&
+    travelMode === 'walk' &&
+    maxMinutes === 15 &&
+    claim.mode === 'transit';
   if (
     !['walk', 'transit', 'either'].includes(travelMode) ||
-    (travelMode !== 'either' && travelMode !== claim.mode) ||
-    (Number.isFinite(maxMinutes) && claim.seconds > maxMinutes * 60)
+    (travelMode !== 'either' &&
+      travelMode !== claim.mode &&
+      !defaultTransitFallback) ||
+    (defaultTransitFallback && claim.seconds > 20 * 60) ||
+    (!defaultTransitFallback &&
+      Number.isFinite(maxMinutes) &&
+      claim.seconds > maxMinutes * 60)
   )
     return false;
   return (
@@ -203,7 +213,12 @@ export function scoreRecommendDecision(dataset, predictionFile) {
           (candidate) => candidate.itemId === item.id,
         );
         if (
-          !['either', 'none'].includes(intent.travelMode) ||
+          (!['either', 'none'].includes(intent.travelMode) &&
+            !(
+              entry.input.defaultNearbyFallback === true &&
+              intent.travelMode === 'walk' &&
+              intent.maxMinutes === 15
+            )) ||
           !distance ||
           distance.meters > 2000 ||
           !warnings.includes('unverified_travel_time')

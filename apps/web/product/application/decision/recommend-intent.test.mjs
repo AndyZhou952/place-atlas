@@ -106,3 +106,42 @@ test('cafe catalog tags remain eligible for an explicit coffee or cafe request',
   );
   assert.deepEqual(unrelated.foodTerms, ['sushi']);
 });
+
+test('an explicit train request near me keeps the train constraint', () => {
+  const result = normalizeRecommendIntent(
+    ['Central Stationから電車20分以内でnear meのカレー'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['curry'],
+      travelMode: 'transit',
+      maxMinutes: 20,
+    },
+  );
+  assert.equal(result.travelMode, 'transit');
+  assert.equal(result.maxMinutes, 20);
+  const withoutNumber = normalizeRecommendIntent(
+    ['Central Stationから電車でnear meのカレー'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['curry'],
+      travelMode: 'transit',
+    },
+  );
+  assert.equal(withoutNumber.travelMode, 'transit');
+  assert.equal(withoutNumber.maxMinutes, 20);
+  const unqualified = normalizeRecommendIntent(
+    ['Good curry near me'],
+    options,
+    {
+      action: 'recommend',
+      foodTerms: ['curry'],
+      travelMode: 'transit',
+    },
+  );
+  assert.equal(unqualified.travelMode, 'walk');
+  assert.equal(unqualified.maxMinutes, 15);
+});

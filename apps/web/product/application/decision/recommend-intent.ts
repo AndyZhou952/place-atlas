@@ -208,32 +208,26 @@ export function normalizeRecommendIntent(
     /(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu,
   );
   const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
+  const explicitTravelMode =
+    /徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit/iu.test(
+      original,
+    );
   const maxMinutes = numbers
     ? ({ 十: 10, 十五: 15, 二十: 20 }[
         numbers[0].match(/^十(?:五)?|^二十/u)?.[0] ?? ''
       ] ?? Number.parseInt(numbers[0], 10))
     : nearMe
-      ? 15
+      ? explicitTravelMode && travelMode === 'transit'
+        ? 20
+        : 15
       : typeof prediction.maxMinutes === 'number' &&
           Number.isFinite(prediction.maxMinutes)
         ? prediction.maxMinutes
         : null;
-  if (nearMe) travelMode = 'walk';
-  if (
-    maxMinutes === null &&
-    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit/iu.test(
-      original,
-    ) &&
-    !nearMe
-  )
+  if (nearMe && !explicitTravelMode) travelMode = 'walk';
+  if (maxMinutes === null && !explicitTravelMode && !nearMe)
     travelMode = 'none';
-  if (
-    maxMinutes !== null &&
-    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit/iu.test(
-      original,
-    ) &&
-    !nearMe
-  )
+  if (maxMinutes !== null && !explicitTravelMode && !nearMe)
     travelMode = 'none';
   const common = {
     originId,

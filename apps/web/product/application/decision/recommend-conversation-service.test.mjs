@@ -937,3 +937,200 @@ test('a full Maps place URL can supply an encoded place-name origin', async () =
   assert.equal(result.recommendations[0].itemId, 'nearby-coffee');
   assert.equal(result.recommendations[0].routeClaim, undefined);
 });
+
+test('default nearby request uses a direct train only when walking does not qualify', async () => {
+  let walkingSeconds = 600;
+  let transitCalls = 0;
+  const recommend = service(
+    [item('saved-curry', 'カレー 灯', '新宿', ['カレー'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['curry'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: walkingSeconds,
+            checkedAt: now,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+    { now: () => new Date(now) },
+    '新宿駅',
+    {
+      coverage() {
+        return 'supported';
+      },
+      async transit() {
+        transitCalls += 1;
+        return {
+          status: 'fresh',
+          durationSeconds: 1080,
+          boardingCount: 1,
+          transferCount: 0,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        };
+      },
+    },
+  );
+  const request = { query: 'Good curry near me', replies: ['新宿駅'] };
+  const walking = await recommend.ask(request);
+  assert.equal(walking.status, 'recommend');
+  assert.equal(walking.recommendations[0].routeClaim.mode, 'walk');
+  assert.equal(transitCalls, 0);
+  walkingSeconds = 960;
+  const transit = await recommend.ask(request);
+  assert.equal(transit.status, 'recommend');
+  assert.equal(transit.recommendations[0].routeClaim.mode, 'transit');
+  assert.equal(transit.recommendations[0].routeClaim.seconds, 1080);
+  assert.equal(transitCalls, 1);
+});
+
+test('default nearby distance fallback is labelled; explicit walking limit stays strict', async () => {
+  const recommend = service(
+    [
+      {
+        ...item('saved-curry', 'カレー 灯', '新宿', ['カレー'], 35.7),
+        longitude: 139.7,
+      },
+    ],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['curry'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: 960,
+            checkedAt: now,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+    { now: () => new Date(now) },
+    '新宿駅',
+    {
+      coverage() {
+        return 'unsupported_region';
+      },
+      async transit() {
+        throw new Error('Unsupported transit must not be called');
+      },
+    },
+  );
+  const nearby = await recommend.ask({
+    query: 'Good curry near me',
+    replies: ['新宿駅'],
+  });
+  assert.equal(nearby.status, 'recommend');
+  assert.equal(nearby.recommendations[0].routeClaim, undefined);
+  assert.deepEqual(nearby.warnings, ['unverified_travel_time']);
+  assert.match(nearby.recommendations[0].reason, /straight-line distance/u);
+  const strict = await recommend.ask({
+    query: '新宿駅から徒歩15分以内のcurry',
+    replies: [],
+  });
+  assert.equal(strict.status, 'no_results');
+});
+
+test('default nearby checks an unvisited train option when only a visited walk qualifies', async () => {
+  let transitCalls = 0;
+  const recommend = service(
+    [
+      {
+        ...item('visited-walk', 'カレー 歩', '新宿', ['カレー']),
+        hasVisited: true,
+      },
+      item('unvisited-train', 'カレー 電', '新宿', ['カレー'], 35.7),
+    ],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['curry'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [600, 960].map((seconds) => ({
+          status: 'fresh',
+          durationSeconds: seconds,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        }));
+      },
+    },
+    { now: () => new Date(now) },
+    '新宿駅',
+    {
+      coverage() {
+        return 'supported';
+      },
+      async transit(_origin, destination) {
+        transitCalls += 1;
+        return destination.latitude === 35.7
+          ? {
+              status: 'fresh',
+              durationSeconds: 1080,
+              boardingCount: 1,
+              transferCount: 0,
+              checkedAt: now,
+              attribution: {
+                label: 'Google Maps',
+                url: 'https://google.com/maps',
+              },
+            }
+          : { status: 'no_direct_route', checkedAt: now };
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: 'Good curry near me',
+    replies: ['新宿駅'],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'unvisited-train');
+  assert.equal(result.recommendations[0].routeClaim.mode, 'transit');
+  assert.ok(transitCalls > 0);
+});

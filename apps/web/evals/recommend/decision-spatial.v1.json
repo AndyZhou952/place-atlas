@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "datasetId": "recommend-decision-spatial-v1",
-  "kind": "synthetic-resolved-origin-distance-without-route-time",
+  "kind": "synthetic-resolved-origin-proximity-and-fallback",
   "catalog": [
     {
       "id": "near-unvisited",
@@ -73,6 +73,149 @@
         "catalogIds": ["far"],
         "routes": [],
         "distances": [{ "itemId": "far", "meters": 5000 }]
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "default-nearby-prefers-walking",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "defaultNearbyFallback": true,
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["near-unvisited"],
+        "routes": [
+          {
+            "itemId": "near-unvisited",
+            "mode": "walk",
+            "seconds": 600,
+            "status": "fresh"
+          },
+          {
+            "itemId": "near-unvisited",
+            "mode": "transit",
+            "seconds": 480,
+            "status": "fresh",
+            "transfers": 0,
+            "doorToDoor": true
+          }
+        ],
+        "distances": [{ "itemId": "near-unvisited", "meters": 900 }]
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["near-unvisited"],
+        "allowedItemIds": ["near-unvisited"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "default-nearby-direct-train-fallback",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "defaultNearbyFallback": true,
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["near-unvisited"],
+        "routes": [
+          {
+            "itemId": "near-unvisited",
+            "mode": "walk",
+            "seconds": 960,
+            "status": "fresh"
+          },
+          {
+            "itemId": "near-unvisited",
+            "mode": "transit",
+            "seconds": 1080,
+            "status": "fresh",
+            "transfers": 0,
+            "doorToDoor": true
+          }
+        ],
+        "distances": [{ "itemId": "near-unvisited", "meters": 900 }]
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["near-unvisited"],
+        "allowedItemIds": ["near-unvisited"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "default-nearby-distance-fallback",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "defaultNearbyFallback": true,
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["near-unvisited"],
+        "routes": [
+          {
+            "itemId": "near-unvisited",
+            "mode": "walk",
+            "seconds": 960,
+            "status": "fresh"
+          }
+        ],
+        "distances": [{ "itemId": "near-unvisited", "meters": 1500 }]
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["near-unvisited"],
+        "allowedItemIds": ["near-unvisited"],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "explicit-walk-limit-has-no-broader-fallback",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["near-unvisited"],
+        "routes": [
+          {
+            "itemId": "near-unvisited",
+            "mode": "walk",
+            "seconds": 960,
+            "status": "fresh"
+          },
+          {
+            "itemId": "near-unvisited",
+            "mode": "transit",
+            "seconds": 1080,
+            "status": "fresh",
+            "transfers": 0,
+            "doorToDoor": true
+          }
+        ],
+        "distances": [{ "itemId": "near-unvisited", "meters": 1500 }]
       },
       "gold": {
         "action": "no_results",

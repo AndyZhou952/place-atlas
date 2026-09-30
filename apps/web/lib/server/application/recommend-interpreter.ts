@@ -17,7 +17,7 @@ export function createRecommendInterpreter(
     ): Promise<unknown> {
       const response = await fetcher(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        redirect: 'error',
+        redirect: 'manual',
         signal: AbortSignal.timeout(20_000),
         headers: {
           'Content-Type': 'application/json',

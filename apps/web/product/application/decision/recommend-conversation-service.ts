@@ -51,6 +51,27 @@ const unavailable = (): RecommendConversationOutput => ({
   retryable: true,
 });
 
+function reportUnavailable(stage: 'catalog' | 'interpreter', error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  const reason =
+    stage === 'interpreter' &&
+    [
+      'Recommend model is not configured',
+      'Recommend model unavailable',
+      'Recommend model response too large',
+      'Recommend model response invalid',
+      'Recommend model response incomplete',
+      'Recommend model answer invalid',
+    ].includes(message)
+      ? message
+      : 'unexpected failure';
+  console.warn('Recommend unavailable', {
+    stage,
+    reason,
+    errorType: error instanceof Error ? error.name : typeof error,
+  });
+}
+
 const normalize = normalizeSearchText;
 
 function optionsFromCatalog(
@@ -81,6 +102,31 @@ function userMessages(input: RecommendConversationInput): string[] {
     input.query,
     ...input.replies.flatMap((reply) => ['Clarification answer:', reply]),
   ];
+}
+
+function addExplicitStationMentions(
+  options: RecommendOriginOption[],
+  input: RecommendConversationInput,
+): void {
+  for (const message of [input.query, ...input.replies]) {
+    const stations = message.matchAll(
+      /(?:^|[でからの\s、。])([\p{L}\p{N}・ー-]{1,60}駅)(?=$|[かまでのへ\s、。])/gu,
+    );
+    for (const match of stations) {
+      const station = match[1];
+      if (
+        options.some((option) =>
+          option.names.some((name) => normalize(name) === normalize(station)),
+        )
+      )
+        continue;
+      options.push({
+        id: `query:${station}`,
+        kind: 'station',
+        names: [station],
+      });
+    }
+  }
 }
 
 function addOriginText(
@@ -151,7 +197,7 @@ function currentRoute(
 
 function recentTimestamp(value: string, now: Date): boolean {
   const age = now.getTime() - Date.parse(value);
-  return Number.isFinite(age) && age >= 0 && age <= 5 * 60 * 1000;
+  return Number.isFinite(age) && age >= -5_000 && age <= 5 * 60 * 1000;
 }
 
 export function createRecommendConversationService(
@@ -167,14 +213,16 @@ export function createRecommendConversationService(
           (item) =>
             item.kind === 'food' && item.verificationStatus === 'verified',
         );
-      } catch {
+      } catch (error) {
+        reportUnavailable('catalog', error);
         return unavailable();
       }
       const options = optionsFromCatalog(items);
       let rawIntent: unknown;
       try {
         rawIntent = await dependencies.interpreter.interpret(input, options);
-      } catch {
+      } catch (error) {
+        reportUnavailable('interpreter', error);
         return unavailable();
       }
       if (
@@ -187,6 +235,7 @@ export function createRecommendConversationService(
         !Array.isArray((rawIntent as Record<string, unknown>).foodTerms)
       )
         return unavailable();
+      addExplicitStationMentions(options, input);
       addOriginText(options, rawIntent, input);
       const intent = normalizeRecommendIntent(
         userMessages(input),
@@ -326,7 +375,6 @@ export function createRecommendConversationService(
         relevantIds.has(item.id),
       );
       if (point && intent.travelMode !== 'none') {
-        const now = dependencies.clock.now();
         if (intent.travelMode === 'walk' || intent.travelMode === 'either') {
           try {
             const evidence = dependencies.routeProvider.walkingMany
@@ -347,10 +395,11 @@ export function createRecommendConversationService(
                 );
             evidence.forEach((route, index) => {
               const fresh =
-                currentRoute(route, now) &&
+                currentRoute(route, dependencies.clock.now()) &&
                 route.status === 'fresh' &&
                 Number.isFinite(route.durationSeconds) &&
                 route.durationSeconds >= 0;
+              if (!fresh) routeState = 'unavailable';
               routes.push({
                 itemId: routeItems[index].id,
                 mode: 'walk',
@@ -381,6 +430,10 @@ export function createRecommendConversationService(
                   distances.find((distance) => distance.itemId === item.id)
                     ?.meters ?? Infinity,
               }))
+              .filter(
+                ({ meters }) =>
+                  meters <= (intent.maxMinutes ?? 20) * 6_000 + 2_000,
+              )
               .sort(
                 (a, b) =>
                   (intent.visited === 'prefer_unvisited' && a.item.hasVisited
@@ -406,7 +459,7 @@ export function createRecommendConversationService(
                         longitude: item.longitude,
                       });
                     const fresh =
-                      currentRoute(route, now) &&
+                      currentRoute(route, dependencies.clock.now()) &&
                       route.status === 'fresh' &&
                       Number.isFinite(route.durationSeconds) &&
                       route.durationSeconds >= 0;
@@ -414,7 +467,10 @@ export function createRecommendConversationService(
                       route.status === 'unavailable' ||
                       route.status === 'stale' ||
                       (route.status === 'no_direct_route' &&
-                        !recentTimestamp(route.checkedAt, now))
+                        !recentTimestamp(
+                          route.checkedAt,
+                          dependencies.clock.now(),
+                        ))
                     )
                       routeState = 'unavailable';
                     routes.push({

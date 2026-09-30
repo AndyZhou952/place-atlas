@@ -152,7 +152,7 @@ function suggestion(
     ? `Saved ${matchedFood ?? 'restaurant'}; verified ${route.mode === 'walk' ? 'walk' : 'direct train'} route ${Math.ceil(route.seconds / 60)} min.`
     : distance !== undefined
       ? `Saved ${matchedFood ?? 'restaurant'}; ${distance} m straight-line distance, travel time unverified.`
-      : `Saved ${matchedFood ?? 'restaurant'} in ${item.area}${item.visited ? ', visited' : ', not yet visited'}.`;
+      : `Saved ${matchedFood ?? 'restaurant'} in ${input.origin.state === 'area' ? input.origin.name : item.area}${item.visited ? ', visited' : ', not yet visited'}.`;
   return {
     itemId: item.id,
     detailTargetId: item.id,

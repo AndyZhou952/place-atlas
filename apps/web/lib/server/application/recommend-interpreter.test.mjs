@@ -41,9 +41,31 @@ test('Recommend interpreter sends bounded owner request without gold labels', as
   );
   assert.equal(result.action, 'clarify');
   assert.equal(sent.url, 'https://api.deepseek.com/chat/completions');
+  assert.equal(sent.init.redirect, 'manual');
   assert.equal(sent.init.headers.Authorization, 'Bearer test-private-key');
   assert.equal(sent.init.body.includes('"gold"'), false);
   assert.equal(JSON.stringify(result).includes('test-private-key'), false);
+});
+
+test('provider redirects are not followed or treated as model answers', async () => {
+  const interpreter = createRecommendInterpreter(
+    {
+      agentApiKey: 'test-private-key',
+      agentBaseUrl: 'https://api.deepseek.com',
+      agentModel: 'deepseek-flash',
+    },
+    async (_url, init) => {
+      assert.equal(init.redirect, 'manual');
+      return new Response(null, {
+        status: 302,
+        headers: { Location: 'https://other.example/chat/completions' },
+      });
+    },
+  );
+  await assert.rejects(
+    interpreter.interpret({ query: 'sushi', replies: [] }, []),
+    /unavailable/u,
+  );
 });
 
 test('truncated model answers fail closed', async () => {

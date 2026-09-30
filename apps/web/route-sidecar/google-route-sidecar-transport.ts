@@ -115,8 +115,8 @@ export function createGoogleRouteSidecarTransport(input: {
         {
           method: 'POST',
           body: JSON.stringify({
-            origin: matrixWaypoint(request.origin),
-            destination: matrixWaypoint(request.destination),
+            origin: routeWaypoint(request.origin),
+            destination: routeWaypoint(request.destination),
             travelMode: 'TRANSIT',
             computeAlternativeRoutes: true,
             transitPreferences: {
@@ -267,12 +267,16 @@ function withApiKeyQuery(url: string, apiKey: string): string {
 
 function matrixWaypoint(point: RouteSidecarPoint) {
   return {
-    waypoint: {
-      location: {
-        latLng: {
-          latitude: point.latitude,
-          longitude: point.longitude,
-        },
+    waypoint: routeWaypoint(point),
+  };
+}
+
+function routeWaypoint(point: RouteSidecarPoint) {
+  return {
+    location: {
+      latLng: {
+        latitude: point.latitude,
+        longitude: point.longitude,
       },
     },
   };

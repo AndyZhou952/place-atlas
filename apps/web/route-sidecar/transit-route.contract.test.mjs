@@ -45,6 +45,8 @@ test('transit mapper selects a direct rail alternative and includes access walki
   assert.deepEqual(mapGoogleTransitRouteResponse({ routes: [] }), {
     directRoute: null,
   });
+  assert.deepEqual(mapGoogleTransitRouteResponse({}), { directRoute: null });
+  assert.equal(mapGoogleTransitRouteResponse({ error: 'unknown' }), undefined);
   assert.equal(
     mapGoogleTransitRouteResponse({ routes: [route([step('SUBWAY')], 'bad')] }),
     undefined,
@@ -80,7 +82,9 @@ test('transit sidecar uses one fixed endpoint and returns closed evidence', asyn
   const sent = JSON.parse(requests[0].init.body);
   assert.equal(sent.travelMode, 'TRANSIT');
   assert.equal(sent.computeAlternativeRoutes, true);
-  assert.deepEqual(sent.origin.waypoint.location.latLng, point);
+  assert.deepEqual(sent.origin.location.latLng, point);
+  assert.deepEqual(sent.destination.location.latLng, request.destination);
+  assert.equal('waypoint' in sent.origin, false);
   assert.equal(
     (await sidecar.transit({ ...request, origin: { ...point, latitude: 900 } }))
       .ok,

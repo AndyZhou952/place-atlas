@@ -18,8 +18,10 @@ interface DirectRoute {
 export function mapGoogleTransitRouteResponse(
   raw: unknown,
 ): { readonly directRoute: DirectRoute | null } | undefined {
-  if (!isRecord(raw) || !Array.isArray(raw.routes) || raw.routes.length > 4)
-    return undefined;
+  if (!isRecord(raw)) return undefined;
+  if (raw.routes === undefined && Object.keys(raw).length === 0)
+    return { directRoute: null };
+  if (!Array.isArray(raw.routes) || raw.routes.length > 4) return undefined;
   const candidates: DirectRoute[] = [];
   for (const route of raw.routes) {
     if (

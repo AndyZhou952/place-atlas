@@ -25,7 +25,12 @@ function item(id, title, area, tags, latitude = 35.67) {
   };
 }
 
-function service(items, interpreter, routeProvider = {}) {
+function service(
+  items,
+  interpreter,
+  routeProvider = {},
+  clock = { now: () => new Date(now) },
+) {
   return createRecommendConversationService({
     catalog: {
       async list() {
@@ -52,7 +57,7 @@ function service(items, interpreter, routeProvider = {}) {
       },
       ...routeProvider,
     },
-    clock: { now: () => new Date(now) },
+    clock,
   });
 }
 
@@ -82,6 +87,8 @@ test('area recommendation needs no route provider and opens the exact saved deta
   assert.equal(result.recommendations[0].itemId, 'saved-sushi');
   assert.equal(result.recommendations[0].detailTargetId, 'saved-sushi');
   assert.equal(result.recommendations[0].routeClaim, undefined);
+  assert.match(result.recommendations[0].reason, /in 銀座/u);
+  assert.doesNotMatch(result.recommendations[0].reason, /area:/u);
 });
 
 test('timed broad-area request asks for exact origin before any route call', async () => {
@@ -168,11 +175,217 @@ test('reply keeps cuisine and time constraints through geocoding and one batched
   });
 });
 
+test('a station reply overrides an earlier broad area even when the model repeats the area', async () => {
+  const recommend = service(
+    [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],
+    {
+      async interpret() {
+        return {
+          action: 'clarify',
+          originId: 'area:新宿',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 10,
+          visited: 'any',
+          clarification: 'exact_origin',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: 600,
+            distanceMeters: 800,
+            checkedAt: now,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '新宿で徒歩10分のラーメン',
+    replies: ['新宿駅'],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'saved-ramen');
+});
+
+test('a station in the first request is an exact origin even when the model repeats an area', async () => {
+  const recommend = service(
+    [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'area:新宿',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'any',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: 600,
+            distanceMeters: 800,
+            checkedAt: now,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '新宿駅から徒歩15分のラーメン',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'saved-ramen');
+});
+
+test('walking provider failure remains unavailable instead of a false empty catalog', async () => {
+  const recommend = service(
+    [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'any',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        return [{ status: 'unavailable' }];
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '新宿駅から徒歩15分のラーメン',
+    replies: [],
+  });
+  assert.equal(result.status, 'unavailable');
+});
+
+test('route timestamps created after the request began are still fresh', async () => {
+  let clockReads = 0;
+  const checkedAt = new Date(Date.parse(now) + 1_000).toISOString();
+  const recommend = service(
+    [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'any',
+        };
+      },
+    },
+    {
+      async walkingMany() {
+        clockReads = 1;
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: 600,
+            distanceMeters: 800,
+            checkedAt,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+    { now: () => new Date(Date.parse(now) + clockReads++ * 1_000) },
+  );
+  const result = await recommend.ask({
+    query: '新宿駅から徒歩15分のラーメン',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].route.checkedAt, checkedAt);
+});
+
+test('small service-clock skew is tolerated but future route evidence fails closed', async () => {
+  for (const [offsetMs, expected] of [
+    [30, 'recommend'],
+    [10_000, 'unavailable'],
+  ]) {
+    const recommend = service(
+      [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],
+      {
+        async interpret() {
+          return {
+            action: 'recommend',
+            originText: '新宿駅',
+            originKind: 'station',
+            foodTerms: ['ramen'],
+            excludedFoodTerms: [],
+            travelMode: 'walk',
+            maxMinutes: 15,
+            visited: 'any',
+          };
+        },
+      },
+      {
+        async walkingMany() {
+          return [
+            {
+              status: 'fresh',
+              durationSeconds: 600,
+              distanceMeters: 800,
+              checkedAt: new Date(Date.parse(now) + offsetMs).toISOString(),
+              attribution: {
+                label: 'Google Maps',
+                url: 'https://google.com/maps',
+              },
+            },
+          ];
+        },
+      },
+    );
+    const result = await recommend.ask({
+      query: '新宿駅から徒歩15分のラーメン',
+      replies: [],
+    });
+    assert.equal(result.status, expected);
+  }
+});
+
 test('transit routes only relevant saved candidates and returns the exact catalog name', async () => {
   const transitDestinations = [];
   const catalog = [
     item('near-sushi', '寿司 青空', '新宿', ['寿司'], 35.691),
     item('ramen', '麺 空', '新宿', ['ラーメン'], 35.7),
+    item('distant-ramen', '麺 遠', '遠方', ['ラーメン'], 40),
   ];
   const recommend = createRecommendConversationService({
     catalog: {

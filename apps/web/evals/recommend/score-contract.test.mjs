@@ -227,7 +227,7 @@ test('a default-distance answer cannot add a timed route claim', () => {
   );
   const prediction = oracle(entry);
   prediction.trace.responses[0].recommendations[0].route = {
-    mode: 'transit',
+    mode: 'drive',
     seconds: 480,
     checkedAt: '2026-09-30T00:00:00.000Z',
     source: { label: 'Google Maps', url: 'https://www.google.com/maps' },
@@ -242,7 +242,7 @@ test('a default-distance answer cannot add a timed route claim', () => {
   ]);
 });
 
-test('current journey contract rejects a transit claim on another result', () => {
+test('current journey contract rejects an unsupported route claim on another result', () => {
   const entry = dataset.cases.find(
     ({ caseId }) => caseId === 'direct-walk-canonical-route',
   );
@@ -252,7 +252,7 @@ test('current journey contract rejects a transit claim on another result', () =>
     detailTargetId: 'another-saved-place',
     name: 'Another saved place',
     reason: 'Nearby',
-    route: { mode: 'transit', seconds: 480 },
+    route: { mode: 'drive', seconds: 480 },
   });
   const report = scoreRecommendContract(
     { ...dataset, cases: [entry] },

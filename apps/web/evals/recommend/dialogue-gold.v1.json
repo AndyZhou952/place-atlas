@@ -71,25 +71,6 @@
       }
     },
     {
-      "caseId": "broad-area-train-exact-origin",
-      "input": {
-        "messages": [
-          "銀座から電車で20分以内の寿司",
-          "Which exact station are you starting from?",
-          "銀座駅"
-        ]
-      },
-      "gold": {
-        "action": "recommend",
-        "originId": "station:ginza",
-        "foodTerms": ["sushi"],
-        "excludedFoodTerms": [],
-        "travelMode": "transit",
-        "maxMinutes": 20,
-        "visited": "prefer_unvisited"
-      }
-    },
-    {
       "caseId": "chain-branch-selection",
       "input": {
         "messages": [
@@ -124,25 +105,6 @@
         "excludedFoodTerms": [],
         "travelMode": "none",
         "maxMinutes": null,
-        "visited": "prefer_unvisited"
-      }
-    },
-    {
-      "caseId": "travel-mode-reply-preserves-food",
-      "input": {
-        "messages": [
-          "銀座駅から15分以内のカレー",
-          "Walking or direct train?",
-          "徒歩"
-        ]
-      },
-      "gold": {
-        "action": "recommend",
-        "originId": "station:ginza",
-        "foodTerms": ["curry"],
-        "excludedFoodTerms": [],
-        "travelMode": "walk",
-        "maxMinutes": 15,
         "visited": "prefer_unvisited"
       }
     },

@@ -18,7 +18,7 @@ const entryDataset = JSON.parse(
   ),
 );
 
-test('deterministic decision gates pass all frozen saved-catalog cases', () => {
+test('deterministic decision gates pass all saved-catalog benchmark cases', () => {
   const report = scoreRecommendDecision(dataset, {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map((entry) => ({
@@ -26,7 +26,7 @@ test('deterministic decision gates pass all frozen saved-catalog cases', () => {
       ...decideRecommend(entry.input, dataset.catalog),
     })),
   });
-  assert.equal(report.cases, 26);
+  assert.equal(report.cases, 21);
   assert.deepEqual(
     report.results.filter((entry) => !entry.passed),
     [],

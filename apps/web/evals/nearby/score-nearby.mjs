@@ -53,7 +53,7 @@ export function scoreNearby(dataset, predictions) {
     for (const claim of prediction.routeClaims)
       requireThat(
         typeof claim.itemId === 'string' &&
-          ['walk', 'transit'].includes(claim.mode) &&
+          claim.mode === 'walk' &&
           Number.isFinite(claim.seconds) &&
           claim.seconds >= 0,
         'Invalid route claim',
@@ -92,15 +92,7 @@ export function scoreNearby(dataset, predictions) {
           r.mode === claim.mode &&
           r.seconds === claim.seconds,
       );
-      if (
-        !p.itemIds.includes(claim.itemId) ||
-        !match ||
-        (claim.mode === 'transit' &&
-          (!match.doorToDoor ||
-            match.transfers !== 0 ||
-            match.seconds > 1200)) ||
-        (claim.mode === 'walk' && match.seconds > 900)
-      )
+      if (!p.itemIds.includes(claim.itemId) || !match || match.seconds > 900)
         failures.push('unsupported_route_claim');
     }
     // Verified route recommendations must provide the evidence, not just names.

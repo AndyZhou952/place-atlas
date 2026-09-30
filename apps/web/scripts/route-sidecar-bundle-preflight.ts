@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 const allowedUrls = [
   'https://maps.googleapis.com/maps/api/geocode/json',
   'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
+  'https://routes.googleapis.com/directions/v2:computeRoutes',
   'https://www.google.com/maps',
 ] as const;
 
@@ -13,14 +14,10 @@ export function inspectRouteSidecarBundle(source: string): {
   readonly blockers: readonly string[];
 } {
   const blockers: string[] = [];
-  if (
-    /foursquare|transit|computeRoutes|directions\/v2|google-fixed-endpoint-transport/iu.test(
-      source,
-    )
-  ) {
+  if (/foursquare|google-fixed-endpoint-transport/iu.test(source)) {
     blockers.push('forbidden_provider_capability');
   }
-  if (!source.includes(allowedUrls[0]) || !source.includes(allowedUrls[1])) {
+  if (allowedUrls.slice(0, 3).some((url) => !source.includes(url))) {
     blockers.push('required_fixed_endpoint_missing');
   }
   const withoutAllowedUrls = allowedUrls.reduce(

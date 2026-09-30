@@ -28,6 +28,10 @@ export { OwnerAuthenticationRequiredError } from './public-read-client.ts';
 import { publishOwnerLoginRequired } from './owner-session-client.ts';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation.ts';
 import type {
+  RecommendConversationInput,
+  RecommendConversationOutput,
+} from '../../product/application/decision/recommend-conversation.ts';
+import type {
   AddErrorCode,
   CatalogIntakeCancelInput,
   CatalogIntakeCancelOutput,
@@ -105,10 +109,6 @@ interface BrowserOperationMap {
     };
     readonly output: VisitMediaRecord;
   };
-  readonly 'media.score': {
-    readonly input: { readonly id: string; readonly score: number | null };
-    readonly output: VisitMediaRecord;
-  };
   readonly 'media.delete': {
     readonly input: { readonly id: string };
     readonly output: { readonly deleted: true };
@@ -131,6 +131,10 @@ interface BrowserOperationMap {
   readonly 'nearby.recommend': {
     readonly input: { readonly locationHint: string };
     readonly output: NearbyRecommendResult;
+  };
+  readonly 'recommend.ask': {
+    readonly input: RecommendConversationInput;
+    readonly output: RecommendConversationOutput;
   };
   readonly 'catalog.intake.discover': {
     readonly input: CatalogIntakeDiscoverInput;
@@ -303,16 +307,6 @@ export function createBrowserAtlasApplication(
           body: JSON.stringify({ caption: caption || null }),
         },
       ),
-    'media.score': ({ id, score }, mutationId) =>
-      requestMutationJson(
-        transport,
-        browserOperationPath('media.score', { id }),
-        mutationId,
-        {
-          method: browserOperationHttpCatalog['media.score'].method,
-          body: JSON.stringify({ score }),
-        },
-      ),
     'media.delete': ({ id }, mutationId) =>
       requestMutationJson(
         transport,
@@ -341,6 +335,11 @@ export function createBrowserAtlasApplication(
         `${browserOperationPath('nearby.recommend')}?${search.toString()}`,
       );
     },
+    'recommend.ask': (input) =>
+      requestJson(transport, browserOperationPath('recommend.ask'), {
+        method: browserOperationHttpCatalog['recommend.ask'].method,
+        body: JSON.stringify(input),
+      }),
     'catalog.intake.discover': (input) =>
       requestCatalogIntakeJson(
         transport,

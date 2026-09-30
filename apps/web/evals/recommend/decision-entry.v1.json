@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-entry-extension-v1",
+  "kind": "synthetic-saved-booking-rules-not-live-availability",
+  "catalog": [
+    {
+      "id": "saved-walk-in",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "Cafe A",
+      "area": "area-a",
+      "address": "Fixture address A",
+      "tags": ["coffee"],
+      "visited": true,
+      "walkIn": "known"
+    },
+    {
+      "id": "saved-unknown",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "Cafe B",
+      "area": "area-a",
+      "address": "Fixture address B",
+      "tags": ["coffee"],
+      "visited": false,
+      "walkIn": "unknown"
+    },
+    {
+      "id": "saved-advance",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "Cafe C",
+      "area": "area-a",
+      "address": "Fixture address C",
+      "tags": ["coffee"],
+      "visited": false,
+      "walkIn": "excluded"
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "known-rule-preferred-over-unvisited-unknown",
+      "input": {
+        "intent": {
+          "foodTerms": ["coffee"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited",
+          "askWalkIn": true
+        },
+        "origin": { "state": "area", "id": "area-a", "name": "Area A" },
+        "catalogIds": ["saved-walk-in", "saved-unknown", "saved-advance"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["saved-walk-in"],
+        "allowedItemIds": ["saved-walk-in", "saved-unknown"],
+        "requiredWarnings": ["walk_in_unknown", "current_availability_unknown"]
+      }
+    },
+    {
+      "caseId": "unknown-rule-is-labelled-fallback",
+      "input": {
+        "intent": {
+          "foodTerms": ["coffee"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited",
+          "askWalkIn": true
+        },
+        "origin": { "state": "area", "id": "area-a", "name": "Area A" },
+        "catalogIds": ["saved-unknown", "saved-advance"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["saved-unknown"],
+        "allowedItemIds": ["saved-unknown"],
+        "requiredWarnings": ["walk_in_unknown", "current_availability_unknown"]
+      }
+    },
+    {
+      "caseId": "known-advance-rule-does-not-satisfy-walk-in-request",
+      "input": {
+        "intent": {
+          "foodTerms": ["coffee"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited",
+          "askWalkIn": true
+        },
+        "origin": { "state": "area", "id": "area-a", "name": "Area A" },
+        "catalogIds": ["saved-advance"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "ordinary-recommendation-keeps-existing-order",
+      "input": {
+        "intent": {
+          "foodTerms": ["coffee"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "area-a", "name": "Area A" },
+        "catalogIds": ["saved-walk-in", "saved-unknown", "saved-advance"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["saved-unknown", "saved-advance"],
+        "allowedItemIds": ["saved-walk-in", "saved-unknown", "saved-advance"],
+        "requiredWarnings": []
+      }
+    }
+  ]
+}

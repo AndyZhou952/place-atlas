@@ -2141,7 +2141,7 @@ const allowedUiModelTypeExpressions: Readonly<
     "Omit<CorePlaceAssessmentPatch,'manualVisited'>&EffectiveVisitedPatch",
   VisitRecord: 'CoreVisit',
   VisitMediaRecord:
-    "Pick<CoreVisitMedia,|'id'|'visitId'|'itemId'|'originalFilename'|'contentType'|'caption'|'score'|'displayOrder'|'contentUrl'>",
+    "Pick<CoreVisitMedia,|'id'|'visitId'|'itemId'|'originalFilename'|'contentType'|'caption'|'displayOrder'|'contentUrl'>",
   NewVisit: 'CoreNewVisit',
   VisitUpdate: "Omit<CoreVisitUpdate,'id'>",
   VisitCreateResult: 'CoreVisitMutationResult',

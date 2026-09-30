@@ -45,5 +45,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        run: npm run build
+      - name: Build owner website
+        run: npm run build:owner-poc
+
+      - name: Bundle route sidecar
+        run: npm run build:route-sidecar

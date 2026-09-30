@@ -79,6 +79,59 @@ test('Nearby uses verified food, live walking routes, a 15-minute hard filter, a
   assert.equal(result.value.resolvedLocation, '東京都中央区銀座');
 });
 
+test('Nearby uses the batch route capability without changing the ranked result', async () => {
+  const items = [
+    item('slow', 1, { durationSeconds: 901 }),
+    item('eligible', 2, { durationSeconds: 600 }),
+    item('visited', 3, { durationSeconds: 120, hasVisited: true }),
+  ];
+  let matrixCalls = 0;
+  const nearby = createNearbyRecommendation({
+    clock: { now: () => new Date('2026-09-13T12:02:00.000Z') },
+    routeEvidenceMaximumAgeMs: 5 * 60 * 1000,
+    catalog: {
+      async list() {
+        return items;
+      },
+    },
+    locationResolver: {
+      async resolve() {
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: 'Origin',
+            point: { latitude: 35.67, longitude: 139.76 },
+          },
+          attribution: googleAttribution,
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('single-destination route must not be called');
+      },
+      async walkingMany(_origin, destinations) {
+        matrixCalls += 1;
+        assert.equal(destinations.length, 3);
+        return items.map((candidate) => ({
+          status: 'fresh',
+          durationSeconds: candidate.testDurationSeconds,
+          distanceMeters: 700,
+          checkedAt: '2026-09-13T12:00:00.000Z',
+          attribution: googleAttribution,
+        }));
+      },
+    },
+  });
+  const result = await nearby.execute({ locationHint: 'Origin' });
+  assert.equal(result.ok, true);
+  assert.equal(matrixCalls, 1);
+  assert.deepEqual(
+    result.value.recommendations.map(({ itemId }) => itemId),
+    ['eligible', 'visited'],
+  );
+});
+
 const googleAttribution = {
   label: 'Google Maps',
   url: 'https://developers.google.com/maps/documentation',

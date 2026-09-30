@@ -108,10 +108,6 @@ export interface NearbyRecommendOperationDependencies extends NearbyRecommendati
   readonly nearbyRecommendation?: NearbyRecommendation;
 }
 
-/** @deprecated Use NearbyRecommendOperationDependencies. */
-export type AgentNearbyOperationDependencies =
-  NearbyRecommendOperationDependencies;
-
 export type NearbyRecommendOperationDefinition = OperationDefinition<
   'nearby.recommend',
   NearbyRecommendInput,
@@ -122,10 +118,6 @@ export type NearbyRecommendOperationDefinition = OperationDefinition<
 export type NearbyRecommendApplicationDefinitions = {
   readonly 'nearby.recommend': NearbyRecommendOperationDefinition;
 };
-
-/** @deprecated Use NearbyRecommendApplicationDefinitions. */
-export type AgentNearbyApplicationDefinitions =
-  NearbyRecommendApplicationDefinitions;
 
 export function createNearbyRecommendationOperationGroup(
   dependencies: NearbyRecommendOperationDependencies,

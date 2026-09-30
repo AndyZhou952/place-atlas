@@ -13,27 +13,23 @@ const transportUrl = new URL(
   import.meta.url,
 );
 
-void test('the Sidecar source graph contains only geocoding and walking Matrix capabilities', async () => {
+void test('the Sidecar source graph contains only the approved Google route capabilities', async () => {
   const source = `${await readFile(serviceUrl, 'utf8')}\n${await readFile(transportUrl, 'utf8')}`;
-  assert.doesNotMatch(
-    source,
-    /foursquare|transit|computeRoutes|directions\/v2|google-fixed-endpoint-transport/iu,
-  );
+  assert.doesNotMatch(source, /foursquare|google-fixed-endpoint-transport/iu);
   assert.deepEqual(inspectRouteSidecarBundle(source), {
     ready: true,
     blockers: [],
   });
 });
 
-void test('bundle preflight rejects Transit, Foursquare, shared transport, and every unexpected endpoint', () => {
+void test('bundle preflight rejects unapproved providers and unexpected endpoints', () => {
   const base = [
     'https://maps.googleapis.com/maps/api/geocode/json',
     'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
+    'https://routes.googleapis.com/directions/v2:computeRoutes',
     'https://www.google.com/maps',
   ].join('\n');
   for (const forbidden of [
-    'TRANSIT',
-    'https://routes.googleapis.com/directions/v2:computeRoutes',
     'Foursquare',
     'google-fixed-endpoint-transport',
     'https://example.com/unexpected',

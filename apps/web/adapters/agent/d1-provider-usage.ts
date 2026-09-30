@@ -3,6 +3,7 @@ import type { ProviderUsagePort } from '../../product/provider-policy/provider-p
 export type ProviderUsageSku =
   | 'geocoding.requests'
   | 'walking_matrix.elements'
+  | 'transit_routes.requests'
   | 'places.search_text.requests'
   | 'places.details.requests'
   | 'places.details_rating.requests';

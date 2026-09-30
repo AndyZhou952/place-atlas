@@ -71,6 +71,10 @@ export interface RouteProvider {
     origin: GeoPoint,
     destination: GeoPoint,
   ): Promise<WalkingRouteEvidence>;
+  walkingMany?(
+    origin: GeoPoint,
+    destinations: readonly GeoPoint[],
+  ): Promise<readonly WalkingRouteEvidence[]>;
 }
 
 export type TransitRouteEvidence =
@@ -92,9 +96,16 @@ export type TransitRouteEvidence =
   | {
       readonly status: 'unavailable';
       readonly warning: string;
+      readonly reason?: 'unsupported_region';
+    }
+  | {
+      readonly status: 'no_direct_route';
+      readonly checkedAt: string;
+      readonly attribution: ProviderAttribution;
     };
 
 export interface TransitRouteProvider {
+  coverage?(origin: GeoPoint): 'supported' | 'unsupported_region';
   transit(
     origin: GeoPoint,
     destination: GeoPoint,

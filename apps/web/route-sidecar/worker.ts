@@ -5,6 +5,8 @@ import {
   type RouteSidecarGeocodeResult,
   type RouteSidecarWalkingMatrixRequest,
   type RouteSidecarWalkingMatrixResult,
+  type RouteSidecarTransitRequest,
+  type RouteSidecarTransitResult,
 } from './route-sidecar-contract.ts';
 import { createGoogleRouteSidecarService } from './route-sidecar-service.ts';
 import { createOperationalNearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
@@ -30,6 +32,12 @@ export default class RouteSidecarWorker extends WorkerEntrypoint<RouteSidecarEnv
     request: RouteSidecarWalkingMatrixRequest,
   ): Promise<RouteSidecarWalkingMatrixResult> {
     return this.#service().walkingMatrix(request);
+  }
+
+  transit(
+    request: RouteSidecarTransitRequest,
+  ): Promise<RouteSidecarTransitResult> {
+    return this.#service().transit(request);
   }
 
   #service() {

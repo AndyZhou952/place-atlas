@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-entry-intent-v1",
+  "kind": "production-intent-guard-extension",
+  "cases": [
+    {
+      "caseId": "hyphenated-walk-in-is-entry",
+      "query": "中目黒で walk-in coffee",
+      "options": [{ "id": "area:中目黒", "kind": "area", "names": ["中目黒"] }],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "area:中目黒",
+        "foodTerms": ["coffee"],
+        "travelMode": "walk"
+      },
+      "expected": {
+        "askWalkIn": true,
+        "action": "recommend",
+        "travelMode": "none",
+        "maxMinutes": null
+      }
+    },
+    {
+      "caseId": "walk-in-ten-minutes-is-travel",
+      "query": "Find coffee I can walk in 10 minutes from 新宿駅",
+      "options": [
+        { "id": "station:新宿", "kind": "station", "names": ["新宿駅"] }
+      ],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "station:新宿",
+        "foodTerms": ["coffee"],
+        "travelMode": "none"
+      },
+      "expected": {
+        "askWalkIn": false,
+        "action": "recommend",
+        "travelMode": "walk",
+        "maxMinutes": 10
+      }
+    },
+    {
+      "caseId": "can-i-walk-in-is-entry",
+      "query": "Can I walk in to a cafe in 新宿?",
+      "options": [{ "id": "area:新宿", "kind": "area", "names": ["新宿"] }],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "area:新宿",
+        "foodTerms": ["cafe"],
+        "travelMode": "walk"
+      },
+      "expected": {
+        "askWalkIn": true,
+        "action": "recommend",
+        "travelMode": "none",
+        "maxMinutes": null
+      }
+    },
+    {
+      "caseId": "japanese-no-reservation-is-entry",
+      "query": "新宿で予約なしで入れるカフェ",
+      "options": [{ "id": "area:新宿", "kind": "area", "names": ["新宿"] }],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "area:新宿",
+        "foodTerms": ["cafe"],
+        "travelMode": "none"
+      },
+      "expected": {
+        "askWalkIn": true,
+        "action": "recommend",
+        "travelMode": "none",
+        "maxMinutes": null
+      }
+    },
+    {
+      "caseId": "japanese-ten-minute-walk-is-travel",
+      "query": "新宿駅から徒歩10分以内のカフェ",
+      "options": [
+        { "id": "station:新宿", "kind": "station", "names": ["新宿駅"] }
+      ],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "station:新宿",
+        "foodTerms": ["cafe"],
+        "travelMode": "none"
+      },
+      "expected": {
+        "askWalkIn": false,
+        "action": "recommend",
+        "travelMode": "walk",
+        "maxMinutes": 10
+      }
+    }
+  ]
+}

@@ -9,7 +9,13 @@ export async function updateVisitMediaCaptionResponse(
   id: string,
   input: unknown,
 ): Promise<Response> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    !Object.prototype.hasOwnProperty.call(input, 'caption') ||
+    Object.keys(input).some((key) => key !== 'caption')
+  ) {
     return new Response('Caption must be text.', { status: 400 });
   }
   const caption = Reflect.get(input, 'caption');
@@ -29,44 +35,6 @@ export async function updateVisitMediaCaptionResponse(
       invalidInput: 'Caption must be text.',
       notFound: 'Photo not found',
       dependencyFailure: 'The photo caption could not be updated.',
-    },
-  });
-}
-
-export async function updateVisitMediaScoreResponse(
-  coordinator: InvocationCoordinator,
-  request: Request,
-  id: string,
-  input: unknown,
-): Promise<Response> {
-  if (
-    !input ||
-    typeof input !== 'object' ||
-    Array.isArray(input) ||
-    !Object.prototype.hasOwnProperty.call(input, 'score') ||
-    Object.keys(input).some((key) => key !== 'score')
-  ) {
-    return new Response('Media score must be from 0 to 5.', { status: 400 });
-  }
-  const score = Reflect.get(input, 'score');
-  if (
-    score !== null &&
-    (typeof score !== 'number' ||
-      !Number.isFinite(score) ||
-      score < 0 ||
-      score > 5)
-  ) {
-    return new Response('Media score must be from 0 to 5.', { status: 400 });
-  }
-  return ownerMutationResponse({
-    coordinator,
-    request,
-    operation: 'media.score',
-    operationInput: { id, score },
-    errors: {
-      invalidInput: 'Media score must be from 0 to 5.',
-      notFound: 'Media not found',
-      dependencyFailure: 'The media score could not be updated.',
     },
   });
 }

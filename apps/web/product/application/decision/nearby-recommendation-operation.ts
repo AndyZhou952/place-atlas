@@ -54,8 +54,25 @@ export function createNearbyRecommendation({
         );
       }
 
+      let matrixRoutes: readonly WalkingRouteEvidence[] | undefined;
+      if (routeProvider.walkingMany) {
+        try {
+          matrixRoutes = await routeProvider.walkingMany(
+            resolution.location.point,
+            candidates.map((item) => ({
+              latitude: item.latitude,
+              longitude: item.longitude,
+            })),
+          );
+        } catch {
+          matrixRoutes = candidates.map(() => ({
+            status: 'unavailable' as const,
+            warning: 'Walking route is temporarily unavailable.',
+          }));
+        }
+      }
       const evaluated = await Promise.all(
-        candidates.map(async (item) => {
+        candidates.map(async (item, index) => {
           const straightLineDistanceKm = distanceInKm(
             resolution.location.point,
             {
@@ -64,11 +81,17 @@ export function createNearbyRecommendation({
             },
           );
           try {
+            const evidence = matrixRoutes
+              ? (matrixRoutes[index] ?? {
+                  status: 'unavailable' as const,
+                  warning: 'Walking route is unavailable.',
+                })
+              : await routeProvider.walking(resolution.location.point, {
+                  latitude: item.latitude,
+                  longitude: item.longitude,
+                });
             const route = normalizeWalkingRoute(
-              await routeProvider.walking(resolution.location.point, {
-                latitude: item.latitude,
-                longitude: item.longitude,
-              }),
+              evidence,
               clock.now(),
               routeEvidenceMaximumAgeMs,
             );

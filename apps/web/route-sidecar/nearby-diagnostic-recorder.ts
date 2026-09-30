@@ -1,8 +1,8 @@
 export type NearbyDiagnosticEvent =
   | {
       readonly layer: 'sidecar_transport';
-      readonly operation: 'geocoding' | 'walking_matrix';
-      readonly endpoint: 'geocoding' | 'walking_matrix';
+      readonly operation: 'geocoding' | 'walking_matrix' | 'transit';
+      readonly endpoint: 'geocoding' | 'walking_matrix' | 'transit';
       readonly resultClass:
         | 'not_configured'
         | 'credential_rejected'
@@ -15,10 +15,17 @@ export type NearbyDiagnosticEvent =
     }
   | {
       readonly layer: 'owner_metering';
-      readonly operation: 'geocoding' | 'walking_matrix';
+      readonly operation: 'geocoding' | 'walking_matrix' | 'transit';
       readonly endpoint: 'route_sidecar_binding';
-      readonly sku: 'geocoding.requests' | 'walking_matrix.elements';
-      readonly resultClass: 'binding_missing' | 'quota_exhausted' | 'reserved';
+      readonly sku:
+        | 'geocoding.requests'
+        | 'walking_matrix.elements'
+        | 'transit_routes.requests';
+      readonly resultClass:
+        | 'binding_missing'
+        | 'quota_exhausted'
+        | 'unsupported_region'
+        | 'reserved';
       readonly quotaDecision: 'not_checked' | 'rejected' | 'reserved';
     };
 

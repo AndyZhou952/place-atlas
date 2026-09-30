@@ -7,6 +7,30 @@ import {
 } from './atlas-api-client.ts';
 import { subscribeOwnerLoginRequired } from './owner-session-client.ts';
 
+test('Recommend browser operation sends the original query and follow-up answers together', async () => {
+  let request;
+  const application = createBrowserAtlasApplication({
+    async request(url, init) {
+      request = { url, init };
+      return Response.json({
+        status: 'no_results',
+        message: 'No saved match.',
+      });
+    },
+  });
+  const result = await application.execute({
+    key: 'recommend.ask',
+    input: { query: '新宿で焼き鳥', replies: ['新宿駅'] },
+  });
+  assert.equal(result.status, 'no_results');
+  assert.equal(request.url, '/api/recommend');
+  assert.equal(request.init.method, 'POST');
+  assert.deepEqual(JSON.parse(request.init.body), {
+    query: '新宿で焼き鳥',
+    replies: ['新宿駅'],
+  });
+});
+
 test('Browser AtlasApplication maps typed operations through an injected transport', async () => {
   const calls = [];
   const item = {
@@ -286,10 +310,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     input: { id: 'media / 1', caption: null },
   });
   await application.execute({
-    key: 'media.score',
-    input: { id: 'media / 1', score: 4.2 },
-  });
-  await application.execute({
     key: 'media.delete',
     input: { id: 'media / 1' },
   });
@@ -352,11 +372,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       url: '/api/media/media%20%2F%201',
       method: 'PATCH',
       body: { caption: null },
-    },
-    {
-      url: '/api/media/media%20%2F%201',
-      method: 'PATCH',
-      body: { score: 4.2 },
     },
     {
       url: '/api/media/media%20%2F%201',

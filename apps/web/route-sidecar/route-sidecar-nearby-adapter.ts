@@ -1,8 +1,11 @@
 import type {
   LocationResolver,
   RouteProvider,
+  TransitRouteProvider,
 } from '../product/application/decision/nearby-recommendation.ts';
 import type { GoogleRouteSidecarPort } from './route-sidecar-contract.ts';
+import { ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS } from './route-sidecar-contract.ts';
+import { isJapanTransitArea } from './transit-coverage.ts';
 
 const policyVersion = 'google-route-sidecar-v1';
 
@@ -11,6 +14,7 @@ export function createRouteSidecarNearbyAdapter(
 ): {
   readonly locationResolver: LocationResolver;
   readonly routeProvider: RouteProvider;
+  readonly transitRouteProvider: TransitRouteProvider;
 } {
   return {
     locationResolver: {
@@ -59,38 +63,103 @@ export function createRouteSidecarNearbyAdapter(
     },
     routeProvider: {
       async walking(origin, destination) {
+        return (await this.walkingMany!(origin, [destination]))[0];
+      },
+      async walkingMany(origin, destinations) {
+        const routes = [];
+        for (
+          let offset = 0;
+          offset < destinations.length;
+          offset += ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS
+        ) {
+          const batch = destinations.slice(
+            offset,
+            offset + ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS,
+          );
+          let result;
+          try {
+            result = await sidecar.walkingMatrix({
+              origin,
+              destinations: batch,
+            });
+          } catch {
+            routes.push(...batch.map(() => unavailableWalkingRoute()));
+            continue;
+          }
+          if (!result.ok) {
+            routes.push(...batch.map(() => unavailableWalkingRoute()));
+            continue;
+          }
+          for (let index = 0; index < batch.length; index += 1) {
+            const route = result.evidence.routes.find(
+              ({ destinationIndex }) => destinationIndex === index,
+            );
+            routes.push(
+              route &&
+                route.durationSeconds !== null &&
+                route.distanceMeters !== null
+                ? {
+                    status: 'fresh' as const,
+                    durationSeconds: route.durationSeconds,
+                    distanceMeters: route.distanceMeters,
+                    checkedAt: result.evidence.checkedAt,
+                    attribution: result.evidence.attribution,
+                  }
+                : {
+                    status: 'unavailable' as const,
+                    warning: 'Walking route is unavailable.',
+                  },
+            );
+          }
+        }
+        return routes;
+      },
+    },
+    transitRouteProvider: {
+      coverage(origin) {
+        return isJapanTransitArea(origin) ? 'unsupported_region' : 'supported';
+      },
+      async transit(origin, destination) {
         let result;
         try {
-          result = await sidecar.walkingMatrix({
-            origin,
-            destinations: [destination],
-          });
+          result = await sidecar.transit({ origin, destination });
         } catch {
-          return unavailableWalkingRoute();
+          return unavailableTransitRoute();
         }
-        if (!result.ok) return unavailableWalkingRoute();
-        const route = result.evidence.routes.find(
-          ({ destinationIndex }) => destinationIndex === 0,
-        );
-        if (
-          !route ||
-          route.durationSeconds === null ||
-          route.distanceMeters === null
-        ) {
+        if (!result.ok)
+          return result.error === 'unsupported_region'
+            ? {
+                status: 'unavailable',
+                reason: 'unsupported_region',
+                warning:
+                  'Japan train routes are unavailable from this provider.',
+              }
+            : unavailableTransitRoute();
+        const { evidence } = result;
+        if (!evidence.directRoute)
           return {
-            status: 'unavailable',
-            warning: 'Walking route is unavailable.',
+            status: 'no_direct_route',
+            checkedAt: evidence.checkedAt,
+            attribution: evidence.attribution,
           };
-        }
         return {
           status: 'fresh',
-          durationSeconds: route.durationSeconds,
-          distanceMeters: route.distanceMeters,
-          checkedAt: result.evidence.checkedAt,
-          attribution: result.evidence.attribution,
+          durationSeconds: evidence.directRoute.durationSeconds,
+          boardingCount: 1,
+          lineIdentities: [evidence.directRoute.lineIdentity],
+          transferCount: 0,
+          checkedAt: evidence.checkedAt,
+          attribution: evidence.attribution,
         };
       },
     },
+  };
+}
+
+function unavailableTransitRoute() {
+  return {
+    status: 'unavailable' as const,
+    warning: 'Transit route is temporarily unavailable.',
   };
 }
 

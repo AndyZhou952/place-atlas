@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-app-contract-v1",
+  "kind": "owner-authenticated-browser-and-api-contract",
+  "api": "POST /api/recommend",
+  "cases": [
+    {
+      "caseId": "one-turn-saved-detail",
+      "query": "銀座の寿司",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-sushi",
+        "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "origin-free-text-continuation",
+      "query": "新宿で徒歩10分以内の焼き鳥",
+      "answers": ["新宿三丁目駅"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "exact_origin",
+        "itemId": "saved-yakitori",
+        "detailTargetId": "saved-yakitori",
+        "name": "焼鳥 まる",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "branch-choice-continuation",
+      "query": "喫茶 みずき",
+      "answers": ["新宿店"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "branch",
+        "itemId": "saved-coffee",
+        "detailTargetId": "saved-coffee",
+        "name": "喫茶 みずき 新宿店",
+        "address": "Fixture address: Shinjuku branch",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "travel-mode-choice-continuation",
+      "query": "銀座駅から15分以内のカレー",
+      "answers": ["徒歩"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "travel_mode",
+        "itemId": "saved-curry",
+        "detailTargetId": "saved-curry",
+        "name": "カレー 灯",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "insufficient-answer-asks-again",
+      "query": "新宿から徒歩10分の焼き鳥",
+      "answers": ["新宿あたり"],
+      "expected": {
+        "status": "clarify",
+        "firstStatus": "clarify",
+        "clarification": "exact_origin"
+      }
+    },
+    {
+      "caseId": "provider-failure-retry",
+      "query": "銀座駅から徒歩10分の寿司",
+      "answers": [],
+      "expected": { "status": "unavailable", "retryKeepsDraft": true }
+    },
+    {
+      "caseId": "empty-catalog",
+      "query": "銀座の寿司",
+      "answers": [],
+      "expected": { "status": "no_results", "noUnsavedSuggestions": true }
+    },
+    {
+      "caseId": "keyboard-question-reply",
+      "query": "徒歩10分でラーメン",
+      "answers": ["銀座駅"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "origin",
+        "itemId": "saved-ramen",
+        "detailTargetId": "saved-ramen",
+        "name": "麺 そら",
+        "reasonRequired": true,
+        "keyboardSubmit": true
+      }
+    },
+    {
+      "caseId": "reset-discards-prior-constraints",
+      "query": "新宿から徒歩10分の焼き鳥",
+      "answers": ["銀座で寿司を探して"],
+      "expected": {
+        "status": "recommend",
+        "resetBeforeAnswer": true,
+        "itemId": "saved-sushi",
+        "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "multilingual-alias-canonical-name",
+      "query": "Find sushi near Ginza",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-sushi",
+        "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "direct-train-canonical-route",
+      "query": "新宿駅から電車20分以内のラーメン",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-ramen",
+        "detailTargetId": "saved-ramen",
+        "name": "麺 そら",
+        "reasonRequired": true,
+        "routeMode": "transit",
+        "maxRouteSeconds": 1200
+      }
+    },
+    {
+      "caseId": "japan-transit-unsupported-with-saved-cafe",
+      "query": "銀座駅から電車20分以内のコーヒー",
+      "answers": [],
+      "expected": {
+        "status": "unavailable",
+        "retryable": false,
+        "messageIncludes": "Train route times in Japan are unavailable"
+      }
+    },
+    {
+      "caseId": "ambiguous-station-choice-continues",
+      "query": "Good curry near me",
+      "answers": ["大久保駅", "Ōkubo Station, Shinjuku, Tokyo"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "origin",
+        "secondStatus": "clarify",
+        "secondClarification": "origin_choice",
+        "choiceHint": "大久保駅",
+        "choiceId": "Ōkubo Station, Shinjuku, Tokyo",
+        "itemId": "saved-curry",
+        "detailTargetId": "saved-curry",
+        "name": "カレー 灯",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "pasted-street-address-overrides-catalog-area",
+      "query": "東京都新宿区新宿3丁目38-1",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-cafe",
+        "detailTargetId": "saved-cafe",
+        "name": "喫茶 みずき 新宿店",
+        "reasonRequired": true,
+        "reasonIncludes": "straight-line distance",
+        "warningIncludes": "unverified_travel_time"
+      }
+    }
+  ]
+}

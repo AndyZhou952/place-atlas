@@ -33,17 +33,26 @@ export function OwnerAccessButton({
       variant="outline"
       type="button"
       aria-controls={panelId}
+      aria-label={
+        state.pending === 'status'
+          ? 'Checking…'
+          : state.authenticated
+            ? 'Owner active'
+            : 'Owner login'
+      }
       aria-expanded={state.expanded}
       aria-busy={state.pending !== null}
       disabled={state.pending !== null}
       onClick={owner.toggle}
     >
       <KeyRound data-icon="inline-start" aria-hidden="true" />
-      {state.pending === 'status'
-        ? 'Checking…'
-        : state.authenticated
-          ? 'Owner active'
-          : 'Owner login'}
+      <span className="header-action-label">
+        {state.pending === 'status'
+          ? 'Checking…'
+          : state.authenticated
+            ? 'Owner active'
+            : 'Owner login'}
+      </span>
     </Button>
   );
 }

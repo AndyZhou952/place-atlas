@@ -15,7 +15,6 @@ import {
   type PublicDisplayAccess,
   unavailablePublicDisplayAccess,
 } from '../public-display/public-display-access.ts';
-import { normalizeAssessmentRating } from '../assessments/assessment-rating.ts';
 
 export interface VisitMediaUpload {
   readonly id?: string;
@@ -33,12 +32,6 @@ export interface AttachVisitMediaInput {
 export interface UpdateVisitMediaCaptionInput {
   readonly id: string;
   readonly caption?: string | null;
-}
-
-export interface UpdateVisitMediaScoreInput {
-  readonly id: string;
-  /** null clears a prior media score without changing the place score. */
-  readonly score: number | null;
 }
 
 export interface DeleteVisitMediaOutput {
@@ -330,52 +323,6 @@ export function createMediaOperationGroup(
     },
   };
 
-  const updateVisitMediaScore: OperationDefinition<
-    'media.score',
-    UpdateVisitMediaScoreInput,
-    VisitMedia,
-    'json'
-  > = {
-    descriptor: {
-      key: 'media.score',
-      resultKind: 'json',
-      effect: 'write',
-      validate: validateScoreInput,
-    },
-    async handle({ id, score: value }, execution) {
-      let score: number | undefined;
-      try {
-        score = value === null ? undefined : normalizeAssessmentRating(value);
-      } catch {
-        return failure('invalid_input', 'Media score must be from 0 to 5.');
-      }
-      try {
-        const directRecord = await state.find(id);
-        const displayRecord = directRecord
-          ? undefined
-          : await state.findByDisplayId(id);
-        const current = directRecord ?? displayRecord;
-        if (!current) return failure('not_found', 'Media not found.');
-        const updatedAt = dependencies.clock.now();
-        const output = toVisitMedia({ ...current, score, updatedAt });
-        const metadata = await state.updateScore(
-          current.id,
-          score,
-          updatedAt,
-          execution?.atomicMutation?.receiptFor(output),
-        );
-        return metadata
-          ? success(output)
-          : failure('not_found', 'Media not found.');
-      } catch {
-        return failure(
-          'dependency_failure',
-          'The media score could not be updated.',
-        );
-      }
-    },
-  };
-
   const deleteVisitMedia: OperationDefinition<
     'media.delete',
     { readonly id: string },
@@ -432,7 +379,6 @@ export function createMediaOperationGroup(
     'media.openDisplay': openDisplayMedia,
     'media.attach': attachVisitMedia,
     'media.caption': updateVisitMediaCaption,
-    'media.score': updateVisitMediaScore,
     'media.delete': deleteVisitMedia,
   });
 }
@@ -493,28 +439,6 @@ function validateCaptionInput(
     return failure('invalid_input', 'Caption must be text.');
   }
   return success({ id, caption });
-}
-
-function validateScoreInput(
-  input: unknown,
-): Result<UpdateVisitMediaScoreInput> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return failure('invalid_input', 'Media score must be from 0 to 5.');
-  }
-  const id = Reflect.get(input, 'id');
-  const score = Reflect.get(input, 'score');
-  if (
-    typeof id !== 'string' ||
-    !id ||
-    (score !== null &&
-      (typeof score !== 'number' ||
-        !Number.isFinite(score) ||
-        score < 0 ||
-        score > 5))
-  ) {
-    return failure('invalid_input', 'Media score must be from 0 to 5.');
-  }
-  return success({ id, score });
 }
 
 function assertAllowedMedia(contentType: string, bytes: Uint8Array): void {

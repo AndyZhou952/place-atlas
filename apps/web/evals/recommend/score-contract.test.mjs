@@ -30,6 +30,7 @@ function oracle(entry) {
               itemId: expected.itemId,
               detailTargetId: expected.detailTargetId,
               name: expected.name,
+              ...(expected.address ? { address: expected.address } : {}),
               reason: expected.routeEstimateBasis
                 ? 'Saved restaurant; estimated direct train route.'
                 : 'Matches your saved catalog and stated request.',
@@ -143,6 +144,20 @@ test('a model-style display name cannot pass even with a valid saved ID', () => 
     { datasetId: dataset.datasetId, predictions: [prediction] },
   );
   assert.deepEqual(report.results[0].failures, ['wrong_canonical_name']);
+});
+
+test('an exact display name cannot hide the wrong saved branch address', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'branch-choice-continuation',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses.at(-1).recommendations[0].address =
+    'Fixture address: another branch';
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['wrong_saved_address']);
 });
 
 test('lost query context and wrong detail click fail separately', () => {

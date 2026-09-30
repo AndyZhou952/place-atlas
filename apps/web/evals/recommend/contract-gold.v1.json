@@ -41,6 +41,7 @@
         "itemId": "saved-coffee",
         "detailTargetId": "saved-coffee",
         "name": "喫茶 みずき 新宿店",
+        "address": "Fixture address: Shinjuku branch",
         "reasonRequired": true
       }
     },

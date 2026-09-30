@@ -6,10 +6,10 @@ import { createGoogleRouteSidecarService } from './route-sidecar-service.ts';
 import { createMeteredRouteSidecarClient } from './metered-route-sidecar-client.ts';
 import { createRouteSidecarNearbyAdapter } from './route-sidecar-nearby-adapter.ts';
 
-const point = { latitude: 35.67, longitude: 139.76 };
+const point = { latitude: 38.72, longitude: -9.14 };
 const request = {
   origin: point,
-  destination: { latitude: 35.69, longitude: 139.71 },
+  destination: { latitude: 38.73, longitude: -9.15 },
 };
 const step = (type, name = 'Metro') => ({
   travelMode: 'TRANSIT',
@@ -150,4 +150,40 @@ test('transit RPC reserves a bounded estimated budget before egress', async () =
     destination: { ...point, longitude: 200 },
   });
   assert.equal(calls, 1);
+});
+
+test('Japan transit requests fail before route-provider egress or quota reservation', async () => {
+  let calls = 0;
+  let reservations = 0;
+  const japanRequest = {
+    origin: { latitude: 35.67, longitude: 139.76 },
+    destination: { latitude: 35.69, longitude: 139.71 },
+  };
+  const sidecar = createGoogleRouteSidecarService({
+    apiKey: 'test-only-key',
+    clock: () => new Date('2026-09-30T00:00:00.000Z'),
+    fetch: async () => {
+      calls += 1;
+      return Response.json({});
+    },
+  });
+  const client = createMeteredRouteSidecarClient({
+    usage: {
+      async reserve() {
+        reservations += 1;
+        return 'reserved';
+      },
+    },
+    service: sidecar,
+  });
+  assert.deepEqual(await sidecar.transit(japanRequest), {
+    ok: false,
+    error: 'unsupported_region',
+  });
+  assert.deepEqual(await client.transit(japanRequest), {
+    ok: false,
+    error: 'unsupported_region',
+  });
+  assert.equal(calls, 0);
+  assert.equal(reservations, 0);
 });

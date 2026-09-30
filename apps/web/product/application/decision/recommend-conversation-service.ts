@@ -51,6 +51,13 @@ const unavailable = (): RecommendConversationOutput => ({
   retryable: true,
 });
 
+const unsupportedJapanTrain = (): RecommendConversationOutput => ({
+  status: 'unavailable',
+  message:
+    'Train route times in Japan are unavailable from the current provider. Try walking or remove the travel-time limit.',
+  retryable: false,
+});
+
 function reportUnavailable(stage: 'catalog' | 'interpreter', error: unknown) {
   const message = error instanceof Error ? error.message : '';
   const reason =
@@ -386,6 +393,14 @@ export function createRecommendConversationService(
       const routeItems = eligibleItems.filter((item) =>
         relevantIds.has(item.id),
       );
+      const transitUnsupported =
+        point !== undefined &&
+        routeItems.length > 0 &&
+        (intent.travelMode === 'transit' || intent.travelMode === 'either') &&
+        dependencies.transitRouteProvider?.coverage?.(point) ===
+          'unsupported_region';
+      if (transitUnsupported && intent.travelMode === 'transit')
+        return unsupportedJapanTrain();
       if (point && intent.travelMode !== 'none') {
         if (intent.travelMode === 'walk' || intent.travelMode === 'either') {
           try {
@@ -433,7 +448,8 @@ export function createRecommendConversationService(
           }
         }
         if (intent.travelMode === 'transit' || intent.travelMode === 'either') {
-          if (!dependencies.transitRouteProvider) routeState = 'unavailable';
+          if (transitUnsupported || !dependencies.transitRouteProvider)
+            routeState = 'unavailable';
           else {
             const shortlist = routeItems
               .map((item) => ({
@@ -549,7 +565,8 @@ export function createRecommendConversationService(
           clarification: 'origin',
           question: decision.question ?? 'Which starting point?',
         };
-      if (decision.action === 'unavailable') return unavailable();
+      if (decision.action === 'unavailable')
+        return transitUnsupported ? unsupportedJapanTrain() : unavailable();
       if (decision.action === 'no_results')
         return {
           status: 'no_results',

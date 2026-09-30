@@ -5,6 +5,7 @@ import type {
 } from '../product/application/decision/nearby-recommendation.ts';
 import type { GoogleRouteSidecarPort } from './route-sidecar-contract.ts';
 import { ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS } from './route-sidecar-contract.ts';
+import { isJapanTransitArea } from './transit-coverage.ts';
 
 const policyVersion = 'google-route-sidecar-v1';
 
@@ -115,6 +116,9 @@ export function createRouteSidecarNearbyAdapter(
       },
     },
     transitRouteProvider: {
+      coverage(origin) {
+        return isJapanTransitArea(origin) ? 'unsupported_region' : 'supported';
+      },
       async transit(origin, destination) {
         let result;
         try {
@@ -122,7 +126,15 @@ export function createRouteSidecarNearbyAdapter(
         } catch {
           return unavailableTransitRoute();
         }
-        if (!result.ok) return unavailableTransitRoute();
+        if (!result.ok)
+          return result.error === 'unsupported_region'
+            ? {
+                status: 'unavailable',
+                reason: 'unsupported_region',
+                warning:
+                  'Japan train routes are unavailable from this provider.',
+              }
+            : unavailableTransitRoute();
         const { evidence } = result;
         if (!evidence.directRoute)
           return {

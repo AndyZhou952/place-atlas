@@ -7,6 +7,7 @@ import {
   type RouteSidecarFailure,
   type RouteSidecarWalkingMatrixResult,
 } from './route-sidecar-contract.ts';
+import { isJapanTransitArea } from './transit-coverage.ts';
 import {
   noOpNearbyDiagnosticRecorder,
   type NearbyDiagnosticRecorder,
@@ -89,6 +90,22 @@ export function createMeteredRouteSidecarClient({
       );
     },
     async transit(request) {
+      if (!isRouteSidecarTransitRequest(request))
+        return failure('invalid_request');
+      if (
+        isJapanTransitArea(request.origin) ||
+        isJapanTransitArea(request.destination)
+      ) {
+        diagnosticRecorder.record({
+          layer: 'owner_metering',
+          operation: 'transit',
+          endpoint: 'route_sidecar_binding',
+          sku: 'transit_routes.requests',
+          resultClass: 'unsupported_region',
+          quotaDecision: 'not_checked',
+        });
+        return failure('unsupported_region');
+      }
       if (!service) {
         recordBindingMissing(
           diagnosticRecorder,
@@ -97,8 +114,6 @@ export function createMeteredRouteSidecarClient({
         );
         return failure('not_configured');
       }
-      if (!isRouteSidecarTransitRequest(request))
-        return failure('invalid_request');
       return reserveThenCall(
         usage,
         diagnosticRecorder,

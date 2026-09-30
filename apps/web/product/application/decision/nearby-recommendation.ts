@@ -96,6 +96,7 @@ export type TransitRouteEvidence =
   | {
       readonly status: 'unavailable';
       readonly warning: string;
+      readonly reason?: 'unsupported_region';
     }
   | {
       readonly status: 'no_direct_route';
@@ -104,6 +105,7 @@ export type TransitRouteEvidence =
     };
 
 export interface TransitRouteProvider {
+  coverage?(origin: GeoPoint): 'supported' | 'unsupported_region';
   transit(
     origin: GeoPoint,
     destination: GeoPoint,

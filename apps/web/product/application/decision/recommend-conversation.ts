@@ -51,7 +51,7 @@ export type RecommendConversationOutput =
   | {
       readonly status: 'unavailable';
       readonly message: string;
-      readonly retryable: true;
+      readonly retryable: boolean;
     };
 
 export function parseRecommendConversationInput(

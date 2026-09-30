@@ -29,7 +29,7 @@ const foodAliases: Readonly<Record<string, readonly string[]>> = {
   curry: ['curry', 'カレー', '咖喱', '咖哩'],
   yakitori: ['yakitori', '焼き鳥', '焼鳥', 'やきとり', '烧鸟'],
   beef_tongue: ['beef_tongue', 'beef tongue', '牛タン', '牛たん', '牛舌'],
-  coffee: ['coffee', 'コーヒー', '咖啡'],
+  coffee: ['coffee', 'コーヒー', '咖啡', 'cafe', 'café', 'カフェ', '喫茶店'],
 };
 
 function normalized(value: string): string {
@@ -191,7 +191,8 @@ export function normalizeRecommendIntent(
     : rawFood.filter(
         (term) =>
           !excludedFoodTerms.includes(term) &&
-          (term !== 'coffee' || /coffee|コーヒー|咖啡/iu.test(original)),
+          (term !== 'coffee' ||
+            /coffee|コーヒー|咖啡|caf[eé]|カフェ|喫茶店/iu.test(original)),
       );
   let travelMode: RecommendIntent['travelMode'] =
     /徒歩|歩いて|歩行|步行|走路|\bwalk/iu.test(original)

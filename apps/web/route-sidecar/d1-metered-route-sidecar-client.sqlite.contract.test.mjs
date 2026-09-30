@@ -160,8 +160,8 @@ void test('D1 transit cap blocks the 251st paid request before provider egress',
     },
   });
   const request = {
-    origin: { latitude: 35.67, longitude: 139.76 },
-    destination: { latitude: 35.69, longitude: 139.7 },
+    origin: { latitude: 38.72, longitude: -9.14 },
+    destination: { latitude: 38.73, longitude: -9.15 },
   };
   assert.equal((await client.transit(request)).ok, true);
   assert.deepEqual(await client.transit(request), {

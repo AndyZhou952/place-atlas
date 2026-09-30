@@ -318,6 +318,94 @@ test('an English station in the production-style catalog overrides a model area'
   assert.equal(nearResult.status, 'no_results');
 });
 
+test('a coffee request routes a saved cafe category without routing unrelated food', async () => {
+  let transitCalls = 0;
+  const recommend = service(
+    [
+      item('saved-cafe', 'Saved Coffee Roaster', '六本木・東京', ['カフェ']),
+      item('saved-ramen', '麺 空', '銀座・東京', ['ラーメン']),
+    ],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'area:銀座',
+          foodTerms: ['coffee'],
+          excludedFoodTerms: [],
+          travelMode: 'transit',
+          maxMinutes: 20,
+          visited: 'any',
+        };
+      },
+    },
+    {},
+    { now: () => new Date(now) },
+    '銀座駅',
+    {
+      async transit() {
+        transitCalls += 1;
+        return {
+          status: 'fresh',
+          durationSeconds: 1080,
+          boardingCount: 1,
+          transferCount: 0,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        };
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '銀座駅から電車20分以内のコーヒー',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(transitCalls, 1);
+  assert.equal(result.recommendations[0].itemId, 'saved-cafe');
+  assert.equal(result.recommendations[0].route.seconds, 1080);
+});
+
+test('unsupported Japan train coverage returns an honest answer without a paid route call', async () => {
+  let transitCalls = 0;
+  const recommend = service(
+    [item('saved-cafe', 'Saved Coffee Roaster', '六本木・東京', ['カフェ'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '銀座駅',
+          originKind: 'station',
+          foodTerms: ['coffee'],
+          excludedFoodTerms: [],
+          travelMode: 'transit',
+          maxMinutes: 20,
+          visited: 'any',
+        };
+      },
+    },
+    {},
+    { now: () => new Date(now) },
+    '銀座駅',
+    {
+      coverage() {
+        return 'unsupported_region';
+      },
+      async transit() {
+        transitCalls += 1;
+        throw new Error('Unsupported train route must not be requested');
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '銀座駅から電車20分以内のコーヒー',
+    replies: [],
+  });
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.retryable, false);
+  assert.match(result.message, /Japan/u);
+  assert.equal(transitCalls, 0);
+});
+
 test('walking provider failure remains unavailable instead of a false empty catalog', async () => {
   const recommend = service(
     [item('saved-ramen', '麺 空', '新宿・東京', ['ラーメン'])],

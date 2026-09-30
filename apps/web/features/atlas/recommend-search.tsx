@@ -174,13 +174,15 @@ export function RecommendSearch({
       {result?.status === 'unavailable' ? (
         <div className="nearby-state" role="alert">
           <strong>{result.message}</strong>
-          <Button
-            type="button"
-            onClick={() => active && void ask(active)}
-            disabled={busy || !active}
-          >
-            Retry
-          </Button>
+          {result.retryable ? (
+            <Button
+              type="button"
+              onClick={() => active && void ask(active)}
+              disabled={busy || !active}
+            >
+              Retry
+            </Button>
+          ) : null}
         </div>
       ) : null}
       {result?.status === 'no_results' ? (

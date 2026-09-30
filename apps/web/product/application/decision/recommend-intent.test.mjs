@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { normalizeRecommendIntent } from './recommend-intent.ts';
+import {
+  normalizeRecommendFoodTerm,
+  normalizeRecommendIntent,
+} from './recommend-intent.ts';
 
 const options = [
   { id: 'area:central', kind: 'area', names: ['中央'] },
@@ -71,4 +74,35 @@ test('user-facing clarification text and codes cannot be supplied by the model',
   assert.equal(result.action, 'clarify');
   assert.equal(result.clarification, 'origin');
   assert.equal(result.question, 'What starting point should I use?');
+});
+
+test('cafe catalog tags remain eligible for an explicit coffee or cafe request', () => {
+  assert.equal(normalizeRecommendFoodTerm('カフェ'), 'coffee');
+  assert.equal(normalizeRecommendFoodTerm('喫茶店'), 'coffee');
+  assert.equal(normalizeRecommendFoodTerm('café'), 'coffee');
+  const result = normalizeRecommendIntent(
+    ['中央駅から電車20分以内のカフェ'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['coffee'],
+      travelMode: 'transit',
+      maxMinutes: 20,
+    },
+  );
+  assert.equal(result.action, 'recommend');
+  assert.deepEqual(result.foodTerms, ['coffee']);
+  const unrelated = normalizeRecommendIntent(
+    ['中央駅から電車20分以内の寿司'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['coffee', 'sushi'],
+      travelMode: 'transit',
+      maxMinutes: 20,
+    },
+  );
+  assert.deepEqual(unrelated.foodTerms, ['sushi']);
 });

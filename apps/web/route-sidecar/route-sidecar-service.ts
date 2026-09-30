@@ -19,6 +19,7 @@ import {
   type RouteSidecarTransitResult,
 } from './route-sidecar-contract.ts';
 import type { NearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
+import { isJapanTransitArea } from './transit-coverage.ts';
 
 export interface GoogleRouteSidecarServiceOptions {
   readonly apiKey: string | undefined;
@@ -64,6 +65,11 @@ export function createGoogleRouteSidecarService({
     async transit(request): Promise<RouteSidecarTransitResult> {
       if (!isRouteSidecarTransitRequest(request))
         return failure('invalid_request');
+      if (
+        isJapanTransitArea(request.origin) ||
+        isJapanTransitArea(request.destination)
+      )
+        return failure('unsupported_region');
       const response = await transport.transit(request);
       if (response.status !== 200) return transportFailure(response.status);
       const evidence = mapTransitEvidence(response.body, clock());

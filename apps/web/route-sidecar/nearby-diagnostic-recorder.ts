@@ -21,7 +21,11 @@ export type NearbyDiagnosticEvent =
         | 'geocoding.requests'
         | 'walking_matrix.elements'
         | 'transit_routes.requests';
-      readonly resultClass: 'binding_missing' | 'quota_exhausted' | 'reserved';
+      readonly resultClass:
+        | 'binding_missing'
+        | 'quota_exhausted'
+        | 'unsupported_region'
+        | 'reserved';
       readonly quotaDecision: 'not_checked' | 'rejected' | 'reserved';
     };
 

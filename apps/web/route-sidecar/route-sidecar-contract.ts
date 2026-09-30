@@ -71,6 +71,7 @@ export type RouteSidecarFailure = {
   readonly error:
     | 'invalid_request'
     | 'not_configured'
+    | 'unsupported_region'
     | 'dependency_failure'
     | 'quota_exceeded';
 };

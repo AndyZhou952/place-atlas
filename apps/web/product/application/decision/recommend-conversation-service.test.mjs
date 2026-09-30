@@ -1226,3 +1226,69 @@ test('an ambiguous origin choice continues from its verified candidate rather th
   });
   assert.equal(undisclosed.status, 'clarify');
 });
+
+test('a pasted street address overrides a shorter catalog area in production-style options', async () => {
+  const address = '東京都新宿区新宿3丁目38-1';
+  let geocodes = 0;
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return [
+          {
+            ...item('saved-cafe', '喫茶 灯', '新宿区新宿', ['カフェ'], 35.691),
+            longitude: 139.703,
+          },
+        ];
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'area:新宿区新宿',
+          foodTerms: [],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'any',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve(hint) {
+        assert.equal(hint, address);
+        geocodes += 1;
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: address,
+            point: { latitude: 35.69, longitude: 139.7 },
+          },
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('No timed route requested');
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const result = await recommend.ask({ query: address, replies: [] });
+  assert.equal(geocodes, 1);
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'saved-cafe');
+  assert.match(result.recommendations[0].reason, /straight-line distance/u);
+  assert.deepEqual(result.warnings, ['unverified_travel_time']);
+  const postal = await recommend.ask({
+    query: `〒160-0022 ${address}`,
+    replies: [],
+  });
+  assert.equal(postal.status, 'recommend');
+  const maps = await recommend.ask({
+    query: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+    replies: [],
+  });
+  assert.equal(maps.status, 'recommend');
+  assert.equal(geocodes, 3);
+});

@@ -48,7 +48,9 @@ function oracle(entry) {
               ...(expected.address ? { address: expected.address } : {}),
               reason: expected.routeEstimateBasis
                 ? 'Saved restaurant; estimated direct train route.'
-                : 'Matches your saved catalog and stated request.',
+                : expected.reasonIncludes
+                  ? `Saved restaurant; ${expected.reasonIncludes} from your origin.`
+                  : 'Matches your saved catalog and stated request.',
               ...(expected.routeMode
                 ? {
                     route: {
@@ -69,6 +71,9 @@ function oracle(entry) {
                 : {}),
             },
           ],
+          ...(expected.warningIncludes
+            ? { warnings: [expected.warningIncludes] }
+            : {}),
         }
       : expected.status === 'clarify'
         ? {
@@ -111,8 +116,26 @@ test('all browser and API contract cases have a valid oracle trace', () => {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 14);
+  assert.equal(report.cases, 15);
   assert.equal(report.casePassRate, 1);
+});
+
+test('a copied street address cannot silently become a broad-area answer', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'pasted-street-address-overrides-catalog-area',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0].recommendations[0].reason =
+    'Saved restaurant in the matching area.';
+  delete prediction.trace.responses[0].warnings;
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, [
+    'missing_distance_evidence',
+    'missing_uncertainty_warning',
+  ]);
 });
 
 test('a Japan average route cannot pass as a precise train-time claim', () => {

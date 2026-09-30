@@ -157,6 +157,51 @@ function addExplicitStationMentions(
   }
 }
 
+function addExplicitAddressMentions(
+  options: RecommendOriginOption[],
+  input: RecommendConversationInput,
+): void {
+  for (const message of [input.query, ...input.replies]) {
+    let address = message.trim();
+    try {
+      const url = new URL(address);
+      if (
+        !['www.google.com', 'google.com', 'maps.google.com'].includes(
+          url.hostname,
+        ) ||
+        !url.pathname.startsWith('/maps/')
+      )
+        continue;
+      address =
+        url.searchParams.get('query') ??
+        url.searchParams.get('q') ??
+        decodeURIComponent(url.pathname.replace(/^\/maps\/place\//u, ''));
+    } catch {
+      if (/^https?:\/\//iu.test(address)) continue;
+    }
+    address = address
+      .replace(/^〒?\d{3}-?\d{4}\s*/u, '')
+      .replace(/(?:の近く|から|付近|周辺).*$/u, '')
+      .trim();
+    if (
+      address.length < 10 ||
+      address.length > 180 ||
+      !/^(?:北海道|東京都|大阪府|京都府|[\p{Script=Han}]{2,3}県).+\d/u.test(
+        address,
+      ) ||
+      options.some((option) =>
+        option.names.some((name) => normalize(name) === normalize(address)),
+      )
+    )
+      continue;
+    options.push({
+      id: `query:${address}`,
+      kind: 'address',
+      names: [address],
+    });
+  }
+}
+
 function addOriginText(
   options: RecommendOriginOption[],
   raw: unknown,
@@ -275,6 +320,7 @@ export function createRecommendConversationService(
       )
         return unavailable();
       addExplicitStationMentions(options, input);
+      addExplicitAddressMentions(options, input);
       addOriginText(options, rawIntent, input);
       const intent = normalizeRecommendIntent(
         userMessages(input),

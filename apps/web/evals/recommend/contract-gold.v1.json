@@ -180,6 +180,20 @@
         "name": "カレー 灯",
         "reasonRequired": true
       }
+    },
+    {
+      "caseId": "pasted-street-address-overrides-catalog-area",
+      "query": "東京都新宿区新宿3丁目38-1",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-cafe",
+        "detailTargetId": "saved-cafe",
+        "name": "喫茶 みずき 新宿店",
+        "reasonRequired": true,
+        "reasonIncludes": "straight-line distance",
+        "warningIncludes": "unverified_travel_time"
+      }
     }
   ]
 }

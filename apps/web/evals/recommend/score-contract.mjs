@@ -126,6 +126,16 @@ export function scoreRecommendContract(dataset, predictionFile) {
           !recommendation.reason.trim())
       )
         failures.push('missing_reason');
+      if (
+        expected.reasonIncludes &&
+        !recommendation?.reason?.includes(expected.reasonIncludes)
+      )
+        failures.push('missing_distance_evidence');
+      if (
+        expected.warningIncludes &&
+        !final?.warnings?.includes(expected.warningIncludes)
+      )
+        failures.push('missing_uncertainty_warning');
       if (expected.routeMode) {
         const route = recommendation?.route;
         if (

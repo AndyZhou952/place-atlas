@@ -51,7 +51,25 @@ interface AtlasWebMcpToolDependencies extends AtlasWebMcpUiActions {
   readonly getCurrentCoordinates: () => Promise<Coordinates | undefined>;
 }
 
-export function useAtlasWebMcp(actions: AtlasWebMcpUiActions): void {
+const publicToolNames = new Set([
+  'list_atlas_items',
+  'focus_atlas_item',
+  'list_visit_media',
+]);
+
+export function toolsForOwnerState(
+  tools: readonly ModelContextTool[],
+  canEdit: boolean,
+): readonly ModelContextTool[] {
+  return canEdit
+    ? tools
+    : tools.filter((tool) => publicToolNames.has(tool.name));
+}
+
+export function useAtlasWebMcp(
+  actions: AtlasWebMcpUiActions,
+  canEdit: boolean,
+): void {
   useEffect(() => {
     const context = document.modelContext;
     if (!context?.registerTool) return;
@@ -62,13 +80,13 @@ export function useAtlasWebMcp(actions: AtlasWebMcpUiActions): void {
       selectItem: actions.selectItem,
       getCurrentCoordinates: readBrowserCoordinates,
     });
-    for (const tool of tools) {
+    for (const tool of toolsForOwnerState(tools, canEdit)) {
       void Promise.resolve(
         context.registerTool(tool, { signal: lifecycle.signal }),
       ).catch(() => undefined);
     }
     return () => lifecycle.abort();
-  }, [actions]);
+  }, [actions, canEdit]);
 }
 
 export function createAtlasWebMcpTools({

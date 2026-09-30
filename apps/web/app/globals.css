@@ -2754,6 +2754,10 @@ button.personal-rating-inline:focus-visible {
   gap: 1rem;
 }
 
+.journal-grid.is-read-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .single-workspace [data-slot='card'] {
   border-color: var(--line);
   background: rgb(251 248 241 / 85%);

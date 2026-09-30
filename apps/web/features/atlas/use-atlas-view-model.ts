@@ -26,7 +26,7 @@ import type { NearbyRecommendResult } from '../../product/application/decision/a
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
 
-export function useAtlasViewModel() {
+export function useAtlasViewModel(canEdit: boolean) {
   const [view, setView] = useState<AtlasView>('map');
   const [state, dispatch] = useReducer(
     reduceAtlasViewModelState,
@@ -672,7 +672,7 @@ export function useAtlasViewModel() {
     ],
   );
 
-  useAtlasWebMcp(webMcpActions);
+  useAtlasWebMcp(webMcpActions, canEdit);
 
   return {
     addVisit,

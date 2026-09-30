@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createAtlasWebMcpTools } from './use-atlas-webmcp.ts';
+import {
+  createAtlasWebMcpTools,
+  toolsForOwnerState,
+} from './use-atlas-webmcp.ts';
 
 const item = {
   id: 'place-1',
@@ -213,6 +216,15 @@ test('WebMCP keeps the existing tool names, input schemas, and annotations', () 
       ),
     ],
   );
+});
+
+test('anonymous WebMCP exposes only public catalog, focus, and media reads', () => {
+  const { tools } = createTools();
+  assert.deepEqual(
+    toolsForOwnerState(tools, false).map((tool) => tool.name),
+    ['list_atlas_items', 'focus_atlas_item', 'list_visit_media'],
+  );
+  assert.deepEqual(toolsForOwnerState(tools, true), tools);
 });
 
 test('persistent WebMCP tools execute Browser AtlasApplication operations instead of cached actions', async () => {

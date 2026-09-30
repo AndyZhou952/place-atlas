@@ -1144,6 +1144,32 @@ function canonicalListingUrl(value: string): string | undefined {
 
 export { researchRegion } from '../product/application/catalog/research-region.ts';
 
+function normalizeJapaneseBlockNumerals(value: string): string {
+  const digits: Record<string, number> = {
+    一: 1,
+    二: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+  };
+  return value.replace(
+    /([一二三四五六七八九十]+)丁目/gu,
+    (whole, numeral: string) => {
+      const ten = numeral.indexOf('十');
+      const number =
+        ten < 0
+          ? digits[numeral]
+          : (ten === 0 ? 1 : digits[numeral.slice(0, ten)]) * 10 +
+            (ten === numeral.length - 1 ? 0 : digits[numeral.slice(ten + 1)]);
+      return number && number <= 99 ? `${number}丁目` : whole;
+    },
+  );
+}
+
 export function initialResearchQuery(subject: {
   readonly transientName: string;
   readonly transientAddress: string;
@@ -1151,6 +1177,17 @@ export function initialResearchQuery(subject: {
 }): string {
   const name = subject.transientName.slice(0, 200).trim();
   const ownerHint = subject.ownerQuery.slice(0, 160).trim();
+  const plainName = (value: string) =>
+    value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[\p{P}\p{Z}\s]/gu, '');
+  const comparableName = (value: string) =>
+    plainName(normalizeJapaneseBlockNumerals(value));
+  const equivalentOwnerName =
+    ownerHint &&
+    plainName(name) !== plainName(ownerHint) &&
+    comparableName(name) === comparableName(ownerHint);
   const addressHint = subject.transientAddress
     .normalize('NFKC')
     .toLowerCase()
@@ -1158,8 +1195,12 @@ export function initialResearchQuery(subject: {
     .replace(/[\s‐‑‒–—−ー]/gu, '-')
     .replace(/-+/gu, '-')
     .match(/\d{1,4}-\d{1,4}-\d{1,4}/u)?.[0];
-  const parts = [name];
-  if (ownerHint && !name.toLowerCase().includes(ownerHint.toLowerCase())) {
+  const parts = [equivalentOwnerName ? ownerHint : name];
+  if (
+    ownerHint &&
+    !equivalentOwnerName &&
+    !name.toLowerCase().includes(ownerHint.toLowerCase())
+  ) {
     parts.push(ownerHint);
   }
   if (addressHint && !parts.some((part) => part.includes(addressHint))) {
@@ -1240,7 +1281,7 @@ function matchesSelectedBranch(
   sourceName?: string,
 ): boolean {
   const normalize = (value: string) =>
-    value
+    normalizeJapaneseBlockNumerals(value)
       .normalize('NFKC')
       .toLowerCase()
       // Normalize equivalent kana spellings across sources. Whole-name and

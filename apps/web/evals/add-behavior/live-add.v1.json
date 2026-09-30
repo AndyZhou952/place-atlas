@@ -91,6 +91,16 @@
       "expectedReservationMode": "reservable",
       "expectedCategoryIncludes": "牛タン",
       "expectedSavedDuplicate": true
+    },
+    {
+      "id": "center-beef-shinjuku-sanchome",
+      "query": "ステーキライスとカレーの店 センタービーフ 新宿三丁目店",
+      "candidateNameIncludes": "センタービーフ",
+      "expectedTitleIncludes": "センタービーフ 新宿三丁目店",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13295399/",
+      "expectedReservationMode": "not_reservable",
+      "expectedCategoryIncludes": "カレー",
+      "expectedSavedDuplicate": false
     }
   ]
 }

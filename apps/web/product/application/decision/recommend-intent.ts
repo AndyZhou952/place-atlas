@@ -137,6 +137,9 @@ export function normalizeRecommendIntent(
       ? (raw as Record<string, unknown>)
       : {};
   const original = queryText(messages);
+  const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
+  const explicitDriving =
+    /\bdriv(?:e|ing)\b|\bby car\b|自驾|驾车|开车|開車|車で/iu.test(original);
   const map = safeMapQuery(original);
   const text = map.text;
   const latest = messages.at(-1) ?? original;
@@ -158,7 +161,7 @@ export function normalizeRecommendIntent(
         normalized(name).startsWith(normalized(messages[0])) &&
         normalized(name).includes(normalized(latest)),
     );
-  const originId = branchReply
+  const proposedOriginId = branchReply
     ? modelOrigin.id
     : originIds.length === 1
       ? originIds[0]
@@ -166,6 +169,8 @@ export function normalizeRecommendIntent(
           optionById.has(prediction.originId)
         ? prediction.originId
         : null;
+  const originId =
+    nearMe && originIds.length === 0 && !branchReply ? null : proposedOriginId;
   const explicitVisited = /まだ行ってない|没去过|未去过|not\s+visited/iu.test(
     original,
   )
@@ -209,7 +214,6 @@ export function normalizeRecommendIntent(
   const numbers = original.match(
     /(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu,
   );
-  const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
   const explicitTravelMode =
     /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|\bwalk in\s+\d+\s*min(?:ute)?s?\b|電車|电车|\btrain|\btransit/iu.test(
       original,
@@ -218,19 +222,16 @@ export function normalizeRecommendIntent(
     ? ({ 十: 10, 十五: 15, 二十: 20 }[
         numbers[0].match(/^十(?:五)?|^二十/u)?.[0] ?? ''
       ] ?? Number.parseInt(numbers[0], 10))
-    : nearMe
-      ? explicitTravelMode && travelMode === 'transit'
+    : explicitTravelMode && nearMe
+      ? travelMode === 'transit'
         ? 20
         : 15
-      : typeof prediction.maxMinutes === 'number' &&
+      : explicitTravelMode &&
+          typeof prediction.maxMinutes === 'number' &&
           Number.isFinite(prediction.maxMinutes)
         ? prediction.maxMinutes
         : null;
-  if (nearMe && !explicitTravelMode) travelMode = 'walk';
-  if (maxMinutes === null && !explicitTravelMode && !nearMe)
-    travelMode = 'none';
-  if (maxMinutes !== null && !explicitTravelMode && !nearMe)
-    travelMode = 'none';
+  if (!explicitTravelMode) travelMode = 'none';
   const common = {
     originId,
     foodTerms,
@@ -254,6 +255,12 @@ export function normalizeRecommendIntent(
       ...common,
       originId: null,
       reason: 'untrusted_url',
+    };
+  if (explicitDriving)
+    return {
+      action: 'unsupported',
+      ...common,
+      reason: 'driving_route_unavailable',
     };
   if (map.status === 'short')
     return clarify(
@@ -284,6 +291,8 @@ export function normalizeRecommendIntent(
       };
   }
   const originKind = originId ? optionById.get(originId)?.kind : undefined;
+  if (nearMe && !originId)
+    return clarify('origin', 'Where are you starting from?');
   if (originKind === 'area' && travelMode !== 'none')
     return clarify('exact_origin', 'Which exact starting point in this area?');
   if (maxMinutes !== null && travelMode === 'none')

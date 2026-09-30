@@ -939,11 +939,16 @@ test('a full Maps place URL can supply an encoded place-name origin', async () =
   assert.equal(result.recommendations[0].routeClaim, undefined);
 });
 
-test('default nearby request uses a direct train only when walking does not qualify', async () => {
-  let walkingSeconds = 600;
+test('default nearby request uses straight-line distance without route calls', async () => {
+  let walkingCalls = 0;
   let transitCalls = 0;
   const recommend = service(
-    [item('saved-curry', 'カレー 灯', '新宿', ['カレー'])],
+    [
+      {
+        ...item('saved-curry', 'カレー 灯', '新宿', ['カレー'], 35.69),
+        longitude: 139.7,
+      },
+    ],
     {
       async interpret() {
         return {
@@ -960,17 +965,8 @@ test('default nearby request uses a direct train only when walking does not qual
     },
     {
       async walkingMany() {
-        return [
-          {
-            status: 'fresh',
-            durationSeconds: walkingSeconds,
-            checkedAt: now,
-            attribution: {
-              label: 'Google Maps',
-              url: 'https://google.com/maps',
-            },
-          },
-        ];
+        walkingCalls += 1;
+        throw new Error('Unrequested route must not be called');
       },
     },
     { now: () => new Date(now) },
@@ -993,16 +989,41 @@ test('default nearby request uses a direct train only when walking does not qual
     },
   );
   const request = { query: 'Good curry near me', replies: ['新宿駅'] };
-  const walking = await recommend.ask(request);
-  assert.equal(walking.status, 'recommend');
-  assert.equal(walking.recommendations[0].routeClaim.mode, 'walk');
+  const result = await recommend.ask(request);
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].routeClaim, undefined);
+  assert.deepEqual(result.warnings, ['unverified_travel_time']);
+  assert.equal(walkingCalls, 0);
   assert.equal(transitCalls, 0);
-  walkingSeconds = 960;
-  const transit = await recommend.ask(request);
-  assert.equal(transit.status, 'recommend');
-  assert.equal(transit.recommendations[0].routeClaim.mode, 'transit');
-  assert.equal(transit.recommendations[0].routeClaim.seconds, 1080);
-  assert.equal(transitCalls, 1);
+});
+
+test('explicit driving does not silently become a straight-line recommendation', async () => {
+  const recommend = service(
+    [
+      {
+        ...item('saved-curry', 'カレー 灯', '新宿', ['カレー'], 35.69),
+        longitude: 139.7,
+      },
+    ],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['curry'],
+          travelMode: 'none',
+        };
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '新宿駅から車で15分以内のカレー',
+    replies: [],
+  });
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.retryable, false);
+  assert.match(result.message, /Driving route times are not available/u);
 });
 
 test('default nearby distance fallback is labelled; explicit walking limit stays strict', async () => {
@@ -1068,15 +1089,19 @@ test('default nearby distance fallback is labelled; explicit walking limit stays
   assert.equal(strict.status, 'no_results');
 });
 
-test('default nearby checks an unvisited train option when only a visited walk qualifies', async () => {
+test('default nearby prefers an unvisited distance candidate without train', async () => {
   let transitCalls = 0;
   const recommend = service(
     [
       {
-        ...item('visited-walk', 'カレー 歩', '新宿', ['カレー']),
+        ...item('visited-walk', 'カレー 歩', '新宿', ['カレー'], 35.69),
+        longitude: 139.7,
         hasVisited: true,
       },
-      item('unvisited-train', 'カレー 電', '新宿', ['カレー'], 35.7),
+      {
+        ...item('unvisited-train', 'カレー 電', '新宿', ['カレー'], 35.7),
+        longitude: 139.7,
+      },
     ],
     {
       async interpret() {
@@ -1094,12 +1119,7 @@ test('default nearby checks an unvisited train option when only a visited walk q
     },
     {
       async walkingMany() {
-        return [600, 960].map((seconds) => ({
-          status: 'fresh',
-          durationSeconds: seconds,
-          checkedAt: now,
-          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
-        }));
+        throw new Error('Unrequested route must not be called');
       },
     },
     { now: () => new Date(now) },
@@ -1132,8 +1152,8 @@ test('default nearby checks an unvisited train option when only a visited walk q
   });
   assert.equal(result.status, 'recommend');
   assert.equal(result.recommendations[0].itemId, 'unvisited-train');
-  assert.equal(result.recommendations[0].routeClaim.mode, 'transit');
-  assert.ok(transitCalls > 0);
+  assert.equal(result.recommendations[0].routeClaim, undefined);
+  assert.equal(transitCalls, 0);
 });
 
 test('an ambiguous origin choice continues from its verified candidate rather than looping', async () => {
@@ -1145,7 +1165,7 @@ test('an ambiguous origin choice continues from its verified candidate rather th
     canonicalAddress: '大久保駅, 明石市, 兵庫',
     point: { latitude: 34.682, longitude: 134.94 },
   };
-  let routeOrigin;
+  let routeCalls = 0;
   const recommend = createRecommendConversationService({
     catalog: {
       async list() {
@@ -1178,19 +1198,9 @@ test('an ambiguous origin choice continues from its verified candidate rather th
       },
     },
     routeProvider: {
-      async walkingMany(origin) {
-        routeOrigin = origin;
-        return [
-          {
-            status: 'fresh',
-            durationSeconds: 600,
-            checkedAt: now,
-            attribution: {
-              label: 'Google Maps',
-              url: 'https://google.com/maps',
-            },
-          },
-        ];
+      async walkingMany() {
+        routeCalls += 1;
+        throw new Error('Unrequested route must not be called');
       },
     },
     clock: { now: () => new Date(now) },
@@ -1211,8 +1221,9 @@ test('an ambiguous origin choice continues from its verified candidate rather th
   );
   const result = await recommend.ask(chosen);
   assert.equal(result.status, 'recommend');
-  assert.deepEqual(routeOrigin, tokyo.point);
+  assert.equal(routeCalls, 0);
   assert.equal(result.recommendations[0].itemId, 'saved-curry');
+  assert.equal(result.recommendations[0].routeClaim, undefined);
   const forged = await recommend.ask({
     ...chosen,
     replies: ['大久保駅', 'Unlisted candidate'],

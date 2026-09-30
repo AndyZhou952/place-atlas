@@ -103,15 +103,6 @@ function walkInStatus(item: AtlasItem): 'known' | 'unknown' | 'excluded' {
   return 'unknown';
 }
 
-function defaultNearbyFallback(query: string): boolean {
-  return (
-    /near me|附近有啥|附近有什么|近くの/iu.test(query) &&
-    !/徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|電車|电车|\btrain|\btransit|(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu.test(
-      query,
-    )
-  );
-}
-
 function optionsFromCatalog(
   items: readonly AtlasItem[],
 ): RecommendOriginOption[] {
@@ -350,8 +341,16 @@ export function createRecommendConversationService(
         rawIntent,
       );
       const askWalkIn = asksForWalkIn(input);
-      const allowDefaultFallback =
-        defaultNearbyFallback(input.query) && intent.travelMode === 'walk';
+      if (
+        intent.action === 'unsupported' &&
+        intent.reason === 'driving_route_unavailable'
+      )
+        return {
+          status: 'unavailable',
+          message:
+            'Driving route times are not available yet. Remove the driving constraint to use straight-line distance.',
+          retryable: false,
+        };
       if (intent.action === 'unsupported')
         return {
           status: 'clarify',
@@ -548,9 +547,7 @@ export function createRecommendConversationService(
       const transitUnsupported =
         point !== undefined &&
         routeItems.length > 0 &&
-        (intent.travelMode === 'transit' ||
-          intent.travelMode === 'either' ||
-          allowDefaultFallback) &&
+        (intent.travelMode === 'transit' || intent.travelMode === 'either') &&
         dependencies.transitRouteProvider?.coverage?.(point) ===
           'unsupported_region';
       if (transitUnsupported && intent.travelMode === 'transit')
@@ -601,34 +598,11 @@ export function createRecommendConversationService(
             routeState = 'unavailable';
           }
         }
-        const hasUnvisitedCandidate = routeItems.some(
-          (item) => item.hasVisited !== true,
-        );
-        const qualifyingWalk = routes.some((route) => {
-          const item = routeItems.find(
-            (candidate) => candidate.id === route.itemId,
-          );
-          return (
-            route.mode === 'walk' &&
-            route.status === 'fresh' &&
-            route.seconds !== null &&
-            route.seconds <= (intent.maxMinutes ?? 15) * 60 &&
-            (intent.visited !== 'prefer_unvisited' ||
-              !hasUnvisitedCandidate ||
-              item?.hasVisited !== true)
-          );
-        });
-        if (
-          intent.travelMode === 'transit' ||
-          intent.travelMode === 'either' ||
-          (allowDefaultFallback && !qualifyingWalk)
-        ) {
+        if (intent.travelMode === 'transit' || intent.travelMode === 'either') {
           if (transitUnsupported || !dependencies.transitRouteProvider)
             routeState = 'unavailable';
           else {
-            const transitLimitMinutes = allowDefaultFallback
-              ? 20
-              : (intent.maxMinutes ?? 20);
+            const transitLimitMinutes = intent.maxMinutes ?? 20;
             const shortlist = routeItems
               .map((item) => ({
                 item,
@@ -741,7 +715,6 @@ export function createRecommendConversationService(
           routes,
           distances,
           ...(routeState ? { routeState } : {}),
-          ...(allowDefaultFallback ? { defaultNearbyFallback: true } : {}),
         },
         catalog,
       );

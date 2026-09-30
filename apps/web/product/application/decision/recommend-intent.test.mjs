@@ -142,8 +142,10 @@ test('an explicit train request near me keeps the train constraint', () => {
       travelMode: 'transit',
     },
   );
-  assert.equal(unqualified.travelMode, 'walk');
-  assert.equal(unqualified.maxMinutes, 15);
+  assert.equal(unqualified.action, 'clarify');
+  assert.equal(unqualified.clarification, 'origin');
+  assert.equal(unqualified.travelMode, 'none');
+  assert.equal(unqualified.maxMinutes, null);
 });
 
 test('walking in a stated number of minutes remains a timed route request', () => {

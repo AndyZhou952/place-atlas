@@ -87,6 +87,10 @@ test('receipt fails closed when the selected record or route evidence changes', 
     receipt(suggestion(), item({ title: 'Changed identity' })),
     undefined,
   );
+  assert.equal(
+    receipt(suggestion(), item({ address: 'Changed branch address' })),
+    undefined,
+  );
   assert.equal(receipt(suggestion(), item({ hasVisited: true })), undefined);
   assert.equal(receipt(suggestion(), item({ latitude: 36 })), undefined);
   const routeClaim = { mode: 'walk', seconds: 600 };

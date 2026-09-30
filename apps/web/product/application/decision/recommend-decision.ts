@@ -27,6 +27,7 @@ export interface RecommendDecisionItem {
   readonly address: string;
   readonly tags: readonly string[];
   readonly visited: boolean;
+  readonly walkIn?: 'known' | 'unknown' | 'excluded';
 }
 
 export interface RecommendRouteObservation {
@@ -57,7 +58,12 @@ export interface RecommendDecisionInput {
 
 export type RecommendReasonFact =
   | {
-      readonly kind: 'saved' | 'unvisited' | 'visited' | 'entry_unknown';
+      readonly kind:
+        | 'saved'
+        | 'unvisited'
+        | 'visited'
+        | 'entry_unknown'
+        | 'walk_in_known';
       readonly value: true;
     }
   | { readonly kind: 'food' | 'area'; readonly value: string }
@@ -117,6 +123,7 @@ export function relevantItems(
       return false;
     if (input.intent.visited === 'only_visited' && !item.visited) return false;
     if (input.intent.visited === 'only_unvisited' && item.visited) return false;
+    if (input.intent.askWalkIn && item.walkIn === 'excluded') return false;
     return true;
   });
 }
@@ -125,7 +132,24 @@ function preferenceRank(
   item: RecommendDecisionItem,
   intent: RecommendDecisionIntent,
 ) {
-  return intent.visited === 'prefer_unvisited' && item.visited ? 1 : 0;
+  return (
+    (intent.askWalkIn && item.walkIn !== 'known' ? 2 : 0) +
+    (intent.visited === 'prefer_unvisited' && item.visited ? 1 : 0)
+  );
+}
+
+function entryWarnings(
+  input: RecommendDecisionInput,
+  selected: readonly RecommendDecisionItem[],
+): string[] {
+  if (!input.intent.askWalkIn) return [];
+  return [
+    'current_availability_unknown',
+    ...(input.entryState === 'unknown' ||
+    selected.some((item) => item.walkIn !== 'known')
+      ? ['walk_in_unknown']
+      : []),
+  ];
 }
 
 function suggestion(
@@ -153,13 +177,18 @@ function suggestion(
   if (route) facts.push({ kind: route.mode, seconds: route.seconds });
   else if (distance !== undefined)
     facts.push({ kind: 'distance', meters: distance });
-  if (input.intent.askWalkIn && input.entryState === 'unknown')
+  if (input.intent.askWalkIn && item.walkIn === 'known')
+    facts.push({ kind: 'walk_in_known', value: true });
+  else if (input.intent.askWalkIn)
     facts.push({ kind: 'entry_unknown', value: true });
-  const reason = route
+  const baseReason = route
     ? `Saved ${matchedFood ?? 'restaurant'}; ${route.estimateBasis === 'average' ? 'estimated' : 'verified'} ${route.mode === 'walk' ? 'walk' : 'direct train'} route ${Math.ceil(route.seconds / 60)} min.`
     : distance !== undefined
       ? `Saved ${matchedFood ?? 'restaurant'}; ${distance} m straight-line distance, travel time unverified.`
       : `Saved ${matchedFood ?? 'restaurant'} in ${input.origin.state === 'area' ? input.origin.name : item.area}${item.visited ? ', visited' : ', not yet visited'}.`;
+  const reason = input.intent.askWalkIn
+    ? `${baseReason} ${item.walkIn === 'known' ? 'Saved rule permits walk-in; current availability and queue unverified.' : 'Walk-in rule and current availability unverified.'}`
+    : baseReason;
   return {
     itemId: item.id,
     detailTargetId: item.id,
@@ -188,10 +217,6 @@ export function decideRecommend(
 
   const items = relevantItems(input, catalog);
   if (!items.length) return empty('no_results');
-  const accessWarning =
-    input.intent.askWalkIn && input.entryState === 'unknown'
-      ? ['walk_in_unknown']
-      : [];
   if (input.intent.travelMode === 'none') {
     if (input.origin.state === 'resolved') {
       const nearby = items
@@ -215,7 +240,13 @@ export function decideRecommend(
             recommendations: nearby.map(({ item, meters }) =>
               suggestion(item, input, undefined, meters),
             ),
-            warnings: [...accessWarning, 'unverified_travel_time'],
+            warnings: [
+              ...entryWarnings(
+                input,
+                nearby.map(({ item }) => item),
+              ),
+              'unverified_travel_time',
+            ],
           }
         : empty('no_results');
     }
@@ -228,7 +259,7 @@ export function decideRecommend(
     return {
       action: 'recommend',
       recommendations: selected.map((item) => suggestion(item, input)),
-      warnings: accessWarning,
+      warnings: entryWarnings(input, selected),
     };
   }
 
@@ -292,7 +323,10 @@ export function decideRecommend(
       recommendations: eligible
         .slice(0, 5)
         .map(({ item, route }) => suggestion(item, input, route)),
-      warnings: accessWarning,
+      warnings: entryWarnings(
+        input,
+        eligible.slice(0, 5).map(({ item }) => item),
+      ),
     };
   }
 
@@ -317,7 +351,13 @@ export function decideRecommend(
           .map(({ item, meters }) =>
             suggestion(item, input, undefined, meters),
           ),
-        warnings: [...accessWarning, 'unverified_travel_time'],
+        warnings: [
+          ...entryWarnings(
+            input,
+            fallback.slice(0, 5).map(({ item }) => item),
+          ),
+          'unverified_travel_time',
+        ],
       };
   }
 

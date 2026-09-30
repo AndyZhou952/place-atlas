@@ -58,11 +58,47 @@ export function materializeRecommendReceipt(
         !evidence.source.url.startsWith('https://'))
     )
       return undefined;
+    const entryRequested = suggestion.reasonFacts.some(
+      (fact) => fact.kind === 'walk_in_known' || fact.kind === 'entry_unknown',
+    );
+    const walkInKnown = suggestion.reasonFacts.some(
+      (fact) => fact.kind === 'walk_in_known',
+    );
+    if (
+      entryRequested &&
+      (item.reservation.mode !== selected.reservation.mode ||
+        item.reservation.label !== selected.reservation.label ||
+        item.reservation.url !== selected.reservation.url ||
+        item.reservation.checkedAt !== selected.reservation.checkedAt)
+    )
+      return undefined;
+    if (
+      walkInKnown &&
+      (item.reservation.mode !== 'walk-in' ||
+        !item.reservation.label.trim() ||
+        !item.reservation.url?.startsWith('https://') ||
+        !item.reservation.checkedAt ||
+        !Number.isFinite(Date.parse(item.reservation.checkedAt)))
+    )
+      return undefined;
     recommendations.push({
       ...suggestion,
       name: item.title,
       address: item.address,
-      warnings,
+      warnings: [
+        ...warnings.filter((warning) => warning !== 'walk_in_unknown'),
+        ...(entryRequested && !walkInKnown ? ['walk_in_unknown'] : []),
+      ],
+      ...(walkInKnown
+        ? {
+            entryEvidence: {
+              mode: 'walk-in' as const,
+              label: item.reservation.label,
+              url: item.reservation.url!,
+              checkedAt: item.reservation.checkedAt!,
+            },
+          }
+        : {}),
       ...(suggestion.routeClaim && evidence
         ? {
             route: {

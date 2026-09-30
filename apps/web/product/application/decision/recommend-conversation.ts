@@ -31,6 +31,12 @@ export interface RecommendConversationItem extends RecommendDecisionSuggestion {
   readonly address: string;
   readonly reasonFacts: readonly RecommendReasonFact[];
   readonly warnings: readonly string[];
+  readonly entryEvidence?: {
+    readonly mode: 'walk-in';
+    readonly label: string;
+    readonly url: string;
+    readonly checkedAt: string;
+  };
   readonly route?: {
     readonly mode: 'walk' | 'transit';
     readonly seconds: number;

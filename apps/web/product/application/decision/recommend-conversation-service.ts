@@ -81,10 +81,32 @@ function reportUnavailable(stage: 'catalog' | 'interpreter', error: unknown) {
 
 const normalize = normalizeSearchText;
 
+function asksForWalkIn(input: RecommendConversationInput): boolean {
+  return [input.query, ...input.replies].some((message) =>
+    /予約(?:なし|無し|不要|せず|しないで)|飛び込み|无需预[约約订訂]|免预[约約订訂]|不用预[约約订訂]|不需要预[约約订訂]|\bwalk[ -]?in\b|\bwithout (?:a )?(?:reservation|booking)\b|\bno (?:reservation|booking)\b/iu.test(
+      message,
+    ),
+  );
+}
+
+function walkInStatus(item: AtlasItem): 'known' | 'unknown' | 'excluded' {
+  const rule = item.reservation;
+  if (
+    !rule.url?.startsWith('https://') ||
+    !rule.label.trim() ||
+    !rule.checkedAt ||
+    !Number.isFinite(Date.parse(rule.checkedAt))
+  )
+    return 'unknown';
+  if (rule.mode === 'walk-in') return 'known';
+  if (rule.mode === 'advance' || rule.mode === 'ticketed') return 'excluded';
+  return 'unknown';
+}
+
 function defaultNearbyFallback(query: string): boolean {
   return (
     /near me|附近有啥|附近有什么|近くの/iu.test(query) &&
-    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit|(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu.test(
+    !/徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|電車|电车|\btrain|\btransit|(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu.test(
       query,
     )
   );
@@ -327,6 +349,7 @@ export function createRecommendConversationService(
         options,
         rawIntent,
       );
+      const askWalkIn = asksForWalkIn(input);
       const allowDefaultFallback =
         defaultNearbyFallback(input.query) && intent.travelMode === 'walk';
       if (intent.action === 'unsupported')
@@ -485,6 +508,7 @@ export function createRecommendConversationService(
           ),
         ],
         visited: item.hasVisited === true,
+        walkIn: walkInStatus(item),
       }));
       const distances = point
         ? eligibleItems.map((item) => ({
@@ -508,6 +532,7 @@ export function createRecommendConversationService(
               excludedFoodTerms: intent.excludedFoodTerms,
               travelMode: intent.travelMode,
               visited: intent.visited,
+              askWalkIn,
             },
             origin,
             catalogIds: catalog.map((item) => item.id),
@@ -709,6 +734,7 @@ export function createRecommendConversationService(
               ? { maxMinutes: intent.maxMinutes }
               : {}),
             visited: intent.visited,
+            askWalkIn,
           },
           origin,
           catalogIds: catalog.map((item) => item.id),
@@ -730,7 +756,9 @@ export function createRecommendConversationService(
       if (decision.action === 'no_results')
         return {
           status: 'no_results',
-          message: 'No saved restaurants match this request yet.',
+          message: askWalkIn
+            ? 'No saved restaurants match this walk-in request based on their saved booking rules.'
+            : 'No saved restaurants match this request yet.',
         };
       let currentItems: readonly AtlasItem[];
       try {

@@ -27,7 +27,17 @@ function supportedReasonFact(fact, item, input, routeClaim) {
           distance.meters <= 2000,
       );
     case 'entry_unknown':
-      return fact.value === true && input.entryState === 'unknown';
+      return (
+        fact.value === true &&
+        (input.entryState === 'unknown' ||
+          (input.intent.askWalkIn === true && item.walkIn === 'unknown'))
+      );
+    case 'walk_in_known':
+      return (
+        fact.value === true &&
+        input.intent.askWalkIn === true &&
+        item.walkIn === 'known'
+      );
     default:
       return false;
   }
@@ -202,6 +212,21 @@ export function scoreRecommendDecision(dataset, predictionFile) {
         (intent.visited === 'only_unvisited' && item.visited)
       )
         failures.push('visited_constraint_violation');
+      if (intent.askWalkIn === true && item.walkIn === 'excluded')
+        failures.push('walk_in_constraint_violation');
+      if (
+        intent.askWalkIn === true &&
+        item.walkIn === 'known' &&
+        !facts.some((fact) => fact?.kind === 'walk_in_known')
+      )
+        failures.push('missing_walk_in_evidence');
+      if (
+        intent.askWalkIn === true &&
+        item.walkIn === 'unknown' &&
+        (!facts.some((fact) => fact?.kind === 'entry_unknown') ||
+          !warnings.includes('walk_in_unknown'))
+      )
+        failures.push('unknown_entry_not_disclosed');
       if (recommendation.routeClaim) {
         if (
           entry.input.origin.state !== 'resolved' ||
@@ -242,6 +267,9 @@ export function scoreRecommendDecision(dataset, predictionFile) {
     'food_constraint_violation',
     'area_constraint_violation',
     'visited_constraint_violation',
+    'walk_in_constraint_violation',
+    'missing_walk_in_evidence',
+    'unknown_entry_not_disclosed',
     'unsupported_route_claim',
     'unverified_route_without_label',
     'missing_uncertainty_warning',

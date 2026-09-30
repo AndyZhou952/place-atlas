@@ -141,3 +141,36 @@ test('an average train estimate must keep its basis through the receipt', () => 
     undefined,
   );
 });
+
+test('walk-in evidence is rejected when the saved rule changes before delivery', () => {
+  const reservation = {
+    mode: 'walk-in',
+    label: 'Walk-in accepted',
+    url: 'https://example.com/entry',
+    checkedAt: '2026-09-30T00:00:00.000Z',
+  };
+  const selected = item({ reservation });
+  const candidate = suggestion({
+    reasonFacts: [
+      { kind: 'saved', value: true },
+      { kind: 'walk_in_known', value: true },
+    ],
+  });
+  const valid = materializeRecommendReceipt(
+    [candidate],
+    [selected],
+    [selected],
+    new Map(),
+    ['current_availability_unknown'],
+  );
+  assert.equal(valid?.[0].entryEvidence?.url, reservation.url);
+  const changed = item({
+    reservation: { ...reservation, mode: 'advance' },
+  });
+  assert.equal(
+    materializeRecommendReceipt([candidate], [selected], [changed], new Map(), [
+      'current_availability_unknown',
+    ]),
+    undefined,
+  );
+});

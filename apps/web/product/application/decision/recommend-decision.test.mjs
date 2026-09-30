@@ -11,6 +11,12 @@ const dataset = JSON.parse(
     'utf8',
   ),
 );
+const entryDataset = JSON.parse(
+  readFileSync(
+    new URL('../../../evals/recommend/decision-entry.v1.json', import.meta.url),
+    'utf8',
+  ),
+);
 
 test('deterministic decision gates pass all frozen saved-catalog cases', () => {
   const report = scoreRecommendDecision(dataset, {
@@ -21,6 +27,22 @@ test('deterministic decision gates pass all frozen saved-catalog cases', () => {
     })),
   });
   assert.equal(report.cases, 26);
+  assert.deepEqual(
+    report.results.filter((entry) => !entry.passed),
+    [],
+  );
+  assert.equal(report.safetyViolationCases, 0);
+});
+
+test('entry-policy decisions pass the separate walk-in extension', () => {
+  const report = scoreRecommendDecision(entryDataset, {
+    datasetId: entryDataset.datasetId,
+    predictions: entryDataset.cases.map((entry) => ({
+      caseId: entry.caseId,
+      ...decideRecommend(entry.input, entryDataset.catalog),
+    })),
+  });
+  assert.equal(report.cases, 4);
   assert.deepEqual(
     report.results.filter((entry) => !entry.passed),
     [],

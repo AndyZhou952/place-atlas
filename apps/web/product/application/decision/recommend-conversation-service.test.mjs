@@ -1292,3 +1292,101 @@ test('a pasted street address overrides a shorter catalog area in production-sty
   assert.equal(maps.status, 'recommend');
   assert.equal(geocodes, 3);
 });
+
+test('a walk-in request prefers a sourced saved rule and labels unknown candidates', async () => {
+  const known = {
+    ...item('known', '喫茶 灯', '新宿', ['coffee']),
+    hasVisited: true,
+    reservation: {
+      mode: 'walk-in',
+      label: 'Walk-in accepted',
+      url: 'https://example.com/entry',
+      checkedAt: now,
+    },
+  };
+  const unknown = item('unknown', '喫茶 雲', '新宿', ['coffee']);
+  const excluded = {
+    ...item('advance', '喫茶 月', '新宿', ['coffee']),
+    reservation: {
+      mode: 'advance',
+      label: 'Advance reservation required',
+      url: 'https://example.com/reserve',
+      checkedAt: now,
+    },
+  };
+  const recommend = service([known, unknown, excluded], {
+    async interpret() {
+      return {
+        action: 'recommend',
+        originId: 'area:新宿',
+        foodTerms: ['coffee'],
+        excludedFoodTerms: [],
+        travelMode: 'none',
+        maxMinutes: null,
+        visited: 'prefer_unvisited',
+      };
+    },
+  });
+  const result = await recommend.ask({
+    query: '新宿で予約なしで入れるカフェ',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.deepEqual(
+    result.recommendations.map((candidate) => candidate.itemId),
+    ['known', 'unknown'],
+  );
+  assert.deepEqual(result.warnings, [
+    'current_availability_unknown',
+    'walk_in_unknown',
+  ]);
+  assert.deepEqual(result.recommendations[0].entryEvidence, {
+    mode: 'walk-in',
+    label: 'Walk-in accepted',
+    url: 'https://example.com/entry',
+    checkedAt: now,
+  });
+  assert.deepEqual(result.recommendations[0].warnings, [
+    'current_availability_unknown',
+  ]);
+  assert.deepEqual(result.recommendations[1].warnings, [
+    'current_availability_unknown',
+    'walk_in_unknown',
+  ]);
+  const ordinary = await recommend.ask({ query: '新宿でカフェ', replies: [] });
+  assert.equal(ordinary.status, 'recommend');
+  assert.equal(ordinary.recommendations[0].itemId, 'unknown');
+  assert.ok(
+    ordinary.recommendations.some(
+      (candidate) => candidate.itemId === 'advance',
+    ),
+  );
+  assert.deepEqual(ordinary.warnings, []);
+});
+
+test('a walk-in label without a checked HTTPS source remains unknown', async () => {
+  const unsourced = {
+    ...item('unsourced', '喫茶 灯', '新宿', ['coffee']),
+    reservation: { mode: 'walk-in', label: 'Walk-in accepted' },
+  };
+  const recommend = service([unsourced], {
+    async interpret() {
+      return {
+        action: 'recommend',
+        originId: 'area:新宿',
+        foodTerms: ['coffee'],
+        excludedFoodTerms: [],
+        travelMode: 'none',
+        maxMinutes: null,
+        visited: 'prefer_unvisited',
+      };
+    },
+  });
+  const result = await recommend.ask({
+    query: '新宿で walk-in cafe',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].entryEvidence, undefined);
+  assert.ok(result.recommendations[0].warnings.includes('walk_in_unknown'));
+});

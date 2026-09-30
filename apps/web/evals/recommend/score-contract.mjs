@@ -62,6 +62,18 @@ export function scoreRecommendContract(dataset, predictionFile) {
         failures.push('missing_or_wrong_clarification');
     }
     if (final?.status !== expected.status) failures.push('wrong_final_status');
+    if (expected.status === 'unavailable') {
+      if (
+        typeof expected.retryable === 'boolean' &&
+        final?.retryable !== expected.retryable
+      )
+        failures.push('wrong_retryability');
+      if (
+        expected.messageIncludes &&
+        !final?.message?.includes(expected.messageIncludes)
+      )
+        failures.push('missing_coverage_explanation');
+    }
     if (expected.status === 'clarify') {
       if (
         final?.clarification !== expected.clarification ||

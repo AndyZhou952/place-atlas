@@ -53,7 +53,16 @@ function oracle(entry) {
             clarification: expected.clarification,
             question: 'Which exact starting point?',
           }
-        : { status: expected.status, recommendations: [] },
+        : {
+            status: expected.status,
+            recommendations: [],
+            ...(typeof expected.retryable === 'boolean'
+              ? { retryable: expected.retryable }
+              : {}),
+            ...(expected.messageIncludes
+              ? { message: `${expected.messageIncludes} from this provider.` }
+              : {}),
+          },
   );
   return {
     caseId: entry.caseId,
@@ -75,7 +84,7 @@ test('all browser and API contract cases have a valid oracle trace', () => {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 11);
+  assert.equal(report.cases, 12);
   assert.equal(report.casePassRate, 1);
 });
 
@@ -119,5 +128,26 @@ test('lost query context and wrong detail click fail separately', () => {
   assert.deepEqual(report.results[0].failures, [
     'reply_lost_initial_request',
     'detail_not_opened',
+  ]);
+});
+
+test('an unsupported region cannot pass as empty results or a retryable outage', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'japan-transit-unsupported-with-saved-cafe',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0] = {
+    status: 'no_results',
+    retryable: true,
+    message: 'No saved restaurants match this request yet.',
+  };
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, [
+    'wrong_final_status',
+    'wrong_retryability',
+    'missing_coverage_explanation',
   ]);
 });

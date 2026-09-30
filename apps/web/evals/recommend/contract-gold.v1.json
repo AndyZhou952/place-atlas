@@ -133,6 +133,16 @@
         "routeMode": "transit",
         "maxRouteSeconds": 1200
       }
+    },
+    {
+      "caseId": "japan-transit-unsupported-with-saved-cafe",
+      "query": "銀座駅から電車20分以内のコーヒー",
+      "answers": [],
+      "expected": {
+        "status": "unavailable",
+        "retryable": false,
+        "messageIncludes": "Train route times in Japan are unavailable"
+      }
     }
   ]
 }

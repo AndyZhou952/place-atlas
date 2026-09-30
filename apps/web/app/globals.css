@@ -3234,6 +3234,10 @@ button.personal-rating-inline:focus-visible {
     gap: 0.35rem;
   }
 
+  .header-action-label {
+    display: none;
+  }
+
   .owner-access-panel {
     padding: 1rem;
   }

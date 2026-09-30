@@ -133,7 +133,7 @@ export function AtlasScreen() {
             }}
           >
             <Sparkles data-icon="inline-start" />
-            Ask Recommend
+            <span className="header-action-label">Ask Recommend</span>
           </Button>
         </div>
       </header>

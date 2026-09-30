@@ -92,7 +92,7 @@ function oracle(entry) {
       responses,
       ...(entry.scenario ? { scenario: entry.scenario } : {}),
       ...(expected.displayIncludes
-        ? { displayedRouteText: expected.displayIncludes }
+        ? { displayedRouteText: expected.displayIncludes.join(' · ') }
         : {}),
       ...(expected.status === 'recommend'
         ? { openedDetailId: expected.detailTargetId }
@@ -236,5 +236,43 @@ test('a default-distance answer cannot add a timed route claim', () => {
     { ...dataset, cases: [entry] },
     { datasetId: dataset.datasetId, predictions: [prediction] },
   );
-  assert.deepEqual(report.results[0].failures, ['unexpected_route_claim']);
+  assert.deepEqual(report.results[0].failures, [
+    'unsupported_route_mode',
+    'unexpected_route_claim',
+  ]);
+});
+
+test('current journey contract rejects a transit claim on another result', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'direct-walk-canonical-route',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0].recommendations.push({
+    itemId: 'another-saved-place',
+    detailTargetId: 'another-saved-place',
+    name: 'Another saved place',
+    reason: 'Nearby',
+    route: { mode: 'transit', seconds: 480 },
+  });
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['unsupported_route_mode']);
+});
+
+test('distance answer fails if the browser shows an invented duration', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) =>
+      caseId === 'station-origin-default-distance-with-saved-cafe',
+  );
+  for (const duration of ['5 min', '徒歩5分']) {
+    const prediction = oracle(entry);
+    prediction.trace.displayedRouteText += ` · ${duration}`;
+    const report = scoreRecommendContract(
+      { ...dataset, cases: [entry] },
+      { datasetId: dataset.datasetId, predictions: [prediction] },
+    );
+    assert.deepEqual(report.results[0].failures, ['unsupported_time_display']);
+  }
 });

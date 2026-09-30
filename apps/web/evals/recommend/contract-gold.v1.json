@@ -3,6 +3,7 @@
   "datasetId": "recommend-app-contract-v1",
   "kind": "owner-authenticated-browser-and-api-contract",
   "api": "POST /api/recommend",
+  "allowedRouteModes": ["walk"],
   "cases": [
     {
       "caseId": "one-turn-saved-detail",
@@ -133,7 +134,8 @@
         "address": "Fixture address: Ginza branch",
         "reasonRequired": true,
         "routeMode": "walk",
-        "maxRouteSeconds": 600
+        "maxRouteSeconds": 600,
+        "displayIncludes": ["Walk", "min"]
       }
     },
     {
@@ -148,7 +150,9 @@
         "reasonRequired": true,
         "reasonIncludes": "straight-line distance",
         "warningIncludes": "unverified_travel_time",
-        "forbidRouteClaim": true
+        "forbidRouteClaim": true,
+        "displayIncludes": ["straight-line distance", "travel time unverified"],
+        "forbidTimedDisplay": true
       }
     },
     {
@@ -181,7 +185,9 @@
         "reasonRequired": true,
         "reasonIncludes": "straight-line distance",
         "warningIncludes": "unverified_travel_time",
-        "forbidRouteClaim": true
+        "forbidRouteClaim": true,
+        "displayIncludes": ["straight-line distance", "travel time unverified"],
+        "forbidTimedDisplay": true
       }
     }
   ]

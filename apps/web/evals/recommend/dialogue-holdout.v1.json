@@ -62,14 +62,18 @@
     {
       "caseId": "mode-answer",
       "input": {
-        "messages": ["京都駅から12分以内の咖喱", "Walk or train?", "電車"]
+        "messages": [
+          "京都駅から12分以内の咖喱",
+          "Walking or straight-line distance?",
+          "徒歩"
+        ]
       },
       "gold": {
         "action": "recommend",
         "originId": "station:kyoto",
         "foodTerms": ["curry"],
         "excludedFoodTerms": [],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 12,
         "visited": "prefer_unvisited"
       }
@@ -78,7 +82,7 @@
       "caseId": "correct-origin",
       "input": {
         "messages": [
-          "京都から電車18分の寿司",
+          "京都から徒歩18分の寿司",
           "Which exact station?",
           "やっぱり梅田駅"
         ]
@@ -88,7 +92,7 @@
         "originId": "station:umeda",
         "foodTerms": ["sushi"],
         "excludedFoodTerms": [],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 18,
         "visited": "prefer_unvisited"
       }

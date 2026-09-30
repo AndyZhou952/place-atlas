@@ -190,20 +190,6 @@
       }
     },
     {
-      "caseId": "area-transit-needs-station",
-      "input": { "message": "銀座から電車20分で行ける寿司" },
-      "gold": {
-        "action": "clarify",
-        "originId": "area:ginza",
-        "foodTerms": ["sushi"],
-        "excludedFoodTerms": [],
-        "travelMode": "transit",
-        "maxMinutes": 20,
-        "visited": "prefer_unvisited",
-        "clarification": "exact_origin"
-      }
-    },
-    {
       "caseId": "station-walk-ja",
       "input": { "message": "新宿駅から徒歩10分のラーメン" },
       "gold": {
@@ -213,21 +199,6 @@
         "excludedFoodTerms": [],
         "travelMode": "walk",
         "maxMinutes": 10,
-        "visited": "prefer_unvisited"
-      }
-    },
-    {
-      "caseId": "station-transit-en",
-      "input": {
-        "message": "Sushi within 20 minutes by direct train from Ginza Station"
-      },
-      "gold": {
-        "action": "recommend",
-        "originId": "station:ginza",
-        "foodTerms": ["sushi"],
-        "excludedFoodTerms": [],
-        "travelMode": "transit",
-        "maxMinutes": 20,
         "visited": "prefer_unvisited"
       }
     },
@@ -408,20 +379,6 @@
         "excludedFoodTerms": [],
         "travelMode": "walk",
         "maxMinutes": 10,
-        "visited": "prefer_unvisited",
-        "clarification": "origin"
-      }
-    },
-    {
-      "caseId": "transit-no-origin",
-      "input": { "message": "电车20分钟以内的咖喱" },
-      "gold": {
-        "action": "clarify",
-        "originId": null,
-        "foodTerms": ["curry"],
-        "excludedFoodTerms": [],
-        "travelMode": "transit",
-        "maxMinutes": 20,
         "visited": "prefer_unvisited",
         "clarification": "origin"
       }

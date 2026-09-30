@@ -220,75 +220,6 @@
       }
     },
     {
-      "caseId": "transit-direct-boundary",
-      "input": {
-        "message": "步行没有的话电车直达20分钟以内",
-        "locationState": "resolved",
-        "originId": "synthetic-ikebukuro",
-        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
-        "visited": "prefer_unvisited",
-        "entryState": "not_requested",
-        "routes": [
-          {
-            "itemId": "ramen-a",
-            "mode": "walk",
-            "seconds": 1000
-          },
-          {
-            "itemId": "ramen-a",
-            "mode": "transit",
-            "seconds": 1200,
-            "transfers": 0,
-            "doorToDoor": true
-          },
-          {
-            "itemId": "sushi-b",
-            "mode": "transit",
-            "seconds": 1201,
-            "transfers": 0,
-            "doorToDoor": true
-          },
-          {
-            "itemId": "curry-d",
-            "mode": "transit",
-            "seconds": 900,
-            "transfers": 1,
-            "doorToDoor": true
-          }
-        ]
-      },
-      "gold": {
-        "action": "recommend",
-        "itemIds": ["ramen-a"],
-        "requiredWarnings": []
-      }
-    },
-    {
-      "caseId": "transit-not-door-to-door",
-      "input": {
-        "message": "20分钟内电车直达",
-        "locationState": "resolved",
-        "originId": "synthetic-ikebukuro",
-        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
-        "visited": "prefer_unvisited",
-        "entryState": "not_requested",
-        "routes": [
-          {
-            "itemId": "ramen-a",
-            "mode": "transit",
-            "seconds": 800,
-            "transfers": 0,
-            "doorToDoor": false
-          }
-        ]
-      },
-      "gold": {
-        "action": "unavailable",
-        "itemIds": [],
-        "requiredWarnings": ["unverified_travel_time"]
-      }
-    },
-    {
       "caseId": "ambiguous-origin",
       "input": {
         "message": "中环附近",
@@ -358,36 +289,6 @@
         "action": "recommend",
         "itemIds": ["ramen-a"],
         "requiredWarnings": ["walk_in_unknown"]
-      }
-    },
-    {
-      "caseId": "prefer-walk-over-transit",
-      "input": {
-        "message": "附近吃饭",
-        "locationState": "resolved",
-        "originId": "synthetic-ikebukuro",
-        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
-        "visited": "prefer_unvisited",
-        "entryState": "not_requested",
-        "routes": [
-          {
-            "itemId": "ramen-a",
-            "mode": "walk",
-            "seconds": 600
-          },
-          {
-            "itemId": "sushi-b",
-            "mode": "transit",
-            "seconds": 300,
-            "transfers": 0,
-            "doorToDoor": true
-          }
-        ]
-      },
-      "gold": {
-        "action": "recommend",
-        "itemIds": ["ramen-a"],
-        "requiredWarnings": []
       }
     }
   ]

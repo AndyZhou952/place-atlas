@@ -388,7 +388,6 @@ void test('assessment and visit projections expose only approved display fields'
           visitId: 'visit-1',
           displayOrder: 0,
           caption: 'Nigiri',
-          score: 4.2,
           contentType: 'image/jpeg',
           displayUrl: '/api/media/pm_opaque_1/content',
         },
@@ -397,7 +396,7 @@ void test('assessment and visit projections expose only approved display fields'
   ]);
 });
 
-void test('display media allows only image content types and emits fixed public headers', async () => {
+void test('display media allows supported photos and videos with fixed public headers', async () => {
   const body = new ReadableStream({
     start(controller) {
       controller.enqueue(Uint8Array.of(1, 2, 3));
@@ -432,6 +431,19 @@ void test('display media allows only image content types and emits fixed public 
     new Uint8Array(await response.arrayBuffer()),
     Uint8Array.of(1, 2, 3),
   );
+
+  for (const contentType of ['video/mp4', 'video/webm']) {
+    const video = await executePublicMediaRead({
+      manifest: createPublicReadManifest(),
+      operation: 'media.openDisplay',
+      principal: anonymous,
+      async load() {
+        return { body: new ReadableStream(), contentType };
+      },
+    });
+    assert.equal(video.status, 200);
+    assert.equal(video.headers.get('content-type'), contentType);
+  }
 
   const refused = await executePublicMediaRead({
     manifest: createPublicReadManifest(),

@@ -9,7 +9,7 @@
       "modelPrediction": {
         "action": "recommend",
         "foodTerms": ["curry"],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 20
       },
       "expected": {
@@ -22,7 +22,13 @@
     {
       "caseId": "near-me-rejects-model-invented-area",
       "messages": ["Good curry near me"],
-      "options": [{ "id": "area:shinjuku", "kind": "area", "names": ["新宿"] }],
+      "options": [
+        {
+          "id": "area:shinjuku",
+          "kind": "area",
+          "names": ["新宿"]
+        }
+      ],
       "modelPrediction": {
         "action": "recommend",
         "originId": "area:shinjuku",
@@ -41,7 +47,11 @@
       "caseId": "near-me-with-exact-origin-uses-distance",
       "messages": ["Good curry near me", "新宿駅"],
       "options": [
-        { "id": "station:shinjuku", "kind": "station", "names": ["新宿駅"] }
+        {
+          "id": "station:shinjuku",
+          "kind": "station",
+          "names": ["新宿駅"]
+        }
       ],
       "modelPrediction": {
         "action": "recommend",
@@ -60,12 +70,18 @@
     {
       "caseId": "broad-area-without-travel-mode-keeps-area",
       "messages": ["新宿でカレー"],
-      "options": [{ "id": "area:shinjuku", "kind": "area", "names": ["新宿"] }],
+      "options": [
+        {
+          "id": "area:shinjuku",
+          "kind": "area",
+          "names": ["新宿"]
+        }
+      ],
       "modelPrediction": {
         "action": "recommend",
         "originId": "area:shinjuku",
         "foodTerms": ["curry"],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 20
       },
       "expected": {
@@ -79,7 +95,11 @@
       "caseId": "explicit-driving-fails-honestly",
       "messages": ["新宿駅から車で15分以内のカレー"],
       "options": [
-        { "id": "station:shinjuku", "kind": "station", "names": ["新宿駅"] }
+        {
+          "id": "station:shinjuku",
+          "kind": "station",
+          "names": ["新宿駅"]
+        }
       ],
       "modelPrediction": {
         "action": "recommend",
@@ -96,7 +116,11 @@
       "caseId": "explicit-walk-keeps-route-constraint",
       "messages": ["新宿駅から徒歩10分以内のカレー"],
       "options": [
-        { "id": "station:shinjuku", "kind": "station", "names": ["新宿駅"] }
+        {
+          "id": "station:shinjuku",
+          "kind": "station",
+          "names": ["新宿駅"]
+        }
       ],
       "modelPrediction": {
         "action": "recommend",
@@ -112,22 +136,81 @@
       }
     },
     {
-      "caseId": "explicit-train-keeps-route-constraint",
-      "messages": ["新宿駅から電車20分以内のカレー"],
+      "caseId": "explicit-walk-corrects-model-duration",
+      "messages": ["新宿駅から徒歩10分以内のカレー"],
       "options": [
-        { "id": "station:shinjuku", "kind": "station", "names": ["新宿駅"] }
+        {
+          "id": "station:shinjuku",
+          "kind": "station",
+          "names": ["新宿駅"]
+        }
       ],
       "modelPrediction": {
         "action": "recommend",
         "originId": "station:shinjuku",
         "foodTerms": ["curry"],
-        "travelMode": "none"
+        "travelMode": "walk",
+        "maxMinutes": 20
       },
       "expected": {
         "action": "recommend",
         "originId": "station:shinjuku",
-        "travelMode": "transit",
-        "maxMinutes": 20
+        "travelMode": "walk",
+        "maxMinutes": 10
+      }
+    },
+    {
+      "caseId": "ambiguous-branch-rejects-model-selection",
+      "messages": ["Coffee Grove"],
+      "options": [
+        {
+          "id": "place:east",
+          "kind": "place",
+          "names": ["Coffee Grove East"]
+        },
+        {
+          "id": "place:west",
+          "kind": "place",
+          "names": ["Coffee Grove West"]
+        }
+      ],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "place:east",
+        "foodTerms": ["coffee"]
+      },
+      "expected": {
+        "action": "clarify",
+        "clarification": "branch",
+        "originId": null
+      }
+    },
+    {
+      "caseId": "distance-answer-clears-timed-constraint",
+      "messages": [
+        "新宿駅から15分以内のカレー",
+        "Clarification answer:",
+        "直線距離で"
+      ],
+      "options": [
+        {
+          "id": "station:shinjuku",
+          "kind": "station",
+          "names": ["新宿駅"]
+        }
+      ],
+      "modelPrediction": {
+        "action": "recommend",
+        "originId": "station:shinjuku",
+        "foodTerms": ["curry"],
+        "travelMode": "walk",
+        "maxMinutes": 15
+      },
+      "expected": {
+        "action": "recommend",
+        "originId": "station:shinjuku",
+        "travelMode": "none",
+        "maxMinutes": null
       }
     }
   ]

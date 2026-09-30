@@ -1,6 +1,6 @@
 # Japan Personal Atlas
 
-A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. The website is publicly readable; only the owner can change it. Each deployment uses its own database, storage, model credentials, and optional map credentials.
+A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. Visitors can read published places, personal ratings and comments, visits, photos and videos without logging in. Only the owner can add or change data or run Recommend and other Agent operations that may incur provider usage. Each deployment uses its own database, storage, model credentials, and optional map credentials.
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
@@ -119,14 +119,14 @@ Set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled` only with working credentia
 
 Without Google matching configuration, Add uses no-key search plus verified Tabelog listing identities for Japanese restaurants. Pasting a full Tabelog main-listing URL skips search. This fallback is not worldwide discovery and may fail when a provider blocks requests. Google improves international matching but does not itself guarantee complete or persistable restaurant research.
 
-For address resolution, walking routes, and supported-region transit routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
+For address resolution and explicit walking routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
 
 ```sh
 npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc
 npx wrangler deploy --config wrangler.route-sidecar.jsonc
 ```
 
-Keep the app's `ROUTE_SIDECAR` binding pointed at `japan-atlas-route-sidecar`. If omitting route services, remove that entry from the app's `services` array to avoid referencing a missing Worker. Recommend must report unavailable route information rather than invent travel times. Google Routes does not supply transit routes in Japan; explicit Japan train requests currently receive an unavailable response. The route Worker has no public website endpoint.
+Keep the app's `ROUTE_SIDECAR` binding pointed at `japan-atlas-route-sidecar`. If omitting route services, remove that entry from the app's `services` array to avoid referencing a missing Worker. Recommend uses straight-line distance by default and must report unavailable route information rather than invent travel times when a walking route is explicitly requested. The route Worker has no public website endpoint.
 
 ## Verify and deploy
 
@@ -136,24 +136,27 @@ From `apps/web`:
 npm run lint
 npm run typecheck
 npm run test:evals
-npm run build:owner-poc
-npx wrangler deploy --config dist/server/wrangler.json
+mkdir -p .wrangler
+npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json > .wrangler/owner-poc-secret-names.json
+npm run deploy:owner-poc
 ```
 
-Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+
+After an update to an existing deployment, run `ALLOW_PRODUCTION_MEDIA_AUDIT=yes npm run audit:media-integrity` from `apps/web` to compare each Visit media row with its R2 object's byte count and SHA-256 without saving media locally. The audit is read-only and requires the Wrangler login and ignored local configuration used for deployment.
 
 For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resources. Do not overwrite newer records with an older backup during rollback.
 
 ## Using the website
 
-Start here only after completing configuration and deployment above. Visitors can read the site without logging in; changing data requires the owner password.
+Start here only after completing configuration and deployment above. Visitors can read published restaurants, personal ratings and comments, visits, photos and videos without logging in. Adding or changing data and running Recommend require the owner password.
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
 2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. For a chain or an ambiguous name, keep the name and fill **Area, station or branch (optional)**, then select **Find matches** again. Choose the intended candidate; multiple matches are never preselected. Research shows a waiting indicator while checking sources. If location research is incomplete, use **Complete or correct details** to enter a verified address; add coordinates only if address lookup still fails. Refresh the preview before confirming. Ratings, reservation rules and other unsupported facts may remain unknown.
 3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
 4. Use the heart to mark a favorite and the visited control to mark a place as visited. For a dated record, use **Add a visit** in the restaurant card or **Journal**. A date is enough; notes, photos, videos and a rating are optional. MP4 and WebM videos can be up to 50 MB each. **Overall マイスコア** updates your overall restaurant score, not a historical per-visit score, and remains separate from external ratings. After saving, the form is ready for another visit. If a media upload fails, add the missing files to the saved visit rather than creating it again. Open media to edit its caption; press Enter or leave the caption field to save. **Edit** on the restaurant header edits restaurant metadata; the pencil beside a Visit edits that dated record, including its restaurant. Changing a Visit's restaurant moves its note and media without changing either restaurant's overall score. The Journal sort menu orders all visits across restaurants by visit date or entry time, oldest or newest first.
-5. Use **Recommend** to find a saved restaurant from a place, area, cuisine, or travel preference. An area-only request can return saved restaurants in that area; a timed walking or train request needs a specific origin. Without a travel mode, nearby ranking uses straight-line distance and labels travel time unverified. An explicit Japan train request currently reports unavailable route coverage.
+5. Use **Recommend** to find a saved restaurant from a place, area, cuisine, or travel preference. An area-only request can return saved restaurants in that area. Without a travel mode, nearby ranking uses straight-line distance and labels travel time unverified. A timed walking request needs a specific origin and a verified route.
 
 ### Calling Add from an integration
 

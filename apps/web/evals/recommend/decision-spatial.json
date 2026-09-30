@@ -121,14 +121,6 @@
             "mode": "walk",
             "seconds": 600,
             "status": "fresh"
-          },
-          {
-            "itemId": "near-unvisited",
-            "mode": "transit",
-            "seconds": 480,
-            "status": "fresh",
-            "transfers": 0,
-            "doorToDoor": true
           }
         ],
         "distances": [
@@ -146,7 +138,7 @@
       }
     },
     {
-      "caseId": "distance-default-ignores-train-route",
+      "caseId": "distance-default-ignores-slow-walking-route",
       "input": {
         "intent": {
           "foodTerms": ["ramen"],
@@ -165,14 +157,6 @@
             "mode": "walk",
             "seconds": 960,
             "status": "fresh"
-          },
-          {
-            "itemId": "near-unvisited",
-            "mode": "transit",
-            "seconds": 1080,
-            "status": "fresh",
-            "transfers": 0,
-            "doorToDoor": true
           }
         ],
         "distances": [
@@ -246,14 +230,6 @@
             "mode": "walk",
             "seconds": 960,
             "status": "fresh"
-          },
-          {
-            "itemId": "near-unvisited",
-            "mode": "transit",
-            "seconds": 1080,
-            "status": "fresh",
-            "transfers": 0,
-            "doorToDoor": true
           }
         ],
         "distances": [

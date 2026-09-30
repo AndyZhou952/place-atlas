@@ -23,7 +23,7 @@ test('curated intent cases and deterministic oracle are internally consistent', 
     })),
   };
   const report = scoreRecommendIntent(dataset, predictions);
-  assert.equal(report.cases, 34);
+  assert.equal(report.cases, 31);
   assert.equal(report.casePassRate, 1);
   assert.equal(report.safetyViolationCases, 0);
 });

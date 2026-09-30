@@ -159,7 +159,6 @@ export interface PublicVisitMediaV1 {
   readonly visitId: string;
   readonly displayOrder: number;
   readonly caption?: string;
-  readonly score?: number;
   readonly contentType: string;
   readonly displayUrl: string;
 }
@@ -266,9 +265,9 @@ export async function executePublicMediaRead({
 
   try {
     const content = await load();
-    if (!isAllowedImageContentType(content.contentType)) {
+    if (!isAllowedMediaContentType(content.contentType)) {
       await content.body.cancel('unsupported public media type');
-      return new Response('Photo content type is unavailable.', {
+      return new Response('Media content type is unavailable.', {
         status: 415,
       });
     }
@@ -280,7 +279,7 @@ export async function executePublicMediaRead({
       },
     });
   } catch {
-    return new Response('Photo content is temporarily unavailable.', {
+    return new Response('Media content is temporarily unavailable.', {
       status: 500,
     });
   }
@@ -466,7 +465,6 @@ function projectVisitMedia(
     ...(optionalString(source.caption) === undefined
       ? {}
       : { caption: optionalString(source.caption) }),
-    ...(source.score === undefined ? {} : { score: asNumber(source.score) }),
     displayUrl: `/api/media/${encodeURIComponent(displayId)}/content`,
   };
 }
@@ -646,7 +644,7 @@ function publicReadNotFound(): Response {
   });
 }
 
-function isAllowedImageContentType(value: string): boolean {
+function isAllowedMediaContentType(value: string): boolean {
   return (
     value === 'image/jpeg' ||
     value === 'image/png' ||

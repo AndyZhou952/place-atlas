@@ -22,11 +22,7 @@ function oracle() {
         ? []
         : c.gold.itemIds.flatMap((id) => {
             const route = c.input.routes.find(
-              (r) =>
-                r.itemId === id &&
-                (r.mode === 'walk'
-                  ? r.seconds <= 900
-                  : r.doorToDoor && r.transfers === 0 && r.seconds <= 1200),
+              (r) => r.itemId === id && r.mode === 'walk' && r.seconds <= 900,
             );
             return route
               ? [{ itemId: id, mode: route.mode, seconds: route.seconds }]
@@ -35,9 +31,9 @@ function oracle() {
     })),
   };
 }
-test('all 14 synthetic policy cases have a satisfiable scoring contract', () => {
+test('all 11 synthetic policy cases have a satisfiable scoring contract', () => {
   const report = scoreNearby(gold, oracle());
-  assert.equal(report.cases, 14);
+  assert.equal(report.cases, 11);
   assert.equal(report.passes, true);
   assert.equal(report.selectionAccuracy, 1);
   assert.equal(report.uncertaintyCoverage, 1);
@@ -52,8 +48,8 @@ test('latency, tool calls and cost are reported separately when every run suppli
   const report = scoreNearby(gold, predictions);
   assert.equal(report.telemetryCoverage, 1);
   assert.equal(report.meanLatencyMs, 200);
-  assert.equal(report.totalToolCalls, 28);
-  assert.equal(report.totalCostUsd.toFixed(3), '0.014');
+  assert.equal(report.totalToolCalls, 22);
+  assert.equal(report.totalCostUsd.toFixed(3), '0.011');
 });
 test('missing cases cannot inflate pass rate', () => {
   const predictions = oracle();

@@ -92,7 +92,7 @@ function oracle(entry) {
       responses,
       ...(entry.scenario ? { scenario: entry.scenario } : {}),
       ...(expected.displayIncludes
-        ? { displayedRouteText: expected.displayIncludes }
+        ? { displayedRouteText: expected.displayIncludes.join(' · ') }
         : {}),
       ...(expected.status === 'recommend'
         ? { openedDetailId: expected.detailTargetId }
@@ -131,9 +131,9 @@ test('a copied street address cannot silently become a broad-area answer', () =>
   ]);
 });
 
-test('a train claim without verified route evidence fails the journey contract', () => {
+test('a walking claim without verified route evidence fails the journey contract', () => {
   const entry = dataset.cases.find(
-    ({ caseId }) => caseId === 'direct-train-canonical-route',
+    ({ caseId }) => caseId === 'direct-walk-canonical-route',
   );
   const prediction = oracle(entry);
   delete prediction.trace.responses[0].recommendations[0].route;
@@ -201,23 +201,78 @@ test('lost query context and wrong detail click fail separately', () => {
   ]);
 });
 
-test('an unsupported region cannot pass as empty results or a retryable outage', () => {
+test('a default-distance answer needs distance evidence and a time caveat', () => {
   const entry = dataset.cases.find(
-    ({ caseId }) => caseId === 'japan-transit-unsupported-with-saved-cafe',
+    ({ caseId }) =>
+      caseId === 'station-origin-default-distance-with-saved-cafe',
   );
   const prediction = oracle(entry);
-  prediction.trace.responses[0] = {
-    status: 'no_results',
-    retryable: true,
-    message: 'No saved restaurants match this request yet.',
+  prediction.trace.responses[0].recommendations[0].reason =
+    'Saved cafe near your starting point.';
+  delete prediction.trace.responses[0].warnings;
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, [
+    'missing_distance_evidence',
+    'missing_uncertainty_warning',
+  ]);
+});
+
+test('a default-distance answer cannot add a timed route claim', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) =>
+      caseId === 'station-origin-default-distance-with-saved-cafe',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0].recommendations[0].route = {
+    mode: 'drive',
+    seconds: 480,
+    checkedAt: '2026-09-30T00:00:00.000Z',
+    source: { label: 'Google Maps', url: 'https://www.google.com/maps' },
   };
   const report = scoreRecommendContract(
     { ...dataset, cases: [entry] },
     { datasetId: dataset.datasetId, predictions: [prediction] },
   );
   assert.deepEqual(report.results[0].failures, [
-    'wrong_final_status',
-    'wrong_retryability',
-    'missing_coverage_explanation',
+    'unsupported_route_mode',
+    'unexpected_route_claim',
   ]);
+});
+
+test('current journey contract rejects an unsupported route claim on another result', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'direct-walk-canonical-route',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0].recommendations.push({
+    itemId: 'another-saved-place',
+    detailTargetId: 'another-saved-place',
+    name: 'Another saved place',
+    reason: 'Nearby',
+    route: { mode: 'drive', seconds: 480 },
+  });
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['unsupported_route_mode']);
+});
+
+test('distance answer fails if the browser shows an invented duration', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) =>
+      caseId === 'station-origin-default-distance-with-saved-cafe',
+  );
+  for (const duration of ['5 min', '徒歩5分']) {
+    const prediction = oracle(entry);
+    prediction.trace.displayedRouteText += ` · ${duration}`;
+    const report = scoreRecommendContract(
+      { ...dataset, cases: [entry] },
+      { datasetId: dataset.datasetId, predictions: [prediction] },
+    );
+    assert.deepEqual(report.results[0].failures, ['unsupported_time_display']);
+  }
 });

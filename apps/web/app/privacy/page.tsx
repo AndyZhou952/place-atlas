@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       </header>
 
       <article className="policy-article">
-        <p className="eyebrow">Public policy · effective 24 September 2026</p>
+        <p className="eyebrow">Public policy · effective 30 September 2026</p>
         <h1>Privacy notice</h1>
         <p className="policy-lede">
           Japan Atlas keeps its public reading surface separate from the private
@@ -33,17 +33,19 @@ export default function PrivacyPage() {
         <section>
           <h2>What is public</h2>
           <p>
-            Anyone with the URL can view published places, overall personal
-            status and comments, visits, display metadata, and selected photo
-            content. Storage keys, original filenames, hashes, internal IDs,
-            audit data, and credentials are not part of the public view.
+            Anyone with the URL can view published places, personal ratings and
+            comments, visits, and their published photos and videos. Storage
+            keys, original filenames, hashes, internal IDs, audit data, and
+            credentials are not part of the public view. Adding or changing data
+            and using Recommend or other Agent operations require the Owner
+            session.
           </p>
         </section>
 
         <section>
           <h2>Location hints</h2>
           <p>
-            Nearby starts only when you manually submit a neighborhood or
+            Recommend starts only when the Owner submits a neighborhood or
             address. Japan Atlas does not request browser geolocation. The hint
             and the coordinates of saved candidate places are sent to the
             private route service for that request. Provider responses are not
@@ -72,17 +74,19 @@ export default function PrivacyPage() {
         <section>
           <h2>Owner place intake</h2>
           <p>
-            When the Owner starts Add, the submitted place query is sent to
-            Google Places for a transient candidate list. Japan Atlas stores
-            only the selected Google Place ID as provider identity; candidate
-            names, addresses, provider request envelopes, and raw responses are
-            not stored and no Google Places content is sent to Leaflet. The
-            Owner-submitted query remains in the intake session for recovery. On
-            selection, the public Nominatim service may receive that public
-            place query to propose a durable OpenStreetMap address and
-            coordinates. Valid Nominatim proposals, source attribution, license,
-            and check time may be cached for up to 30 days before confirmation;
-            they enter the Atlas catalog only after Owner confirmation.
+            When the Owner starts Add, the submitted place query may be sent to
+            configured Google Places for a transient candidate list or to a
+            public search service for no-key discovery. In the Google flow,
+            Japan Atlas stores only the selected Google Place ID as provider
+            identity; candidate names, addresses, provider request envelopes,
+            and raw responses are not stored and no Google Places content is
+            sent to Leaflet. The Owner-submitted query remains in the intake
+            session for recovery. On selection, the public Nominatim service may
+            receive that public place query to propose a durable OpenStreetMap
+            address and coordinates. Valid Nominatim proposals, source
+            attribution, license, and check time may be cached for up to 30 days
+            before confirmation; they enter the Atlas catalog only after Owner
+            confirmation.
           </p>
         </section>
 
@@ -90,9 +94,10 @@ export default function PrivacyPage() {
           <h2>Owner data and retention</h2>
           <p>
             Owner edits are stored in the Atlas database; uploaded visit photos
-            are stored in private object storage and exposed only through the
-            published display projection. Authentication secrets remain in the
-            hosting platform’s encrypted secret store.
+            and videos are stored in private object storage and served through
+            opaque published display links. Internal media identifiers remain
+            Owner-only. Authentication secrets remain in the hosting platform’s
+            encrypted secret store.
           </p>
         </section>
 

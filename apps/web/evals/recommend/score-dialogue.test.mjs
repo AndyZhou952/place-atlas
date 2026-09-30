@@ -19,6 +19,6 @@ test('clarification continuation cases preserve and update the intended constrai
         : {}),
     })),
   });
-  assert.equal(report.cases, 8);
+  assert.equal(report.cases, 6);
   assert.equal(report.casePassRate, 1);
 });

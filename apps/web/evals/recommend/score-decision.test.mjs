@@ -70,7 +70,7 @@ test('curated decision cases and independent verifier accept a complete oracle',
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 26);
+  assert.equal(report.cases, 21);
   assert.equal(report.casePassRate, 1);
   assert.equal(report.safetyViolationCases, 0);
 });

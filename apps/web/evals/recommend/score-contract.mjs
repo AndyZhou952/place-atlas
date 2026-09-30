@@ -110,6 +110,16 @@ export function scoreRecommendContract(dataset, predictionFile) {
     if (expected.status === 'recommend') {
       const recommendation = final?.recommendations?.[0];
       if (
+        Array.isArray(dataset.allowedRouteModes) &&
+        Array.isArray(final?.recommendations) &&
+        final.recommendations.some(
+          (candidate) =>
+            candidate?.route &&
+            !dataset.allowedRouteModes.includes(candidate.route.mode),
+        )
+      )
+        failures.push('unsupported_route_mode');
+      if (
         recommendation?.itemId !== expected.itemId ||
         recommendation?.detailTargetId !== expected.detailTargetId
       )
@@ -147,6 +157,22 @@ export function scoreRecommendContract(dataset, predictionFile) {
         )
           failures.push('missing_verified_route');
       }
+      if (expected.forbidRouteClaim && recommendation?.route)
+        failures.push('unexpected_route_claim');
+      if (
+        Array.isArray(expected.displayIncludes) &&
+        expected.displayIncludes.some(
+          (fragment) =>
+            typeof trace?.displayedRouteText !== 'string' ||
+            !trace.displayedRouteText.includes(fragment),
+        )
+      )
+        failures.push('missing_displayed_evidence');
+      if (
+        expected.forbidTimedDisplay &&
+        /\b\d+\s*(?:min(?:utes)?\b|分)/iu.test(trace?.displayedRouteText ?? '')
+      )
+        failures.push('unsupported_time_display');
       if (trace?.openedDetailId !== expected.detailTargetId)
         failures.push('detail_not_opened');
     } else if (final?.recommendations?.length)

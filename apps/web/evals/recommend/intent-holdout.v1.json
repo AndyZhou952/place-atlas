@@ -86,16 +86,16 @@
       }
     },
     {
-      "caseId": "umeda-station-train",
+      "caseId": "umeda-station-walk",
       "input": {
-        "message": "Sushi within 18 minutes by direct train from Umeda Station"
+        "message": "Sushi within 18 minutes walking from Umeda Station"
       },
       "gold": {
         "action": "recommend",
         "originId": "station:umeda",
         "foodTerms": ["sushi"],
         "excludedFoodTerms": [],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 18,
         "visited": "prefer_unvisited"
       }

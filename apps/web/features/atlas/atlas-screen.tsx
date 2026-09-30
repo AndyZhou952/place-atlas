@@ -92,7 +92,8 @@ const navItems: readonly { value: AtlasView; label: string }[] = [
 
 export function AtlasScreen() {
   const owner = useOwnerSession();
-  const vm = useAtlasViewModel();
+  const canEdit = owner.state.authenticated === true;
+  const vm = useAtlasViewModel(canEdit);
   const [nearbyFocusRequest, setNearbyFocusRequest] = useState(0);
 
   return (
@@ -124,17 +125,19 @@ export function AtlasScreen() {
 
         <div className="header-actions">
           <OwnerAccessButton owner={owner} />
-          <Button
-            className="ask-button"
-            aria-label="Ask for a saved restaurant recommendation"
-            onClick={() => {
-              vm.setView('map');
-              setNearbyFocusRequest((request) => request + 1);
-            }}
-          >
-            <Sparkles data-icon="inline-start" />
-            <span className="header-action-label">Ask Recommend</span>
-          </Button>
+          {canEdit ? (
+            <Button
+              className="ask-button"
+              aria-label="Ask for a saved restaurant recommendation"
+              onClick={() => {
+                vm.setView('map');
+                setNearbyFocusRequest((request) => request + 1);
+              }}
+            >
+              <Sparkles data-icon="inline-start" />
+              <span className="header-action-label">Ask Recommend</span>
+            </Button>
+          ) : null}
         </div>
       </header>
 
@@ -152,9 +155,15 @@ export function AtlasScreen() {
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}
 
       {vm.view === 'map' ? (
-        <MapWorkspace vm={vm} nearbyFocusRequest={nearbyFocusRequest} />
+        <MapWorkspace
+          vm={vm}
+          nearbyFocusRequest={nearbyFocusRequest}
+          canEdit={canEdit}
+        />
       ) : null}
-      {vm.view === 'journal' ? <JournalWorkspace vm={vm} /> : null}
+      {vm.view === 'journal' ? (
+        <JournalWorkspace vm={vm} canEdit={canEdit} />
+      ) : null}
       <footer className="site-footer">
         <span>Japan Atlas · personal field guide</span>
         <nav aria-label="Legal">
@@ -172,9 +181,11 @@ type LayoutVariant = 'floating' | 'split' | 'bottom';
 function MapWorkspace({
   vm,
   nearbyFocusRequest,
+  canEdit,
 }: {
   readonly vm: AtlasViewModel;
   readonly nearbyFocusRequest: number;
+  readonly canEdit: boolean;
 }) {
   const [listOpen, setListOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<AtlasItem>();
@@ -260,12 +271,15 @@ function MapWorkspace({
             </Button>
           </div>
 
-          <CatalogIntakePanel
-            onCommitted={vm.reloadCatalogViews}
-            onOpenSaved={vm.selectItem}
-          />
-
-          <RecommendSearch onSelect={vm.selectItem} />
+          {canEdit ? (
+            <>
+              <CatalogIntakePanel
+                onCommitted={vm.reloadCatalogViews}
+                onOpenSaved={vm.selectItem}
+              />
+              <RecommendSearch onSelect={vm.selectItem} />
+            </>
+          ) : null}
 
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
@@ -353,9 +367,11 @@ function MapWorkspace({
               <p className="eyebrow">Tokyo · source checked 2026-09-06</p>
               <h2>{vm.visibleItems.length} real records</h2>
             </div>
-            <a className="nearby-jump" href="#nearby-location">
-              <LocateFixed aria-hidden="true" /> Recommend
-            </a>
+            {canEdit ? (
+              <a className="nearby-jump" href="#nearby-location">
+                <LocateFixed aria-hidden="true" /> Recommend
+              </a>
+            ) : null}
           </div>
 
           <div className="search-field">
@@ -377,6 +393,7 @@ function MapWorkspace({
                   key={item.id}
                   item={item}
                   selected={vm.selectedItem?.id === item.id}
+                  canEdit={canEdit}
                   distance={vm.distances[item.id]}
                   onSelect={() => vm.selectItem(item.id)}
                   onToggleFavorite={() =>
@@ -403,7 +420,7 @@ function MapWorkspace({
           </div>
         </aside>
         {vm.selectedItem ? (
-          <PlaceDetail key={vm.selectedItem.id} vm={vm} />
+          <PlaceDetail key={vm.selectedItem.id} vm={vm} canEdit={canEdit} />
         ) : (
           <div className="detail-card detail-card-empty">
             <CircleHelp aria-hidden="true" />
@@ -413,20 +430,22 @@ function MapWorkspace({
         )}
       </section>
 
-      <DeleteItemDialog
-        item={pendingDelete}
-        busy={pendingDelete ? vm.isItemPending(pendingDelete.id) : false}
-        onCancel={() => setPendingDelete(undefined)}
-        onConfirm={async () => {
-          if (!pendingDelete) return;
-          try {
-            await vm.removeItem(pendingDelete.id);
-            setPendingDelete(undefined);
-          } catch {
-            // The view model presents the error in the notice bar.
-          }
-        }}
-      />
+      {canEdit ? (
+        <DeleteItemDialog
+          item={pendingDelete}
+          busy={pendingDelete ? vm.isItemPending(pendingDelete.id) : false}
+          onCancel={() => setPendingDelete(undefined)}
+          onConfirm={async () => {
+            if (!pendingDelete) return;
+            try {
+              await vm.removeItem(pendingDelete.id);
+              setPendingDelete(undefined);
+            } catch {
+              // The view model presents the error in the notice bar.
+            }
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -434,6 +453,7 @@ function MapWorkspace({
 function PlaceRow({
   item,
   selected,
+  canEdit,
   distance,
   onSelect,
   onToggleFavorite,
@@ -443,6 +463,7 @@ function PlaceRow({
 }: {
   readonly item: AtlasItem;
   readonly selected: boolean;
+  readonly canEdit: boolean;
   readonly distance?: number;
   readonly onSelect: () => void;
   readonly onToggleFavorite: () => void;
@@ -491,51 +512,53 @@ function PlaceRow({
             <span className="list-kind-label">{kindLabel[item.kind]}</span>
           )}
         </span>
-        <div className="place-row-actions">
-          <button
-            type="button"
-            className={cn('place-row-action', item.isFavorite && 'is-active')}
-            aria-label={
-              item.isFavorite
-                ? `お気に入りを解除 ${item.title}`
-                : `お気に入りに追加 ${item.title}`
-            }
-            aria-pressed={Boolean(item.isFavorite)}
-            title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
-            onClick={onToggleFavorite}
-            disabled={busy}
-          >
-            <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'place-row-action is-visited',
-              item.hasVisited && 'is-active',
-            )}
-            aria-label={
-              item.hasVisited
-                ? `未訪問に戻す ${item.title}`
-                : `訪問済みにする ${item.title}`
-            }
-            aria-pressed={Boolean(item.hasVisited)}
-            title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
-            onClick={onToggleVisited}
-            disabled={busy}
-          >
-            <Circle fill={item.hasVisited ? 'currentColor' : 'none'} />
-            <span>行った</span>
-          </button>
-          <button
-            type="button"
-            className="place-row-action is-delete"
-            aria-label={`Delete ${item.title}`}
-            title="削除"
-            onClick={onDelete}
-          >
-            <Trash2 aria-hidden="true" />
-          </button>
-        </div>
+        {canEdit ? (
+          <div className="place-row-actions">
+            <button
+              type="button"
+              className={cn('place-row-action', item.isFavorite && 'is-active')}
+              aria-label={
+                item.isFavorite
+                  ? `お気に入りを解除 ${item.title}`
+                  : `お気に入りに追加 ${item.title}`
+              }
+              aria-pressed={Boolean(item.isFavorite)}
+              title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
+              onClick={onToggleFavorite}
+              disabled={busy}
+            >
+              <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'place-row-action is-visited',
+                item.hasVisited && 'is-active',
+              )}
+              aria-label={
+                item.hasVisited
+                  ? `未訪問に戻す ${item.title}`
+                  : `訪問済みにする ${item.title}`
+              }
+              aria-pressed={Boolean(item.hasVisited)}
+              title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
+              onClick={onToggleVisited}
+              disabled={busy}
+            >
+              <Circle fill={item.hasVisited ? 'currentColor' : 'none'} />
+              <span>行った</span>
+            </button>
+            <button
+              type="button"
+              className="place-row-action is-delete"
+              aria-label={`Delete ${item.title}`}
+              title="削除"
+              onClick={onDelete}
+            >
+              <Trash2 aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -596,9 +619,11 @@ function DeleteItemDialog({
 function PersonalRatingInline({
   item,
   vm,
+  canEdit,
 }: {
   readonly item: AtlasItem;
   readonly vm: AtlasViewModel;
+  readonly canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const cancelNextBlur = useRef(false);
@@ -640,7 +665,7 @@ function PersonalRatingInline({
     }
   }
 
-  if (editing) {
+  if (editing && canEdit) {
     return (
       <form
         className="rating-strip-item personal-rating-editor"
@@ -685,6 +710,14 @@ function PersonalRatingInline({
     );
   }
 
+  if (!canEdit)
+    return (
+      <span className="rating-strip-item personal-rating-inline">
+        <span>マイスコア</span>
+        <strong>{item.personalRating ?? '未評価'}</strong>
+      </span>
+    );
+
   return (
     <button
       type="button"
@@ -712,9 +745,11 @@ type OverallCommentStatus = 'idle' | 'saving' | 'error' | 'success';
 function OverallCommentEditor({
   item,
   vm,
+  canEdit,
 }: {
   readonly item: AtlasItem;
   readonly vm: AtlasViewModel;
+  readonly canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.overallComment ?? '');
@@ -762,7 +797,7 @@ function OverallCommentEditor({
           <p className="eyebrow">Personal note</p>
           <h3 id={`overall-comment-title-${item.id}`}>Overall comment</h3>
         </div>
-        {!editing ? (
+        {canEdit && !editing ? (
           <Button
             type="button"
             size="sm"
@@ -778,7 +813,7 @@ function OverallCommentEditor({
         ) : null}
       </header>
 
-      {editing ? (
+      {editing && canEdit ? (
         <form
           className="overall-comment-editor"
           aria-busy={status === 'saving'}
@@ -841,7 +876,13 @@ function OverallCommentEditor({
   );
 }
 
-function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
+function PlaceDetail({
+  vm,
+  canEdit,
+}: {
+  readonly vm: AtlasViewModel;
+  readonly canEdit: boolean;
+}) {
   const item = vm.selectedItem!;
   const storedGoogleRating =
     researchRegion(item.address) === 'mainland_china'
@@ -853,7 +894,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
     url: string;
   }>();
   useEffect(() => {
-    if (item.kind !== 'food') return;
+    if (!canEdit || item.kind !== 'food') return;
     const controller = new AbortController();
     void fetch(`/api/items/${encodeURIComponent(item.id)}/google-rating`, {
       signal: controller.signal,
@@ -884,7 +925,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [item.id, item.kind]);
+  }, [canEdit, item.id, item.kind]);
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
   const overallCheckedAt = [
     item.verifiedAt,
@@ -928,56 +969,60 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               <p className="detail-local">{item.alternateTitle}</p>
             ) : null}
           </div>
-          <div className="detail-actions">
-            <Button
-              variant={item.isFavorite ? 'default' : 'outline'}
-              size="icon-sm"
-              aria-label={
-                item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'
-              }
-              title={item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'}
-              aria-pressed={Boolean(item.isFavorite)}
-              onClick={() =>
-                void vm.saveAssessment(item.id, {
-                  isFavorite: !item.isFavorite,
-                })
-              }
-              disabled={vm.isItemPending(item.id)}
-            >
-              <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
-            </Button>
-            <Button
-              className="visited-toggle"
-              variant="outline"
-              size="sm"
-              aria-label={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
-              title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
-              aria-pressed={Boolean(item.hasVisited)}
-              onClick={() =>
-                void vm.saveAssessment(item.id, {
-                  hasVisited: !item.hasVisited,
-                })
-              }
-              disabled={vm.isItemPending(item.id)}
-            >
-              <Circle
-                data-icon="inline-start"
-                fill={item.hasVisited ? 'currentColor' : 'none'}
-              />
-              行った
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(true)}
-            >
-              <Pencil data-icon="inline-start" /> Edit place
-            </Button>
-          </div>
+          {canEdit ? (
+            <div className="detail-actions">
+              <Button
+                variant={item.isFavorite ? 'default' : 'outline'}
+                size="icon-sm"
+                aria-label={
+                  item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'
+                }
+                title={
+                  item.isFavorite ? 'お気に入りを解除' : 'お気に入りに追加'
+                }
+                aria-pressed={Boolean(item.isFavorite)}
+                onClick={() =>
+                  void vm.saveAssessment(item.id, {
+                    isFavorite: !item.isFavorite,
+                  })
+                }
+                disabled={vm.isItemPending(item.id)}
+              >
+                <Heart fill={item.isFavorite ? 'currentColor' : 'none'} />
+              </Button>
+              <Button
+                className="visited-toggle"
+                variant="outline"
+                size="sm"
+                aria-label={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
+                title={item.hasVisited ? '未訪問に戻す' : '訪問済みにする'}
+                aria-pressed={Boolean(item.hasVisited)}
+                onClick={() =>
+                  void vm.saveAssessment(item.id, {
+                    hasVisited: !item.hasVisited,
+                  })
+                }
+                disabled={vm.isItemPending(item.id)}
+              >
+                <Circle
+                  data-icon="inline-start"
+                  fill={item.hasVisited ? 'currentColor' : 'none'}
+                />
+                行った
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil data-icon="inline-start" /> Edit place
+              </Button>
+            </div>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent>
-        {editing ? (
+        {editing && canEdit ? (
           <form className="edit-form" onSubmit={submit}>
             <label htmlFor="edit-title">
               Display title
@@ -1042,7 +1087,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             </div>
 
             <div className="rating-strip" aria-label="Ratings">
-              <PersonalRatingInline item={item} vm={vm} />
+              <PersonalRatingInline item={item} vm={vm} canEdit={canEdit} />
               {item.tabelog ? (
                 <a
                   className="rating-strip-item tabelog-rating-inline"
@@ -1078,20 +1123,27 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
               </span>
             </div>
 
-            <OverallCommentEditor key={item.id} item={item} vm={vm} />
+            <OverallCommentEditor
+              key={item.id}
+              item={item}
+              vm={vm}
+              canEdit={canEdit}
+            />
 
-            <details className="detail-visit-recorder">
-              <summary>
-                <NotebookPen aria-hidden="true" /> Add a visit
-              </summary>
-              <VisitComposer
-                key={item.id}
-                vm={vm}
-                itemId={item.id}
-                idPrefix={`detail-${item.id}`}
-                compact
-              />
-            </details>
+            {canEdit ? (
+              <details className="detail-visit-recorder">
+                <summary>
+                  <NotebookPen aria-hidden="true" /> Add a visit
+                </summary>
+                <VisitComposer
+                  key={item.id}
+                  vm={vm}
+                  itemId={item.id}
+                  idPrefix={`detail-${item.id}`}
+                  compact
+                />
+              </details>
+            ) : null}
 
             <div className="fact-grid">
               <div className="fact-card">
@@ -1134,6 +1186,7 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                         (entry) => entry.visitId === visit.id,
                       )}
                       mediaBusy={vm.isMediaVisitPending(visit.id)}
+                      canEdit={canEdit}
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
@@ -1144,7 +1197,9 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
                 </ol>
               ) : (
                 <p className="detail-visit-empty">
-                  No visits yet. Add the first one above.
+                  {canEdit
+                    ? 'No visits yet. Add the first one above.'
+                    : 'No visits recorded yet.'}
                 </p>
               )}
             </section>
@@ -1164,21 +1219,23 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
             {overallCheckedAt ? (
               <p className="source-checked-at">最終確認：{overallCheckedAt}</p>
             ) : null}
-            <DeleteVisitDialog
-              visit={pendingVisitDelete}
-              busy={vm.journalBusy}
-              onCancel={() => setPendingVisitDelete(undefined)}
-              onConfirm={async () => {
-                if (!pendingVisitDelete) return;
-                const visit = pendingVisitDelete;
-                setPendingVisitDelete(undefined);
-                try {
-                  await vm.removeVisit(visit.id);
-                } catch {
-                  setPendingVisitDelete(visit);
-                }
-              }}
-            />
+            {canEdit ? (
+              <DeleteVisitDialog
+                visit={pendingVisitDelete}
+                busy={vm.journalBusy}
+                onCancel={() => setPendingVisitDelete(undefined)}
+                onConfirm={async () => {
+                  if (!pendingVisitDelete) return;
+                  const visit = pendingVisitDelete;
+                  setPendingVisitDelete(undefined);
+                  try {
+                    await vm.removeVisit(visit.id);
+                  } catch {
+                    setPendingVisitDelete(visit);
+                  }
+                }}
+              />
+            ) : null}
           </>
         )}
       </CardContent>
@@ -1186,7 +1243,13 @@ function PlaceDetail({ vm }: { readonly vm: AtlasViewModel }) {
   );
 }
 
-function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
+function JournalWorkspace({
+  vm,
+  canEdit,
+}: {
+  readonly vm: AtlasViewModel;
+  readonly canEdit: boolean;
+}) {
   const [placeFilter, setPlaceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -1220,19 +1283,22 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
         <p className="eyebrow">Personal journal</p>
         <h2>Your journal</h2>
         <p>
-          Record a visit with just a date, or include photos, an optional note
-          and your overall place rating. Add more photos later.
+          {canEdit
+            ? 'Record a visit with just a date, or include photos, an optional note and your overall place rating. Add more photos later.'
+            : 'Browse visit notes, photos and videos. Log in as Owner to add or edit a visit.'}
         </p>
       </div>
-      <div className="journal-grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Add a visit</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <VisitComposer vm={vm} idPrefix="journal" />
-          </CardContent>
-        </Card>
+      <div className={cn('journal-grid', !canEdit && 'is-read-only')}>
+        {canEdit ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Add a visit</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VisitComposer vm={vm} idPrefix="journal" />
+            </CardContent>
+          </Card>
+        ) : null}
         <div className="journal-browser">
           <div className="journal-filters" aria-label="Journal filters">
             <label htmlFor="journal-sort">
@@ -1324,6 +1390,7 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
                         (entry) => entry.visitId === visit.id,
                       )}
                       mediaBusy={vm.isMediaVisitPending(visit.id)}
+                      canEdit={canEdit}
                       onSave={vm.editVisit}
                       onUpload={vm.addVisitMedia}
                       onSaveCaption={vm.saveMediaCaption}
@@ -1351,22 +1418,24 @@ function JournalWorkspace({ vm }: { readonly vm: AtlasViewModel }) {
           </div>
         </div>
       </div>
-      <DeleteVisitDialog
-        visit={pendingDelete}
-        busy={vm.journalBusy}
-        onCancel={() => setPendingDelete(undefined)}
-        onConfirm={async () => {
-          if (!pendingDelete) return;
-          const visit = pendingDelete;
-          setPendingDelete(undefined);
-          try {
-            await vm.removeVisit(visit.id);
-          } catch {
-            setPendingDelete(visit);
-            // The view model restores the record and presents the error.
-          }
-        }}
-      />
+      {canEdit ? (
+        <DeleteVisitDialog
+          visit={pendingDelete}
+          busy={vm.journalBusy}
+          onCancel={() => setPendingDelete(undefined)}
+          onConfirm={async () => {
+            if (!pendingDelete) return;
+            const visit = pendingDelete;
+            setPendingDelete(undefined);
+            try {
+              await vm.removeVisit(visit.id);
+            } catch {
+              setPendingDelete(visit);
+              // The view model restores the record and presents the error.
+            }
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1810,6 +1879,7 @@ function JournalVisitRow({
   busy,
   media,
   mediaBusy,
+  canEdit,
   onSave,
   onUpload,
   onSaveCaption,
@@ -1823,6 +1893,7 @@ function JournalVisitRow({
   readonly busy: boolean;
   readonly media: readonly VisitMediaRecord[];
   readonly mediaBusy: boolean;
+  readonly canEdit: boolean;
   readonly onSave: AtlasViewModel['editVisit'];
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
@@ -1875,7 +1946,7 @@ function JournalVisitRow({
     }
   }
 
-  if (editing) {
+  if (editing && canEdit) {
     return (
       <li className="journal-visit is-editing">
         <form className="journal-visit-form" onSubmit={submit} noValidate>
@@ -1973,29 +2044,32 @@ function JournalVisitRow({
           visitId={visit.id}
           media={media}
           busy={mediaBusy}
+          canEdit={canEdit}
           onUpload={onUpload}
           onSaveCaption={onSaveCaption}
           onDelete={onDeleteMedia}
         />
       </div>
-      <div className="journal-visit-actions">
-        <button
-          type="button"
-          aria-label={`Edit visit ${visitNumber} and restaurant`}
-          title="Edit visit or change restaurant"
-          onClick={beginEditing}
-        >
-          <Pencil aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label={`Delete visit ${visitNumber}`}
-          title="Delete visit"
-          onClick={onDelete}
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
-      </div>
+      {canEdit ? (
+        <div className="journal-visit-actions">
+          <button
+            type="button"
+            aria-label={`Edit visit ${visitNumber} and restaurant`}
+            title="Edit visit or change restaurant"
+            onClick={beginEditing}
+          >
+            <Pencil aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label={`Delete visit ${visitNumber}`}
+            title="Delete visit"
+            onClick={onDelete}
+          >
+            <Trash2 aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -2004,6 +2078,7 @@ function VisitMediaEditor({
   visitId,
   media,
   busy,
+  canEdit,
   onUpload,
   onSaveCaption,
   onDelete,
@@ -2011,6 +2086,7 @@ function VisitMediaEditor({
   readonly visitId: string;
   readonly media: readonly VisitMediaRecord[];
   readonly busy: boolean;
+  readonly canEdit: boolean;
   readonly onUpload: AtlasViewModel['addVisitMedia'];
   readonly onSaveCaption: AtlasViewModel['saveMediaCaption'];
   readonly onDelete: AtlasViewModel['removeMedia'];
@@ -2031,11 +2107,12 @@ function VisitMediaEditor({
 
   return (
     <div className="visit-media-editor">
-      <div className="visit-media-gallery is-editable">
+      <div className={cn('visit-media-gallery', canEdit && 'is-editable')}>
         {visibleMedia.map((entry, index) => (
           <MediaCaptionEditor
             key={`${entry.id}:${entry.caption ?? ''}`}
             media={entry}
+            canEdit={canEdit}
             onSave={onSaveCaption}
             onDelete={onDelete}
             onOpen={() => setLightboxIndex(index)}
@@ -2046,27 +2123,33 @@ function VisitMediaEditor({
         count={media.length}
         onOpen={() => setLightboxIndex(0)}
       />
-      <label className={cn('media-upload-control', busy && 'is-busy')}>
-        <ImagePlus aria-hidden="true" />
-        {busy ? 'Uploading…' : 'Add photos or videos'}
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
-          multiple
-          disabled={busy}
-          onChange={(event) => void selectFiles(event)}
-        />
-      </label>
+      {canEdit ? (
+        <label className={cn('media-upload-control', busy && 'is-busy')}>
+          <ImagePlus aria-hidden="true" />
+          {busy ? 'Uploading…' : 'Add photos or videos'}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+            multiple
+            disabled={busy}
+            onChange={(event) => void selectFiles(event)}
+          />
+        </label>
+      ) : null}
       {lightboxIndex !== undefined ? (
         <PhotoLightbox
           media={media}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(undefined)}
-          onSaveCaption={onSaveCaption}
-          onDelete={async (id) => {
-            if (media.length === 1) setLightboxIndex(undefined);
-            return onDelete(id);
-          }}
+          onSaveCaption={canEdit ? onSaveCaption : undefined}
+          onDelete={
+            canEdit
+              ? async (id) => {
+                  if (media.length === 1) setLightboxIndex(undefined);
+                  return onDelete(id);
+                }
+              : undefined
+          }
         />
       ) : null}
     </div>
@@ -2090,11 +2173,13 @@ function MediaBrowseButton({
 
 function MediaCaptionEditor({
   media,
+  canEdit,
   onSave,
   onDelete,
   onOpen,
 }: {
   readonly media: VisitMediaRecord;
+  readonly canEdit: boolean;
   readonly onSave: AtlasViewModel['saveMediaCaption'];
   readonly onDelete: AtlasViewModel['removeMedia'];
   readonly onOpen: () => void;
@@ -2133,37 +2218,44 @@ function MediaCaptionEditor({
             />
           )}
         </button>
-        <button
-          className="media-thumbnail-delete"
-          type="button"
-          aria-label={`Delete ${media.originalFilename}`}
-          title="Delete media"
-          onClick={() => {
-            const kind = media.contentType.startsWith('video/')
-              ? 'video'
-              : 'photo';
-            if (window.confirm(`Delete this ${kind}?`)) void onDelete(media.id);
-          }}
-        >
-          <X aria-hidden="true" />
-        </button>
+        {canEdit ? (
+          <button
+            className="media-thumbnail-delete"
+            type="button"
+            aria-label={`Delete ${media.originalFilename}`}
+            title="Delete media"
+            onClick={() => {
+              const kind = media.contentType.startsWith('video/')
+                ? 'video'
+                : 'photo';
+              if (window.confirm(`Delete this ${kind}?`))
+                void onDelete(media.id);
+            }}
+          >
+            <X aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
-      <div className="media-caption-row">
-        <Input
-          value={caption}
-          maxLength={160}
-          aria-label={`Caption for ${media.originalFilename}`}
-          placeholder="What is this?"
-          onChange={(event) => setCaption(event.target.value)}
-          onBlur={() => void saveCaption()}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-          }}
-        />
-      </div>
+      {canEdit ? (
+        <div className="media-caption-row">
+          <Input
+            value={caption}
+            maxLength={160}
+            aria-label={`Caption for ${media.originalFilename}`}
+            placeholder="What is this?"
+            onChange={(event) => setCaption(event.target.value)}
+            onBlur={() => void saveCaption()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+          />
+        </div>
+      ) : media.caption ? (
+        <figcaption>{media.caption}</figcaption>
+      ) : null}
     </figure>
   );
 }

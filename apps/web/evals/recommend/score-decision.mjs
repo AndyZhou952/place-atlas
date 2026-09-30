@@ -15,7 +15,6 @@ function supportedReasonFact(fact, item, input, routeClaim) {
     case 'visited':
       return fact.value === true && item.visited === true;
     case 'walk':
-    case 'transit':
       return (
         routeClaim?.mode === fact.kind && routeClaim.seconds === fact.seconds
       );
@@ -55,17 +54,12 @@ function validRouteClaim(claim, itemId, input) {
   if (!route) return false;
   const { travelMode, maxMinutes } = input.intent;
   if (
-    !['walk', 'transit', 'either'].includes(travelMode) ||
-    (travelMode !== 'either' && travelMode !== claim.mode) ||
+    !['walk', 'either'].includes(travelMode) ||
+    claim.mode !== 'walk' ||
     (Number.isFinite(maxMinutes) && claim.seconds > maxMinutes * 60)
   )
     return false;
-  return (
-    claim.mode === 'walk' ||
-    (claim.mode === 'transit' &&
-      route.transfers === 0 &&
-      route.doorToDoor === true)
-  );
+  return true;
 }
 
 export function scoreRecommendDecision(dataset, predictionFile) {

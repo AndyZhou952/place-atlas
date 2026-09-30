@@ -1,0 +1,66 @@
+{
+  "purpose": "Bind the existing journey contract to an independently captured public catalog. Source URLs identify expected saved records; predictions never choose their own expected identity. Controlled scenarios use the production application service and deployed UI, with fixture dependencies explicitly distinguished from live DeepSeek and Google calls.",
+  "cases": {
+    "one-turn-saved-detail": {
+      "scenario": "live",
+      "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/"
+    },
+    "origin-free-text-continuation": {
+      "scenario": "live",
+      "query": "新宿で徒歩10分以内のラーメン",
+      "answers": ["西武新宿駅"],
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/"
+    },
+    "branch-choice-continuation": {
+      "scenario": "branch-choice",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/"
+    },
+    "travel-mode-choice-continuation": {
+      "scenario": "live",
+      "query": "新宿駅から15分以内のカレー",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13295399/"
+    },
+    "insufficient-answer-asks-again": {
+      "scenario": "live",
+      "query": "新宿から徒歩10分のラーメン"
+    },
+    "provider-failure-retry": { "scenario": "provider-failure" },
+    "empty-catalog": { "scenario": "empty-catalog" },
+    "keyboard-question-reply": {
+      "scenario": "live",
+      "query": "徒歩10分で寿司",
+      "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/"
+    },
+    "reset-discards-prior-constraints": {
+      "scenario": "live",
+      "query": "新宿から徒歩10分のラーメン",
+      "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/"
+    },
+    "multilingual-alias-canonical-name": {
+      "scenario": "live",
+      "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/"
+    },
+    "direct-walk-canonical-route": {
+      "scenario": "live",
+      "query": "銀座駅から徒歩10分以内の寿司",
+      "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/"
+    },
+    "station-origin-default-distance-with-saved-cafe": {
+      "scenario": "live",
+      "query": "新宿駅の近くでコーヒー",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/"
+    },
+    "ambiguous-station-choice-continues": {
+      "scenario": "live",
+      "answers": [
+        "大久保駅",
+        "Ōkubo Station, 1-chōme-17-1 Hyakuninchō, Shinjuku City, Tokyo 169-0073, Japan"
+      ],
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130404/13206139/"
+    },
+    "pasted-street-address-overrides-catalog-area": {
+      "scenario": "live",
+      "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13227776/"
+    }
+  }
+}

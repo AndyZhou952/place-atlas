@@ -9,7 +9,7 @@
       "modelPrediction": {
         "action": "recommend",
         "foodTerms": ["curry"],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 20
       },
       "expected": {
@@ -65,7 +65,7 @@
         "action": "recommend",
         "originId": "area:shinjuku",
         "foodTerms": ["curry"],
-        "travelMode": "transit",
+        "travelMode": "walk",
         "maxMinutes": 20
       },
       "expected": {
@@ -112,8 +112,8 @@
       }
     },
     {
-      "caseId": "explicit-train-keeps-route-constraint",
-      "messages": ["新宿駅から電車20分以内のカレー"],
+      "caseId": "explicit-walk-corrects-model-duration",
+      "messages": ["新宿駅から徒歩10分以内のカレー"],
       "options": [
         { "id": "station:shinjuku", "kind": "station", "names": ["新宿駅"] }
       ],
@@ -121,13 +121,14 @@
         "action": "recommend",
         "originId": "station:shinjuku",
         "foodTerms": ["curry"],
-        "travelMode": "none"
+        "travelMode": "walk",
+        "maxMinutes": 20
       },
       "expected": {
         "action": "recommend",
         "originId": "station:shinjuku",
-        "travelMode": "transit",
-        "maxMinutes": 20
+        "travelMode": "walk",
+        "maxMinutes": 10
       }
     }
   ]

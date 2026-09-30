@@ -32,7 +32,7 @@ test('resolved-origin recommendations use nearby saved IDs and label straight-li
   );
   for (const caseId of [
     'distance-default-ignores-walking-route',
-    'distance-default-ignores-train-route',
+    'distance-default-ignores-slow-walking-route',
     'distance-default-uses-geodesic-without-route',
   ]) {
     assert.equal(byCase.get(caseId).recommendations[0].routeClaim, undefined);
@@ -46,14 +46,14 @@ test('resolved-origin recommendations use nearby saved IDs and label straight-li
 
 test('a route claim is rejected when no travel mode was requested', () => {
   const entry = dataset.cases.find(
-    ({ caseId }) => caseId === 'distance-default-ignores-train-route',
+    ({ caseId }) => caseId === 'distance-default-ignores-slow-walking-route',
   );
   const actual = decideRecommend(entry.input, dataset.catalog);
   const prediction = { caseId: entry.caseId, ...actual };
   prediction.recommendations = [
     {
       ...actual.recommendations[0],
-      routeClaim: { mode: 'transit', seconds: 1080 },
+      routeClaim: { mode: 'walk', seconds: 960 },
     },
   ];
   const report = scoreRecommendDecision(

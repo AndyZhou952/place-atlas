@@ -147,6 +147,8 @@ export function scoreRecommendContract(dataset, predictionFile) {
         )
           failures.push('missing_verified_route');
       }
+      if (expected.forbidRouteClaim && recommendation?.route)
+        failures.push('unexpected_route_claim');
       if (trace?.openedDetailId !== expected.detailTargetId)
         failures.push('detail_not_opened');
     } else if (final?.recommendations?.length)

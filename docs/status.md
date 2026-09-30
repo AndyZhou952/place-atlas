@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-09-30. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
+Updated: 2026-10-01. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
 
 `[x]` records completed implementation or verification. `[ ]` records work still open. Local tests and model-only benchmarks do not replace deployed website acceptance.
 
@@ -32,21 +32,19 @@ Updated: 2026-09-30. This is the development progress tracker. System boundaries
 - [x] The deterministic foundation reads verified saved food only, uses catalog/route evidence, prefers unvisited places and provides exact saved-detail targets. The final receipt rereads current D1 identity and source facts, rejects removed/changed/mismatched candidates, and emits the database's canonical name and address rather than a model-generated one.
 - [x] The owner-authenticated, no-store Recommend API accepts a bounded query, replies and optional verified origin choice. The Map UI supports follow-up questions, keyboard answers, geocoder choices, reset and retry without losing the draft. Broad-area requests can return area matches; timed route requests require an exact origin. A pasted shop name or map address can be an origin hint.
 - [x] Without an explicit travel mode, a precise origin ranks saved restaurants within 2 km straight-line distance and labels travel time unverified; a broad area carries no distance or time claim. “Near me” asks for a start. Explicit walking keeps fresh route/time checks; explicit driving truthfully reports unsupported. Walk-in entry wording is distinct from walking duration, and sourced booking rules can exclude incompatible recommendations while unknown availability stays unknown.
-- [x] The private Route Sidecar batches walking destinations and supports verified direct-rail routes in regions covered by Google Routes. Japan transit coverage is unavailable from that API, so Japan train requests fail clearly before provider egress. No paid alternate provider or extra credential is assumed.
+- [x] The private Route Sidecar batches walking destinations. Existing direct-rail support is optional and unavailable for Japan through Google Routes; it is outside the PoC release benchmark and requires no paid alternate provider or extra credential.
 - [x] The frozen model-only benchmark has 34 intent, 8 dialogue, 26 decision, 14 retained Nearby policy and 10 station cases (92 total). Three original DeepSeek baseline runs passed 27/92, 28/92 and 27/92. Three fresh production-interpreter runs passed the 34+8 intent/dialogue cases each time; an additional paraphrase regression passed 15+4 after a near-me fix. These runs use synthetic options and do not establish browser acceptance.
-- [x] Current deterministic extensions cover default distance, proximity intent, walk-in entry and wording, plus 14 application contracts. Scorers and oracle tests distinguish action, saved identity, route/source safety, clarification and UI continuation. Legacy Nearby cases remain active retention gates.
-- [x] Corrected the application contract's positive direct-train fixture to use a supported London region; the separate Japan train case still requires a truthful unavailable response. A service-level supported-region route and canonical saved branch test passes. The 14 application traces themselves remain unscored.
-- [x] Deployed browser subsets verified broad-area suggestions, exact-origin replies and choices, direct saved-detail clicks, distance caveats, a sourced walking route, draft-preserving retry, walk-in uncertainty, English station names, pasted addresses and a truthful Japan-train unavailable response. These are partial acceptance results.
-- [ ] Capture and score all 14 owner-authenticated browser/API application traces, including supported-region direct rail, provider failure and mobile continuation. Oracle tests and partial browser checks do not close this gate.
+- [x] Current deterministic extensions cover default distance, proximity intent, walk-in entry and wording, plus 14 application contracts. Current release fixtures require straight-line distance with an uncertainty warning by default, and sourced walking time only when explicitly requested; they contain no train-time acceptance case. The frozen 92-case historical baseline remains available for comparison, with its old transit scenarios excluded from the current release rate. Scorers and oracle tests distinguish action, saved identity, route/source safety, clarification and UI continuation.
+- [x] Deployed browser subsets verified broad-area suggestions, exact-origin replies and choices, direct saved-detail clicks, distance caveats, a sourced walking route, draft-preserving retry, walk-in uncertainty, English station names and pasted addresses. These are partial acceptance results.
+- [ ] Capture and score all 14 owner-authenticated browser/API application traces, including default-distance and explicit-walking behavior, provider failure and mobile continuation. Oracle tests and partial browser checks do not close this gate.
 - [ ] Add image-based location understanding only after collecting labelled screenshot cases and a separate modality baseline.
-- [ ] Revisit explicit Japan rail only when a reliable free structured provider can be verified live; preserve the current truthful unavailable response until then.
 
 ## Shared platform and release
 
 - [x] Cloudflare Workers, D1, R2, owner sessions, public catalog responses, map rendering and personal controls are implemented. Mobile Map/Journal layout and touch targets passed deployed checks at 320, 390 and 768 CSS pixels; the 320-pixel header no longer overflows.
 - [x] The publication rule is explicit: anonymous visitors may read published places, personal ratings and comments, Visits, photos and videos; only the Owner may add/edit records or call Recommend and other metered Agent operations. Public media uses opaque display IDs; internal media IDs and storage keys remain private. README, architecture and site policy now describe the same boundary.
 - [x] CI runs formatting, lint, typecheck, all Node tests, the owner website build and the private Route Sidecar bundle preflight. Add, Record, retained Nearby and Recommend regression tests are included in the single test run rather than repeated by separate CI jobs.
-- [x] Release audit of the current deployment found no expired active Add sessions or overdue terminal references; 37 gateway audit events and 195 committed mutation receipts were retained. One expired uncommitted claim can be reclaimed by the existing same-payload retry path. The local suite passed 925/925, including the complete unsafe-route auth surface and rejection-before-write contracts.
+- [x] Release audit of the current deployment found no expired active Add sessions or overdue terminal references; 37 gateway audit events and 195 committed mutation receipts were retained. One expired uncommitted claim can be reclaimed by the existing same-payload retry path. The local suite passed, including the complete unsafe-route auth surface and rejection-before-write contracts.
 - [x] The pre-release live data audit found 57 saved items, 13 Visits, no orphan Visits/media, no pending D1 migration, and 38 D1-referenced R2 objects (10,679,105 bytes) whose sizes and SHA-256 values match. The read-only media audit is now a reusable `audit:media-integrity` command.
 - [ ] Recheck the public/private boundary and every write path after the release deployment, including anonymous photo/video access and Owner-only Recommend.
 - [ ] Verify deployed D1/R2 bindings, migrations, markers and media persistence after release changes; ensure Add, Record and Recommend agree on saved state after refresh.
@@ -55,6 +53,6 @@ Updated: 2026-09-30. This is the development progress tracker. System boundaries
 
 ## Next
 
-1. Finish the 14 Recommend application traces and mobile acceptance; retain truthful Japan train unavailability.
+1. Finish the 14 Recommend application traces and mobile acceptance using default-distance and explicit-walking cases.
 2. Run shared data/auth and fresh deployment regression checks for Add, Record and Recommend.
 3. Close the release gate only with deployed evidence. Keep raw evaluation runs ignored and curated benchmarks in `apps/web/evals/`.

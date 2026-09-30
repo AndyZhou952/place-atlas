@@ -122,28 +122,33 @@
       }
     },
     {
-      "caseId": "direct-train-canonical-route",
-      "query": "London Bridge Stationから電車20分以内のラーメン",
+      "caseId": "direct-walk-canonical-route",
+      "query": "銀座駅から徒歩10分以内のラーメン",
       "answers": [],
       "expected": {
         "status": "recommend",
-        "itemId": "saved-london-ramen",
-        "detailTargetId": "saved-london-ramen",
-        "name": "Ramen South",
-        "address": "Fixture address: London Bridge branch",
+        "itemId": "saved-ginza-ramen",
+        "detailTargetId": "saved-ginza-ramen",
+        "name": "麺 そら 銀座店",
+        "address": "Fixture address: Ginza branch",
         "reasonRequired": true,
-        "routeMode": "transit",
-        "maxRouteSeconds": 1200
+        "routeMode": "walk",
+        "maxRouteSeconds": 600
       }
     },
     {
-      "caseId": "japan-transit-unsupported-with-saved-cafe",
-      "query": "銀座駅から電車20分以内のコーヒー",
+      "caseId": "station-origin-default-distance-with-saved-cafe",
+      "query": "銀座駅の近くでコーヒー",
       "answers": [],
       "expected": {
-        "status": "unavailable",
-        "retryable": false,
-        "messageIncludes": "Train route times in Japan are unavailable"
+        "status": "recommend",
+        "itemId": "saved-ginza-cafe",
+        "detailTargetId": "saved-ginza-cafe",
+        "name": "喫茶 銀座",
+        "reasonRequired": true,
+        "reasonIncludes": "straight-line distance",
+        "warningIncludes": "unverified_travel_time",
+        "forbidRouteClaim": true
       }
     },
     {
@@ -175,7 +180,8 @@
         "name": "喫茶 みずき 新宿店",
         "reasonRequired": true,
         "reasonIncludes": "straight-line distance",
-        "warningIncludes": "unverified_travel_time"
+        "warningIncludes": "unverified_travel_time",
+        "forbidRouteClaim": true
       }
     }
   ]

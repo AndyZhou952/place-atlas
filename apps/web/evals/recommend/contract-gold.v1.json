@@ -123,13 +123,14 @@
     },
     {
       "caseId": "direct-train-canonical-route",
-      "query": "新宿駅から電車20分以内のラーメン",
+      "query": "London Bridge Stationから電車20分以内のラーメン",
       "answers": [],
       "expected": {
         "status": "recommend",
-        "itemId": "saved-ramen",
-        "detailTargetId": "saved-ramen",
-        "name": "麺 そら",
+        "itemId": "saved-london-ramen",
+        "detailTargetId": "saved-london-ramen",
+        "name": "Ramen South",
+        "address": "Fixture address: London Bridge branch",
         "reasonRequired": true,
         "routeMode": "transit",
         "maxRouteSeconds": 1200

@@ -14,6 +14,7 @@ const row = {
   byte_size: 123,
   content_sha256: 'sha-1',
   caption: null,
+  score: 4.2,
   display_order: 2,
   created_at: '2026-09-10T08:00:00.000Z',
   updated_at: '2026-09-10T08:00:00.000Z',
@@ -44,6 +45,7 @@ test('the D1 VisitMedia adapter filters by Visit and item with legacy ordering',
   assert.deepEqual(calls[0].values, ['visit-1', 'item-1']);
   assert.match(calls[0].sql, /WHERE visit_id = \? AND item_id = \?/u);
   assert.match(calls[0].sql, /ORDER BY visit_id, display_order, created_at/u);
+  assert.doesNotMatch(calls[0].sql, /\bscore\b/u);
   assert.deepEqual(records, [
     {
       id: 'media-1',
@@ -145,7 +147,6 @@ test('the D1 adapter reads Visit ordering context and atomically inserts metadat
     123,
     'sha-1',
     '鮨',
-    null,
     3,
     '2026-09-12T08:00:00.000Z',
     '2026-09-12T08:00:00.000Z',
@@ -183,36 +184,6 @@ test('the D1 adapter updates a caption and returns the stored metadata', async (
   assert.deepEqual(calls[0].values, ['鮨 course', 'updated', 'media-1']);
   assert.equal(result.caption, '鮨 course');
   assert.equal(result.updatedAt, 'updated');
-});
-
-test('the D1 adapter updates and clears a media score without touching its caption', async () => {
-  const calls = [];
-  const database = {
-    prepare(sql) {
-      const call = { sql, values: [] };
-      calls.push(call);
-      return {
-        bind(...values) {
-          call.values = values;
-          return this;
-        },
-        async first() {
-          return { ...row, caption: '鮨 course', score: 4.2 };
-        },
-      };
-    },
-  };
-  const state = new D1VisitMediaState(database);
-  const scored = await state.updateScore('media-1', 4.2, 'updated');
-  assert.match(
-    calls[0].sql,
-    /UPDATE visit_media SET score = \?, updated_at = \?/u,
-  );
-  assert.deepEqual(calls[0].values, [4.2, 'updated', 'media-1']);
-  assert.equal(scored.score, 4.2);
-  assert.equal(scored.caption, '鮨 course');
-  await state.updateScore('media-1', undefined, 'cleared');
-  assert.deepEqual(calls[1].values, [null, 'cleared', 'media-1']);
 });
 
 test('the D1 adapter deletes metadata and returns its object identity in one statement', async () => {

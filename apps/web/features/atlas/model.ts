@@ -64,7 +64,6 @@ export type VisitMediaRecord = Pick<
   | 'originalFilename'
   | 'contentType'
   | 'caption'
-  | 'score'
   | 'displayOrder'
   | 'contentUrl'
 >;

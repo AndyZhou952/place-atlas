@@ -310,10 +310,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
     input: { id: 'media / 1', caption: null },
   });
   await application.execute({
-    key: 'media.score',
-    input: { id: 'media / 1', score: 4.2 },
-  });
-  await application.execute({
     key: 'media.delete',
     input: { id: 'media / 1' },
   });
@@ -376,11 +372,6 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       url: '/api/media/media%20%2F%201',
       method: 'PATCH',
       body: { caption: null },
-    },
-    {
-      url: '/api/media/media%20%2F%201',
-      method: 'PATCH',
-      body: { score: 4.2 },
     },
     {
       url: '/api/media/media%20%2F%201',

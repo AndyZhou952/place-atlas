@@ -1774,7 +1774,6 @@ const expectedOperationKeys = [
   'decision.nearby',
   'media.attach',
   'media.caption',
-  'media.score',
   'media.delete',
   'media.list',
   'media.open',

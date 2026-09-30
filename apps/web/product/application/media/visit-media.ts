@@ -7,8 +7,6 @@ export interface VisitMedia {
   readonly byteSize: number;
   readonly contentSha256: string;
   readonly caption?: string;
-  /** Optional score for this media item; independent of the place score. */
-  readonly score?: number;
   readonly displayOrder: number;
   readonly contentUrl: string;
   readonly createdAt: string;

@@ -211,10 +211,25 @@ export function RecommendSearch({
                   </span>
                 </button>
                 <p className="nearby-reason">{candidate.reason}</p>
+                {candidate.route ? (
+                  <p className="nearby-evidence">
+                    {candidate.route.mode === 'walk' ? 'Walk' : 'Direct train'}{' '}
+                    · {Math.ceil(candidate.route.seconds / 60)} min ·{' '}
+                    <a
+                      href={candidate.route.source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {candidate.route.source.label}
+                    </a>{' '}
+                    · checked{' '}
+                    {new Date(candidate.route.checkedAt).toLocaleString()}
+                  </p>
+                ) : null}
                 {candidate.warnings.length ? (
                   <ul className="nearby-warnings">
                     {candidate.warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
+                      <li key={warning}>{recommendWarningLabel(warning)}</li>
                     ))}
                   </ul>
                 ) : null}
@@ -225,4 +240,15 @@ export function RecommendSearch({
       ) : null}
     </section>
   );
+}
+
+function recommendWarningLabel(code: string): string {
+  switch (code) {
+    case 'unverified_travel_time':
+      return 'Travel time is not verified; distance is straight-line only.';
+    case 'walk_in_unknown':
+      return 'Walk-in and queue status are unknown.';
+    default:
+      return code.replaceAll('_', ' ');
+  }
 }

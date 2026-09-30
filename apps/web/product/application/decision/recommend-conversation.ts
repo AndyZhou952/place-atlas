@@ -27,6 +27,12 @@ export interface RecommendConversationItem extends RecommendDecisionSuggestion {
   readonly address: string;
   readonly reasonFacts: readonly RecommendReasonFact[];
   readonly warnings: readonly string[];
+  readonly route?: {
+    readonly mode: 'walk' | 'transit';
+    readonly seconds: number;
+    readonly checkedAt: string;
+    readonly source: { readonly label: string; readonly url: string };
+  };
 }
 
 export type RecommendConversationOutput =

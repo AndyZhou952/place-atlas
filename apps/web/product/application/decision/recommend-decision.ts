@@ -186,6 +186,32 @@ export function decideRecommend(
       ? ['walk_in_unknown']
       : [];
   if (input.intent.travelMode === 'none') {
+    if (input.origin.state === 'resolved') {
+      const nearby = items
+        .flatMap((item) => {
+          const meters = input.distances.find(
+            (distance) => distance.itemId === item.id,
+          )?.meters;
+          return meters !== undefined && meters <= 2000
+            ? [{ item, meters }]
+            : [];
+        })
+        .sort(
+          (a, b) =>
+            preferenceRank(a.item, input.intent) -
+              preferenceRank(b.item, input.intent) || a.meters - b.meters,
+        )
+        .slice(0, 5);
+      return nearby.length
+        ? {
+            action: 'recommend',
+            recommendations: nearby.map(({ item, meters }) =>
+              suggestion(item, input, undefined, meters),
+            ),
+            warnings: [...accessWarning, 'unverified_travel_time'],
+          }
+        : empty('no_results');
+    }
     const selected = items
       .sort(
         (a, b) =>

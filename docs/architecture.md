@@ -16,7 +16,7 @@ The model proposes facts; application code validates and commits them. Source te
 
 Cloudflare D1 stores restaurant identity, coordinates, sources, personal ratings, visits, and media metadata. R2 stores uploaded images and videos. Personal ratings and external ratings are independent fields. Updating one must preserve the others. A Google Places rating requested for a saved overseas place is read on demand from its persisted Place ID and returned only in a private, no-store response; it is not written by that read path.
 
-Nearby compares only saved restaurants. Coordinates permit a distance prefilter; an optional route provider supplies walking time. An unavailable route provider must not turn straight-line distance into a claimed travel time.
+Recommend uses a model to interpret the owner's request into bounded origin, cuisine, visit and travel constraints. Application code matches only verified saved food items and selects restaurant IDs with deterministic policy; the model never supplies the final restaurant name or detail target. Before delivery, the application rereads the catalog and requires each selected ID to remain verified with unchanged eligibility facts and the detail target to equal that ID. Names and addresses come from this current database read. Route claims require matching fresh provider evidence. Missing or changed identity/evidence returns a retryable unavailable state; a provider failure is not an empty result. Coordinates permit a distance prefilter, but straight-line distance is never presented as walking time.
 
 ## Module boundaries
 

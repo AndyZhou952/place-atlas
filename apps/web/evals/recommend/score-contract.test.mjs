@@ -29,6 +29,7 @@ function oracle(entry) {
             {
               itemId: expected.itemId,
               detailTargetId: expected.detailTargetId,
+              name: expected.name,
               reason: 'Matches your saved catalog and stated request.',
             },
           ],
@@ -63,6 +64,19 @@ test('all browser and API contract cases have a valid oracle trace', () => {
   });
   assert.equal(report.cases, 9);
   assert.equal(report.casePassRate, 1);
+});
+
+test('a model-style display name cannot pass even with a valid saved ID', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'one-turn-saved-detail',
+  );
+  const prediction = oracle(entry);
+  prediction.trace.responses[0].recommendations[0].name = 'Invented alias';
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['wrong_canonical_name']);
 });
 
 test('lost query context and wrong detail click fail separately', () => {

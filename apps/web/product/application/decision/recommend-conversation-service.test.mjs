@@ -160,6 +160,12 @@ test('reply keeps cuisine and time constraints through geocoding and one batched
     mode: 'walk',
     seconds: 600,
   });
+  assert.deepEqual(result.recommendations[0].route, {
+    mode: 'walk',
+    seconds: 600,
+    checkedAt: now,
+    source: { label: 'Google Maps', url: 'https://google.com/maps' },
+  });
 });
 
 test('interpreter failure stays unavailable and does not suggest unsaved restaurants', async () => {
@@ -176,4 +182,109 @@ test('interpreter failure stays unavailable and does not suggest unsaved restaur
     message: 'Recommendations are temporarily unavailable. Please retry.',
     retryable: true,
   });
+});
+
+test('model-supplied restaurant names are ignored; the receipt uses saved database identity', async () => {
+  const recommend = service(
+    [item('saved-sushi', '寿司 青空', '銀座', ['寿司'])],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'area:銀座',
+          foodTerms: ['sushi'],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'any',
+          recommendations: [
+            { name: 'Invented restaurant', itemId: 'unknown-item' },
+          ],
+        };
+      },
+    },
+  );
+  const result = await recommend.ask({ query: '銀座の寿司', replies: [] });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].name, '寿司 青空');
+  assert.equal(result.recommendations[0].itemId, 'saved-sushi');
+});
+
+test('a saved item removed before delivery cannot appear in the response', async () => {
+  let reads = 0;
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        reads += 1;
+        return reads === 1
+          ? [item('saved-sushi', '寿司 青空', '銀座', ['寿司'])]
+          : [];
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'area:銀座',
+          foodTerms: ['sushi'],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'any',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve() {
+        throw new Error('unexpected');
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('unexpected');
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  assert.deepEqual(await recommend.ask({ query: '銀座の寿司', replies: [] }), {
+    status: 'unavailable',
+    message: 'Recommendations are temporarily unavailable. Please retry.',
+    retryable: true,
+  });
+  assert.equal(reads, 2);
+});
+
+test('a saved shop name is an origin hint and recommends another nearby saved place', async () => {
+  const recommend = service(
+    [
+      item('origin-shop', '喫茶 みずき 新宿店', '新宿', ['喫茶店']),
+      item('nearby-shop', '麺 空', '新宿', ['ラーメン'], 35.671),
+      item('far-shop', '寿司 青空', '銀座', ['寿司'], 35.8),
+    ],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originId: 'place:origin-shop',
+          foodTerms: [],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: '喫茶 みずき 新宿店',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.deepEqual(
+    result.recommendations.map(({ itemId }) => itemId),
+    ['nearby-shop'],
+  );
+  assert.match(result.recommendations[0].reason, /straight-line distance/u);
+  assert.equal(result.recommendations[0].routeClaim, undefined);
+  assert.deepEqual(result.warnings, ['unverified_travel_time']);
 });

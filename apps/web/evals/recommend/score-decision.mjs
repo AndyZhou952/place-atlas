@@ -173,7 +173,6 @@ export function scoreRecommendDecision(dataset, predictionFile) {
           )) ||
         (!recommendation.routeClaim &&
           entry.input.origin.state === 'resolved' &&
-          intent.travelMode !== 'none' &&
           !facts.some((fact) => fact?.kind === 'distance'))
       )
         failures.push('missing_relevant_reason_fact');
@@ -199,15 +198,12 @@ export function scoreRecommendDecision(dataset, predictionFile) {
           !validRouteClaim(recommendation.routeClaim, item.id, entry.input)
         )
           failures.push('unsupported_route_claim');
-      } else if (
-        entry.input.origin.state === 'resolved' &&
-        intent.travelMode !== 'none'
-      ) {
+      } else if (entry.input.origin.state === 'resolved') {
         const distance = entry.input.distances.find(
           (candidate) => candidate.itemId === item.id,
         );
         if (
-          intent.travelMode !== 'either' ||
+          !['either', 'none'].includes(intent.travelMode) ||
           !distance ||
           distance.meters > 2000 ||
           !warnings.includes('unverified_travel_time')

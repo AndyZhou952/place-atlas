@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-intent-holdout-v1",
+  "kind": "synthetic-paraphrase-holdout-not-live-geocoding",
+  "originOptions": [
+    { "id": "area:umeda", "kind": "area", "names": ["梅田", "Umeda"] },
+    { "id": "area:kyoto", "kind": "area", "names": ["京都", "Kyoto"] },
+    {
+      "id": "station:umeda",
+      "kind": "station",
+      "names": ["梅田駅", "Umeda Station"]
+    },
+    {
+      "id": "station:kyoto",
+      "kind": "station",
+      "names": ["京都駅", "Kyoto Station"]
+    },
+    {
+      "id": "place:bistro-ueno",
+      "kind": "place",
+      "names": ["Bistro Aoba Ueno"]
+    },
+    {
+      "id": "place:bistro-shibuya",
+      "kind": "place",
+      "names": ["Bistro Aoba Shibuya"]
+    },
+    {
+      "id": "address:umeda-block",
+      "kind": "address",
+      "names": ["大阪府大阪市北区梅田1-1-1"]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "dinner-food-only",
+      "input": { "message": "今夜は寿司が食べたい" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "kyoto-curry-zh",
+      "input": { "message": "京都找咖喱" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:kyoto",
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "umeda-area-en",
+      "input": { "message": "Restaurants in Umeda" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:umeda",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "umeda-eight-minute-area",
+      "input": { "message": "梅田で徒歩8分以内のラーメン" },
+      "gold": {
+        "action": "clarify",
+        "originId": "area:umeda",
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 8,
+        "visited": "prefer_unvisited",
+        "clarification": "exact_origin"
+      }
+    },
+    {
+      "caseId": "umeda-station-train",
+      "input": {
+        "message": "Sushi within 18 minutes by direct train from Umeda Station"
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:umeda",
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "transit",
+        "maxMinutes": 18,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "bistro-place-origin",
+      "input": { "message": "Bistro Aoba Ueno" },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:bistro-ueno",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "bistro-branch-ambiguity",
+      "input": { "message": "Bistro Aoba" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "branch"
+      }
+    },
+    {
+      "caseId": "bistro-food-no-time",
+      "input": { "message": "Bistro Aoba Shibuya 附近想吃寿司" },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:bistro-shibuya",
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "address-block",
+      "input": { "message": "大阪府大阪市北区梅田1-1-1" },
+      "gold": {
+        "action": "recommend",
+        "originId": "address:umeda-block",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "exclude-ramen",
+      "input": { "message": "京都不要拉面" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:kyoto",
+        "foodTerms": [],
+        "excludedFoodTerms": ["ramen"],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "visited-only-paraphrase",
+      "input": { "message": "Umeda Stationから徒歩9分、行った店だけ" },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:umeda",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 9,
+        "visited": "only_visited"
+      }
+    },
+    {
+      "caseId": "short-link-holdout",
+      "input": { "message": "https://maps.app.goo.gl/AnotherShort" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "full_address_or_link"
+      }
+    },
+    {
+      "caseId": "untrusted-link-holdout",
+      "input": {
+        "message": "https://maps.google.example.invalid/maps/place/Bistro-Aoba"
+      },
+      "gold": {
+        "action": "unsupported",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "reason": "untrusted_url"
+      }
+    },
+    {
+      "caseId": "unspecified-travel-mode",
+      "input": { "message": "京都駅から12分以内の咖喱" },
+      "gold": {
+        "action": "clarify",
+        "originId": "station:kyoto",
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": 12,
+        "visited": "prefer_unvisited",
+        "clarification": "travel_mode"
+      }
+    },
+    {
+      "caseId": "near-me-ja",
+      "input": { "message": "近くのラーメン" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 15,
+        "visited": "prefer_unvisited",
+        "clarification": "origin"
+      }
+    }
+  ]
+}

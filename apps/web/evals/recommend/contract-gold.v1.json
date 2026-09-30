@@ -12,6 +12,7 @@
         "status": "recommend",
         "itemId": "saved-sushi",
         "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
         "reasonRequired": true
       }
     },
@@ -25,6 +26,7 @@
         "clarification": "exact_origin",
         "itemId": "saved-yakitori",
         "detailTargetId": "saved-yakitori",
+        "name": "焼鳥 まる",
         "reasonRequired": true
       }
     },
@@ -38,6 +40,7 @@
         "clarification": "branch",
         "itemId": "saved-coffee",
         "detailTargetId": "saved-coffee",
+        "name": "喫茶 みずき 新宿店",
         "reasonRequired": true
       }
     },
@@ -51,6 +54,7 @@
         "clarification": "travel_mode",
         "itemId": "saved-curry",
         "detailTargetId": "saved-curry",
+        "name": "カレー 灯",
         "reasonRequired": true
       }
     },
@@ -86,6 +90,7 @@
         "clarification": "origin",
         "itemId": "saved-ramen",
         "detailTargetId": "saved-ramen",
+        "name": "麺 そら",
         "reasonRequired": true,
         "keyboardSubmit": true
       }
@@ -99,6 +104,7 @@
         "resetBeforeAnswer": true,
         "itemId": "saved-sushi",
         "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
         "reasonRequired": true
       }
     }

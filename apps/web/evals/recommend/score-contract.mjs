@@ -77,6 +77,8 @@ export function scoreRecommendContract(dataset, predictionFile) {
         recommendation?.detailTargetId !== expected.detailTargetId
       )
         failures.push('wrong_saved_item_or_detail_target');
+      if (recommendation?.name !== expected.name)
+        failures.push('wrong_canonical_name');
       if (
         expected.reasonRequired &&
         (typeof recommendation?.reason !== 'string' ||

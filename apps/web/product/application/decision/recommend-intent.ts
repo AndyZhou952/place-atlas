@@ -33,10 +33,9 @@ const foodAliases: Readonly<Record<string, readonly string[]>> = {
 };
 
 function normalized(value: string): string {
-  return normalizeSearchText(value)
+  return normalizeSearchText(value.replace(/\bstation\b/giu, '駅'))
     .replaceAll('银', '銀')
     .replaceAll('站', '駅')
-    .replace(/station$/u, '駅')
     .replaceAll('ー', '')
     .replace(/[丁目番地]/gu, '');
 }
@@ -189,7 +188,11 @@ export function normalizeRecommendIntent(
       );
   const foodTerms = exactPlace
     ? []
-    : rawFood.filter((term) => !excludedFoodTerms.includes(term));
+    : rawFood.filter(
+        (term) =>
+          !excludedFoodTerms.includes(term) &&
+          (term !== 'coffee' || /coffee|コーヒー|咖啡/iu.test(original)),
+      );
   let travelMode: RecommendIntent['travelMode'] =
     /徒歩|歩いて|歩行|步行|走路|\bwalk/iu.test(original)
       ? 'walk'
@@ -203,22 +206,32 @@ export function normalizeRecommendIntent(
   const numbers = original.match(
     /(?:\d{1,2}|十|十五|二十)\s*(?:分|分钟|分鐘|minute)/iu,
   );
+  const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
   const maxMinutes = numbers
     ? ({ 十: 10, 十五: 15, 二十: 20 }[
         numbers[0].match(/^十(?:五)?|^二十/u)?.[0] ?? ''
       ] ?? Number.parseInt(numbers[0], 10))
-    : /near me|附近有啥|附近有什么/iu.test(original)
+    : nearMe
       ? 15
       : typeof prediction.maxMinutes === 'number' &&
           Number.isFinite(prediction.maxMinutes)
         ? prediction.maxMinutes
         : null;
-  if (/near me|附近有啥|附近有什么/iu.test(original)) travelMode = 'walk';
+  if (nearMe) travelMode = 'walk';
+  if (
+    maxMinutes === null &&
+    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit/iu.test(
+      original,
+    ) &&
+    !nearMe
+  )
+    travelMode = 'none';
   if (
     maxMinutes !== null &&
-    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit|near me|附近有啥|附近有什么/iu.test(
+    !/徒歩|歩いて|歩行|步行|走路|\bwalk|電車|电车|\btrain|\btransit/iu.test(
       original,
-    )
+    ) &&
+    !nearMe
   )
     travelMode = 'none';
   const common = {

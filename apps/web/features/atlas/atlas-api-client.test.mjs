@@ -12,7 +12,10 @@ test('Recommend browser operation sends the original query and follow-up answers
   const application = createBrowserAtlasApplication({
     async request(url, init) {
       request = { url, init };
-      return Response.json({ status: 'no_results', message: 'No saved match.' });
+      return Response.json({
+        status: 'no_results',
+        message: 'No saved match.',
+      });
     },
   });
   const result = await application.execute({

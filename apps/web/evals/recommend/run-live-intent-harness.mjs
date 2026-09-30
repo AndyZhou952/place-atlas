@@ -68,6 +68,9 @@ export async function runLiveIntentDataset({
 
 async function main() {
   const outputDirectory = process.argv[2];
+  const holdout = process.argv[3] === '--holdout';
+  if (process.argv[3] && !holdout)
+    throw new Error('Only --holdout is supported as an optional flag.');
   const apiKey = process.env.AGENT_API_KEY;
   const model = process.env.AGENT_MODEL;
   if (!outputDirectory || !apiKey || !model)
@@ -100,8 +103,11 @@ async function main() {
     datasets: [],
   };
   for (const [kind, filename] of [
-    ['intent', 'intent-gold.v1.json'],
-    ['dialogue', 'dialogue-gold.v1.json'],
+    ['intent', holdout ? 'intent-holdout.v1.json' : 'intent-gold.v1.json'],
+    [
+      'dialogue',
+      holdout ? 'dialogue-holdout.v1.json' : 'dialogue-gold.v1.json',
+    ],
   ]) {
     const raw = await readFile(resolve(here, filename), 'utf8');
     const dataset = JSON.parse(raw);
@@ -115,11 +121,13 @@ async function main() {
       },
       onProgress: (progress) => console.error(JSON.stringify(progress)),
     });
-    for (const [name, content] of [
+    /** @type {Array<[string, unknown]>} */
+    const outputs = [
       ['predictions', result.predictionFile],
       ['attempts', result.attempts],
       ['score', result.score],
-    ])
+    ];
+    for (const [name, content] of outputs)
       await writeFile(
         resolve(target, `${kind}-${name}.json`),
         JSON.stringify(content, null, 2) + '\n',

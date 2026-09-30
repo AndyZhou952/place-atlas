@@ -23,6 +23,10 @@ import {
   type RecommendOriginOption,
 } from './recommend-intent.ts';
 import { normalizeSearchText } from './search-policy.ts';
+import {
+  materializeRecommendReceipt,
+  type RecommendRouteSource,
+} from './recommend-receipt.ts';
 
 export interface RecommendInterpreter {
   interpret(
@@ -95,12 +99,27 @@ function addOriginText(
   )
     return;
   const originText = value.originText.trim();
-  if (
-    ![input.query, ...input.replies].some((message) =>
-      normalize(message).includes(normalize(originText)),
-    )
-  )
-    return;
+  const disclosed = [input.query, ...input.replies].some((message) => {
+    if (normalize(message).includes(normalize(originText))) return true;
+    try {
+      const url = new URL(message);
+      if (
+        !['www.google.com', 'google.com', 'maps.google.com'].includes(
+          url.hostname,
+        ) ||
+        !url.pathname.startsWith('/maps/')
+      )
+        return false;
+      const location =
+        url.searchParams.get('query') ?? url.searchParams.get('q');
+      return Boolean(
+        location && normalize(location).includes(normalize(originText)),
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (!disclosed) return;
   if (
     options.some((option) =>
       option.names.some((name) => normalize(name) === normalize(originText)),
@@ -240,7 +259,9 @@ export function createRecommendConversationService(
                 normalize(item.area).includes(normalize(name)),
               ),
             )
-          : items;
+          : selectedOption?.kind === 'place'
+            ? items.filter((item) => `place:${item.id}` !== selectedOption.id)
+            : items;
       const catalog: RecommendDecisionItem[] = eligibleItems.map((item) => ({
         id: item.id,
         kind: item.kind,
@@ -271,6 +292,7 @@ export function createRecommendConversationService(
           }))
         : [];
       const routes: RecommendRouteObservation[] = [];
+      const routeSources = new Map<string, RecommendRouteSource>();
       let routeState: 'unavailable' | undefined;
       if (point && intent.travelMode !== 'none') {
         const now = dependencies.clock.now();
@@ -293,13 +315,24 @@ export function createRecommendConversationService(
                   ),
                 );
             evidence.forEach((route, index) => {
+              const fresh =
+                currentRoute(route, now) &&
+                route.status === 'fresh' &&
+                Number.isFinite(route.durationSeconds) &&
+                route.durationSeconds >= 0;
               routes.push({
                 itemId: eligibleItems[index].id,
                 mode: 'walk',
                 seconds:
                   route.status === 'fresh' ? route.durationSeconds : null,
-                status: currentRoute(route, now) ? 'fresh' : 'unavailable',
+                status: fresh ? 'fresh' : 'unavailable',
               });
+              if (fresh)
+                routeSources.set(`${eligibleItems[index].id}:walk`, {
+                  seconds: route.durationSeconds,
+                  checkedAt: route.checkedAt,
+                  source: route.attribution,
+                });
             });
             if (evidence.length !== eligibleItems.length)
               routeState = 'unavailable';
@@ -327,12 +360,17 @@ export function createRecommendConversationService(
                       latitude: item.latitude,
                       longitude: item.longitude,
                     });
+                  const fresh =
+                    currentRoute(route, now) &&
+                    route.status === 'fresh' &&
+                    Number.isFinite(route.durationSeconds) &&
+                    route.durationSeconds >= 0;
                   routes.push({
                     itemId: item.id,
                     mode: 'transit',
                     seconds:
                       route.status === 'fresh' ? route.durationSeconds : null,
-                    status: currentRoute(route, now) ? 'fresh' : 'unavailable',
+                    status: fresh ? 'fresh' : 'unavailable',
                     transfers:
                       route.status === 'fresh'
                         ? route.transferCount
@@ -340,6 +378,12 @@ export function createRecommendConversationService(
                     doorToDoor:
                       route.status === 'fresh' && route.boardingCount >= 1,
                   });
+                  if (fresh)
+                    routeSources.set(`${item.id}:transit`, {
+                      seconds: route.durationSeconds,
+                      checkedAt: route.checkedAt,
+                      source: route.attribution,
+                    });
                 } catch {
                   routeState = 'unavailable';
                 }
@@ -379,20 +423,24 @@ export function createRecommendConversationService(
           status: 'no_results',
           message: 'No saved restaurants match this request yet.',
         };
+      let currentItems: readonly AtlasItem[];
+      try {
+        currentItems = await dependencies.catalog.list('verified_catalog');
+      } catch {
+        return unavailable();
+      }
+      const recommendations = materializeRecommendReceipt(
+        decision.recommendations,
+        eligibleItems,
+        currentItems,
+        routeSources,
+        decision.warnings,
+      );
+      if (!recommendations) return unavailable();
       return {
         status: 'recommend',
         warnings: decision.warnings,
-        recommendations: decision.recommendations.map((suggestion) => {
-          const item = items.find(
-            (candidate) => candidate.id === suggestion.itemId,
-          )!;
-          return {
-            ...suggestion,
-            name: item.title,
-            address: item.address,
-            warnings: decision.warnings,
-          };
-        }),
+        recommendations,
       };
     },
   };

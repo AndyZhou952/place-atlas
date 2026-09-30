@@ -109,11 +109,23 @@ function addExplicitStationMentions(
   input: RecommendConversationInput,
 ): void {
   for (const message of [input.query, ...input.replies]) {
-    const stations = message.matchAll(
-      /(?:^|[でからの\s、。])([\p{L}\p{N}・ー-]{1,60}駅)(?=$|[かまでのへ\s、。])/gu,
-    );
-    for (const match of stations) {
-      const station = match[1];
+    const japaneseStations = [
+      ...message.matchAll(
+        /(?:^|[でからの\s、。])([\p{L}\p{N}・ー-]{1,60}駅)(?=$|[かまでのへ\s、。])/gu,
+      ),
+    ].map((match) => match[1]);
+    const englishStations = [
+      ...message.matchAll(
+        /\b(?:from|near|at|around)\s+((?:[\p{L}\p{N}-]+\s+){1,3}Station)\b/giu,
+      ),
+    ].map((match) => match[1]);
+    if (!englishStations.length) {
+      const bareStation = message.match(
+        /^((?:[\p{L}\p{N}-]+\s+){1,3}Station)(?=$|から|で|へ)/iu,
+      );
+      if (bareStation) englishStations.push(bareStation[1]);
+    }
+    for (const station of [...japaneseStations, ...englishStations]) {
       if (
         options.some((option) =>
           option.names.some((name) => normalize(name) === normalize(station)),

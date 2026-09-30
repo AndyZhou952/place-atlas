@@ -30,6 +30,8 @@ function service(
   interpreter,
   routeProvider = {},
   clock = { now: () => new Date(now) },
+  expectedOrigin = '新宿駅',
+  transitRouteProvider,
 ) {
   return createRecommendConversationService({
     catalog: {
@@ -40,11 +42,11 @@ function service(
     interpreter,
     locationResolver: {
       async resolve(locationHint) {
-        assert.equal(locationHint, '新宿駅');
+        assert.equal(locationHint, expectedOrigin);
         return {
           status: 'resolved',
           location: {
-            canonicalAddress: '新宿駅',
+            canonicalAddress: expectedOrigin,
             point: { latitude: 35.69, longitude: 139.7 },
           },
           attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
@@ -57,6 +59,7 @@ function service(
       },
       ...routeProvider,
     },
+    transitRouteProvider,
     clock,
   });
 }
@@ -256,6 +259,63 @@ test('a station in the first request is an exact origin even when the model repe
   });
   assert.equal(result.status, 'recommend');
   assert.equal(result.recommendations[0].itemId, 'saved-ramen');
+});
+
+test('an English station in the production-style catalog overrides a model area', async () => {
+  const recommend = service(
+    [item('saved-sushi', '寿司 青空', '銀座・東京', ['寿司'])],
+    {
+      async interpret(input, options) {
+        assert.equal(
+          options.some((option) => option.kind === 'station'),
+          false,
+        );
+        return {
+          action: 'recommend',
+          originId: 'area:銀座',
+          foodTerms: ['sushi'],
+          excludedFoodTerms: [],
+          travelMode:
+            input.query === 'Sushi near Ginza Station' ? 'none' : 'transit',
+          maxMinutes: input.query === 'Sushi near Ginza Station' ? null : 20,
+          visited: 'any',
+        };
+      },
+    },
+    {},
+    { now: () => new Date(now) },
+    'Ginza Station',
+    {
+      async transit() {
+        return {
+          status: 'fresh',
+          durationSeconds: 900,
+          boardingCount: 1,
+          transferCount: 0,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        };
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: 'Sushi within 20 minutes by direct train from Ginza Station',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'saved-sushi');
+  assert.equal(result.recommendations[0].name, '寿司 青空');
+  const replyResult = await recommend.ask({
+    query: '銀座から電車20分以内の寿司',
+    replies: ['Ginza Station'],
+  });
+  assert.equal(replyResult.status, 'recommend');
+  assert.equal(replyResult.recommendations[0].itemId, 'saved-sushi');
+  const nearResult = await recommend.ask({
+    query: 'Sushi near Ginza Station',
+    replies: [],
+  });
+  assert.equal(nearResult.status, 'no_results');
 });
 
 test('walking provider failure remains unavailable instead of a false empty catalog', async () => {

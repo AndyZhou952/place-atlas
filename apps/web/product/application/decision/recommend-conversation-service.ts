@@ -111,7 +111,13 @@ function addOriginText(
       )
         return false;
       const location =
-        url.searchParams.get('query') ?? url.searchParams.get('q');
+        url.searchParams.get('query') ??
+        url.searchParams.get('q') ??
+        (url.pathname.startsWith('/maps/place/')
+          ? decodeURIComponent(
+              (url.pathname.split('/')[3] ?? '').replaceAll('+', ' '),
+            )
+          : null);
       return Boolean(
         location && normalize(location).includes(normalize(originText)),
       );

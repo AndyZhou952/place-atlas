@@ -288,3 +288,56 @@ test('a saved shop name is an origin hint and recommends another nearby saved pl
   assert.equal(result.recommendations[0].routeClaim, undefined);
   assert.deepEqual(result.warnings, ['unverified_travel_time']);
 });
+
+test('a full Maps place URL can supply an encoded place-name origin', async () => {
+  let geocoded = false;
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return [item('nearby-coffee', '喫茶 青葉', '新宿', ['coffee'])];
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '未保存の店',
+          originKind: 'place',
+          foodTerms: ['coffee'],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve(locationHint) {
+        assert.equal(locationHint, '未保存の店');
+        geocoded = true;
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: '新宿',
+            point: { latitude: 35.67, longitude: 139.76 },
+          },
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('unexpected');
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const result = await recommend.ask({
+    query: `https://www.google.com/maps/place/${encodeURIComponent('未保存の店')}`,
+    replies: [],
+  });
+  assert.equal(geocoded, true);
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'nearby-coffee');
+  assert.equal(result.recommendations[0].routeClaim, undefined);
+});

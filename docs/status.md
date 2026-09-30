@@ -51,10 +51,9 @@ Updated: 2026-10-01. This is the development progress tracker. System boundaries
 - [x] Release deployment used the intended D1, R2 and private Route Sidecar bindings, with no pending migration. Refreshed shared catalog and Journal reads agree with database counts; the repeat media audit verified all 38 referenced R2 objects and hashes after test cleanup.
 - [x] The root README has a first-use sequence for credentials, Cloudflare resources, migrations, preflighted deployment, Owner login, model settings and the Add/Record/Recommend journeys; it includes a read-only media integrity audit for updates.
 - [x] The finite Add, Record and Recommend deployment gates passed. The live Add report separates sourced facts, duplicate identity and provider failures; Recommend separates live-model journeys from controlled failure scenarios. Unknown identity, ratings, route times and booking rules remain unverified.
-- [ ] Complete final branch CI and integration, then record the released revision.
+- [x] Final branch CI passed and PR #32 was merged into `main` as `01de91f`. The accepted runtime is deployed as Worker version `b6928e90-9afe-4fd0-8f99-8e89a9570767`; the PoC release gates are complete.
 
 ## Next
 
-1. Complete final branch CI and integration for this release.
-2. Continue measuring source availability and broader branch disambiguation as follow-up quality work; the finite release cases do not prove universal availability.
-3. Collect labelled screenshots before starting image-based location understanding. Keep raw runs ignored and curated benchmarks in `apps/web/evals/`.
+1. Continue measuring source availability and broader branch disambiguation as follow-up quality work; the finite release cases do not prove universal availability.
+2. Collect labelled screenshots before starting image-based location understanding. Keep raw runs ignored and curated benchmarks in `apps/web/evals/`.

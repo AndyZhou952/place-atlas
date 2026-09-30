@@ -51,9 +51,19 @@ void test('public policy explains Owner-only Add provider boundaries and Nominat
   assert.match(privacySource, /stores\s+only the selected Google Place ID/u);
   assert.match(
     privacySource,
-    /provider request envelopes, and raw responses are\s+not stored/u,
+    /provider request envelopes,\s+and raw responses are not stored/u,
   );
   assert.match(privacySource, /Owner-submitted query remains/u);
   assert.match(privacySource, /cached for up to 30 days/u);
-  assert.match(privacySource, /effective 24 September 2026/u);
+  assert.match(privacySource, /effective 30 September 2026/u);
+});
+
+void test('public policy states visitor reads and Owner-only metered actions', () => {
+  assert.match(termsSource, /photos, and videos/u);
+  assert.match(
+    termsSource,
+    /running\s+Recommend or other Agent operations require/u,
+  );
+  assert.match(privacySource, /their published photos and videos/u);
+  assert.match(privacySource, /Internal media identifiers remain/u);
 });

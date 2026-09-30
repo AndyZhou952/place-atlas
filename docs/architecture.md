@@ -1,6 +1,6 @@
 # Application architecture
 
-The browser calls authenticated application APIs. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
+The browser reads the published catalog, personal ratings and comments, visits, and their published photo/video display links without login. Adding or changing places and records, and calling Recommend or other metered Agent operations, requires an Owner session. Internal storage keys, credentials, sessions, and audit records are never public. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
 
 ## Add
 
@@ -15,6 +15,8 @@ The model proposes facts; application code validates and commits them. Source te
 ## Storage and views
 
 Cloudflare D1 stores restaurant identity, coordinates, sources, personal ratings, visits, and media metadata. R2 stores uploaded images and videos. Personal ratings and external ratings are independent fields. Updating one must preserve the others. A Google Places rating requested for a saved overseas place is read on demand from its persisted Place ID and returned only in a private, no-store response; it is not written by that read path.
+
+Published media use opaque `pm_` display IDs and can be read anonymously, including supported photos and videos. The internal media ID path remains Owner-only. Public responses expose display metadata and media content, not R2 object keys, original filenames, hashes, receipts, or credentials. An Owner session and same-origin checks guard every browser write. Recommend is Owner-only even though it reads saved public restaurants, because model and route calls can incur provider usage.
 
 Recommend uses a model to interpret the owner's request into bounded origin, cuisine, visit and travel constraints. Application code matches only verified saved food items and selects restaurant IDs with deterministic policy; the model never supplies the final restaurant name or detail target. Before delivery, the application rereads the catalog and requires each selected ID to remain verified with unchanged canonical title and eligibility facts and the detail target to equal that ID. Names and addresses come from this current database read. Route claims require matching fresh provider evidence. Missing or changed identity/evidence returns a retryable unavailable state; a provider failure is not an empty result. Coordinates permit a distance prefilter, but straight-line distance is never presented as walking time.
 When an origin lookup returns multiple places, the UI sends the user's selected candidate ID with the original lookup hint. The server resolves the hint again and uses the candidate only if it uniquely matches the fresh geocoder response; a text-only model interpretation cannot override that selection.

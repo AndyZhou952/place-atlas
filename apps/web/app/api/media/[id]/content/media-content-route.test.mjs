@@ -73,6 +73,39 @@ void test('anonymous opaque display IDs execute only media.openDisplay', async (
   ]);
 });
 
+void test('anonymous opaque display IDs also stream supported videos', async () => {
+  const GET = createMediaContentGet({
+    async authorizeOwnerRead() {
+      throw new Error('public display should not require an owner session');
+    },
+    getApplication() {
+      return {
+        async openMedia() {
+          return {
+            ok: true,
+            value: {
+              body: mediaBody(),
+              contentType: 'video/webm',
+              byteSize: 3,
+            },
+          };
+        },
+      };
+    },
+  });
+
+  const response = await GET(
+    new Request('https://atlas.example/api/media/pm_video-token/content'),
+    { params: Promise.resolve({ id: 'pm_video-token' }) },
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'video/webm');
+  assert.deepEqual(
+    new Uint8Array(await response.arrayBuffer()),
+    Uint8Array.of(1, 2, 3),
+  );
+});
+
 void test('authenticated internal IDs return bytes through media.open', async () => {
   const operations = [];
   const GET = createMediaContentGet({

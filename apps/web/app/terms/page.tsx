@@ -23,7 +23,7 @@ export default function TermsPage() {
       </header>
 
       <article className="policy-article">
-        <p className="eyebrow">Public policy · effective 24 September 2026</p>
+        <p className="eyebrow">Public policy · effective 30 September 2026</p>
         <h1>Terms of use</h1>
         <p className="policy-lede">
           Japan Atlas is a personal field guide for browsing saved places and
@@ -34,9 +34,10 @@ export default function TermsPage() {
           <h2>Use of the Atlas</h2>
           <p>
             Anyone with the site link may read the published catalog, personal
-            comments, visits, and selected photos. Editing requires the Owner
-            session. Do not attempt to bypass that access control or disrupt the
-            service.
+            ratings and comments, visits, photos, and videos. Adding or editing
+            data and running Recommend or other Agent operations require the
+            Owner session. Do not attempt to bypass that access control or
+            disrupt the service.
           </p>
         </section>
 
@@ -56,7 +57,7 @@ export default function TermsPage() {
           <p>
             Place details may come from official sites, restaurant listings, and
             personal records. Source facts can change. Provider quotas,
-            maintenance, or network failures may temporarily disable Nearby
+            maintenance, or network failures may temporarily disable Recommend
             without changing the saved catalog.
           </p>
         </section>

@@ -27,7 +27,8 @@
     "eval:place-enrichment": "node evals/place-enrichment/score-place-enrichment.mjs evals/place-enrichment/place-enrichment-gold.v1.json evals/place-enrichment/place-enrichment-predictions.example.v1.json",
     "migration:check": "node --experimental-strip-types scripts/migration-packaging.ts --candidate-site-version 17",
     "db:generate": "drizzle-kit generate",
-    "maintenance:assessment-reset": "node --experimental-strip-types scripts/assessment-reset-maintenance.ts"
+    "maintenance:assessment-reset": "node --experimental-strip-types scripts/assessment-reset-maintenance.ts",
+    "audit:media-integrity": "node scripts/audit-media-integrity.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

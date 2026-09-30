@@ -43,10 +43,14 @@ Updated: 2026-09-30. This is the development progress tracker. System boundaries
 ## Shared platform and release
 
 - [x] Cloudflare Workers, D1, R2, owner sessions, public catalog responses, map rendering and personal controls are implemented. Mobile Map/Journal layout and touch targets passed deployed checks at 320, 390 and 768 CSS pixels; the 320-pixel header no longer overflows.
+- [x] The publication rule is explicit: anonymous visitors may read published places, personal ratings and comments, Visits, photos and videos; only the Owner may add/edit records or call Recommend and other metered Agent operations. Public media uses opaque display IDs; internal media IDs and storage keys remain private. README, architecture and site policy now describe the same boundary.
 - [x] CI runs formatting, lint, typecheck, all Node tests, the owner website build and the private Route Sidecar bundle preflight. Add, Record, retained Nearby and Recommend regression tests are included in the single test run rather than repeated by separate CI jobs.
-- [ ] Audit public/private data boundaries, owner authorization, retained sessions and audit events across every write path.
+- [x] Release audit of the current deployment found no expired active Add sessions or overdue terminal references; 37 gateway audit events and 195 committed mutation receipts were retained. One expired uncommitted claim can be reclaimed by the existing same-payload retry path. The local suite passed 924/924, including the complete unsafe-route auth surface and rejection-before-write contracts.
+- [x] The pre-release live data audit found 57 saved items, 13 Visits, no orphan Visits/media, no pending D1 migration, and 38 D1-referenced R2 objects (10,679,105 bytes) whose sizes and SHA-256 values match. The read-only media audit is now a reusable `audit:media-integrity` command.
+- [ ] Recheck the public/private boundary and every write path after the release deployment, including anonymous photo/video access and Owner-only Recommend.
 - [ ] Verify deployed D1/R2 bindings, migrations, markers and media persistence after release changes; ensure Add, Record and Recommend agree on saved state after refresh.
-- [ ] Complete all three deployed user journeys, real-model factual-quality reports and the root README first-use procedure before declaring the PoC released. Never present invented identity, ratings, route times or booking rules as verified facts.
+- [x] The root README has a first-use sequence for credentials, Cloudflare resources, migrations, preflighted deployment, Owner login, model settings and the Add/Record/Recommend journeys; it includes a read-only media integrity audit for updates.
+- [ ] Complete all three deployed user journeys and real-model factual-quality reports before declaring the PoC released. Never present invented identity, ratings, route times or booking rules as verified facts.
 
 ## Next
 

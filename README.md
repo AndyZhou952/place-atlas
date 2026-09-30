@@ -1,6 +1,6 @@
 # Japan Personal Atlas
 
-A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. The website is publicly readable; only the owner can change it. Each deployment uses its own database, storage, model credentials, and optional map credentials.
+A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. Visitors can read published places, personal ratings and comments, visits, photos and videos without logging in. Only the owner can add or change data or run Recommend and other Agent operations that may incur provider usage. Each deployment uses its own database, storage, model credentials, and optional map credentials.
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
@@ -136,17 +136,20 @@ From `apps/web`:
 npm run lint
 npm run typecheck
 npm run test:evals
-npm run build:owner-poc
-npx wrangler deploy --config dist/server/wrangler.json
+mkdir -p .wrangler
+npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json > .wrangler/owner-poc-secret-names.json
+npm run deploy:owner-poc
 ```
 
-Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+
+After an update to an existing deployment, run `ALLOW_PRODUCTION_MEDIA_AUDIT=yes npm run audit:media-integrity` from `apps/web` to compare each Visit media row with its R2 object's byte count and SHA-256 without saving media locally. The audit is read-only and requires the Wrangler login and ignored local configuration used for deployment.
 
 For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resources. Do not overwrite newer records with an older backup during rollback.
 
 ## Using the website
 
-Start here only after completing configuration and deployment above. Visitors can read the site without logging in; changing data requires the owner password.
+Start here only after completing configuration and deployment above. Visitors can read published restaurants, personal ratings and comments, visits, photos and videos without logging in. Adding or changing data and running Recommend require the owner password.
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.

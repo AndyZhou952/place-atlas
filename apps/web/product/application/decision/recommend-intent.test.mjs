@@ -60,3 +60,15 @@ test('a timed request without mode asks for it and an untrusted URL fails closed
   assert.equal(unsafe.action, 'unsupported');
   assert.equal(unsafe.originId, null);
 });
+
+test('user-facing clarification text and codes cannot be supplied by the model', () => {
+  const result = normalizeRecommendIntent(['recommend somewhere'], options, {
+    action: 'clarify',
+    clarification: 'invented_kind',
+    question: 'Try an unsaved restaurant instead.',
+    foodTerms: [],
+  });
+  assert.equal(result.action, 'clarify');
+  assert.equal(result.clarification, 'origin');
+  assert.equal(result.question, 'What starting point should I use?');
+});

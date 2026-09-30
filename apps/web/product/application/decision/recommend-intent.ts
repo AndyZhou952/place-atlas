@@ -298,12 +298,18 @@ export function normalizeRecommendIntent(
     typeof prediction.clarification === 'string' &&
     !originId &&
     !foodTerms.length
-  )
-    return clarify(
-      prediction.clarification,
-      typeof prediction.question === 'string' && prediction.question.trim()
-        ? prediction.question
-        : 'What starting point should I use?',
-    );
+  ) {
+    const questions: Readonly<Record<string, string>> = {
+      branch: 'Which branch is your starting point?',
+      origin: 'What starting point should I use?',
+      origin_choice: 'Which starting point should I use?',
+      unresolved_origin: 'Could you provide a more precise address or station?',
+      full_address_or_link: 'Please paste the full Maps link or address.',
+    };
+    const kind = Object.hasOwn(questions, prediction.clarification)
+      ? prediction.clarification
+      : 'origin';
+    return clarify(kind, questions[kind]);
+  }
   return { action: 'recommend', ...common };
 }

@@ -242,6 +242,57 @@ test('transit routes only relevant saved candidates and returns the exact catalo
   });
 });
 
+test('a verified absent direct train is distinct from a transit provider outage', async () => {
+  const transit = { status: 'no_direct_route', checkedAt: now };
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return [item('ramen', '麺 空', '新宿', ['ラーメン'])];
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'transit',
+          maxMinutes: 20,
+          visited: 'any',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve() {
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: '新宿駅',
+            point: { latitude: 35.69, longitude: 139.7 },
+          },
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('unexpected');
+      },
+    },
+    transitRouteProvider: {
+      async transit() {
+        return transit;
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const request = { query: '新宿駅から電車20分以内のラーメン', replies: [] };
+  assert.equal((await recommend.ask(request)).status, 'no_results');
+  transit.status = 'unavailable';
+  assert.equal((await recommend.ask(request)).status, 'unavailable');
+});
+
 test('interpreter failure stays unavailable and does not suggest unsaved restaurants', async () => {
   const recommend = service(
     [item('saved-sushi', '寿司 青空', '銀座', ['寿司'])],

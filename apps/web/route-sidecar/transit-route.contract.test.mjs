@@ -42,6 +42,9 @@ test('transit mapper selects a direct rail alternative and includes access walki
     mapGoogleTransitRouteResponse({ routes: [route([step('BUS')])] }),
     { directRoute: null },
   );
+  assert.deepEqual(mapGoogleTransitRouteResponse({ routes: [] }), {
+    directRoute: null,
+  });
   assert.equal(
     mapGoogleTransitRouteResponse({ routes: [route([step('SUBWAY')], 'bad')] }),
     undefined,

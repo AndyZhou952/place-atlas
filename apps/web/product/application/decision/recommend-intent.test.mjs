@@ -46,6 +46,35 @@ test('a branch answer preserves the original query and selects the model-support
   assert.equal(result.originId, 'place:cafe-east');
 });
 
+test('a model cannot choose a branch before the user resolves an ambiguous name', () => {
+  const result = normalizeRecommendIntent(['喫茶 木陰'], options, {
+    action: 'recommend',
+    originId: 'place:cafe-east',
+    foodTerms: ['coffee'],
+  });
+  assert.equal(result.action, 'clarify');
+  assert.equal(result.clarification, 'branch');
+  assert.equal(result.originId, null);
+  assert.deepEqual(result.foodTerms, []);
+});
+
+test('a distance-only answer resolves a timed request without inventing travel time', () => {
+  const result = normalizeRecommendIntent(
+    ['中央駅から15分以内のカレー', 'Clarification answer:', '直線距離で'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['curry'],
+      travelMode: 'walk',
+      maxMinutes: 15,
+    },
+  );
+  assert.equal(result.action, 'recommend');
+  assert.equal(result.travelMode, 'none');
+  assert.equal(result.maxMinutes, null);
+});
+
 test('a timed request without mode asks for it and an untrusted URL fails closed', () => {
   const timed = normalizeRecommendIntent(
     ['中央駅から15分以内のカレー'],

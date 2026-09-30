@@ -10,7 +10,7 @@ const dataset = JSON.parse(
 
 test('proximity and explicit travel policy survives adversarial model predictions', () => {
   assert.equal(dataset.datasetId, 'recommend-intent-proximity');
-  assert.equal(new Set(dataset.cases.map(({ caseId }) => caseId)).size, 7);
+  assert.equal(new Set(dataset.cases.map(({ caseId }) => caseId)).size, 9);
   for (const entry of dataset.cases) {
     const actual = normalizeRecommendIntent(
       entry.messages,

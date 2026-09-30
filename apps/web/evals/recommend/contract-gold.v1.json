@@ -39,10 +39,10 @@
         "status": "recommend",
         "firstStatus": "clarify",
         "clarification": "branch",
-        "itemId": "saved-coffee",
-        "detailTargetId": "saved-coffee",
-        "name": "喫茶 みずき 新宿店",
-        "address": "Fixture address: Shinjuku branch",
+        "itemId": "saved-cafe",
+        "detailTargetId": "saved-cafe",
+        "name": "喫茶 近く",
+        "address": "Fixture address: nearby cafe",
         "reasonRequired": true
       }
     },
@@ -74,13 +74,19 @@
       "caseId": "provider-failure-retry",
       "query": "銀座駅から徒歩10分の寿司",
       "answers": [],
-      "expected": { "status": "unavailable", "retryKeepsDraft": true }
+      "expected": {
+        "status": "unavailable",
+        "retryKeepsDraft": true
+      }
     },
     {
       "caseId": "empty-catalog",
       "query": "銀座の寿司",
       "answers": [],
-      "expected": { "status": "no_results", "noUnsavedSuggestions": true }
+      "expected": {
+        "status": "no_results",
+        "noUnsavedSuggestions": true
+      }
     },
     {
       "caseId": "keyboard-question-reply",
@@ -128,9 +134,9 @@
       "answers": [],
       "expected": {
         "status": "recommend",
-        "itemId": "saved-ginza-ramen",
-        "detailTargetId": "saved-ginza-ramen",
-        "name": "麺 そら 銀座店",
+        "itemId": "saved-ramen",
+        "detailTargetId": "saved-ramen",
+        "name": "麺 そら",
         "address": "Fixture address: Ginza branch",
         "reasonRequired": true,
         "routeMode": "walk",
@@ -151,7 +157,10 @@
         "reasonIncludes": "straight-line distance",
         "warningIncludes": "unverified_travel_time",
         "forbidRouteClaim": true,
-        "displayIncludes": ["straight-line distance", "travel time unverified"],
+        "displayIncludes": [
+          "straight-line distance",
+          "Travel time is not verified"
+        ],
         "forbidTimedDisplay": true
       }
     },
@@ -186,7 +195,10 @@
         "reasonIncludes": "straight-line distance",
         "warningIncludes": "unverified_travel_time",
         "forbidRouteClaim": true,
-        "displayIncludes": ["straight-line distance", "travel time unverified"],
+        "displayIncludes": [
+          "straight-line distance",
+          "Travel time is not verified"
+        ],
         "forbidTimedDisplay": true
       }
     }

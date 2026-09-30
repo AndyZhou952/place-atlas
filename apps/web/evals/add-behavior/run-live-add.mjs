@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { savedDuplicateIds } from './live-catalog-state.mjs';
 
 const manifest = JSON.parse(
   readFileSync(new URL('./live-add.v1.json', import.meta.url), 'utf8'),
@@ -50,7 +51,7 @@ async function call(operation, input, conversationId) {
   };
 }
 
-function score(sample, preview) {
+function score(sample, preview, expectedDuplicateIds) {
   const checks = {
     title: preview?.titleProposal?.value?.includes(
       sample.expectedTitleIncludes,
@@ -103,9 +104,15 @@ function score(sample, preview) {
       !sample.expectedBookingLink ||
       preview?.profile?.bookingLink?.value === sample.expectedBookingLink,
     savedDuplicate:
-      Boolean(
-        preview?.suspectedDuplicates?.some((item) => item.match === 'strong'),
-      ) === (sample.expectedSavedDuplicate ?? true),
+      JSON.stringify(
+        (preview?.suspectedDuplicates ?? [])
+          .filter((item) => item.match === 'strong')
+          .map((item) => item.itemId)
+          .sort((a, b) => a.localeCompare(b)),
+      ) ===
+      JSON.stringify(
+        [...expectedDuplicateIds].sort((a, b) => a.localeCompare(b)),
+      ),
   };
   return {
     pass: Object.values(checks).every(Boolean),
@@ -134,6 +141,15 @@ for (const sample of cases) {
   let result;
   let cleanup = 'not_started';
   try {
+    const catalogResponse = await fetch(new URL('/api/items', endpoint), {
+      signal: AbortSignal.timeout(15_000),
+      headers: { 'cache-control': 'no-cache' },
+    });
+    if (!catalogResponse.ok) throw new Error('Live catalog unavailable');
+    const expectedDuplicateIds = savedDuplicateIds(
+      sample,
+      await catalogResponse.json(),
+    );
     const discovered = await call('discover', {
       query: sample.query,
       requestToken: `live-add-${crypto.randomUUID()}`,
@@ -173,7 +189,8 @@ for (const sample of cases) {
           ? {
               stage: 'select',
               candidateAddress: matches[0].transientAddress,
-              ...score(sample, selected.body.preview),
+              expectedDuplicateIds,
+              ...score(sample, selected.body.preview, expectedDuplicateIds),
             }
           : {
               pass: false,

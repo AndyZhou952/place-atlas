@@ -161,6 +161,13 @@ export function normalizeRecommendIntent(
         normalized(name).startsWith(normalized(messages[0])) &&
         normalized(name).includes(normalized(latest)),
     );
+  const possibleBranches = options.filter(
+    (option) =>
+      option.kind === 'place' &&
+      option.names.some((name) =>
+        normalized(name).startsWith(normalized(latest)),
+      ),
+  );
   const proposedOriginId = branchReply
     ? modelOrigin.id
     : originIds.length === 1
@@ -218,20 +225,25 @@ export function normalizeRecommendIntent(
     /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|\bwalk in\s+\d+\s*min(?:ute)?s?\b|電車|电车|\btrain|\btransit/iu.test(
       original,
     );
-  const maxMinutes = numbers
-    ? ({ 十: 10, 十五: 15, 二十: 20 }[
-        numbers[0].match(/^十(?:五)?|^二十/u)?.[0] ?? ''
-      ] ?? Number.parseInt(numbers[0], 10))
-    : explicitTravelMode && nearMe
-      ? travelMode === 'transit'
-        ? 20
-        : 15
-      : explicitTravelMode &&
-          typeof prediction.maxMinutes === 'number' &&
-          Number.isFinite(prediction.maxMinutes)
-        ? prediction.maxMinutes
-        : null;
-  if (!explicitTravelMode) travelMode = 'none';
+  const distanceReply =
+    messages.length > 1 &&
+    /straight[ -]line|distance only|直線距離|直线距离|距离就好/iu.test(latest);
+  const maxMinutes = distanceReply
+    ? null
+    : numbers
+      ? ({ 十: 10, 十五: 15, 二十: 20 }[
+          numbers[0].match(/^十(?:五)?|^二十/u)?.[0] ?? ''
+        ] ?? Number.parseInt(numbers[0], 10))
+      : explicitTravelMode && nearMe
+        ? travelMode === 'transit'
+          ? 20
+          : 15
+        : explicitTravelMode &&
+            typeof prediction.maxMinutes === 'number' &&
+            Number.isFinite(prediction.maxMinutes)
+          ? prediction.maxMinutes
+          : null;
+  if (!explicitTravelMode || distanceReply) travelMode = 'none';
   const common = {
     originId,
     foodTerms,
@@ -272,15 +284,13 @@ export function normalizeRecommendIntent(
       ...clarify('origin_choice', 'Which starting point?'),
       originId: null,
     };
+  if (!branchReply && originIds.length === 0 && possibleBranches.length > 1)
+    return {
+      ...clarify('branch', 'Which branch is your starting point?'),
+      originId: null,
+      foodTerms: [],
+    };
   if (!originId) {
-    const placeOptions = options.filter((option) => option.kind === 'place');
-    const possibleBranches = placeOptions.filter((option) =>
-      option.names.some((name) =>
-        normalized(name).startsWith(normalized(latest)),
-      ),
-    );
-    if (possibleBranches.length > 1)
-      return clarify('branch', 'Which branch is your starting point?');
     if (latest.endsWith('店') || /^(?:カフェ|喫茶)\s+\S+/u.test(latest))
       return {
         ...clarify(
@@ -296,7 +306,10 @@ export function normalizeRecommendIntent(
   if (originKind === 'area' && travelMode !== 'none')
     return clarify('exact_origin', 'Which exact starting point in this area?');
   if (maxMinutes !== null && travelMode === 'none')
-    return clarify('travel_mode', 'Walking or direct train?');
+    return clarify(
+      'travel_mode',
+      'Would you like a walking route, or straight-line distance without a time limit?',
+    );
   if (!originId && travelMode !== 'none')
     return clarify('origin', 'Where are you starting from?');
   if (

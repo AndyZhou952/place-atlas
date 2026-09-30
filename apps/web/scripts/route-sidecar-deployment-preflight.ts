@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 
 const workerName = 'japan-atlas-route-sidecar';
 const requiredSecret = 'GOOGLE_MAPS_API_KEY';
-const optionalSecret = 'NAVITIME_RAPIDAPI_KEY';
 const allowedConfigKeys = new Set([
   '$schema',
   'name',
@@ -58,14 +57,8 @@ export function inspectRouteSidecarDeployment(input: {
     blockers.push(`missing_secret:${requiredSecret}`);
   }
   if (
-    input.remoteSecrets.length < 1 ||
-    input.remoteSecrets.length > 2 ||
-    input.remoteSecrets.filter(isExactGoogleSecret).length !== 1 ||
-    input.remoteSecrets.filter(isExactNavitimeSecret).length > 1 ||
-    input.remoteSecrets.some(
-      (secret) =>
-        !isExactGoogleSecret(secret) && !isExactNavitimeSecret(secret),
-    )
+    input.remoteSecrets.length !== 1 ||
+    !isExactGoogleSecret(input.remoteSecrets[0])
   ) {
     blockers.push('secret_evidence_malformed');
   }
@@ -73,8 +66,7 @@ export function inspectRouteSidecarDeployment(input: {
     if (
       isRecord(secret) &&
       typeof secret.name === 'string' &&
-      secret.name !== requiredSecret &&
-      secret.name !== optionalSecret
+      secret.name !== requiredSecret
     ) {
       blockers.push(`forbidden_secret:${secret.name}`);
     }
@@ -170,17 +162,6 @@ function isExactGoogleSecret(value: unknown): boolean {
     Object.hasOwn(value, 'name') &&
     Object.hasOwn(value, 'type') &&
     value.name === requiredSecret &&
-    value.type === 'secret_text'
-  );
-}
-
-function isExactNavitimeSecret(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 2 &&
-    Object.hasOwn(value, 'name') &&
-    Object.hasOwn(value, 'type') &&
-    value.name === optionalSecret &&
     value.type === 'secret_text'
   );
 }

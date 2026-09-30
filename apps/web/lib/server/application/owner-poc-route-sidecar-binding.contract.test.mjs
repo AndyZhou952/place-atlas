@@ -31,6 +31,6 @@ void test('Browser owner composition receives the private Route Sidecar and shar
   assert.match(providerManifest, /GOOGLE_PLACES_API_KEY/u);
   assert.doesNotMatch(
     `${dbSource}\n${serverSource}`,
-    /GOOGLE_MAPS_API_KEY|NAVITIME_RAPIDAPI_KEY|foursquare/iu,
+    /GOOGLE_MAPS_API_KEY|transit|foursquare/iu,
   );
 });

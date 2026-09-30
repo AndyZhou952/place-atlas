@@ -1,6 +1,5 @@
 import {
   GOOGLE_ROUTE_SIDECAR_PROVIDER_ID,
-  NAVITIME_TRANSIT_PROVIDER_ID,
   isRouteSidecarGeocodeRequest,
   isRouteSidecarWalkingMatrixRequest,
   isRouteSidecarTransitRequest,
@@ -24,9 +23,7 @@ type RouteSidecarSku =
 
 export interface RouteSidecarUsagePort {
   reserve(reservation: {
-    readonly providerId:
-      | typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID
-      | typeof NAVITIME_TRANSIT_PROVIDER_ID;
+    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
     readonly sku: RouteSidecarSku;
     readonly units: number;
     readonly requests: 1;
@@ -41,16 +38,13 @@ export interface MeteredRouteSidecarClientOptions {
   readonly service: GoogleRouteSidecarPort | undefined;
   readonly usage: RouteSidecarUsagePort;
   readonly diagnosticRecorder?: NearbyDiagnosticRecorder;
-  readonly japanTransitEnabled?: boolean;
 }
 
 export function createMeteredRouteSidecarClient({
   service,
   usage,
   diagnosticRecorder = noOpNearbyDiagnosticRecorder,
-  japanTransitEnabled = false,
 }: MeteredRouteSidecarClientOptions): GoogleRouteSidecarPort {
-  let japanReadiness: Promise<boolean> | undefined;
   return {
     async geocode(request) {
       if (!service) {
@@ -98,10 +92,10 @@ export function createMeteredRouteSidecarClient({
     async transit(request) {
       if (!isRouteSidecarTransitRequest(request))
         return failure('invalid_request');
-      const japanTransit =
+      if (
         isJapanTransitArea(request.origin) ||
-        isJapanTransitArea(request.destination);
-      if (japanTransit && !japanTransitEnabled) {
+        isJapanTransitArea(request.destination)
+      ) {
         diagnosticRecorder.record({
           layer: 'owner_metering',
           operation: 'transit',
@@ -120,18 +114,6 @@ export function createMeteredRouteSidecarClient({
         );
         return failure('not_configured');
       }
-      if (japanTransit) {
-        japanReadiness ??= Promise.resolve().then(
-          () => service.japanTransitReady?.() ?? false,
-        );
-        let ready = false;
-        try {
-          ready = await japanReadiness;
-        } catch {
-          ready = false;
-        }
-        if (!ready) return failure('not_configured');
-      }
       return reserveThenCall(
         usage,
         diagnosticRecorder,
@@ -139,9 +121,6 @@ export function createMeteredRouteSidecarClient({
         'transit_routes.requests',
         1,
         () => service.transit(request),
-        japanTransit
-          ? NAVITIME_TRANSIT_PROVIDER_ID
-          : GOOGLE_ROUTE_SIDECAR_PROVIDER_ID,
       );
     },
   };
@@ -154,22 +133,15 @@ async function reserveThenCall<T>(
   sku: RouteSidecarSku,
   units: number,
   invoke: () => Promise<T>,
-  providerId:
-    | typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID
-    | typeof NAVITIME_TRANSIT_PROVIDER_ID = GOOGLE_ROUTE_SIDECAR_PROVIDER_ID,
 ): Promise<T | RouteSidecarFailure> {
   let reservation: Awaited<ReturnType<RouteSidecarUsagePort['reserve']>>;
   try {
     reservation = await usage.reserve({
-      providerId,
+      providerId: GOOGLE_ROUTE_SIDECAR_PROVIDER_ID,
       sku,
       units,
       requests: 1,
-      costUsd:
-        sku === 'transit_routes.requests' &&
-        providerId === GOOGLE_ROUTE_SIDECAR_PROVIDER_ID
-          ? 0.02
-          : 0,
+      costUsd: sku === 'transit_routes.requests' ? 0.02 : 0,
       hardRequestLimit:
         sku === 'transit_routes.requests'
           ? transitMonthlyLimit
@@ -178,11 +150,7 @@ async function reserveThenCall<T>(
         sku === 'transit_routes.requests'
           ? transitMonthlyLimit
           : hardMonthlyLimit,
-      hardCostLimitUsd:
-        sku === 'transit_routes.requests' &&
-        providerId === GOOGLE_ROUTE_SIDECAR_PROVIDER_ID
-          ? 5
-          : 0,
+      hardCostLimitUsd: sku === 'transit_routes.requests' ? 5 : 0,
     });
   } catch {
     recordQuotaExhausted(diagnosticRecorder, operation, sku);
@@ -251,5 +219,5 @@ function failure(error: RouteSidecarFailure['error']): RouteSidecarFailure {
 
 export type RouteSidecarServiceBinding = Pick<
   GoogleRouteSidecarPort,
-  'geocode' | 'walkingMatrix' | 'transit' | 'japanTransitReady'
+  'geocode' | 'walkingMatrix' | 'transit'
 >;

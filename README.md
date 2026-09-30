@@ -119,7 +119,7 @@ Set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled` only with working credentia
 
 Without Google matching configuration, Add uses no-key search plus verified Tabelog listing identities for Japanese restaurants. Pasting a full Tabelog main-listing URL skips search. This fallback is not worldwide discovery and may fail when a provider blocks requests. Google improves international matching but does not itself guarantee complete or persistable restaurant research.
 
-For address resolution, walking routes, and direct-rail transit routes outside Japan, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
+For address resolution, walking routes, and direct-rail transit routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
 
 ```sh
 npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc
@@ -127,8 +127,6 @@ npx wrangler deploy --config wrangler.route-sidecar.jsonc
 ```
 
 Keep the app's `ROUTE_SIDECAR` binding pointed at `japan-atlas-route-sidecar`. If omitting route services, remove that entry from the app's `services` array to avoid referencing a missing Worker. Nearby must report unavailable route information rather than invent travel times. The route Worker has no public website endpoint.
-
-Google Routes API does not cover Japan transit partners. Japan direct-train estimates can instead use [NAVITIME Route(totalnavi)](https://api-sdk.navitime.co.jp/api/specs/api_guide/route_transit.html) through RapidAPI. Its API-market route times are [averages, not timetable departures](https://api-sdk.navitime.co.jp/api/specs/tips/averagetime.html). The feature is off by default. After subscribing to that API, set `NAVITIME_RAPIDAPI_KEY` as a secret on the private route Worker, deploy that Worker, then set `JAPAN_TRANSIT_PROVIDER` to `navitime-average` in the owner Worker's local Wrangler `vars` and deploy the owner Worker. The owner key must never be put in this repository or a browser. The application caps this provider at 250 calls per UTC month, below the currently documented 500-call free tier; confirm your own plan and terms before enabling. The UI labels its results as average estimates and asks users to check the current timetable. Without the key and flag, Japan train-time requests remain unavailable rather than returning a false “no results.”
 
 ## Verify and deploy
 

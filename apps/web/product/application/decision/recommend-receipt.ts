@@ -6,7 +6,6 @@ export interface RecommendRouteSource {
   readonly seconds: number;
   readonly checkedAt: string;
   readonly source: { readonly label: string; readonly url: string };
-  readonly estimateBasis?: 'average';
 }
 
 export function materializeRecommendReceipt(
@@ -53,7 +52,6 @@ export function materializeRecommendReceipt(
       suggestion.routeClaim &&
       (!evidence ||
         evidence.seconds !== suggestion.routeClaim.seconds ||
-        evidence.estimateBasis !== suggestion.routeClaim.estimateBasis ||
         !evidence.source.label.trim() ||
         !evidence.source.url.startsWith('https://'))
     )
@@ -105,9 +103,6 @@ export function materializeRecommendReceipt(
               ...suggestion.routeClaim,
               checkedAt: evidence.checkedAt,
               source: evidence.source,
-              ...(evidence.estimateBasis
-                ? { estimateBasis: evidence.estimateBasis }
-                : {}),
             },
           }
         : {}),

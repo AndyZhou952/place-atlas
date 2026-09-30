@@ -114,34 +114,6 @@ test('receipt fails closed when the selected record or route evidence changes', 
   );
 });
 
-test('an average train estimate must keep its basis through the receipt', () => {
-  const routeClaim = {
-    mode: 'transit',
-    seconds: 1080,
-    estimateBasis: 'average',
-  };
-  const routeSource = {
-    seconds: 1080,
-    checkedAt: '2026-09-30T00:00:00.000Z',
-    source: { label: 'NAVITIME', url: 'https://www.navitime.co.jp/' },
-    estimateBasis: 'average',
-  };
-  const result = receipt(
-    suggestion({ routeClaim }),
-    item(),
-    new Map([['saved-a:transit', routeSource]]),
-  );
-  assert.equal(result?.[0].route.estimateBasis, 'average');
-  assert.equal(
-    receipt(
-      suggestion({ routeClaim: { mode: 'transit', seconds: 1080 } }),
-      item(),
-      new Map([['saved-a:transit', routeSource]]),
-    ),
-    undefined,
-  );
-});
-
 test('walk-in evidence is rejected when the saved rule changes before delivery', () => {
   const reservation = {
     mode: 'walk-in',

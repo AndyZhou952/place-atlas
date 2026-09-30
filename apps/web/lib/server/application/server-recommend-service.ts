@@ -1,6 +1,5 @@
 import {
   getD1,
-  getJapanTransitEnabled,
   getOwnerPocCatalogIntakeRuntime,
   getRouteSidecarServiceBinding,
 } from '../../../db/index.ts';
@@ -17,7 +16,6 @@ import { createRecommendInterpreter } from './recommend-interpreter.ts';
 
 export function getServerRecommendService() {
   const database = getD1();
-  const japanTransitEnabled = getJapanTransitEnabled();
   const runtime = getOwnerPocCatalogIntakeRuntime();
   const routes = createRouteSidecarNearbyAdapter(
     createD1MeteredRouteSidecarClient({
@@ -25,9 +23,7 @@ export function getServerRecommendService() {
       service: getRouteSidecarServiceBinding(),
       clock: () => new Date(),
       diagnosticRecorder: createOperationalNearbyDiagnosticRecorder(),
-      japanTransitEnabled,
     }),
-    { japanTransitEnabled },
   );
   const settings = createAgentSettingsService(
     createD1AgentSettingsStore(database),

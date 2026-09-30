@@ -10,13 +10,11 @@ import {
 } from './route-sidecar-contract.ts';
 import { createGoogleRouteSidecarService } from './route-sidecar-service.ts';
 import { createOperationalNearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
-import { createRegionalTransitService } from './regional-transit-service.ts';
-import { hasNavitimeTransitCredential } from './navitime-transit-transport.ts';
 
 // The raw secret is deliberately absent from Wrangler config. Keep its runtime
 // surface narrow here instead of committing a path-sensitive generated Env.
 type RouteSidecarEnv = Readonly<
-  Record<'GOOGLE_MAPS_API_KEY' | 'NAVITIME_RAPIDAPI_KEY', string | undefined>
+  Record<'GOOGLE_MAPS_API_KEY', string | undefined>
 >;
 
 export default class RouteSidecarWorker extends WorkerEntrypoint<RouteSidecarEnv> {
@@ -36,19 +34,10 @@ export default class RouteSidecarWorker extends WorkerEntrypoint<RouteSidecarEnv
     return this.#service().walkingMatrix(request);
   }
 
-  async japanTransitReady(): Promise<boolean> {
-    return hasNavitimeTransitCredential(this.env.NAVITIME_RAPIDAPI_KEY);
-  }
-
   transit(
     request: RouteSidecarTransitRequest,
   ): Promise<RouteSidecarTransitResult> {
-    return createRegionalTransitService({
-      googleTransit: (value) => this.#service().transit(value),
-      navitimeApiKey: this.env.NAVITIME_RAPIDAPI_KEY,
-      now: () => new Date(),
-      fetch: (url, init) => fetch(url, init),
-    })(request);
+    return this.#service().transit(request);
   }
 
   #service() {

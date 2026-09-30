@@ -146,24 +146,6 @@
       }
     },
     {
-      "caseId": "japan-direct-train-average-disclosure",
-      "scenario": "navitime-average-configured",
-      "query": "銀座駅から電車20分以内のコーヒー",
-      "answers": [],
-      "expected": {
-        "status": "recommend",
-        "itemId": "saved-cafe",
-        "detailTargetId": "saved-cafe",
-        "name": "喫茶 みずき 新宿店",
-        "reasonRequired": true,
-        "routeMode": "transit",
-        "maxRouteSeconds": 1200,
-        "routeEstimateBasis": "average",
-        "routeSourceLabel": "NAVITIME",
-        "displayIncludes": "average estimate"
-      }
-    },
-    {
       "caseId": "ambiguous-station-choice-continues",
       "query": "Good curry near me",
       "answers": ["大久保駅", "Ōkubo Station, Shinjuku, Tokyo"],

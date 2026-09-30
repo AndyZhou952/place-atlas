@@ -24,10 +24,6 @@ export function getAtlasDeploymentEnvironment(): string | undefined {
   return env.ATLAS_DEPLOYMENT_ENV;
 }
 
-export function getJapanTransitEnabled(): boolean {
-  return env.JAPAN_TRANSIT_PROVIDER === 'navitime-average';
-}
-
 export function getRouteSidecarServiceBinding():
   | RouteSidecarServiceBinding
   | undefined {

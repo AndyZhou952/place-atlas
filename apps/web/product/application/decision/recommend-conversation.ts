@@ -42,7 +42,6 @@ export interface RecommendConversationItem extends RecommendDecisionSuggestion {
     readonly seconds: number;
     readonly checkedAt: string;
     readonly source: { readonly label: string; readonly url: string };
-    readonly estimateBasis?: 'average';
   };
 }
 

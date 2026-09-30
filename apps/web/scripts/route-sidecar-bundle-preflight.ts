@@ -7,8 +7,6 @@ const allowedUrls = [
   'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
   'https://routes.googleapis.com/directions/v2:computeRoutes',
   'https://www.google.com/maps',
-  'https://navitime-route-totalnavi.p.rapidapi.com/route_transit',
-  'https://www.navitime.co.jp/',
 ] as const;
 
 export function inspectRouteSidecarBundle(source: string): {
@@ -19,11 +17,7 @@ export function inspectRouteSidecarBundle(source: string): {
   if (/foursquare|google-fixed-endpoint-transport/iu.test(source)) {
     blockers.push('forbidden_provider_capability');
   }
-  if (
-    [...allowedUrls.slice(0, 3), allowedUrls[4]].some(
-      (url) => !source.includes(url),
-    )
-  ) {
+  if (allowedUrls.slice(0, 3).some((url) => !source.includes(url))) {
     blockers.push('required_fixed_endpoint_missing');
   }
   const withoutAllowedUrls = allowedUrls.reduce(

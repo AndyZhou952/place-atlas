@@ -664,19 +664,12 @@ export function createRecommendConversationService(
                           : undefined,
                       doorToDoor:
                         route.status === 'fresh' && route.boardingCount >= 1,
-                      estimateBasis:
-                        route.status === 'fresh'
-                          ? route.estimateBasis
-                          : undefined,
                     });
                     if (fresh)
                       routeSources.set(`${item.id}:transit`, {
                         seconds: route.durationSeconds,
                         checkedAt: route.checkedAt,
                         source: route.attribution,
-                        ...(route.estimateBasis
-                          ? { estimateBasis: route.estimateBasis }
-                          : {}),
                       });
                     return (
                       fresh &&

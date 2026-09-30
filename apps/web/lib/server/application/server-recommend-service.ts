@@ -46,6 +46,7 @@ export function getServerRecommendService() {
     },
     locationResolver: routes.locationResolver,
     routeProvider: routes.routeProvider,
+    transitRouteProvider: routes.transitRouteProvider,
     clock: { now: () => new Date() },
   });
 }

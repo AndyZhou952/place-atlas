@@ -13,6 +13,7 @@ import {
 } from './recommend-conversation.ts';
 import {
   decideRecommend,
+  relevantItems,
   type RecommendDecisionItem,
   type RecommendDecisionOrigin,
   type RecommendRouteObservation,
@@ -300,6 +301,26 @@ export function createRecommendConversationService(
       const routes: RecommendRouteObservation[] = [];
       const routeSources = new Map<string, RecommendRouteSource>();
       let routeState: 'unavailable' | undefined;
+      const relevantIds = new Set(
+        relevantItems(
+          {
+            intent: {
+              foodTerms: intent.foodTerms,
+              excludedFoodTerms: intent.excludedFoodTerms,
+              travelMode: intent.travelMode,
+              visited: intent.visited,
+            },
+            origin,
+            catalogIds: catalog.map((item) => item.id),
+            routes: [],
+            distances: [],
+          },
+          catalog,
+        ).map((item) => item.id),
+      );
+      const routeItems = eligibleItems.filter((item) =>
+        relevantIds.has(item.id),
+      );
       if (point && intent.travelMode !== 'none') {
         const now = dependencies.clock.now();
         if (intent.travelMode === 'walk' || intent.travelMode === 'either') {
@@ -307,13 +328,13 @@ export function createRecommendConversationService(
             const evidence = dependencies.routeProvider.walkingMany
               ? await dependencies.routeProvider.walkingMany(
                   point,
-                  eligibleItems.map((item) => ({
+                  routeItems.map((item) => ({
                     latitude: item.latitude,
                     longitude: item.longitude,
                   })),
                 )
               : await Promise.all(
-                  eligibleItems.map((item) =>
+                  routeItems.map((item) =>
                     dependencies.routeProvider.walking(point, {
                       latitude: item.latitude,
                       longitude: item.longitude,
@@ -327,20 +348,20 @@ export function createRecommendConversationService(
                 Number.isFinite(route.durationSeconds) &&
                 route.durationSeconds >= 0;
               routes.push({
-                itemId: eligibleItems[index].id,
+                itemId: routeItems[index].id,
                 mode: 'walk',
                 seconds:
                   route.status === 'fresh' ? route.durationSeconds : null,
                 status: fresh ? 'fresh' : 'unavailable',
               });
               if (fresh)
-                routeSources.set(`${eligibleItems[index].id}:walk`, {
+                routeSources.set(`${routeItems[index].id}:walk`, {
                   seconds: route.durationSeconds,
                   checkedAt: route.checkedAt,
                   source: route.attribution,
                 });
             });
-            if (evidence.length !== eligibleItems.length)
+            if (evidence.length !== routeItems.length)
               routeState = 'unavailable';
           } catch {
             routeState = 'unavailable';
@@ -349,7 +370,7 @@ export function createRecommendConversationService(
         if (intent.travelMode === 'transit' || intent.travelMode === 'either') {
           if (!dependencies.transitRouteProvider) routeState = 'unavailable';
           else {
-            const shortlist = eligibleItems
+            const shortlist = routeItems
               .map((item) => ({
                 item,
                 meters:
@@ -371,6 +392,11 @@ export function createRecommendConversationService(
                     route.status === 'fresh' &&
                     Number.isFinite(route.durationSeconds) &&
                     route.durationSeconds >= 0;
+                  if (
+                    route.status === 'unavailable' ||
+                    route.status === 'stale'
+                  )
+                    routeState = 'unavailable';
                   routes.push({
                     itemId: item.id,
                     mode: 'transit',

@@ -1,11 +1,14 @@
 import { mapGoogleGeocodingResponse } from '../adapters/providers/google-provider-response-mappers.ts';
 import { mapGoogleRouteMatrixResponse } from '../adapters/providers/google-route-matrix-response-mapper.ts';
+import { mapGoogleTransitRouteResponse } from '../adapters/providers/google-transit-route-response-mapper.ts';
 import {
   isRouteSidecarGeocodeRequest,
   isRouteSidecarWalkingMatrixRequest,
+  isRouteSidecarTransitRequest,
   type RouteSidecarGeocodeRequest,
   type RouteSidecarPoint,
   type RouteSidecarWalkingMatrixRequest,
+  type RouteSidecarTransitRequest,
 } from './route-sidecar-contract.ts';
 import {
   noOpNearbyDiagnosticRecorder,
@@ -16,6 +19,7 @@ export const GOOGLE_ROUTE_SIDECAR_ENDPOINTS = {
   geocoding: 'https://maps.googleapis.com/maps/api/geocode/json',
   walkingMatrix:
     'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
+  transit: 'https://routes.googleapis.com/directions/v2:computeRoutes',
 } as const;
 
 const walkingMatrixFieldMask = [
@@ -27,12 +31,22 @@ const walkingMatrixFieldMask = [
   'duration',
 ].join(',');
 
+const transitFieldMask = [
+  'routes.duration',
+  'routes.legs.steps.travelMode',
+  'routes.legs.steps.transitDetails.transitLine.name',
+  'routes.legs.steps.transitDetails.transitLine.vehicle.type',
+].join(',');
+
 export interface GoogleRouteSidecarTransport {
   geocode(
     request: RouteSidecarGeocodeRequest,
   ): Promise<RouteSidecarTransportResponse>;
   walkingMatrix(
     request: RouteSidecarWalkingMatrixRequest,
+  ): Promise<RouteSidecarTransportResponse>;
+  transit(
+    request: RouteSidecarTransitRequest,
   ): Promise<RouteSidecarTransportResponse>;
 }
 
@@ -93,6 +107,31 @@ export function createGoogleRouteSidecarTransport(input: {
         },
       );
     },
+    async transit(request) {
+      if (!isRouteSidecarTransitRequest(request)) return invalid();
+      return execute(
+        input,
+        `${GOOGLE_ROUTE_SIDECAR_ENDPOINTS.transit}?fields=${encodeURIComponent(transitFieldMask)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            origin: matrixWaypoint(request.origin),
+            destination: matrixWaypoint(request.destination),
+            travelMode: 'TRANSIT',
+            computeAlternativeRoutes: true,
+            transitPreferences: {
+              allowedTravelModes: ['SUBWAY', 'TRAIN', 'LIGHT_RAIL', 'RAIL'],
+              routingPreference: 'FEWER_TRANSFERS',
+            },
+            languageCode: 'ja',
+            regionCode: 'JP',
+          }),
+        },
+        'header',
+        'transit',
+        (raw) => mapGoogleTransitRouteResponse(raw),
+      );
+    },
   };
 }
 
@@ -105,7 +144,7 @@ async function execute(
   url: string,
   init: { readonly method: 'GET' | 'POST'; readonly body?: string },
   credential: 'query' | 'header',
-  operation: 'geocoding' | 'walking_matrix',
+  operation: 'geocoding' | 'walking_matrix' | 'transit',
   map: (raw: unknown) => Readonly<Record<string, unknown>> | undefined,
 ): Promise<RouteSidecarTransportResponse> {
   const diagnostics = input.diagnosticRecorder ?? noOpNearbyDiagnosticRecorder;
@@ -176,7 +215,7 @@ async function execute(
 }
 
 function sidecarDiagnostic(
-  operation: 'geocoding' | 'walking_matrix',
+  operation: 'geocoding' | 'walking_matrix' | 'transit',
   resultClass:
     | 'credential_rejected'
     | 'transport_unavailable'
@@ -196,7 +235,7 @@ function sidecarDiagnostic(
 }
 
 function classifyMappedFailure(
-  operation: 'geocoding' | 'walking_matrix',
+  operation: 'geocoding' | 'walking_matrix' | 'transit',
   raw: unknown,
 ): 'credential_rejected' | 'upstream_unavailable' | 'malformed_response' {
   if (operation !== 'geocoding') return 'malformed_response';

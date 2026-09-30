@@ -107,6 +107,32 @@
         "name": "寿司 青空",
         "reasonRequired": true
       }
+    },
+    {
+      "caseId": "multilingual-alias-canonical-name",
+      "query": "Find sushi near Ginza",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-sushi",
+        "detailTargetId": "saved-sushi",
+        "name": "寿司 青空",
+        "reasonRequired": true
+      }
+    },
+    {
+      "caseId": "direct-train-canonical-route",
+      "query": "新宿駅から電車20分以内のラーメン",
+      "answers": [],
+      "expected": {
+        "status": "recommend",
+        "itemId": "saved-ramen",
+        "detailTargetId": "saved-ramen",
+        "name": "麺 そら",
+        "reasonRequired": true,
+        "routeMode": "transit",
+        "maxRouteSeconds": 1200
+      }
     }
   ]
 }

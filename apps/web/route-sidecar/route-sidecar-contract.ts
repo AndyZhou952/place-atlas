@@ -48,6 +48,24 @@ export interface RouteSidecarWalkingMatrixEvidence {
   readonly checkedAt: string;
 }
 
+export interface RouteSidecarTransitRequest {
+  readonly origin: RouteSidecarPoint;
+  readonly destination: RouteSidecarPoint;
+}
+
+export interface RouteSidecarTransitEvidence {
+  readonly directRoute: {
+    readonly durationSeconds: number;
+    readonly lineIdentity: string;
+  } | null;
+  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
+  readonly source: {
+    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
+    readonly endpoint: string;
+  };
+  readonly checkedAt: string;
+}
+
 export type RouteSidecarFailure = {
   readonly ok: false;
   readonly error:
@@ -71,6 +89,10 @@ export type RouteSidecarWalkingMatrixResult =
     }
   | RouteSidecarFailure;
 
+export type RouteSidecarTransitResult =
+  | { readonly ok: true; readonly evidence: RouteSidecarTransitEvidence }
+  | RouteSidecarFailure;
+
 export interface GoogleRouteSidecarPort {
   geocode(
     request: RouteSidecarGeocodeRequest,
@@ -78,6 +100,20 @@ export interface GoogleRouteSidecarPort {
   walkingMatrix(
     request: RouteSidecarWalkingMatrixRequest,
   ): Promise<RouteSidecarWalkingMatrixResult>;
+  transit(
+    request: RouteSidecarTransitRequest,
+  ): Promise<RouteSidecarTransitResult>;
+}
+
+export function isRouteSidecarTransitRequest(
+  value: unknown,
+): value is RouteSidecarTransitRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['origin', 'destination']) &&
+    isRouteSidecarPoint(value.origin) &&
+    isRouteSidecarPoint(value.destination)
+  );
 }
 
 export function isRouteSidecarGeocodeRequest(

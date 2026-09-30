@@ -31,6 +31,19 @@ function oracle(entry) {
               detailTargetId: expected.detailTargetId,
               name: expected.name,
               reason: 'Matches your saved catalog and stated request.',
+              ...(expected.routeMode
+                ? {
+                    route: {
+                      mode: expected.routeMode,
+                      seconds: expected.maxRouteSeconds,
+                      checkedAt: '2026-09-30T00:00:00.000Z',
+                      source: {
+                        label: 'Google Maps',
+                        url: 'https://www.google.com/maps',
+                      },
+                    },
+                  }
+                : {}),
             },
           ],
         }
@@ -62,8 +75,21 @@ test('all browser and API contract cases have a valid oracle trace', () => {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 9);
+  assert.equal(report.cases, 11);
   assert.equal(report.casePassRate, 1);
+});
+
+test('a train claim without verified route evidence fails the journey contract', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'direct-train-canonical-route',
+  );
+  const prediction = oracle(entry);
+  delete prediction.trace.responses[0].recommendations[0].route;
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['missing_verified_route']);
 });
 
 test('a model-style display name cannot pass even with a valid saved ID', () => {

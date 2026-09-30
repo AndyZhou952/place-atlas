@@ -135,10 +135,10 @@ test('reply keeps cuisine and time constraints through geocoding and one batched
     {
       async walkingMany(_origin, destinations) {
         batches += 1;
-        assert.equal(destinations.length, 2);
-        return destinations.map((_, index) => ({
+        assert.equal(destinations.length, 1);
+        return destinations.map(() => ({
           status: 'fresh',
-          durationSeconds: index === 0 ? 600 : 300,
+          durationSeconds: 600,
           distanceMeters: 800,
           checkedAt: now,
           attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
@@ -165,6 +165,80 @@ test('reply keeps cuisine and time constraints through geocoding and one batched
     seconds: 600,
     checkedAt: now,
     source: { label: 'Google Maps', url: 'https://google.com/maps' },
+  });
+});
+
+test('transit routes only relevant saved candidates and returns the exact catalog name', async () => {
+  const transitDestinations = [];
+  const catalog = [
+    item('near-sushi', '寿司 青空', '新宿', ['寿司'], 35.691),
+    item('ramen', '麺 空', '新宿', ['ラーメン'], 35.7),
+  ];
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return catalog;
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['ramen'],
+          excludedFoodTerms: [],
+          travelMode: 'transit',
+          maxMinutes: 20,
+          visited: 'prefer_unvisited',
+          recommendations: [{ name: 'Ramen Invented' }],
+        };
+      },
+    },
+    locationResolver: {
+      async resolve() {
+        return {
+          status: 'resolved',
+          location: {
+            canonicalAddress: '新宿駅',
+            point: { latitude: 35.69, longitude: 139.7 },
+          },
+        };
+      },
+    },
+    routeProvider: {
+      async walking() {
+        throw new Error('unexpected');
+      },
+    },
+    transitRouteProvider: {
+      async transit(_origin, destination) {
+        transitDestinations.push(destination);
+        return {
+          status: 'fresh',
+          durationSeconds: 1080,
+          boardingCount: 1,
+          lineIdentities: ['Line A'],
+          transferCount: 0,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        };
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const result = await recommend.ask({
+    query: '新宿駅から電車20分以内のラーメン',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.deepEqual(transitDestinations, [
+    { latitude: 35.7, longitude: 139.76 },
+  ]);
+  assert.equal(result.recommendations[0].name, '麺 空');
+  assert.deepEqual(result.recommendations[0].routeClaim, {
+    mode: 'transit',
+    seconds: 1080,
   });
 });
 

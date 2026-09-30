@@ -236,6 +236,13 @@ export function RecommendSearch({
               </li>
             ))}
           </ol>
+          {result.recommendations.some(
+            (candidate) => candidate.route?.source.label === 'Google Maps',
+          ) ? (
+            <p className="nearby-evidence">
+              Powered by Google, ©{new Date().getFullYear()} Google
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>

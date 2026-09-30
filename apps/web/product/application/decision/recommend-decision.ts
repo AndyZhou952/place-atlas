@@ -91,7 +91,7 @@ const empty = (
   ...(question ? { question } : {}),
 });
 
-function relevantItems(
+export function relevantItems(
   input: RecommendDecisionInput,
   catalog: readonly RecommendDecisionItem[],
 ): RecommendDecisionItem[] {

@@ -96,6 +96,11 @@ export type TransitRouteEvidence =
   | {
       readonly status: 'unavailable';
       readonly warning: string;
+    }
+  | {
+      readonly status: 'no_direct_route';
+      readonly checkedAt: string;
+      readonly attribution: ProviderAttribution;
     };
 
 export interface TransitRouteProvider {

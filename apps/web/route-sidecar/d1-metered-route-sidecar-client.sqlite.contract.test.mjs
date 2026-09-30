@@ -135,6 +135,54 @@ void test('D1 metering reserves both 8,000-unit SKUs by UTC month before RPC', a
   );
 });
 
+void test('D1 transit cap blocks the 251st paid request before provider egress', async () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(await readFile(legacyMigrationUrl, 'utf8'));
+  database.exec(await readFile(skuMigrationUrl, 'utf8'));
+  database.exec(`
+    INSERT INTO agent_provider_usage_by_sku (
+      provider_id, sku, period_start_utc, request_count, billable_units,
+      cost_micro_usd
+    ) VALUES (
+      'google-maps-platform', 'transit_routes.requests',
+      '2026-09-01T00:00:00.000Z', 249, 249, 4980000
+    )
+  `);
+  let calls = 0;
+  const client = createD1MeteredRouteSidecarClient({
+    database: toD1(database),
+    clock: () => new Date('2026-09-30T00:00:00.000Z'),
+    service: {
+      async transit() {
+        calls += 1;
+        return { ok: true, evidence: { directRoute: null } };
+      },
+    },
+  });
+  const request = {
+    origin: { latitude: 35.67, longitude: 139.76 },
+    destination: { latitude: 35.69, longitude: 139.7 },
+  };
+  assert.equal((await client.transit(request)).ok, true);
+  assert.deepEqual(await client.transit(request), {
+    ok: false,
+    error: 'quota_exceeded',
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    {
+      ...database
+        .prepare(`
+      SELECT request_count, billable_units, cost_micro_usd
+      FROM agent_provider_usage_by_sku
+      WHERE sku = 'transit_routes.requests'
+    `)
+        .get(),
+    },
+    { request_count: 250, billable_units: 250, cost_micro_usd: 5000000 },
+  );
+});
+
 function toD1(database) {
   return {
     prepare(sql) {

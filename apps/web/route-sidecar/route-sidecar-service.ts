@@ -8,12 +8,15 @@ import {
   isRouteSidecarGeocodeRequest,
   isRouteSidecarPoint,
   isRouteSidecarWalkingMatrixRequest,
+  isRouteSidecarTransitRequest,
   type GoogleRouteSidecarPort,
   type RouteSidecarFailure,
   type RouteSidecarGeocodeEvidence,
   type RouteSidecarGeocodeResult,
   type RouteSidecarWalkingMatrixEvidence,
   type RouteSidecarWalkingMatrixResult,
+  type RouteSidecarTransitEvidence,
+  type RouteSidecarTransitResult,
 } from './route-sidecar-contract.ts';
 import type { NearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
 
@@ -58,6 +61,43 @@ export function createGoogleRouteSidecarService({
       );
       return evidence ? { ok: true, evidence } : failure('dependency_failure');
     },
+    async transit(request): Promise<RouteSidecarTransitResult> {
+      if (!isRouteSidecarTransitRequest(request))
+        return failure('invalid_request');
+      const response = await transport.transit(request);
+      if (response.status !== 200) return transportFailure(response.status);
+      const evidence = mapTransitEvidence(response.body, clock());
+      return evidence ? { ok: true, evidence } : failure('dependency_failure');
+    },
+  };
+}
+
+function mapTransitEvidence(
+  body: Readonly<Record<string, unknown>>,
+  checkedAt: Date,
+): RouteSidecarTransitEvidence | undefined {
+  if (!isValidDate(checkedAt)) return undefined;
+  const route = body.directRoute;
+  if (
+    route !== null &&
+    (!route ||
+      typeof route !== 'object' ||
+      Array.isArray(route) ||
+      typeof (route as Record<string, unknown>).durationSeconds !== 'number' ||
+      !Number.isFinite((route as Record<string, unknown>).durationSeconds) ||
+      (route as Record<string, number>).durationSeconds <= 0 ||
+      typeof (route as Record<string, unknown>).lineIdentity !== 'string' ||
+      !(route as Record<string, string>).lineIdentity.trim())
+  )
+    return undefined;
+  return {
+    directRoute: route as RouteSidecarTransitEvidence['directRoute'],
+    attribution: GOOGLE_ROUTE_SIDECAR_ATTRIBUTION,
+    source: {
+      providerId: GOOGLE_ROUTE_SIDECAR_PROVIDER_ID,
+      endpoint: GOOGLE_ROUTE_SIDECAR_ENDPOINTS.transit,
+    },
+    checkedAt: checkedAt.toISOString(),
   };
 }
 

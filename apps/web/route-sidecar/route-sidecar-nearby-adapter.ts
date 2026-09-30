@@ -1,6 +1,7 @@
 import type {
   LocationResolver,
   RouteProvider,
+  TransitRouteProvider,
 } from '../product/application/decision/nearby-recommendation.ts';
 import type { GoogleRouteSidecarPort } from './route-sidecar-contract.ts';
 import { ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS } from './route-sidecar-contract.ts';
@@ -12,6 +13,7 @@ export function createRouteSidecarNearbyAdapter(
 ): {
   readonly locationResolver: LocationResolver;
   readonly routeProvider: RouteProvider;
+  readonly transitRouteProvider: TransitRouteProvider;
 } {
   return {
     locationResolver: {
@@ -112,6 +114,40 @@ export function createRouteSidecarNearbyAdapter(
         return routes;
       },
     },
+    transitRouteProvider: {
+      async transit(origin, destination) {
+        let result;
+        try {
+          result = await sidecar.transit({ origin, destination });
+        } catch {
+          return unavailableTransitRoute();
+        }
+        if (!result.ok) return unavailableTransitRoute();
+        const { evidence } = result;
+        if (!evidence.directRoute)
+          return {
+            status: 'no_direct_route',
+            checkedAt: evidence.checkedAt,
+            attribution: evidence.attribution,
+          };
+        return {
+          status: 'fresh',
+          durationSeconds: evidence.directRoute.durationSeconds,
+          boardingCount: 1,
+          lineIdentities: [evidence.directRoute.lineIdentity],
+          transferCount: 0,
+          checkedAt: evidence.checkedAt,
+          attribution: evidence.attribution,
+        };
+      },
+    },
+  };
+}
+
+function unavailableTransitRoute() {
+  return {
+    status: 'unavailable' as const,
+    warning: 'Transit route is temporarily unavailable.',
   };
 }
 

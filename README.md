@@ -119,7 +119,7 @@ Set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled` only with working credentia
 
 Without Google matching configuration, Add uses no-key search plus verified Tabelog listing identities for Japanese restaurants. Pasting a full Tabelog main-listing URL skips search. This fallback is not worldwide discovery and may fail when a provider blocks requests. Google improves international matching but does not itself guarantee complete or persistable restaurant research.
 
-For address resolution and walking routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
+For address resolution, walking routes, and direct-rail transit routes, deploy the private route Worker with a key allowed to call Geocoding API and Routes API:
 
 ```sh
 npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc

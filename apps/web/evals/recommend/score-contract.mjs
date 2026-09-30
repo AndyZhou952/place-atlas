@@ -85,6 +85,19 @@ export function scoreRecommendContract(dataset, predictionFile) {
           !recommendation.reason.trim())
       )
         failures.push('missing_reason');
+      if (expected.routeMode) {
+        const route = recommendation?.route;
+        if (
+          route?.mode !== expected.routeMode ||
+          typeof route?.seconds !== 'number' ||
+          !Number.isFinite(route.seconds) ||
+          route.seconds > expected.maxRouteSeconds ||
+          typeof route?.source?.url !== 'string' ||
+          !route.source.url.startsWith('https://') ||
+          !Number.isFinite(Date.parse(route?.checkedAt))
+        )
+          failures.push('missing_verified_route');
+      }
       if (trace?.openedDetailId !== expected.detailTargetId)
         failures.push('detail_not_opened');
     } else if (final?.recommendations?.length)

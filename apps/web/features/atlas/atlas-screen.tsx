@@ -42,7 +42,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { isEffectivelyVisited } from '@/product/application/assessments/effective-visited';
 import { researchRegion } from '@/product/application/catalog/research-region';
 
 import type {
@@ -65,9 +64,9 @@ import { normalizeRating, parseOptionalRating } from './rating';
 import { searchCatalogRestaurantsByName } from '@/product/application/decision/search-policy';
 import { useAtlasViewModel } from './use-atlas-view-model';
 import { CatalogIntakePanel } from './catalog-intake-panel';
+import { RecommendSearch } from './recommend-search';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
 import { useOwnerSession } from './use-owner-session';
-import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
 const filters: readonly {
   value: AtlasKindFilter;
@@ -127,14 +126,14 @@ export function AtlasScreen() {
           <OwnerAccessButton owner={owner} />
           <Button
             className="ask-button"
-            aria-label="Find nearby Atlas items"
+            aria-label="Ask for a saved restaurant recommendation"
             onClick={() => {
               vm.setView('map');
               setNearbyFocusRequest((request) => request + 1);
             }}
           >
             <Sparkles data-icon="inline-start" />
-            Ask nearby
+            Ask Recommend
           </Button>
         </div>
       </header>
@@ -266,7 +265,7 @@ function MapWorkspace({
             onOpenSaved={vm.selectItem}
           />
 
-          <NearbySearch vm={vm} />
+          <RecommendSearch onSelect={vm.selectItem} />
 
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
@@ -355,7 +354,7 @@ function MapWorkspace({
               <h2>{vm.visibleItems.length} real records</h2>
             </div>
             <a className="nearby-jump" href="#nearby-location">
-              <LocateFixed aria-hidden="true" /> Nearby
+              <LocateFixed aria-hidden="true" /> Recommend
             </a>
           </div>
 
@@ -430,269 +429,6 @@ function MapWorkspace({
       />
     </section>
   );
-}
-
-function NearbySearch({ vm }: { readonly vm: AtlasViewModel }) {
-  async function submit(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await vm.locateNearby();
-  }
-
-  return (
-    <section className="nearby-console" aria-labelledby="nearby-title">
-      <header>
-        <div>
-          <p className="eyebrow">Route check</p>
-          <h3 id="nearby-title">Nearby saved places</h3>
-        </div>
-        <span>Manual location</span>
-      </header>
-      <form
-        className="nearby-search"
-        aria-busy={vm.nearbyBusy}
-        onSubmit={submit}
-        noValidate
-      >
-        <label htmlFor="nearby-location">Neighborhood or address</label>
-        <div className="nearby-search-row">
-          <Input
-            id="nearby-location"
-            value={vm.nearbyLocationHint}
-            placeholder="e.g. 銀座, Ginza, or a copied address"
-            autoComplete="street-address"
-            aria-invalid={Boolean(vm.nearbyError)}
-            aria-describedby={
-              vm.nearbyError ? 'nearby-error' : 'nearby-location-help'
-            }
-            disabled={vm.nearbyBusy}
-            onChange={(event) => vm.setNearbyLocationHint(event.target.value)}
-          />
-          <Button
-            type="submit"
-            disabled={vm.nearbyBusy || !vm.nearbyLocationHint.trim()}
-          >
-            <LocateFixed data-icon="inline-start" />
-            {vm.nearbyBusy ? 'Checking…' : 'Check routes'}
-          </Button>
-        </div>
-        <small id="nearby-location-help">
-          Only saved Atlas places are compared. Your browser location is never
-          requested.
-        </small>
-      </form>
-
-      {vm.nearbyBusy ? (
-        <output className="nearby-progress" aria-live="polite">
-          <Clock3 aria-hidden="true" /> Searching saved places…
-        </output>
-      ) : null}
-      {vm.nearbyError ? (
-        <p id="nearby-error" className="nearby-error" role="alert">
-          {vm.nearbyError}
-        </p>
-      ) : null}
-      {!vm.nearbyBusy && !vm.nearbyError && vm.nearbyResult ? (
-        <NearbyResult
-          result={vm.nearbyResult}
-          onSelect={vm.selectItem}
-          onRetry={() => void vm.locateNearby()}
-          onChooseLocation={(locationHint) => {
-            vm.setNearbyLocationHint(locationHint);
-            void vm.locateNearby(locationHint);
-          }}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function NearbyResult({
-  result,
-  onSelect,
-  onRetry,
-  onChooseLocation,
-}: {
-  readonly result: NearbyRecommendResult;
-  readonly onSelect: (itemId: string) => void;
-  readonly onRetry: () => void;
-  readonly onChooseLocation: (locationHint: string) => void;
-}) {
-  if (
-    result.status === 'unresolved' &&
-    result.reason === 'dependency_failure'
-  ) {
-    return (
-      <div className="nearby-state" role="alert">
-        <strong>Location service is temporarily unavailable.</strong>
-        <span>
-          No saved places were checked. Your location entry is unchanged.
-        </span>
-        <Button
-          type="button"
-          className="min-h-11 justify-self-start"
-          onClick={onRetry}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (result.status === 'unresolved') {
-    return (
-      <div className="nearby-state" role="alert">
-        <strong>Location could not be found.</strong>
-        <span>Add a city or full address and check again.</span>
-      </div>
-    );
-  }
-
-  if (result.status === 'ambiguous') {
-    return (
-      <div className="nearby-state">
-        <strong>Choose a more specific location</strong>
-        <span>Copy one of these addresses into the field and check again.</span>
-        <ul className="nearby-address-options">
-          {result.candidates.map((candidate) => (
-            <li key={candidate.canonicalAddress}>
-              <button
-                type="button"
-                onClick={() => onChooseLocation(candidate.canonicalAddress)}
-              >
-                {candidate.canonicalAddress}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <ProviderEvidence
-          attribution={result.attribution}
-          checkedAt={result.provenance.checkedAt}
-          sourceUrl={result.provenance.sourceUrl}
-        />
-      </div>
-    );
-  }
-
-  if (!result.recommendations.length) {
-    return (
-      <div className="nearby-state">
-        <strong>No saved places are reachable from this location yet.</strong>
-        <span>
-          Try another nearby station, neighborhood, or copied address.
-        </span>
-        <ProviderEvidence
-          attribution={result.attribution}
-          checkedAt={result.provenance.checkedAt}
-          sourceUrl={result.provenance.sourceUrl}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="nearby-resolved">
-      <p className="nearby-resolution">
-        From <strong>{result.resolvedLocation}</strong>
-      </p>
-      <ol className="nearby-results" aria-label="Nearby recommendations">
-        {result.recommendations.map((candidate, index) => {
-          const visited = isEffectivelyVisited(
-            candidate.visit.manualVisited,
-            candidate.visit.visitCount,
-          );
-          const warnings = [
-            ...candidate.warnings,
-            candidate.entryAccess.walkInAssertion.warning,
-            candidate.entryAccess.queueAssertion.warning,
-          ].filter((warning): warning is string => Boolean(warning));
-          return (
-            <li key={candidate.itemId}>
-              <button
-                type="button"
-                className="nearby-candidate"
-                onClick={() => onSelect(candidate.itemId)}
-              >
-                <span className="nearby-order" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="nearby-candidate-copy">
-                  <strong>{candidate.name}</strong>
-                  <span>{candidate.address}</span>
-                </span>
-              </button>
-              <div className="nearby-facts">
-                <span>
-                  {candidate.route
-                    ? `${candidate.route.mode === 'walking' ? 'Walk' : 'Direct train'} · ${candidate.route.durationMinutes} min`
-                    : `${candidate.straightLineDistanceKm.toFixed(1)} km · distance layer`}
-                </span>
-                <span>
-                  {visited ? 'Visited' : 'Not visited'}
-                  {visited && ` · ${candidate.visit.visitCount}`}
-                  {candidate.visit.personalRating === undefined
-                    ? ''
-                    : ` · My ${candidate.visit.personalRating}`}
-                </span>
-              </div>
-              <p className="nearby-reason">{candidate.reason}</p>
-              {warnings.length ? (
-                <ul className="nearby-warnings">
-                  {[...new Set(warnings)].map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {candidate.route ? (
-                <ProviderEvidence
-                  attribution={candidate.route.source}
-                  checkedAt={candidate.route.checkedAt}
-                  sourceUrl={candidate.route.source.url}
-                />
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-      <ProviderEvidence
-        attribution={result.attribution}
-        checkedAt={result.provenance.checkedAt}
-        sourceUrl={result.provenance.sourceUrl}
-      />
-    </div>
-  );
-}
-
-function ProviderEvidence({
-  attribution,
-  checkedAt,
-  sourceUrl,
-}: {
-  readonly attribution: { readonly label: string; readonly url: string };
-  readonly checkedAt: string;
-  readonly sourceUrl: string;
-}) {
-  return (
-    <small className="nearby-evidence">
-      <a href={attribution.url} target="_blank" rel="noreferrer">
-        {attribution.label}
-      </a>{' '}
-      · source {formatProviderSource(sourceUrl)} · checked{' '}
-      {formatCheckedAt(checkedAt)}
-    </small>
-  );
-}
-
-function formatProviderSource(value: string): string {
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return 'provider endpoint';
-  }
-}
-
-function formatCheckedAt(value: string): string {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
 function PlaceRow({

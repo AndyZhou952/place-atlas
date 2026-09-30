@@ -3,6 +3,7 @@ import type {
   RouteProvider,
 } from '../product/application/decision/nearby-recommendation.ts';
 import type { GoogleRouteSidecarPort } from './route-sidecar-contract.ts';
+import { ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS } from './route-sidecar-contract.ts';
 
 const policyVersion = 'google-route-sidecar-v1';
 
@@ -59,36 +60,56 @@ export function createRouteSidecarNearbyAdapter(
     },
     routeProvider: {
       async walking(origin, destination) {
-        let result;
-        try {
-          result = await sidecar.walkingMatrix({
-            origin,
-            destinations: [destination],
-          });
-        } catch {
-          return unavailableWalkingRoute();
-        }
-        if (!result.ok) return unavailableWalkingRoute();
-        const route = result.evidence.routes.find(
-          ({ destinationIndex }) => destinationIndex === 0,
-        );
-        if (
-          !route ||
-          route.durationSeconds === null ||
-          route.distanceMeters === null
+        return (await this.walkingMany!(origin, [destination]))[0];
+      },
+      async walkingMany(origin, destinations) {
+        const routes = [];
+        for (
+          let offset = 0;
+          offset < destinations.length;
+          offset += ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS
         ) {
-          return {
-            status: 'unavailable',
-            warning: 'Walking route is unavailable.',
-          };
+          const batch = destinations.slice(
+            offset,
+            offset + ROUTE_SIDECAR_MAXIMUM_MATRIX_DESTINATIONS,
+          );
+          let result;
+          try {
+            result = await sidecar.walkingMatrix({
+              origin,
+              destinations: batch,
+            });
+          } catch {
+            routes.push(...batch.map(() => unavailableWalkingRoute()));
+            continue;
+          }
+          if (!result.ok) {
+            routes.push(...batch.map(() => unavailableWalkingRoute()));
+            continue;
+          }
+          for (let index = 0; index < batch.length; index += 1) {
+            const route = result.evidence.routes.find(
+              ({ destinationIndex }) => destinationIndex === index,
+            );
+            routes.push(
+              route &&
+                route.durationSeconds !== null &&
+                route.distanceMeters !== null
+                ? {
+                    status: 'fresh' as const,
+                    durationSeconds: route.durationSeconds,
+                    distanceMeters: route.distanceMeters,
+                    checkedAt: result.evidence.checkedAt,
+                    attribution: result.evidence.attribution,
+                  }
+                : {
+                    status: 'unavailable' as const,
+                    warning: 'Walking route is unavailable.',
+                  },
+            );
+          }
         }
-        return {
-          status: 'fresh',
-          durationSeconds: route.durationSeconds,
-          distanceMeters: route.distanceMeters,
-          checkedAt: result.evidence.checkedAt,
-          attribution: result.evidence.attribution,
-        };
+        return routes;
       },
     },
   };

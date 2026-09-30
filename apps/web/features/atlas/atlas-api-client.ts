@@ -28,6 +28,10 @@ export { OwnerAuthenticationRequiredError } from './public-read-client.ts';
 import { publishOwnerLoginRequired } from './owner-session-client.ts';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation.ts';
 import type {
+  RecommendConversationInput,
+  RecommendConversationOutput,
+} from '../../product/application/decision/recommend-conversation.ts';
+import type {
   AddErrorCode,
   CatalogIntakeCancelInput,
   CatalogIntakeCancelOutput,
@@ -131,6 +135,10 @@ interface BrowserOperationMap {
   readonly 'nearby.recommend': {
     readonly input: { readonly locationHint: string };
     readonly output: NearbyRecommendResult;
+  };
+  readonly 'recommend.ask': {
+    readonly input: RecommendConversationInput;
+    readonly output: RecommendConversationOutput;
   };
   readonly 'catalog.intake.discover': {
     readonly input: CatalogIntakeDiscoverInput;
@@ -341,6 +349,11 @@ export function createBrowserAtlasApplication(
         `${browserOperationPath('nearby.recommend')}?${search.toString()}`,
       );
     },
+    'recommend.ask': (input) =>
+      requestJson(transport, browserOperationPath('recommend.ask'), {
+        method: browserOperationHttpCatalog['recommend.ask'].method,
+        body: JSON.stringify(input),
+      }),
     'catalog.intake.discover': (input) =>
       requestCatalogIntakeJson(
         transport,

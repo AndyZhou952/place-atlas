@@ -94,6 +94,12 @@ test('agent capabilities preserve their HTTP surface and are generated from the 
     path: '/api/nearby',
     bodyKind: 'none',
   });
+  assert.deepEqual(browserOperationHttpCatalog['recommend.ask'], {
+    key: 'recommend.ask',
+    method: 'POST',
+    path: '/api/recommend',
+    bodyKind: 'json',
+  });
   for (const operation of ['discover', 'select', 'confirm', 'cancel']) {
     const { capability, ...descriptor } =
       browserOperationHttpCatalog[`catalog.intake.${operation}`];

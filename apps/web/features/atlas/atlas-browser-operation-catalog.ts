@@ -47,6 +47,12 @@ export const browserOperationHttpCatalog = defineBrowserOperationHttpCatalog({
     path: '/api/nearby',
     bodyKind: 'none',
   },
+  'recommend.ask': {
+    key: 'recommend.ask',
+    method: 'POST',
+    path: '/api/recommend',
+    bodyKind: 'json',
+  },
   'catalog.intake.discover': {
     key: 'catalog.intake.discover',
     method: 'POST',

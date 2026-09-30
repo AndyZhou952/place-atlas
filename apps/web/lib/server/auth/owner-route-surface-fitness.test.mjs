@@ -23,6 +23,7 @@ const closedRouteSurface = [
   route('media/[id]/route.ts', ['DELETE', 'PATCH'], 'owner_cookie'),
   route('media/route.ts', ['POST'], 'owner_cookie'),
   route('owner/agent-settings/route.ts', ['DELETE', 'PUT'], 'owner_cookie'),
+  route('recommend/route.ts', ['POST'], 'owner_cookie'),
 ];
 
 const ownerPocBusinessWriteSurface = [

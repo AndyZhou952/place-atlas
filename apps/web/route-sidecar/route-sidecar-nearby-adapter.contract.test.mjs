@@ -3,6 +3,49 @@ import test from 'node:test';
 
 import { createRouteSidecarNearbyAdapter } from './route-sidecar-nearby-adapter.ts';
 
+void test('walking matrix batches 51 destinations into three bounded calls and preserves position', async () => {
+  const batchSizes = [];
+  const adapter = createRouteSidecarNearbyAdapter({
+    async geocode() {
+      throw new Error('not used');
+    },
+    async walkingMatrix(request) {
+      batchSizes.push(request.destinations.length);
+      if (batchSizes.length === 2)
+        return { ok: false, error: { kind: 'provider_failure' } };
+      return {
+        ok: true,
+        evidence: {
+          routes: request.destinations.map((_, destinationIndex) => ({
+            destinationIndex,
+            durationSeconds: 300 + destinationIndex,
+            distanceMeters: 500 + destinationIndex,
+          })),
+          checkedAt: '2026-09-21T00:00:01.000Z',
+          attribution: {
+            label: 'Google Maps',
+            url: 'https://www.google.com/maps',
+          },
+        },
+      };
+    },
+  });
+  const destinations = Array.from({ length: 51 }, (_, index) => ({
+    latitude: 35 + index / 1000,
+    longitude: 139,
+  }));
+  const routes = await adapter.routeProvider.walkingMany(
+    { latitude: 35, longitude: 139 },
+    destinations,
+  );
+  assert.deepEqual(batchSizes, [25, 25, 1]);
+  assert.equal(routes.length, 51);
+  assert.equal(routes[24].durationSeconds, 324);
+  assert.equal(routes[25].status, 'unavailable');
+  assert.equal(routes[49].status, 'unavailable');
+  assert.equal(routes[50].durationSeconds, 300);
+});
+
 void test('RouteEvidencePort maps closed Sidecar evidence into nearby location and walking contracts', async () => {
   const calls = [];
   const adapter = createRouteSidecarNearbyAdapter({

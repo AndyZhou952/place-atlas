@@ -71,6 +71,10 @@ export interface RouteProvider {
     origin: GeoPoint,
     destination: GeoPoint,
   ): Promise<WalkingRouteEvidence>;
+  walkingMany?(
+    origin: GeoPoint,
+    destinations: readonly GeoPoint[],
+  ): Promise<readonly WalkingRouteEvidence[]>;
 }
 
 export type TransitRouteEvidence =

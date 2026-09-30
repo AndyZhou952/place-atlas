@@ -26,12 +26,9 @@ const suggestion = (overrides = {}) => ({
 const receipt = (candidate, current = item(), routes = new Map()) =>
   materializeRecommendReceipt([candidate], [item()], [current], routes, []);
 
-test('receipt uses the current database title even if a model supplies a different name', () => {
-  const result = receipt(
-    suggestion({ name: 'Invented Restaurant' }),
-    item({ title: 'Current database name' }),
-  );
-  assert.equal(result?.[0].name, 'Current database name');
+test('receipt uses the exact database title even if a model supplies a different name', () => {
+  const result = receipt(suggestion({ name: 'Invented Restaurant' }));
+  assert.equal(result?.[0].name, 'Stored canonical name');
   assert.equal(result?.[0].detailTargetId, result?.[0].itemId);
 });
 
@@ -50,6 +47,10 @@ test('receipt rejects unknown, deleted, unverified and mismatched detail IDs', (
 
 test('receipt fails closed when the selected record or route evidence changes', () => {
   assert.equal(receipt(suggestion(), item({ tags: ['ramen'] })), undefined);
+  assert.equal(
+    receipt(suggestion(), item({ title: 'Changed identity' })),
+    undefined,
+  );
   assert.equal(receipt(suggestion(), item({ hasVisited: true })), undefined);
   assert.equal(receipt(suggestion(), item({ latitude: 36 })), undefined);
   const routeClaim = { mode: 'walk', seconds: 600 };

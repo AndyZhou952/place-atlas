@@ -30,6 +30,7 @@ export function materializeRecommendReceipt(
       !item ||
       item.kind !== 'food' ||
       item.verificationStatus !== 'verified' ||
+      item.title !== selected.title ||
       item.latitude !== selected.latitude ||
       item.longitude !== selected.longitude ||
       item.area !== selected.area ||

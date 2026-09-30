@@ -44,6 +44,8 @@ test('clarification stays in the same panel with choices, free text and keyboard
     /<form className="nearby-search" onSubmit=\{submitReply\}/u,
   );
   assert.match(search, /appendRecommendReply\(active, reply\)/u);
+  assert.match(search, /appendRecommendChoice\(/u);
+  assert.match(search, /result\.originHint/u);
   assert.match(search, /appendRecommendReply\(active, option\.label\)/u);
   assert.match(search, /Start over/u);
   assert.match(

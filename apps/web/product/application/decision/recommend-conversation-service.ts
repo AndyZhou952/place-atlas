@@ -235,6 +235,17 @@ export function createRecommendConversationService(
     async ask(rawInput: unknown): Promise<RecommendConversationOutput> {
       const input = parseRecommendConversationInput(rawInput);
       if (!input) throw new Error('Invalid Recommend request');
+      if (
+        input.originChoice &&
+        ![input.query, ...input.replies.slice(0, -1)].some((message) =>
+          normalize(message).includes(normalize(input.originChoice!.hint)),
+        )
+      )
+        return {
+          status: 'clarify',
+          clarification: 'origin',
+          question: 'What starting point should I use?',
+        };
       let items: readonly AtlasItem[];
       try {
         items = (await dependencies.catalog.list('verified_catalog')).filter(
@@ -278,7 +289,18 @@ export function createRecommendConversationService(
           clarification: 'full_address_or_link',
           question: 'Please paste a full Google Maps link or address.',
         };
-      if (intent.action === 'clarify')
+      if (
+        intent.action === 'clarify' &&
+        !(
+          input.originChoice &&
+          [
+            'origin',
+            'origin_choice',
+            'exact_origin',
+            'unresolved_origin',
+          ].includes(intent.clarification ?? '')
+        )
+      )
         return {
           status: 'clarify',
           clarification: intent.clarification as 'origin',
@@ -290,7 +312,54 @@ export function createRecommendConversationService(
       );
       let origin: RecommendDecisionOrigin = { state: 'none' };
       let point: { latitude: number; longitude: number } | undefined;
-      if (selectedOption?.kind === 'area') {
+      if (input.originChoice) {
+        try {
+          const resolution = await dependencies.locationResolver.resolve(
+            input.originChoice.hint,
+          );
+          if (resolution.status === 'unresolved')
+            return resolution.reason === 'dependency_failure'
+              ? unavailable()
+              : {
+                  status: 'clarify',
+                  clarification: 'unresolved_origin',
+                  question:
+                    'Could you provide a more precise address or station?',
+                };
+          const candidates =
+            resolution.status === 'ambiguous'
+              ? resolution.candidates
+              : [resolution.location];
+          const matches = candidates.filter(
+            (candidate) =>
+              candidate.canonicalAddress === input.originChoice?.id,
+          );
+          if (matches.length > 1)
+            return {
+              status: 'clarify',
+              clarification: 'unresolved_origin',
+              question: 'Could you provide a more precise address or station?',
+            };
+          if (matches.length === 0)
+            return {
+              status: 'clarify',
+              clarification: 'origin_choice',
+              question: 'Which exact location is your starting point?',
+              originHint: input.originChoice.hint,
+              options: candidates.slice(0, 5).map((candidate) => ({
+                id: candidate.canonicalAddress,
+                label: candidate.canonicalAddress,
+              })),
+            };
+          origin = {
+            state: 'resolved',
+            id: `choice:${matches[0].canonicalAddress}`,
+          };
+          point = matches[0].point;
+        } catch {
+          return unavailable();
+        }
+      } else if (selectedOption?.kind === 'area') {
         origin = {
           state: 'area',
           id: selectedOption.id,
@@ -315,6 +384,7 @@ export function createRecommendConversationService(
               status: 'clarify',
               clarification: 'origin_choice',
               question: 'Which exact location is your starting point?',
+              originHint: selectedOption.names[0],
               options: resolution.candidates.slice(0, 5).map((candidate) => ({
                 id: candidate.canonicalAddress,
                 label: candidate.canonicalAddress,

@@ -6,6 +6,10 @@ import type {
 export interface RecommendConversationInput {
   readonly query: string;
   readonly replies: readonly string[];
+  readonly originChoice?: {
+    readonly hint: string;
+    readonly id: string;
+  };
 }
 
 export type RecommendClarificationKind =
@@ -42,6 +46,7 @@ export type RecommendConversationOutput =
       readonly clarification: RecommendClarificationKind;
       readonly question: string;
       readonly options?: readonly RecommendClarificationOption[];
+      readonly originHint?: string;
     }
   | {
       readonly status: 'recommend';
@@ -73,6 +78,27 @@ export function parseRecommendConversationInput(
     typeof reply === 'string' ? reply.trim() : '',
   );
   if (replies.some((reply) => !reply || reply.length > 300)) return undefined;
+  const rawChoice = record.originChoice;
+  if (rawChoice !== undefined) {
+    if (!rawChoice || typeof rawChoice !== 'object' || Array.isArray(rawChoice))
+      return undefined;
+    const choice = rawChoice as Record<string, unknown>;
+    if (
+      typeof choice.hint !== 'string' ||
+      typeof choice.id !== 'string' ||
+      !choice.hint.trim() ||
+      choice.hint.length > 200 ||
+      !choice.id.trim() ||
+      choice.id.length > 300 ||
+      replies.at(-1) !== choice.id
+    )
+      return undefined;
+    return {
+      query,
+      replies,
+      originChoice: { hint: choice.hint.trim(), id: choice.id },
+    };
+  }
   return { query, replies };
 }
 
@@ -83,5 +109,17 @@ export function appendRecommendReply(
   return parseRecommendConversationInput({
     query: input.query,
     replies: [...input.replies, answer],
+  });
+}
+
+export function appendRecommendChoice(
+  input: RecommendConversationInput,
+  hint: string,
+  id: string,
+): RecommendConversationInput | undefined {
+  return parseRecommendConversationInput({
+    query: input.query,
+    replies: [...input.replies, id],
+    originChoice: { hint, id },
   });
 }

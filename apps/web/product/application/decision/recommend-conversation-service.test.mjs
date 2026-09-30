@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createRecommendConversationService } from './recommend-conversation-service.ts';
+import { appendRecommendChoice } from './recommend-conversation.ts';
 
 const now = '2026-09-30T00:00:00.000Z';
 
@@ -1133,4 +1134,95 @@ test('default nearby checks an unvisited train option when only a visited walk q
   assert.equal(result.recommendations[0].itemId, 'unvisited-train');
   assert.equal(result.recommendations[0].routeClaim.mode, 'transit');
   assert.ok(transitCalls > 0);
+});
+
+test('an ambiguous origin choice continues from its verified candidate rather than looping', async () => {
+  const tokyo = {
+    canonicalAddress: 'Ōkubo Station, Shinjuku, Tokyo',
+    point: { latitude: 35.7008, longitude: 139.697 },
+  };
+  const hyogo = {
+    canonicalAddress: '大久保駅, 明石市, 兵庫',
+    point: { latitude: 34.682, longitude: 134.94 },
+  };
+  let routeOrigin;
+  const recommend = createRecommendConversationService({
+    catalog: {
+      async list() {
+        return [
+          {
+            ...item('saved-curry', 'カレー 灯', '新宿', ['カレー'], 35.702),
+            longitude: 139.697,
+          },
+        ];
+      },
+    },
+    interpreter: {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '大久保駅',
+          originKind: 'station',
+          foodTerms: ['curry'],
+          excludedFoodTerms: [],
+          travelMode: 'walk',
+          maxMinutes: 15,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    locationResolver: {
+      async resolve(hint) {
+        assert.equal(hint, '大久保駅');
+        return { status: 'ambiguous', candidates: [hyogo, tokyo] };
+      },
+    },
+    routeProvider: {
+      async walkingMany(origin) {
+        routeOrigin = origin;
+        return [
+          {
+            status: 'fresh',
+            durationSeconds: 600,
+            checkedAt: now,
+            attribution: {
+              label: 'Google Maps',
+              url: 'https://google.com/maps',
+            },
+          },
+        ];
+      },
+    },
+    clock: { now: () => new Date(now) },
+  });
+  const first = { query: 'Good curry near me', replies: ['大久保駅'] };
+  const question = await recommend.ask(first);
+  assert.equal(question.status, 'clarify');
+  assert.equal(question.clarification, 'origin_choice');
+  assert.equal(question.originHint, '大久保駅');
+  assert.deepEqual(
+    question.options.map((option) => option.id),
+    [hyogo.canonicalAddress, tokyo.canonicalAddress],
+  );
+  const chosen = appendRecommendChoice(
+    first,
+    question.originHint,
+    tokyo.canonicalAddress,
+  );
+  const result = await recommend.ask(chosen);
+  assert.equal(result.status, 'recommend');
+  assert.deepEqual(routeOrigin, tokyo.point);
+  assert.equal(result.recommendations[0].itemId, 'saved-curry');
+  const forged = await recommend.ask({
+    ...chosen,
+    replies: ['大久保駅', 'Unlisted candidate'],
+    originChoice: { hint: '大久保駅', id: 'Unlisted candidate' },
+  });
+  assert.equal(forged.status, 'clarify');
+  assert.equal(forged.clarification, 'origin_choice');
+  const undisclosed = await recommend.ask({
+    ...chosen,
+    originChoice: { hint: 'Different station', id: tokyo.canonicalAddress },
+  });
+  assert.equal(undisclosed.status, 'clarify');
 });

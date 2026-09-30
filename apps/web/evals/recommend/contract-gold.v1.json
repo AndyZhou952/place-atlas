@@ -162,6 +162,24 @@
         "routeSourceLabel": "NAVITIME",
         "displayIncludes": "average estimate"
       }
+    },
+    {
+      "caseId": "ambiguous-station-choice-continues",
+      "query": "Good curry near me",
+      "answers": ["大久保駅", "Ōkubo Station, Shinjuku, Tokyo"],
+      "expected": {
+        "status": "recommend",
+        "firstStatus": "clarify",
+        "clarification": "origin",
+        "secondStatus": "clarify",
+        "secondClarification": "origin_choice",
+        "choiceHint": "大久保駅",
+        "choiceId": "Ōkubo Station, Shinjuku, Tokyo",
+        "itemId": "saved-curry",
+        "detailTargetId": "saved-curry",
+        "name": "カレー 灯",
+        "reasonRequired": true
+      }
     }
   ]
 }

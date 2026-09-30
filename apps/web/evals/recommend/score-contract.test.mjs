@@ -13,13 +13,28 @@ function oracle(entry) {
   const requests = [{ query, replies: [] }];
   if (expected.resetBeforeAnswer)
     requests.push({ query: answers[0], replies: [] });
-  else if (answers.length) requests.push({ query, replies: answers });
+  else if (expected.secondStatus === 'clarify') {
+    requests.push({ query, replies: [answers[0]] });
+    requests.push({
+      query,
+      replies: answers,
+      originChoice: { hint: expected.choiceHint, id: expected.choiceId },
+    });
+  } else if (answers.length) requests.push({ query, replies: answers });
   const responses = [];
   if (expected.firstStatus === 'clarify')
     responses.push({
       status: 'clarify',
       clarification: expected.clarification,
       question: 'Which exact starting point?',
+    });
+  if (expected.secondStatus === 'clarify')
+    responses.push({
+      status: 'clarify',
+      clarification: expected.secondClarification,
+      question: 'Which exact location is your starting point?',
+      originHint: expected.choiceHint,
+      options: [{ id: expected.choiceId, label: expected.choiceId }],
     });
   responses.push(
     expected.status === 'recommend'
@@ -96,7 +111,7 @@ test('all browser and API contract cases have a valid oracle trace', () => {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 13);
+  assert.equal(report.cases, 14);
   assert.equal(report.casePassRate, 1);
 });
 
@@ -158,6 +173,19 @@ test('an exact display name cannot hide the wrong saved branch address', () => {
     { datasetId: dataset.datasetId, predictions: [prediction] },
   );
   assert.deepEqual(report.results[0].failures, ['wrong_saved_address']);
+});
+
+test('a geocoder choice must carry the selected ID through the API', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'ambiguous-station-choice-continues',
+  );
+  const prediction = oracle(entry);
+  delete prediction.trace.requests[2].originChoice;
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, ['origin_choice_not_preserved']);
 });
 
 test('lost query context and wrong detail click fail separately', () => {

@@ -45,6 +45,31 @@ export function scoreRecommendContract(dataset, predictionFile) {
         trace?.reset !== true
       )
         failures.push('reset_did_not_discard_context');
+    } else if (expected.secondStatus === 'clarify') {
+      if (
+        !same(requests[1], {
+          query: entry.query,
+          replies: [entry.answers[0]],
+        }) ||
+        !same(requests[2], {
+          query: entry.query,
+          replies: entry.answers,
+          originChoice: {
+            hint: expected.choiceHint,
+            id: expected.choiceId,
+          },
+        })
+      )
+        failures.push('origin_choice_not_preserved');
+      if (
+        responses[1]?.status !== 'clarify' ||
+        responses[1]?.clarification !== expected.secondClarification ||
+        responses[1]?.originHint !== expected.choiceHint ||
+        !responses[1]?.options?.some(
+          (option) => option.id === expected.choiceId,
+        )
+      )
+        failures.push('missing_or_wrong_origin_choices');
     } else if (entry.answers.length) {
       if (
         !same(requests[1], {

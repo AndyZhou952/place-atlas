@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  appendRecommendChoice,
   appendRecommendReply,
   parseRecommendConversationInput,
 } from './recommend-conversation.ts';
@@ -20,6 +21,38 @@ test('clarification reply keeps the original request and prior answers', () => {
     query: '新宿で徒歩10分の焼き鳥',
     replies: ['新宿三丁目駅'],
   });
+});
+
+test('a selected geocoder candidate remains structured in the next request', () => {
+  const first = { query: 'Good curry near me', replies: ['大久保駅'] };
+  const chosen = appendRecommendChoice(
+    first,
+    '大久保駅',
+    'Ōkubo Station, Shinjuku, Tokyo',
+  );
+  assert.deepEqual(chosen, {
+    query: first.query,
+    replies: ['大久保駅', 'Ōkubo Station, Shinjuku, Tokyo'],
+    originChoice: {
+      hint: '大久保駅',
+      id: 'Ōkubo Station, Shinjuku, Tokyo',
+    },
+  });
+  assert.deepEqual(appendRecommendReply(chosen, 'new starting point'), {
+    query: first.query,
+    replies: [
+      '大久保駅',
+      'Ōkubo Station, Shinjuku, Tokyo',
+      'new starting point',
+    ],
+  });
+  assert.equal(
+    parseRecommendConversationInput({
+      ...chosen,
+      originChoice: { hint: '大久保駅', id: 'Other place' },
+    }),
+    undefined,
+  );
 });
 
 test('empty, oversized and too many follow-up answers fail before model work', () => {

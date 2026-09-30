@@ -6,6 +6,7 @@ import { Clock3, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  appendRecommendChoice,
   appendRecommendReply,
   type RecommendConversationInput,
   type RecommendConversationOutput,
@@ -141,7 +142,13 @@ export function RecommendSearch({
                   disabled={busy || !active}
                   onClick={() => {
                     if (!active) return;
-                    const next = appendRecommendReply(active, option.label);
+                    const next = result.originHint
+                      ? appendRecommendChoice(
+                          active,
+                          result.originHint,
+                          option.id,
+                        )
+                      : appendRecommendReply(active, option.label);
                     if (next) void ask(next);
                   }}
                 >

@@ -1390,3 +1390,50 @@ test('a walk-in label without a checked HTTPS source remains unknown', async () 
   assert.equal(result.recommendations[0].entryEvidence, undefined);
   assert.ok(result.recommendations[0].warnings.includes('walk_in_unknown'));
 });
+
+test('walking in ten minutes does not impose a walk-in booking rule', async () => {
+  const advance = {
+    ...item('advance', '喫茶 灯', '新宿', ['coffee']),
+    reservation: {
+      mode: 'advance',
+      label: 'Advance reservation required',
+      url: 'https://example.com/reserve',
+      checkedAt: now,
+    },
+  };
+  const recommend = service(
+    [advance],
+    {
+      async interpret() {
+        return {
+          action: 'recommend',
+          originText: '新宿駅',
+          originKind: 'station',
+          foodTerms: ['coffee'],
+          excludedFoodTerms: [],
+          travelMode: 'none',
+          maxMinutes: null,
+          visited: 'prefer_unvisited',
+        };
+      },
+    },
+    {
+      async walkingMany(_origin, destinations) {
+        return destinations.map(() => ({
+          status: 'fresh',
+          durationSeconds: 600,
+          distanceMeters: 800,
+          checkedAt: now,
+          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+        }));
+      },
+    },
+  );
+  const result = await recommend.ask({
+    query: 'Find coffee I can walk in 10 minutes from 新宿駅',
+    replies: [],
+  });
+  assert.equal(result.status, 'recommend');
+  assert.equal(result.recommendations[0].itemId, 'advance');
+  assert.deepEqual(result.warnings, []);
+});

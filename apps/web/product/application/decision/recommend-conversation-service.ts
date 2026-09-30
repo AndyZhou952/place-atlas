@@ -83,7 +83,7 @@ const normalize = normalizeSearchText;
 
 function asksForWalkIn(input: RecommendConversationInput): boolean {
   return [input.query, ...input.replies].some((message) =>
-    /予約(?:なし|無し|不要|せず|しないで)|飛び込み|无需预[约約订訂]|免预[约約订訂]|不用预[约約订訂]|不需要预[约約订訂]|\bwalk[ -]?in\b|\bwithout (?:a )?(?:reservation|booking)\b|\bno (?:reservation|booking)\b/iu.test(
+    /予約(?:なし|無し|不要|せず|しないで)|飛び込み|无需预[约約订訂]|免预[约約订訂]|不用预[约約订訂]|不需要预[约約订訂]|\bwalk-?in\b|\b(?:can|could|may) (?:i|we) walk in\b|\bwithout (?:a )?(?:reservation|booking)\b|\bno (?:reservation|booking)\b/iu.test(
       message,
     ),
   );

@@ -195,7 +195,9 @@ export function normalizeRecommendIntent(
             /coffee|コーヒー|咖啡|caf[eé]|カフェ|喫茶店/iu.test(original)),
       );
   let travelMode: RecommendIntent['travelMode'] =
-    /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)/iu.test(original)
+    /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|\bwalk in\s+\d+\s*min(?:ute)?s?\b/iu.test(
+      original,
+    )
       ? 'walk'
       : /電車|电车|\btrain|\btransit/iu.test(original)
         ? 'transit'
@@ -209,7 +211,7 @@ export function normalizeRecommendIntent(
   );
   const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
   const explicitTravelMode =
-    /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|電車|电车|\btrain|\btransit/iu.test(
+    /徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|\bwalk in\s+\d+\s*min(?:ute)?s?\b|電車|电车|\btrain|\btransit/iu.test(
       original,
     );
   const maxMinutes = numbers

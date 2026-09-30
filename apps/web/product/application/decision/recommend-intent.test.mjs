@@ -145,3 +145,19 @@ test('an explicit train request near me keeps the train constraint', () => {
   assert.equal(unqualified.travelMode, 'walk');
   assert.equal(unqualified.maxMinutes, 15);
 });
+
+test('walking in a stated number of minutes remains a timed route request', () => {
+  const result = normalizeRecommendIntent(
+    ['Find coffee I can walk in 10 minutes from Central Station'],
+    options,
+    {
+      action: 'recommend',
+      originId: 'station:central',
+      foodTerms: ['coffee'],
+      travelMode: 'none',
+    },
+  );
+  assert.equal(result.action, 'recommend');
+  assert.equal(result.travelMode, 'walk');
+  assert.equal(result.maxMinutes, 10);
+});

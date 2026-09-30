@@ -6,7 +6,7 @@ import { decideRecommend } from '../../product/application/decision/recommend-de
 import { scoreRecommendDecision } from './score-decision.mjs';
 
 const dataset = JSON.parse(
-  readFileSync(new URL('./decision-spatial.v2.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./decision-spatial.json', import.meta.url), 'utf8'),
 );
 
 test('resolved-origin recommendations use nearby saved IDs and label straight-line evidence', () => {

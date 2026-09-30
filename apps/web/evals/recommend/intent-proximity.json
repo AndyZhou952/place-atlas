@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "datasetId": "recommend-intent-proximity-v2",
+  "datasetId": "recommend-intent-proximity",
   "kind": "production-intent-policy-extension",
   "cases": [
     {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "datasetId": "recommend-decision-spatial-v2",
+  "datasetId": "recommend-decision-spatial",
   "kind": "synthetic-resolved-origin-distance-default-and-explicit-route",
   "catalog": [
     {

@@ -5,11 +5,11 @@ import test from 'node:test';
 import { normalizeRecommendIntent } from '../../product/application/decision/recommend-intent.ts';
 
 const dataset = JSON.parse(
-  readFileSync(new URL('./intent-proximity.v2.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./intent-proximity.json', import.meta.url), 'utf8'),
 );
 
 test('proximity and explicit travel policy survives adversarial model predictions', () => {
-  assert.equal(dataset.datasetId, 'recommend-intent-proximity-v2');
+  assert.equal(dataset.datasetId, 'recommend-intent-proximity');
   assert.equal(new Set(dataset.cases.map(({ caseId }) => caseId)).size, 7);
   for (const entry of dataset.cases) {
     const actual = normalizeRecommendIntent(

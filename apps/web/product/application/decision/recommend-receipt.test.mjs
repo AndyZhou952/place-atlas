@@ -45,6 +45,42 @@ test('receipt rejects unknown, deleted, unverified and mismatched detail IDs', (
   assert.equal(receipt(suggestion({ detailTargetId: 'other' })), undefined);
 });
 
+test('an exact display name cannot substitute for branch identity', () => {
+  const first = item({
+    id: 'branch-a',
+    title: 'Same Chain',
+    address: 'Shinjuku address',
+  });
+  const second = item({
+    id: 'branch-b',
+    title: 'Same Chain',
+    address: 'Shibuya address',
+  });
+  const wrongBranch = materializeRecommendReceipt(
+    [
+      suggestion({
+        itemId: first.id,
+        detailTargetId: second.id,
+        name: 'Same Chain',
+      }),
+    ],
+    [first, second],
+    [first, second],
+    new Map(),
+    [],
+  );
+  assert.equal(wrongBranch, undefined);
+  const correctBranch = materializeRecommendReceipt(
+    [suggestion({ itemId: first.id, detailTargetId: first.id })],
+    [first, second],
+    [first, second],
+    new Map(),
+    [],
+  );
+  assert.equal(correctBranch?.[0].name, 'Same Chain');
+  assert.equal(correctBranch?.[0].address, 'Shinjuku address');
+});
+
 test('receipt fails closed when the selected record or route evidence changes', () => {
   assert.equal(receipt(suggestion(), item({ tags: ['ramen'] })), undefined);
   assert.equal(

@@ -12,9 +12,23 @@ const transportUrl = new URL(
   '../route-sidecar/google-route-sidecar-transport.ts',
   import.meta.url,
 );
+const navitimeTransportUrl = new URL(
+  '../route-sidecar/navitime-transit-transport.ts',
+  import.meta.url,
+);
+const regionalServiceUrl = new URL(
+  '../route-sidecar/regional-transit-service.ts',
+  import.meta.url,
+);
 
-void test('the Sidecar source graph contains only the approved Google route capabilities', async () => {
-  const source = `${await readFile(serviceUrl, 'utf8')}\n${await readFile(transportUrl, 'utf8')}`;
+void test('the Sidecar source graph contains only approved route capabilities', async () => {
+  const source = (
+    await Promise.all(
+      [serviceUrl, transportUrl, navitimeTransportUrl, regionalServiceUrl].map(
+        (url) => readFile(url, 'utf8'),
+      ),
+    )
+  ).join('\n');
   assert.doesNotMatch(source, /foursquare|google-fixed-endpoint-transport/iu);
   assert.deepEqual(inspectRouteSidecarBundle(source), {
     ready: true,
@@ -28,6 +42,8 @@ void test('bundle preflight rejects unapproved providers and unexpected endpoint
     'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix',
     'https://routes.googleapis.com/directions/v2:computeRoutes',
     'https://www.google.com/maps',
+    'https://navitime-route-totalnavi.p.rapidapi.com/route_transit',
+    'https://www.navitime.co.jp/',
   ].join('\n');
   for (const forbidden of [
     'Foursquare',

@@ -35,6 +35,8 @@ export function scoreRecommendContract(dataset, predictionFile) {
     const responses = Array.isArray(trace?.responses) ? trace.responses : [];
     const expected = entry.expected;
     const final = responses.at(-1);
+    if (entry.scenario && trace?.scenario !== entry.scenario)
+      failures.push('wrong_provider_scenario');
     if (!same(requests[0], { query: entry.query, replies: [] }))
       failures.push('incorrect_initial_request');
     if (expected.resetBeforeAnswer) {
@@ -109,7 +111,29 @@ export function scoreRecommendContract(dataset, predictionFile) {
           !Number.isFinite(Date.parse(route?.checkedAt))
         )
           failures.push('missing_verified_route');
+        if (
+          expected.routeEstimateBasis &&
+          route?.estimateBasis !== expected.routeEstimateBasis
+        )
+          failures.push('missing_route_estimate_basis');
+        if (
+          expected.routeSourceLabel &&
+          route?.source?.label !== expected.routeSourceLabel
+        )
+          failures.push('wrong_route_source');
+        if (
+          expected.routeEstimateBasis === 'average' &&
+          !/estimated|average|approx|約|目安/iu.test(
+            recommendation?.reason ?? '',
+          )
+        )
+          failures.push('reason_claims_precise_route');
       }
+      if (
+        expected.displayIncludes &&
+        !trace?.displayedRouteText?.includes(expected.displayIncludes)
+      )
+        failures.push('missing_display_disclosure');
       if (trace?.openedDetailId !== expected.detailTargetId)
         failures.push('detail_not_opened');
     } else if (final?.recommendations?.length)

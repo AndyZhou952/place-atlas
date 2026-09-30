@@ -356,7 +356,9 @@ function hasOwnerPocGuard(value: unknown): boolean {
     value.ATLAS_DATASET === 'owner-poc' &&
     (value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'enabled' ||
       value.CATALOG_INTAKE_GOOGLE_PLACES_MODE === 'disabled') &&
-    value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled'
+    value.CATALOG_INTAKE_DURABLE_GEOCODER_MODE === 'enabled' &&
+    (value.JAPAN_TRANSIT_PROVIDER === undefined ||
+      value.JAPAN_TRANSIT_PROVIDER === 'navitime-average')
   );
 }
 

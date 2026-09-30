@@ -10,10 +10,12 @@ export function createD1MeteredRouteSidecarClient(input: {
   readonly service: RouteSidecarServiceBinding | undefined;
   readonly clock: () => Date;
   readonly diagnosticRecorder?: NearbyDiagnosticRecorder;
+  readonly japanTransitEnabled?: boolean;
 }) {
   return createMeteredRouteSidecarClient({
     service: input.service,
     usage: new D1ProviderUsage(input.database, input.clock),
     diagnosticRecorder: input.diagnosticRecorder,
+    japanTransitEnabled: input.japanTransitEnabled,
   });
 }

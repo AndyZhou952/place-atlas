@@ -349,8 +349,12 @@ test('a coffee request routes a saved cafe category without routing unrelated fo
           durationSeconds: 1080,
           boardingCount: 1,
           transferCount: 0,
+          estimateBasis: 'average',
           checkedAt: now,
-          attribution: { label: 'Google Maps', url: 'https://google.com/maps' },
+          attribution: {
+            label: 'NAVITIME',
+            url: 'https://www.navitime.co.jp/',
+          },
         };
       },
     },
@@ -363,6 +367,8 @@ test('a coffee request routes a saved cafe category without routing unrelated fo
   assert.equal(transitCalls, 1);
   assert.equal(result.recommendations[0].itemId, 'saved-cafe');
   assert.equal(result.recommendations[0].route.seconds, 1080);
+  assert.equal(result.recommendations[0].route.estimateBasis, 'average');
+  assert.match(result.recommendations[0].reason, /estimated direct train/u);
 });
 
 test('unsupported Japan train coverage returns an honest answer without a paid route call', async () => {

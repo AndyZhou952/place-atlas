@@ -30,7 +30,9 @@ function oracle(entry) {
               itemId: expected.itemId,
               detailTargetId: expected.detailTargetId,
               name: expected.name,
-              reason: 'Matches your saved catalog and stated request.',
+              reason: expected.routeEstimateBasis
+                ? 'Saved restaurant; estimated direct train route.'
+                : 'Matches your saved catalog and stated request.',
               ...(expected.routeMode
                 ? {
                     route: {
@@ -38,9 +40,14 @@ function oracle(entry) {
                       seconds: expected.maxRouteSeconds,
                       checkedAt: '2026-09-30T00:00:00.000Z',
                       source: {
-                        label: 'Google Maps',
-                        url: 'https://www.google.com/maps',
+                        label: expected.routeSourceLabel ?? 'Google Maps',
+                        url: expected.routeSourceLabel
+                          ? 'https://www.navitime.co.jp/'
+                          : 'https://www.google.com/maps',
                       },
+                      ...(expected.routeEstimateBasis
+                        ? { estimateBasis: expected.routeEstimateBasis }
+                        : {}),
                     },
                   }
                 : {}),
@@ -69,6 +76,10 @@ function oracle(entry) {
     trace: {
       requests,
       responses,
+      ...(entry.scenario ? { scenario: entry.scenario } : {}),
+      ...(expected.displayIncludes
+        ? { displayedRouteText: expected.displayIncludes }
+        : {}),
       ...(expected.status === 'recommend'
         ? { openedDetailId: expected.detailTargetId }
         : {}),
@@ -84,8 +95,28 @@ test('all browser and API contract cases have a valid oracle trace', () => {
     datasetId: dataset.datasetId,
     predictions: dataset.cases.map(oracle),
   });
-  assert.equal(report.cases, 12);
+  assert.equal(report.cases, 13);
   assert.equal(report.casePassRate, 1);
+});
+
+test('a Japan average route cannot pass as a precise train-time claim', () => {
+  const entry = dataset.cases.find(
+    ({ caseId }) => caseId === 'japan-direct-train-average-disclosure',
+  );
+  const prediction = oracle(entry);
+  const recommendation = prediction.trace.responses[0].recommendations[0];
+  delete recommendation.route.estimateBasis;
+  recommendation.reason = 'Verified direct train route 18 min.';
+  delete prediction.trace.displayedRouteText;
+  const report = scoreRecommendContract(
+    { ...dataset, cases: [entry] },
+    { datasetId: dataset.datasetId, predictions: [prediction] },
+  );
+  assert.deepEqual(report.results[0].failures, [
+    'missing_route_estimate_basis',
+    'reason_claims_precise_route',
+    'missing_display_disclosure',
+  ]);
 });
 
 test('a train claim without verified route evidence fails the journey contract', () => {

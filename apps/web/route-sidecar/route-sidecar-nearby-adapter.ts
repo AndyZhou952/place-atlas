@@ -11,6 +11,7 @@ const policyVersion = 'google-route-sidecar-v1';
 
 export function createRouteSidecarNearbyAdapter(
   sidecar: GoogleRouteSidecarPort,
+  options: { readonly japanTransitEnabled?: boolean } = {},
 ): {
   readonly locationResolver: LocationResolver;
   readonly routeProvider: RouteProvider;
@@ -117,7 +118,9 @@ export function createRouteSidecarNearbyAdapter(
     },
     transitRouteProvider: {
       coverage(origin) {
-        return isJapanTransitArea(origin) ? 'unsupported_region' : 'supported';
+        return isJapanTransitArea(origin) && !options.japanTransitEnabled
+          ? 'unsupported_region'
+          : 'supported';
       },
       async transit(origin, destination) {
         let result;
@@ -150,6 +153,9 @@ export function createRouteSidecarNearbyAdapter(
           transferCount: 0,
           checkedAt: evidence.checkedAt,
           attribution: evidence.attribution,
+          ...(evidence.directRoute.estimateBasis
+            ? { estimateBasis: evidence.directRoute.estimateBasis }
+            : {}),
         };
       },
     },

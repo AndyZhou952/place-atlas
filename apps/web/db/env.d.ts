@@ -14,5 +14,6 @@ declare namespace Cloudflare {
     RESTAURANT_SOURCE_READER?: string;
     FIRECRAWL_API_KEY?: string;
     ATLAS_DEPLOYMENT_ENV?: string;
+    JAPAN_TRANSIT_PROVIDER?: string;
   }
 }

@@ -16,11 +16,21 @@ async function template() {
   );
 }
 
-void test('route sidecar preflight accepts only the isolated private runtime and Google secret name', async () => {
+void test('route sidecar preflight accepts the isolated private runtime and optional Japan transit secret', async () => {
   assert.deepEqual(
     inspectRouteSidecarDeployment({
       config: await template(),
       remoteSecrets: [{ name: 'GOOGLE_MAPS_API_KEY', type: 'secret_text' }],
+    }),
+    { ready: true, blockers: [] },
+  );
+  assert.deepEqual(
+    inspectRouteSidecarDeployment({
+      config: await template(),
+      remoteSecrets: [
+        { name: 'GOOGLE_MAPS_API_KEY', type: 'secret_text' },
+        { name: 'NAVITIME_RAPIDAPI_KEY', type: 'secret_text' },
+      ],
     }),
     { ready: true, blockers: [] },
   );
@@ -85,6 +95,12 @@ void test('route sidecar preflight rejects malformed, duplicate, and non-secret 
   for (const remoteSecrets of [
     [],
     [valid, valid],
+    [valid, { name: 'NAVITIME_RAPIDAPI_KEY', type: 'plain_text' }],
+    [
+      valid,
+      { name: 'NAVITIME_RAPIDAPI_KEY', type: 'secret_text' },
+      { name: 'NAVITIME_RAPIDAPI_KEY', type: 'secret_text' },
+    ],
     [valid, { name: 123, type: 'secret_text' }],
     [valid, { type: 'secret_text' }],
     [{ ...valid, unexpected: true }],

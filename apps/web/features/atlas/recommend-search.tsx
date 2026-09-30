@@ -216,7 +216,12 @@ export function RecommendSearch({
                 {candidate.route ? (
                   <p className="nearby-evidence">
                     {candidate.route.mode === 'walk' ? 'Walk' : 'Direct train'}{' '}
-                    · {Math.ceil(candidate.route.seconds / 60)} min ·{' '}
+                    · {candidate.route.estimateBasis === 'average' ? '~' : ''}
+                    {Math.ceil(candidate.route.seconds / 60)} min
+                    {candidate.route.estimateBasis === 'average'
+                      ? ' average estimate; check the current timetable'
+                      : ''}{' '}
+                    ·{' '}
                     <a
                       href={candidate.route.source.url}
                       target="_blank"

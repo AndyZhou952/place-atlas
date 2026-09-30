@@ -86,6 +86,7 @@ export type TransitRouteEvidence =
       readonly transferCount: number;
       readonly checkedAt: string;
       readonly attribution: ProviderAttribution;
+      readonly estimateBasis?: 'average';
     }
   | {
       readonly status: 'stale';

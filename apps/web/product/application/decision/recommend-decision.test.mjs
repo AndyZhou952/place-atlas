@@ -27,3 +27,46 @@ test('deterministic decision gates pass all frozen saved-catalog cases', () => {
   );
   assert.equal(report.safetyViolationCases, 0);
 });
+
+test('an average route is disclosed in both the reason and route claim', () => {
+  const result = decideRecommend(
+    {
+      intent: {
+        foodTerms: [],
+        excludedFoodTerms: [],
+        travelMode: 'transit',
+        maxMinutes: 20,
+        visited: 'prefer_unvisited',
+      },
+      origin: { state: 'resolved', id: 'station' },
+      catalogIds: ['saved'],
+      routes: [
+        {
+          itemId: 'saved',
+          mode: 'transit',
+          seconds: 1080,
+          status: 'fresh',
+          transfers: 0,
+          doorToDoor: true,
+          estimateBasis: 'average',
+        },
+      ],
+      distances: [],
+    },
+    [
+      {
+        id: 'saved',
+        kind: 'food',
+        verificationStatus: 'verified',
+        title: 'Saved Restaurant',
+        area: 'Tokyo',
+        address: 'Stored address',
+        tags: ['cafe'],
+        visited: false,
+      },
+    ],
+  );
+  assert.equal(result.action, 'recommend');
+  assert.match(result.recommendations[0].reason, /estimated direct train/u);
+  assert.equal(result.recommendations[0].routeClaim.estimateBasis, 'average');
+});

@@ -1,4 +1,5 @@
 export const GOOGLE_ROUTE_SIDECAR_PROVIDER_ID = 'google-maps-platform' as const;
+export const NAVITIME_TRANSIT_PROVIDER_ID = 'navitime-rapidapi' as const;
 
 export const GOOGLE_ROUTE_SIDECAR_ATTRIBUTION = {
   label: 'Google Maps',
@@ -57,10 +58,13 @@ export interface RouteSidecarTransitEvidence {
   readonly directRoute: {
     readonly durationSeconds: number;
     readonly lineIdentity: string;
+    readonly estimateBasis?: 'average';
   } | null;
-  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
+  readonly attribution: { readonly label: string; readonly url: string };
   readonly source: {
-    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
+    readonly providerId:
+      | typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID
+      | typeof NAVITIME_TRANSIT_PROVIDER_ID;
     readonly endpoint: string;
   };
   readonly checkedAt: string;
@@ -95,6 +99,7 @@ export type RouteSidecarTransitResult =
   | RouteSidecarFailure;
 
 export interface GoogleRouteSidecarPort {
+  japanTransitReady?(): Promise<boolean>;
   geocode(
     request: RouteSidecarGeocodeRequest,
   ): Promise<RouteSidecarGeocodeResult>;

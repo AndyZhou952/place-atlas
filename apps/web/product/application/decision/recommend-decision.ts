@@ -36,6 +36,7 @@ export interface RecommendRouteObservation {
   readonly status: 'fresh' | 'stale' | 'unavailable';
   readonly transfers?: number;
   readonly doorToDoor?: boolean;
+  readonly estimateBasis?: 'average';
 }
 
 export interface RecommendDistanceObservation {
@@ -70,6 +71,7 @@ export interface RecommendDecisionSuggestion {
   readonly routeClaim?: {
     readonly mode: 'walk' | 'transit';
     readonly seconds: number;
+    readonly estimateBasis?: 'average';
   };
 }
 
@@ -128,7 +130,11 @@ function preferenceRank(
 function suggestion(
   item: RecommendDecisionItem,
   input: RecommendDecisionInput,
-  route?: { readonly mode: 'walk' | 'transit'; readonly seconds: number },
+  route?: {
+    readonly mode: 'walk' | 'transit';
+    readonly seconds: number;
+    readonly estimateBasis?: 'average';
+  },
   distance?: number,
 ): RecommendDecisionSuggestion {
   const facts: RecommendReasonFact[] = [{ kind: 'saved', value: true }];
@@ -149,7 +155,7 @@ function suggestion(
   if (input.intent.askWalkIn && input.entryState === 'unknown')
     facts.push({ kind: 'entry_unknown', value: true });
   const reason = route
-    ? `Saved ${matchedFood ?? 'restaurant'}; verified ${route.mode === 'walk' ? 'walk' : 'direct train'} route ${Math.ceil(route.seconds / 60)} min.`
+    ? `Saved ${matchedFood ?? 'restaurant'}; ${route.estimateBasis === 'average' ? 'estimated' : 'verified'} ${route.mode === 'walk' ? 'walk' : 'direct train'} route ${Math.ceil(route.seconds / 60)} min.`
     : distance !== undefined
       ? `Saved ${matchedFood ?? 'restaurant'}; ${distance} m straight-line distance, travel time unverified.`
       : `Saved ${matchedFood ?? 'restaurant'} in ${input.origin.state === 'area' ? input.origin.name : item.area}${item.visited ? ', visited' : ', not yet visited'}.`;
@@ -247,7 +253,18 @@ export function decideRecommend(
             : 1,
       )[0];
     return route && route.seconds !== null
-      ? [{ item, route: { mode: route.mode, seconds: route.seconds } }]
+      ? [
+          {
+            item,
+            route: {
+              mode: route.mode,
+              seconds: route.seconds,
+              ...(route.estimateBasis
+                ? { estimateBasis: route.estimateBasis }
+                : {}),
+            },
+          },
+        ]
       : [];
   });
   if (eligible.length) {

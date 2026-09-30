@@ -27,6 +27,7 @@ The acceptance target for curated deterministic cases is 100% case pass and zero
 
 ```sh
 node --test evals/recommend/*.test.mjs
+node --experimental-strip-types evals/recommend/score-entry-intent.mjs evals/recommend/intent-entry.v1.json
 AGENT_API_KEY=... AGENT_MODEL=deepseek-chat node evals/recommend/run-deepseek-baseline.mjs evals/runs/recommend-formal-UNIQUE-NAME
 AGENT_API_KEY=... AGENT_MODEL=deepseek-chat node --experimental-strip-types evals/recommend/run-live-intent-harness.mjs evals/runs/recommend-harness-UNIQUE-NAME
 AGENT_API_KEY=... AGENT_MODEL=deepseek-chat node --experimental-strip-types evals/recommend/run-live-intent-harness.mjs evals/runs/recommend-holdout-UNIQUE-NAME --holdout

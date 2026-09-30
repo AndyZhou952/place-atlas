@@ -815,9 +815,9 @@ export function createPlaceResearchAgent(
               continue;
             // Exact factual values must occur in evidence; only a description may paraphrase.
             if (field === 'signatureDishes' && Array.isArray(claim)) {
-              // Japanese source typography often quotes just the ingredient name:
-              // 「六白黒豚」のとんかつ. Ignore typography, not words, and retain
-              // supported entries even when a different proposed dish is invented.
+              // A source may quote part of a dish name with Japanese punctuation.
+              // Ignore typography, not words, and retain supported entries even
+              // when a different proposed dish is invented.
               const normalizeDish = (value: string) =>
                 value.normalize('NFKC').replace(/[「」『』“”"\s]/gu, '');
               const quote = normalizeDish(proof.quote);
@@ -1243,8 +1243,8 @@ function matchesSelectedBranch(
     value
       .normalize('NFKC')
       .toLowerCase()
-      // A shop may write a common word in katakana on Google and hiragana
-      // on Tabelog (牛タン / 牛たん). Keep the whole-name and address gates below.
+      // Normalize equivalent kana spellings across sources. Whole-name and
+      // address checks below still establish the selected branch identity.
       .replace(/[ァ-ヶ]/gu, (char) =>
         String.fromCharCode(char.charCodeAt(0) - 0x60),
       )
@@ -1274,8 +1274,8 @@ function matchesSelectedBranch(
         listedName,
       ) &&
       (selectedOwnerName.startsWith(listedName) ||
-        // The owner may omit a suffix such as 西口店 while still supplying a
-        // distinctive business name and area. Street and postcode must agree.
+        // The owner may omit a branch suffix while still supplying a
+        // distinctive name and area. Street and postcode must agree.
         (selectedOwnerName.length >= 5 &&
           listedName.startsWith(selectedOwnerName)))) ||
     aliases.some(

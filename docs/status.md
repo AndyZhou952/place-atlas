@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-09-29. This is the sole development progress checklist. Architecture and operating boundaries are in `docs/architecture.md`.
+Updated: 2026-09-30. This is the sole development progress checklist. Architecture and operating boundaries are in `docs/architecture.md`.
 
 - [x] means the stated implementation or verification is complete.
 - [ ] means implementation, integration, or acceptance is still pending; the note identifies which.
@@ -94,18 +94,20 @@ Updated: 2026-09-29. This is the sole development progress checklist. Architectu
 - [x] **Live Record core acceptance:** a dated Visit with notes and multiple captioned photos was created, edited, refreshed and read in Journal and card, with media bytes served back from R2. Test data was deleted. Upload-interruption recovery and direct R2 object audit also passed.
 - [x] **Interrupted upload recovery:** code preserves stable media and mutation IDs, deduplicates replayed responses, and offers retry on the already saved Visit. The five-file, second-batch failure scenario in `scripts/record-browser-smoke.mjs` passed against the deployment with real D1/R2 writes and cleanup.
 
-## 3. Nearby — Agent understanding and recommendations over saved restaurants
+## 3. Recommend (formerly Nearby) — Agent understanding and recommendations over saved restaurants
 
 - [x] **Deterministic foundation:** saved-catalog lookup, straight-line distance, location resolution/route adapters, fallback policies and local tests.
 - [x] **Offline policy benchmark seed:** 14 synthetic cases plus a scorer cover saved-only choices, walk/transit/distance rules, visited preference, clarification and source failures; this is not live Agent acceptance.
 - [x] **Separated seed metrics:** the scorer now reports action and selection accuracy, uncertainty coverage, safety violations, and optional latency/tool/cost telemetry independently. The 14 cases are still synthetic tool evidence, not verified geography or real-model results.
 - [x] **Verified location seed:** ten Chinese/Japanese/English station-identity and intent cases distinguish four officially documented Tokyo Metro stations; a separate scorer checks resolution, clarification and constraints. No route times or real-model results are inferred from station pages.
-- [ ] **Agent benchmark first:** curate multilingual short-location, intent, ambiguity, visited preference, walk/transit fallback and provider-failure cases. An initial synthetic policy suite is not a live quality result.
+- [x] **Recommend benchmark v1 designed before the formal baseline:** `apps/web/evals/recommend/` adds 34 multilingual short-request and origin cases, 8 clarification-continuation cases, 26 saved-catalog and frozen-route decisions, and 9 API/browser journey contracts. Together with the retained 14 policy and 10 station cases, this is 92 model-only cases plus 9 application traces. Deterministic scorers and oracle/negative tests pass. Synthetic origins/routes and oracle tests do not establish model or production quality. The new contract explicitly requires a query-plus-replies API, visible clarification UI, retry preservation, reasons and exact saved-detail navigation.
+- [ ] **Formal Recommend baseline and stability:** run DeepSeek on the frozen 92-case model-only benchmark with gold withheld and at least three unselected repeats; report action, selection, safety, latency and token/cost separately. An earlier 14+10 diagnostic pilot is not the formal baseline. Obtain actual browser/API traces for the nine journey cases after implementation.
 - [ ] **Screenshot benchmark:** add labelled map screenshots with ground-truth location/ambiguity before enabling image-based location recognition.
-- [ ] **Connect the Agent:** interpret the location and constraints, ask only necessary clarification, call catalog/location/route tools, and explain recommendations.
+- [ ] **Connect the Recommend Agent and follow-up interface:** interpret short requests and constraints, ask only necessary clarification through owner-authenticated `POST /api/recommend` and a reply-capable UI, call catalog/location/route tools, and explain recommendations. Preserve the original query and constraints across replies. A broad area alone permits area recommendations without timed-route claims; a broad area with a walk/train time needs a precise starting point. A pasted shop name is an origin hint; clarify same-name branches.
+- [ ] **Reduce route-provider calls:** current owner flow issues a walking route request for each saved food item and does not wire transit in production. Batch eligible walking destinations, shortlist before route calls and meter the result while retaining saved-only and route-evidence rules; confirm p50/p95 and per-request provider usage on representative cases.
 - [ ] **Preserve recommendation rules:** recommend only saved restaurants; default to unvisited, walking within 10–15 minutes; if none, broaden to a clearly labelled 2 km distance fallback or direct transit within 20 minutes door-to-door. Never present straight-line distance as verified walking time.
 - [ ] **Entry feasibility:** source walk-in/reservation information; unknown availability or queues remain explicitly unknown. Do not claim an unsourced wait time.
-- [ ] **Live Nearby acceptance:** score real Agent predictions against the approved benchmark, then verify a browser query yields useful saved-place recommendations and truthful route/entry caveats.
+- [ ] **Live Recommend acceptance:** score real Agent predictions against the approved benchmark, then verify browser queries, clarification replies, reasons, exact saved-detail clicks and truthful route/entry caveats.
 
 ## 4. Map, storage and authorization — shared deterministic foundation
 
@@ -114,16 +116,16 @@ Updated: 2026-09-29. This is the sole development progress checklist. Architectu
 - [x] **Map and personal controls in code:** map rendering, favorite, visited and edit controls exist.
 - [x] **Mobile touch and layout acceptance:** the 2026-09-29 deployed Map and Journal had no horizontal overflow at 320, 390 or 768 CSS pixels. Navigation, map rows, Journal forms and filters, media deletion and lightbox actions sampled at 44 × 44 CSS pixels or larger; the media delete X remains visually compact. The 320-pixel screenshot is retained in `apps/web/evals/ui/mobile-journal-320.png`. GitHub issue #8 closed with PR #29.
 - [x] **Immediate personal-action feedback:** favorite and visited changes already render optimistically, with rollback on failure. A single D1 read now returns assessment and Visit count together; four warm deployed browser actions settled in 497–611 ms, and the original states were restored and verified after refresh. The full web suite passed 833/833 and PR #29 CI passed.
-- [ ] **Mutation latency profile (GitHub #10):** measure browser-to-Worker, owner auth, mutation claim, D1 write/receipt and response phases for cold and warm actions from the owner's usual region. Report p50/p95 and a latency budget, verify comment/favorite/visited pending feedback and ledger/rollback guarantees, then decide whether further optimization is warranted. The four warm end-to-end samples above are insufficient to close this issue.
+- [x] **Immediate personal-action feedback accepted by owner (GitHub #10):** favorite and visited UI behavior was accepted and the issue was closed. The four warm end-to-end samples above do not establish a cold/warm phase latency profile; deeper performance characterization remains optional future work.
 - [ ] **Data boundary audit:** verify intended public fields versus private notes/media/session/audit data and that anonymous callers cannot access private records or write.
 - [ ] **Real deployment validation:** verify the intended writable personal D1/R2 bindings, migrations, retained data, map markers and media persistence; fixture-only tests do not establish this.
 - [ ] **Session and audit coverage:** verify Add/Agent session retention and audit coverage for all accepted write paths.
-- [ ] **Regression acceptance:** Add, Record and Nearby read the same saved catalog and personal state; updates are visible consistently after refresh.
+- [ ] **Regression acceptance:** Add, Record and Recommend read the same saved catalog and personal state; updates are visible consistently after refresh.
 
 ## 5. PoC release gate
 
 - [ ] All three live user journeys above pass on Cloudflare; implementation-only checks do not close these gates.
-- [ ] Real DeepSeek resolution predictions pass the existing resolution gates; enrichment and Nearby have separate factual-quality reports.
+- [ ] Real DeepSeek resolution predictions pass the existing resolution gates; enrichment and Recommend have separate factual-quality reports.
 - [ ] No invented identity, score, route time or booking rule; failed providers are not reported as empty search results or successful completion.
 - [ ] Owner auth, confirmation, retries, photo persistence and map visibility pass integration/browser checks.
 - [ ] A new user can follow the root README from API configuration and owner secrets through deployment and first successful use.
@@ -131,7 +133,7 @@ Updated: 2026-09-29. This is the sole development progress checklist. Architectu
 ## Immediate execution order
 
 1. Make Add research and its field-to-database path useful; evaluate resolution against the existing gold dataset and enrichment separately.
-2. Prepare the Nearby benchmark before wiring its Agent. In parallel-capable work, finish deterministic Record integration and browser tests.
+2. Run the frozen Recommend baseline, then wire its Agent and reply-capable interface; retain the completed Record regression gates.
 3. Validate all three paths on the deployment, then close the release gates.
 
 Evaluation protocols and gates live beside the datasets in `apps/web/evals/`. Keep raw runs in ignored `evals/runs/`; retain curated gold data, schemas and test fixtures. Record and Add progress belongs only in this file.

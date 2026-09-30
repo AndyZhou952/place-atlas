@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-decision-v1",
+  "kind": "synthetic-saved-catalog-and-frozen-tool-evidence-not-live-routes",
+  "catalog": [
+    {
+      "id": "ramen-a",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "らーめん 木漏れ日 新宿店",
+      "area": "shinjuku",
+      "address": "東京都新宿区西新宿1-2-3",
+      "tags": ["ramen"],
+      "description": "Ramen restaurant",
+      "visited": false
+    },
+    {
+      "id": "ramen-b",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "らーめん 木漏れ日 六本木店",
+      "area": "roppongi",
+      "address": "東京都港区六本木2-3-4",
+      "tags": ["ramen"],
+      "description": "Ramen restaurant",
+      "visited": false
+    },
+    {
+      "id": "ramen-visited",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "麺屋 さくら",
+      "area": "shinjuku",
+      "address": "東京都新宿区西新宿2-3-4",
+      "tags": ["ramen"],
+      "description": "Ramen restaurant",
+      "visited": true
+    },
+    {
+      "id": "sushi-ginza",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "寿司 あおい",
+      "area": "ginza",
+      "address": "東京都中央区銀座2-3-4",
+      "tags": ["sushi"],
+      "description": "Sushi restaurant",
+      "visited": false
+    },
+    {
+      "id": "yakitori-ginza",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "焼鳥 そら",
+      "area": "ginza",
+      "address": "東京都中央区銀座3-4-5",
+      "tags": ["yakitori"],
+      "description": "Yakitori restaurant",
+      "visited": false
+    },
+    {
+      "id": "curry-shinjuku",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "カレー 風",
+      "area": "shinjuku",
+      "address": "東京都新宿区新宿3-4-5",
+      "tags": ["curry"],
+      "description": "Curry restaurant",
+      "visited": false
+    },
+    {
+      "id": "beef-shinjuku",
+      "kind": "food",
+      "verificationStatus": "verified",
+      "title": "炭火 ひかり",
+      "area": "shinjuku",
+      "address": "東京都新宿区西新宿4-5-6",
+      "tags": ["beef_tongue"],
+      "description": "Grilled beef tongue",
+      "visited": false
+    },
+    {
+      "id": "unverified-sushi",
+      "kind": "food",
+      "verificationStatus": "needs_review",
+      "title": "寿司 未確認",
+      "area": "ginza",
+      "address": "東京都中央区銀座4-5-6",
+      "tags": ["sushi"],
+      "description": "Unverified",
+      "visited": false
+    },
+    {
+      "id": "event-ginza",
+      "kind": "event",
+      "verificationStatus": "verified",
+      "title": "銀座 Food Event",
+      "area": "ginza",
+      "address": "東京都中央区銀座5-6-7",
+      "tags": ["sushi"],
+      "description": "Event",
+      "visited": false
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "global-cuisine",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "none" },
+        "catalogIds": ["ramen-a", "ramen-visited", "sushi-ginza"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a", "ramen-visited"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "global-signature-dish",
+      "input": {
+        "intent": {
+          "foodTerms": ["beef_tongue"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "none" },
+        "catalogIds": ["beef-shinjuku", "ramen-a"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["beef-shinjuku"],
+        "allowedItemIds": ["beef-shinjuku"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "area-sushi-no-time",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "ginza", "name": "銀座" },
+        "catalogIds": ["sushi-ginza", "ramen-a", "unverified-sushi"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["sushi-ginza"],
+        "allowedItemIds": ["sushi-ginza"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "area-open-choice",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "ginza", "name": "銀座" },
+        "catalogIds": ["sushi-ginza", "yakitori-ginza", "ramen-a"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["sushi-ginza", "yakitori-ginza"],
+        "allowedItemIds": ["sushi-ginza", "yakitori-ginza"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "area-timed-route-needs-origin",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 10,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "shinjuku", "name": "新宿" },
+        "catalogIds": ["ramen-a"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "clarify",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-prefer-unvisited",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a", "ramen-visited"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600,
+            "status": "fresh"
+          },
+          {
+            "itemId": "ramen-visited",
+            "mode": "walk",
+            "seconds": 240,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a", "ramen-visited"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-exact-boundary",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a", "curry-shinjuku"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 900,
+            "status": "fresh"
+          },
+          {
+            "itemId": "curry-shinjuku",
+            "mode": "walk",
+            "seconds": 901,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-request-excludes-transit",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 10,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza"],
+        "routes": [
+          {
+            "itemId": "sushi-ginza",
+            "mode": "walk",
+            "seconds": 1400,
+            "status": "fresh"
+          },
+          {
+            "itemId": "sushi-ginza",
+            "mode": "transit",
+            "seconds": 600,
+            "transfers": 0,
+            "doorToDoor": true,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "distance-fallback-labelled",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "either",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a", "sushi-ginza"],
+        "routes": [],
+        "distances": [
+          { "itemId": "ramen-a", "meters": 1500 },
+          { "itemId": "sushi-ginza", "meters": 2001 }
+        ],
+        "routeState": "unavailable"
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "distance-over-two-km",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "either",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza"],
+        "routes": [],
+        "distances": [{ "itemId": "sushi-ginza", "meters": 2001 }],
+        "routeState": "unavailable"
+      },
+      "gold": {
+        "action": "unavailable",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "direct-train-twenty-minutes",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "transit",
+          "maxMinutes": 20,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza", "curry-shinjuku"],
+        "routes": [
+          {
+            "itemId": "sushi-ginza",
+            "mode": "transit",
+            "seconds": 1200,
+            "transfers": 0,
+            "doorToDoor": true,
+            "status": "fresh"
+          },
+          {
+            "itemId": "curry-shinjuku",
+            "mode": "transit",
+            "seconds": 800,
+            "transfers": 1,
+            "doorToDoor": true,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["sushi-ginza"],
+        "allowedItemIds": ["sushi-ginza"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "train-over-boundary",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "transit",
+          "maxMinutes": 20,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza"],
+        "routes": [
+          {
+            "itemId": "sushi-ginza",
+            "mode": "transit",
+            "seconds": 1201,
+            "transfers": 0,
+            "doorToDoor": true,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "train-transfer-rejected",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "transit",
+          "maxMinutes": 20,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza"],
+        "routes": [
+          {
+            "itemId": "sushi-ginza",
+            "mode": "transit",
+            "seconds": 900,
+            "transfers": 1,
+            "doorToDoor": true,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "train-not-door-to-door",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "transit",
+          "maxMinutes": 20,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["sushi-ginza"],
+        "routes": [
+          {
+            "itemId": "sushi-ginza",
+            "mode": "transit",
+            "seconds": 800,
+            "transfers": 0,
+            "doorToDoor": false,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "unavailable",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "only-visited",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "only_visited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a", "ramen-visited"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 500,
+            "status": "fresh"
+          },
+          {
+            "itemId": "ramen-visited",
+            "mode": "walk",
+            "seconds": 800,
+            "status": "fresh"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-visited"],
+        "allowedItemIds": ["ramen-visited"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "only-unvisited-none",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "only_unvisited"
+        },
+        "origin": { "state": "area", "id": "shinjuku", "name": "新宿" },
+        "catalogIds": ["ramen-visited"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-in-unknown",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited",
+          "askWalkIn": true
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600,
+            "status": "fresh"
+          }
+        ],
+        "distances": [],
+        "entryState": "unknown"
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": ["walk_in_unknown"]
+      }
+    },
+    {
+      "caseId": "empty-catalog",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "ginza", "name": "銀座" },
+        "catalogIds": [],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "location-provider-down",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "unavailable" },
+        "catalogIds": ["ramen-a"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "unavailable",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": ["location_provider_unavailable"]
+      }
+    },
+    {
+      "caseId": "ambiguous-origin",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": {
+          "state": "ambiguous",
+          "choices": ["station:shinjuku", "station:shinjuku-sanchome"]
+        },
+        "catalogIds": ["ramen-a"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "clarify",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "wrong-branch-same-brand",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "shinjuku", "name": "新宿" },
+        "catalogIds": ["ramen-a", "ramen-b"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "unverified-distractor",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "ginza", "name": "銀座" },
+        "catalogIds": ["sushi-ginza", "unverified-sushi"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["sushi-ginza"],
+        "allowedItemIds": ["sushi-ginza"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "event-not-restaurant",
+      "input": {
+        "intent": {
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "ginza", "name": "銀座" },
+        "catalogIds": ["event-ginza"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "no_results",
+        "topItemIds": [],
+        "allowedItemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "stale-route-distance-only",
+      "input": {
+        "intent": {
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "either",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 500,
+            "status": "stale"
+          }
+        ],
+        "distances": [{ "itemId": "ramen-a", "meters": 700 }]
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "partial-route-results",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "resolved", "id": "station:shinjuku" },
+        "catalogIds": ["ramen-a", "curry-shinjuku"],
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600,
+            "status": "fresh"
+          },
+          {
+            "itemId": "curry-shinjuku",
+            "mode": "walk",
+            "seconds": null,
+            "status": "unavailable"
+          }
+        ],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["ramen-a"],
+        "allowedItemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "food-exclusion",
+      "input": {
+        "intent": {
+          "foodTerms": [],
+          "excludedFoodTerms": ["ramen"],
+          "travelMode": "none",
+          "visited": "prefer_unvisited"
+        },
+        "origin": { "state": "area", "id": "shinjuku", "name": "新宿" },
+        "catalogIds": ["ramen-a", "curry-shinjuku"],
+        "routes": [],
+        "distances": []
+      },
+      "gold": {
+        "action": "recommend",
+        "topItemIds": ["curry-shinjuku"],
+        "allowedItemIds": ["curry-shinjuku"],
+        "requiredWarnings": []
+      }
+    }
+  ]
+}

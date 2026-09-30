@@ -20,9 +20,12 @@ The acceptance target for curated deterministic cases is 100% case pass and zero
 
 `run-deepseek-baseline.mjs` sends only each case's request, catalog subset, origin options and frozen tool observations to DeepSeek. It never sends `gold`, case IDs, scoring code or expected item IDs. It records prompt/dataset/runner hashes, model name, token use, response and elapsed time in ignored `evals/runs/`. Temperature is zero, with one attempt per case; a provider failure is a missing prediction. The runner is a **model-only diagnostic**, not a production harness test.
 
+`run-live-intent-harness.mjs` instead calls the production `createRecommendInterpreter` and `normalizeRecommendIntent` code on the frozen 34 request and 8 continuation cases. It still supplies synthetic origin options; it does not exercise D1, geocoding, routes or browser clicks. Use a fresh output directory and compare its score and raw attempts with the baseline. A replay of baseline outputs through the new normalizer is development feedback, not an independent model run.
+
 ```sh
 node --test evals/recommend/*.test.mjs
 AGENT_API_KEY=... AGENT_MODEL=deepseek-flash node evals/recommend/run-deepseek-baseline.mjs evals/runs/recommend-formal-UNIQUE-NAME
+AGENT_API_KEY=... AGENT_MODEL=deepseek-flash node --experimental-strip-types evals/recommend/run-live-intent-harness.mjs evals/runs/recommend-harness-UNIQUE-NAME
 ```
 
 Keep the key out of shell history, source, reports and chat. The formal baseline starts only after these fixtures, scorers and the application contract are reviewed. Review freeform `reason` text independently: the deterministic scorer validates saved IDs, detail targets and structured supporting facts, but cannot prove the prose is faithful. A browser trace must record the request sequence, displayed response and opened detail ID for each contract case.

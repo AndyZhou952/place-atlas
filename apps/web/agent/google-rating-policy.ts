@@ -35,10 +35,6 @@ export function previewRatingPlaceId(
       .filter(Boolean)
       .join(' '),
   );
-  if (
-    region === 'mainland_china' ||
-    (region === 'japan' && preview.tabelog.status === 'known')
-  )
-    return undefined;
+  if (region === 'mainland_china') return undefined;
   return identity.placeId;
 }

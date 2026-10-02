@@ -258,6 +258,16 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
             ),
           ),
         this.#database
+          .prepare(insertGoogleReferenceSql)
+          .bind(
+            promotionId ?? itemId,
+            now.toISOString(),
+            now.toISOString(),
+            preview.sessionId,
+            mutationKey,
+            preview.candidateIdentity.placeId,
+          ),
+        this.#database
           .prepare(insertCommittedTerminalSql)
           .bind(
             now.getTime(),
@@ -814,3 +824,15 @@ function canonicalJson(value: unknown): string {
     '}'
   );
 }
+
+// The same transaction publishes the preview's rating and place. A failed or
+// cancelled Add cannot leave a saved reference; duplicate replay cannot replace it.
+const insertGoogleReferenceSql = `INSERT INTO atlas_google_rating_references (item_id, reference_json, updated_at)
+  SELECT r.item_id, json_set(s.google_rating_reference_json, '$.itemId', ?, '$.capturedAt', ?), ?
+  FROM catalog_intake_sessions AS s JOIN catalog_intake_publish_receipts AS r
+    ON r.session_id = s.session_id
+  WHERE s.session_id = ? AND r.mutation_key = ?
+    AND json_extract(r.outcome_json, '$.status') = 'committed_verified'
+    AND json_extract(s.google_rating_reference_json, '$.placeId') = ?
+    AND EXISTS (SELECT 1 FROM atlas_items WHERE id = r.item_id AND verification_status = 'verified')
+  ON CONFLICT(item_id) DO NOTHING`;

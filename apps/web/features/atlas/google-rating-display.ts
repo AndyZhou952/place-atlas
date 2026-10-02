@@ -1,3 +1,5 @@
+import type { GoogleRatingReference } from '../../product/application/catalog/google-rating-reference-operations.ts';
+import { ratingPlaceId } from '../../agent/google-rating-policy.ts';
 import type { AtlasItem, TabelogSnapshot } from './model.ts';
 import { researchRegion } from '../../product/application/catalog/research-region.ts';
 
@@ -59,13 +61,27 @@ export function parseGoogleRating(
 export function withDisplayedGoogleRatings(
   items: readonly AtlasItem[],
   displays: Readonly<Record<string, GoogleRatingDisplay>>,
+  references: Readonly<Record<string, GoogleRatingReference>> = {},
 ): readonly AtlasItem[] {
   return items.map((item) => {
     if (researchRegion(item.address) === 'mainland_china')
       return { ...item, googleRating: undefined };
+    const reference = references[item.id];
+    const saved =
+      reference && reference.placeId === ratingPlaceId(item)
+        ? {
+            ...item,
+            googleRating: {
+              score: reference.score,
+              reviewCount: reference.reviewCount,
+              url: reference.url,
+              checkedAt: reference.observedAt,
+            },
+          }
+        : item;
     const display = displays[item.id];
     return display?.identity === googleRatingIdentity(item) && display.rating
       ? { ...item, googleRating: display.rating }
-      : item;
+      : saved;
   });
 }

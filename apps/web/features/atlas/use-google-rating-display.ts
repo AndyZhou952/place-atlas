@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AtlasItem } from './model';
+import { useGoogleRatingReferences } from './use-google-rating-references';
 import { ratingPlaceId } from '../../agent/google-rating-policy';
 import {
   googleRatingIdentity,
@@ -15,6 +16,7 @@ export function useGoogleRatingDisplay(
   items: readonly AtlasItem[],
   canEdit: boolean,
 ) {
+  const references = useGoogleRatingReferences(canEdit, items);
   const [displays, setDisplays] = useState<Record<string, GoogleRatingDisplay>>(
     {},
   );
@@ -41,12 +43,18 @@ export function useGoogleRatingDisplay(
         !ratingPlaceId(item)
       )
         return;
+      if (
+        !retry &&
+        (!references.referencesReady ||
+          references.references[item.id]?.placeId === ratingPlaceId(item))
+      )
+        return;
       const identity = googleRatingIdentity(item);
       const pending = inFlight.current.get(identity);
       if (pending) return pending;
       if (
         displays[item.id]?.identity === identity &&
-        (displays[item.id]?.status === 'loaded' ||
+        ((!retry && displays[item.id]?.status === 'loaded') ||
           (!retry && displays[item.id]?.status === 'unavailable'))
       )
         return;
@@ -69,11 +77,19 @@ export function useGoogleRatingDisplay(
               `/api/items/${encodeURIComponent(item.id)}/google-rating`,
               { signal, cache: 'no-store' },
             );
-            if (response.status === 200)
-              return parseGoogleRating(
-                await response.json(),
-                new Date().toISOString(),
-              );
+            if (response.status === 200) {
+              const value = await response.json();
+              const checkedAt =
+                value &&
+                typeof value === 'object' &&
+                'checkedAt' in value &&
+                typeof value.checkedAt === 'string'
+                  ? value.checkedAt
+                  : undefined;
+              return checkedAt && Number.isFinite(Date.parse(checkedAt))
+                ? parseGoogleRating(value, checkedAt)
+                : undefined;
+            }
           } catch {
             /* A failed source read must not replace a known score. */
           }
@@ -98,7 +114,7 @@ export function useGoogleRatingDisplay(
       if (inFlight.current.get(identity) === request)
         inFlight.current.delete(identity);
     },
-    [canEdit, displays],
+    [canEdit, displays, references.referencesReady, references.references],
   );
   const loadMany = async (ids: readonly string[]) => {
     if (!canEdit || busy) return;
@@ -121,10 +137,16 @@ export function useGoogleRatingDisplay(
   };
   const activeDisplays = canEdit ? displays : emptyDisplays;
   return {
+    ...references,
     canQuery: canEdit,
     items: useMemo(
-      () => withDisplayedGoogleRatings(items, activeDisplays),
-      [items, activeDisplays],
+      () =>
+        withDisplayedGoogleRatings(
+          items,
+          activeDisplays,
+          references.references,
+        ),
+      [items, activeDisplays, references.references],
     ),
     displays: activeDisplays,
     busy: canEdit && busy,

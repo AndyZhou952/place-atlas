@@ -42,7 +42,7 @@ test('preview Google rating uses only a current selected Place ID and respects r
       previewSession('青森 海坊厨', '青森県青森市', 'known'),
       now,
     ),
-    undefined,
+    identity.placeId,
   );
   assert.equal(
     previewRatingPlaceId(previewSession('海底捞 上海', '上海市'), now),

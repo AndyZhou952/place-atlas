@@ -31,7 +31,32 @@ export async function getPreviewGoogleRating(
     return { kind: 'not_found' } as const;
   const placeId = previewRatingPlaceId(session);
   if (!placeId) return { kind: 'unavailable' } as const;
-  return getRatingByPlaceId(placeId);
+  const result = await getRatingByPlaceId(placeId);
+  if (result.kind === 'found') {
+    const { score, reviewCount, url, checkedAt } = result.value;
+    // Stage only the response for this exact preview; confirmation owns publication.
+    await getD1()
+      .prepare(`UPDATE catalog_intake_sessions SET google_rating_reference_json = ?
+      WHERE session_id = ? AND owner_id = 'owner' AND channel = 'web' AND conversation_id = ?
+      AND state = 'preview_ready' AND expires_at_ms > ?
+      AND json_extract(session_json, '$.preview.evidenceDigest') = ?`)
+      .bind(
+        JSON.stringify({
+          placeId,
+          score,
+          reviewCount,
+          url,
+          observedAt: checkedAt,
+          source: 'google_places_api',
+        }),
+        sessionId,
+        conversationId,
+        Date.now(),
+        session.preview.evidenceDigest,
+      )
+      .run();
+  }
+  return result;
 }
 
 async function getRatingByPlaceId(placeId: string) {
@@ -46,6 +71,9 @@ async function getRatingByPlaceId(placeId: string) {
     usage: new D1ProviderUsage(getD1(), () => new Date()),
   }).getRating(placeId);
   return rating.ok
-    ? ({ kind: 'found', value: rating.value } as const)
+    ? ({
+        kind: 'found',
+        value: { ...rating.value, checkedAt: new Date().toISOString() },
+      } as const)
     : ({ kind: 'unavailable' } as const);
 }

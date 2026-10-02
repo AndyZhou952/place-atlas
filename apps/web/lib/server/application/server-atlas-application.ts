@@ -1,3 +1,5 @@
+import { createGoogleRatingReferenceOperationGroup } from '@/product/application/catalog/google-rating-reference-operations';
+import { D1GoogleRatingReferenceState } from './d1-google-rating-reference-state';
 import {
   getAtlasDeploymentEnvironment,
   getD1,
@@ -77,6 +79,11 @@ export function createServerAtlasApplication(
       state: catalogState,
       clock: dependencies.clock,
     }),
+    ...createGoogleRatingReferenceOperationGroup(
+      catalogRead,
+      new D1GoogleRatingReferenceState(database),
+      dependencies.clock,
+    ),
     ...createCatalogIntakeOperationGroup(
       dependencies.catalogIntakeModule ??
         createUnavailableCatalogIntakeModule(),

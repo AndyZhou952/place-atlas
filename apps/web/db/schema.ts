@@ -125,3 +125,12 @@ export const journalEntries = sqliteTable(
     index('idx_journal_entries_item_visited').on(table.itemId, table.visitedAt),
   ],
 );
+
+export const googleRatingReferences = sqliteTable(
+  'atlas_google_rating_references',
+  {
+    itemId: text('item_id').primaryKey(),
+    referenceJson: text('reference_json').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+);

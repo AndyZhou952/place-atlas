@@ -467,6 +467,7 @@ function PreviewStep({
     readonly reviewCount?: number;
     readonly url: string;
   }>();
+  const [googleLookupCompleteKey, setGoogleLookupCompleteKey] = useState('');
   const liveGoogleRating =
     fetchedGoogleRating?.previewKey === previewKey
       ? fetchedGoogleRating
@@ -479,7 +480,10 @@ function PreviewStep({
       {
         credentials: 'same-origin',
         cache: 'no-store',
-        signal: controller.signal,
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(15000),
+        ]),
       },
     )
       .then(async (response) => {
@@ -503,7 +507,10 @@ function PreviewStep({
           });
       })
       .catch(() => {
-        // A provider failure must not change the Add preview or its save gate.
+        // A failed lookup leaves the rating unknown and does not prevent saving.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setGoogleLookupCompleteKey(previewKey);
       });
     return () => controller.abort();
   }, [preview.sessionId, previewKey, hasStrongDuplicate]);
@@ -620,6 +627,9 @@ function PreviewStep({
               <span translate="no">Google Maps</span>
             </a>{' '}
             {liveGoogleRating.score.toFixed(1)}
+            <small>
+              Saved as a dated reference when you confirm this place.
+            </small>
             {liveGoogleRating.reviewCount === undefined
               ? ''
               : ` (${liveGoogleRating.reviewCount} reviews)`}
@@ -944,6 +954,7 @@ function PreviewStep({
           onClick={() => void onConfirm()}
           disabled={
             busy ||
+            googleLookupCompleteKey !== previewKey ||
             intake.state.previewNeedsRefresh ||
             preview.locationEvidence.status === 'unknown' ||
             preview.suspectedDuplicates.some((item) => item.match === 'strong')
@@ -951,7 +962,9 @@ function PreviewStep({
         >
           {preview.suspectedDuplicates.some((item) => item.match === 'strong')
             ? 'Already saved'
-            : confirmLabel}
+            : googleLookupCompleteKey !== previewKey
+              ? 'Checking Google rating…'
+              : confirmLabel}
         </Button>
         <Button
           type="button"

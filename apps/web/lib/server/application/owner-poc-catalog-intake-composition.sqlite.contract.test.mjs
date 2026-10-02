@@ -50,6 +50,7 @@ test('production owner-poc composition supports manual fields when research is d
     '0007_nominatim_policy_state.sql',
     '0008_catalog_intake_publication.sql',
     '0009_catalog_intake_research_allowances.sql',
+    '0012_google_rating_references.sql',
   ]) {
     sqlite.exec(await readFile(new URL(migration, root), 'utf8'));
   }
@@ -183,6 +184,7 @@ test('production refuses incomplete Add without creating a hidden review candida
     '0007_nominatim_policy_state.sql',
     '0008_catalog_intake_publication.sql',
     '0009_catalog_intake_research_allowances.sql',
+    '0012_google_rating_references.sql',
   ]) {
     sqlite.exec(await readFile(new URL(migration, root), 'utf8'));
   }

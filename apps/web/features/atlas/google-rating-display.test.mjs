@@ -1,3 +1,4 @@
+import { verifiedAtlasItems } from './verified-items.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -98,4 +99,25 @@ test('rating response validates scale, count and Google attribution URL', () => 
   ])
     assert.equal(parseGoogleRating(value, 'now'), undefined);
   assert.equal(rating(4).reviewCount, 123);
+});
+
+test('the full initial catalog renders without private references, including non-restaurants and missing Place IDs', () => {
+  const displayed = withDisplayedGoogleRatings(verifiedAtlasItems, {});
+  assert.equal(displayed.length, verifiedAtlasItems.length);
+  for (const item of verifiedAtlasItems) {
+    assert.equal(displayed.find((row) => row.id === item.id).title, item.title);
+  }
+  assert.doesNotThrow(() =>
+    withDisplayedGoogleRatings(
+      [
+        {
+          ...verifiedAtlasItems[0],
+          kind: 'architecture',
+          googlePlaceId: undefined,
+          intakeEvidence: undefined,
+        },
+      ],
+      {},
+    ),
+  );
 });

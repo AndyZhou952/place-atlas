@@ -270,10 +270,12 @@ export function CatalogTable({
             </Button>
             <p>
               Owner queries use the Google API. Ratings are shared with Map for
-              this session; reload them after refreshing.
+              this session. Save a reference explicitly to keep its score and
+              observation date; later queries leave it unchanged.
             </p>
           </div>
         )}
+      {googleRatings.error ? <p role="alert">{googleRatings.error}</p> : null}
       <output className="catalog-table-count" aria-live="polite">
         {rows.length} / {items.length} records · Unknown ratings and unvisited
         places appear last
@@ -298,6 +300,9 @@ export function CatalogTable({
               {sortHeading('personalRating')}
               {sortHeading('tabelog')}
               {sortHeading('google')}
+              {googleRatings.canQuery ? (
+                <th scope="col">Google reference</th>
+              ) : null}
               {sortHeading('lastVisit')}
               <th scope="col">Visits</th>
               <th scope="col">Reservation</th>
@@ -307,6 +312,16 @@ export function CatalogTable({
           </thead>
           <tbody>
             {rows.map(({ item, visits: itemVisits, lastVisit }) => {
+              const reference = googleRatings.references[item.id];
+              const savedReference =
+                reference && reference.placeId === ratingPlaceId(item)
+                  ? reference
+                  : undefined;
+              const display = googleRatings.displays[item.id];
+              const canSaveReference =
+                display?.status === 'loaded' &&
+                Boolean(display.rating) &&
+                display.identity === googleRatingIdentity(item);
               const cuisine = item.classification?.cuisines ?? [];
               const geo = item.classification?.geography;
               const categoryLabels = cuisine
@@ -397,6 +412,57 @@ export function CatalogTable({
                       'Not loaded'
                     )}
                   </td>
+                  {googleRatings.canQuery ? (
+                    <td>
+                      {savedReference ? (
+                        <>
+                          <a
+                            href={savedReference.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {savedReference.score.toFixed(1)}{' '}
+                            <small translate="no">Google Maps</small>
+                          </a>
+                          <small>
+                            Observed{' '}
+                            {new Date(
+                              savedReference.observedAt,
+                            ).toLocaleDateString('en-CA')}
+                          </small>
+                          <small>
+                            {savedReference.reviewCount ?? 'Unknown'} reviews ·
+                            Google Places API
+                          </small>
+                          <small>
+                            Saved{' '}
+                            {new Date(
+                              savedReference.capturedAt,
+                            ).toLocaleDateString('en-CA')}
+                          </small>
+                        </>
+                      ) : (
+                        <small>No saved reference</small>
+                      )}
+                      {canSaveReference ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={googleRatings.saving[item.id]}
+                          aria-label={`${item.title}: ${savedReference ? 'Replace' : 'Save'} Google reference`}
+                          onClick={() =>
+                            void googleRatings.saveReference(item, display)
+                          }
+                        >
+                          {googleRatings.saving[item.id]
+                            ? 'Saving…'
+                            : savedReference
+                              ? 'Replace reference'
+                              : 'Save reference'}
+                        </Button>
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td>{lastVisit ?? 'Not visited'}</td>
                   <td>{itemVisits.length}</td>
                   <td>{item.reservation.label || unknown}</td>

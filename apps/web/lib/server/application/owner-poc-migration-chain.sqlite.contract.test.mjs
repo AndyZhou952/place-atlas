@@ -16,9 +16,10 @@ const migrations = [
   '0009_catalog_intake_research_allowances.sql',
   '0010_owner_agent_settings.sql',
   '0011_visit_media_score.sql',
+  '0012_google_rating_references.sql',
 ];
 
-test('owner-poc append-only 0001-0011 chain replays from two empty databases', async () => {
+test('owner-poc append-only 0001-0012 chain replays from two empty databases', async () => {
   for (let run = 0; run < 2; run += 1) {
     const database = new DatabaseSync(':memory:');
     for (const migration of migrations) {
@@ -37,6 +38,7 @@ test('owner-poc append-only 0001-0011 chain replays from two empty databases', a
       'catalog_intake_publish_receipts',
       'catalog_intake_research_phase_spends',
       'owner_agent_settings',
+      'atlas_google_rating_references',
     ]) {
       assert.ok(tables.includes(required), required);
     }

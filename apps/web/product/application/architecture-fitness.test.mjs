@@ -1763,6 +1763,8 @@ const expectedOperationKeys = [
   'nearby.recommend',
   'catalog.delete_item',
   'catalog.get',
+  'catalog.google_rating_references',
+  'catalog.save_google_rating_reference',
   'catalog.intake.cancel',
   'catalog.intake.confirm',
   'catalog.intake.discover',
@@ -1788,6 +1790,7 @@ const expectedOperationKeys = [
 
 const expectedOperationGroupCreators = [
   'createCatalogOperationGroup',
+  'createGoogleRatingReferenceOperationGroup',
   'createCatalogIntakeOperationGroup',
   'createPlaceAssessmentOperationGroup',
   'createPublicDisplayOperationGroup',

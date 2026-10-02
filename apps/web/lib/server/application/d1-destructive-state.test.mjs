@@ -107,6 +107,7 @@ test('the D1 destructive adapter atomically removes all item records and writes 
     'atlas_item_overrides',
     'atlas_review_candidates',
     'atlas_items',
+    'atlas_google_rating_references',
   ]) {
     assert.match(sql, new RegExp(`DELETE FROM ${table}`, 'u'), table);
   }

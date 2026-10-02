@@ -2120,7 +2120,7 @@ const allowedUiModelTypeExpressions: Readonly<
   Record<string, string | readonly string[]>
 > = {
   AtlasItemKind: 'CoreAtlasItemKind',
-  AtlasView: "'map'|'journal'",
+  AtlasView: "'map'|'journal'|'table'",
   AtlasKindFilter: "'all'|AtlasItemKind",
   AtlasPersonalFilter: "'all'|'unvisited'|'visited'",
   PersonalState: 'CorePersonalState',

@@ -1,4 +1,5 @@
 import type { AtlasItem, VisitMediaRecord, VisitRecord } from './model';
+import { isRestaurantClassification } from '../../product/application/catalog/restaurant-classification.ts';
 
 export class OwnerAuthenticationRequiredError extends Error {
   readonly code = 'auth_required' as const;
@@ -33,19 +34,27 @@ interface PublicVisit {
   readonly id: string;
   readonly itemId: string;
   readonly visitedOn: string;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
   readonly displayNote?: string;
   readonly media: readonly PublicMedia[];
 }
 
 export async function loadPublicCatalog(
   transport: ReadTransport,
+  profile: 'verified_catalog' | 'full_merged_catalog' = 'verified_catalog',
 ): Promise<readonly AtlasItem[]> {
   const catalog = decodePublicCatalog(
-    await getJson<unknown>(transport, '/api/items'),
+    await getJson<unknown>(
+      transport,
+      profile === 'full_merged_catalog'
+        ? '/api/items?profile=full_merged_catalog'
+        : '/api/items',
+    ),
   );
   return Promise.all(
     catalog.map(async (item) => {
-      if (!item.reservation) return item;
+      if (item.verificationStatus !== 'verified') return item;
       const assessment = await getJson<PublicAssessment>(
         transport,
         `/api/items/${encodeURIComponent(item.id)}/personal`,
@@ -86,7 +95,8 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
   const reservation = decodeReservation(value.reservation, evidenceShape);
   const verifiedAt =
     optionalString(value.verifiedAt) ?? reservation.legacyCheckedAt;
-  if (!verifiedAt) throw new TypeError('Invalid public catalog item.');
+  if (!verifiedAt && value.verificationStatus !== 'needs_review')
+    throw new TypeError('Invalid public catalog item.');
   const kind = value.kind;
   const verificationStatus = value.verificationStatus;
   if (
@@ -107,11 +117,21 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
     description: requiredString(value.description),
     latitude: finiteNumber(value.latitude),
     longitude: finiteNumber(value.longitude),
+    ...(isRestaurantClassification(value.classification)
+      ? { classification: value.classification }
+      : {}),
+    ...(optionalString(value.updatedAt) === undefined
+      ? {}
+      : { updatedAt: optionalString(value.updatedAt) }),
     verificationStatus,
-    verifiedAt,
+    verifiedAt: verifiedAt ?? '',
     ...(optionalString(value.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(value.officialUrl) }),
+    ...(typeof value.googlePlaceId === 'string' &&
+    /^[A-Za-z0-9_-]{10,500}$/u.test(value.googlePlaceId)
+      ? { googlePlaceId: value.googlePlaceId }
+      : {}),
     ...(value.googleRating === undefined
       ? {}
       : { googleRating: decodeTabelog(value.googleRating, 'legacy') }),
@@ -330,8 +350,8 @@ export async function loadPublicVisits(
     itemTitle: titles.get(visit.itemId) ?? visit.itemId,
     visitedAt: visit.visitedOn,
     note: visit.displayNote,
-    createdAt: visit.visitedOn,
-    updatedAt: visit.visitedOn,
+    createdAt: visit.createdAt ?? visit.visitedOn,
+    updatedAt: visit.updatedAt ?? visit.visitedOn,
   }));
 }
 

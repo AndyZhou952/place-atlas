@@ -54,11 +54,16 @@ export function matchesAtlasNameQuery(
   item: Pick<AtlasItem, 'title' | 'alternateTitle'>,
   query: string,
 ): boolean {
+  return matchesAtlasTextQuery([item.title, item.alternateTitle ?? ''], query);
+}
+
+export function matchesAtlasTextQuery(
+  fields: readonly string[],
+  query: string,
+): boolean {
   const tokens = query.trim().split(/\s+/u).filter(Boolean);
   if (!tokens.length) return true;
-  const names = [item.title, item.alternateTitle ?? ''].map(
-    normalizeSearchText,
-  );
+  const names = fields.map(normalizeSearchText);
   return tokens.every((rawToken) => {
     const token = normalizeSearchText(rawToken);
     return !token || names.some((name) => name.includes(token));

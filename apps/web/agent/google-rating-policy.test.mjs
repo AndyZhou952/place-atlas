@@ -80,12 +80,15 @@ test('preview Google rating uses only a current selected Place ID and respects r
   );
 });
 
-test('Google rating uses a saved place ID overseas and only fills Japan without Tabelog', () => {
+test('saved Google rating is independent from Tabelog and excludes mainland China', () => {
   assert.equal(
     ratingPlaceId(item('7 Dempsey Road, Singapore', false)),
     identity.placeId,
   );
-  assert.equal(ratingPlaceId(item('青森県青森市古川1-13-12', true)), undefined);
+  assert.equal(
+    ratingPlaceId(item('青森県青森市古川1-13-12', true)),
+    identity.placeId,
+  );
   assert.equal(ratingPlaceId(item('Tokyo, Japan', false)), identity.placeId);
   assert.equal(ratingPlaceId(item('中国浙江省杭州市', false)), undefined);
   assert.equal(

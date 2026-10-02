@@ -1,15 +1,22 @@
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
 import { rejectUncoordinatedOwnerPocWrite } from '@/lib/server/application/owner-poc-write-policy';
-import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
+import {
+  authorizeOwnerRead,
+  withOwnerWriteAuth,
+} from '@/lib/server/auth/owner-auth';
 import { isAtlasItem } from '@/product/application/catalog/catalog-projection';
 
 import { saveDiscoveredItemResponse } from './item-write-response';
-import { listAtlasItemsResponse } from './list-atlas-items-response';
+import { listAtlasItemsForRequest } from './list-atlas-items-response';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  return listAtlasItemsResponse(getServerAtlasApplication());
+export async function GET(request: Request) {
+  return listAtlasItemsForRequest(
+    request,
+    getServerAtlasApplication(),
+    authorizeOwnerRead,
+  );
 }
 
 export const POST = withOwnerWriteAuth(async function POST(request: Request) {

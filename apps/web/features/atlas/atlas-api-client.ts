@@ -49,7 +49,9 @@ export interface BrowserTransport {
 
 interface BrowserOperationMap {
   readonly 'catalog.list': {
-    readonly input: { readonly profile: 'full_merged_catalog' };
+    readonly input: {
+      readonly profile: 'verified_catalog' | 'full_merged_catalog';
+    };
     readonly output: readonly AtlasItem[];
   };
   readonly 'assessment.update': {
@@ -211,7 +213,7 @@ export function createBrowserAtlasApplication(
   conversationStore: WebConversationStore = defaultBrowserConversationStore(),
 ): BrowserAtlasApplication {
   const handlers: BrowserOperationHandlers = {
-    'catalog.list': () => loadPublicCatalog(transport),
+    'catalog.list': ({ profile }) => loadPublicCatalog(transport, profile),
     'assessment.update': ({ itemId, patch }, mutationId) => {
       const { manualVisited, ...rest } = patch;
       return requestMutationJson<{

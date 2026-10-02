@@ -77,6 +77,10 @@ test('complete researched profile survives D1 publication and public projection 
   );
   const projected = createPublicReadManifest().project('catalog.get', stored);
   assert.deepEqual(projected.tags, ['洋食', 'Oysters']);
+  assert.deepEqual(stored.classification.cuisines, [
+    { familyId: 'japanese', categoryId: 'japanese.yoshoku' },
+  ]);
+  assert.deepEqual(projected.classification, stored.classification);
   assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
   assert.equal(projected.googleRating.score, 4.2);

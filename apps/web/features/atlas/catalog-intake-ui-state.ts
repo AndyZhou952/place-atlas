@@ -1,3 +1,9 @@
+import {
+  catalogIntakeEditorValues,
+  catalogIntakeManualLabels,
+} from './catalog-intake-editor.ts';
+export { catalogIntakeManualLabels } from './catalog-intake-editor.ts';
+
 import type {
   AddErrorCode,
   CatalogIntakeCandidateOutput,
@@ -204,6 +210,8 @@ export function catalogIntakeInitialState(): CatalogIntakeUiState {
 export function catalogIntakeManualCompletionError(
   state: CatalogIntakeUiState,
 ): string | undefined {
+  if (state.preview && !state.title.trim())
+    return 'Enter a restaurant name before updating the preview.';
   for (const [label, value] of [
     ['Categories', state.categories],
     ['Signature dishes', state.signatureDishes],
@@ -262,13 +270,6 @@ export function catalogIntakeManualCompletionError(
   return undefined;
 }
 
-export function catalogIntakeManualLabels(value: string): string[] {
-  return value
-    .split(/[,，、]/u)
-    .map((entry) => entry.normalize('NFC').trim())
-    .filter(Boolean);
-}
-
 export function reduceCatalogIntakeUi(
   state: CatalogIntakeUiState,
   action: CatalogIntakeUiAction,
@@ -278,6 +279,11 @@ export function reduceCatalogIntakeUi(
       return {
         ...state,
         [action.field]: action.value,
+        ...(action.field === 'address' &&
+        state.preview &&
+        action.value !== state.address
+          ? { latitude: '', longitude: '' }
+          : {}),
         previewNeedsRefresh:
           state.previewNeedsRefresh ||
           (action.field !== 'query' &&
@@ -366,12 +372,15 @@ export function reduceCatalogIntakeUi(
             sessionVersion: action.output.sessionVersion,
             clarification: undefined,
             preview: action.output.preview,
+            ...catalogIntakeEditorValues(action.output.preview),
             error: undefined,
           });
     case 'confirm_succeeded':
       if (action.output.status === 'conflict') {
         return toStage(state, 'conflict', {
           preview: action.output.newPreview,
+          ...catalogIntakeEditorValues(action.output.newPreview),
+          previewNeedsRefresh: false,
           sessionVersion: action.output.newPreview.previewVersion,
           error: undefined,
         });

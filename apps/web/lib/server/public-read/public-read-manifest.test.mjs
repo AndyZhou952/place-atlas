@@ -295,6 +295,7 @@ void test('authoritative intake unknown evidence never falls back to inconsisten
 
   assert.equal(response.status, 200);
   const projected = await response.json();
+  assert.equal(projected.googlePlaceId, 'place-unknown');
   assert.equal(projected.tabelog, undefined);
   assert.deepEqual(projected.reservation, { status: 'unknown' });
   assert.deepEqual(projected.sources, []);
@@ -302,6 +303,7 @@ void test('authoritative intake unknown evidence never falls back to inconsisten
     'address',
     'area',
     'description',
+    'googlePlaceId',
     'id',
     'kind',
     'latitude',

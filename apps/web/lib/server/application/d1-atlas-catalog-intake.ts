@@ -9,6 +9,7 @@ import type {
   ReservationSnapshot,
 } from '../../../product/application/catalog/atlas-item.ts';
 import { compactRestaurantTags } from '../../../product/application/catalog-intake/restaurant-profile-presentation.ts';
+import { withRestaurantClassification } from '../../../product/application/catalog/restaurant-classification.ts';
 
 interface ReceiptRow {
   readonly outcome_json: string;
@@ -644,7 +645,7 @@ function toAtlasItem(
   if (!location || !title || !address) {
     throw new Error('Verified publication requires complete durable evidence.');
   }
-  return {
+  return withRestaurantClassification({
     id: itemId,
     kind: 'food',
     title,
@@ -701,7 +702,7 @@ function toAtlasItem(
     ],
     intakeEvidence: intakeEvidence(preview),
     updatedAt: now.toISOString(),
-  };
+  });
 }
 
 function toReviewCandidate(
@@ -713,7 +714,7 @@ function toReviewCandidate(
   if (!title) {
     throw new Error('Review Candidate requires a durable title proposal.');
   }
-  return {
+  return withRestaurantClassification({
     recordType: 'review_candidate',
     id: itemId,
     kind: 'food',
@@ -725,7 +726,7 @@ function toReviewCandidate(
     tags: [],
     reviewEvidence: intakeEvidence(preview),
     updatedAt: now.toISOString(),
-  };
+  });
 }
 
 function intakeEvidence(preview: CatalogIntakePreview) {

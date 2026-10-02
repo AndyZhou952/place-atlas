@@ -159,7 +159,7 @@ export function parseTabelogListing(
       'iu',
     ).exec(html)?.[1];
   // The Restaurant JSON-LD name can be Japanese-only while the same page's
-  // 店名 row supplies an official Latin alias. Bind it to that row and to the
+  // The restaurant-name row supplies an official Latin alias. Bind it to that row and to the
   // structured restaurant name; never mine reviews or unrelated page text.
   const displayedName = clean(row('店名') ?? '');
   const aliases = displayedName.startsWith(name)

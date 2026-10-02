@@ -1,0 +1,79 @@
+.owner-workspace {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(34rem, 100%);
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: -1rem 0 3rem color-mix(in srgb, var(--ink) 15%, transparent);
+}
+
+.owner-workspace[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.owner-workspace::backdrop {
+  background: color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+.owner-workspace-header,
+.owner-workspace-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.owner-workspace-header h2 {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+}
+
+.owner-workspace-tools {
+  justify-content: flex-start;
+  padding-block: 0.75rem;
+}
+
+.owner-workspace [data-slot='button'] {
+  min-height: 2.75rem;
+}
+
+.owner-workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+}
+
+.owner-workspace .catalog-intake,
+.owner-workspace .nearby-console {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.owner-workspace .catalog-intake-preview dl > div {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+}
+
+@media (max-width: 480px) {
+  .owner-workspace-header,
+  .owner-workspace-tools,
+  .owner-workspace-content {
+    padding-inline: 1rem;
+  }
+}

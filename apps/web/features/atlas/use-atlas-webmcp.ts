@@ -47,6 +47,7 @@ interface Coordinates {
 }
 
 interface AtlasWebMcpToolDependencies extends AtlasWebMcpUiActions {
+  readonly catalogProfile?: 'verified_catalog' | 'full_merged_catalog';
   readonly application: BrowserAtlasApplication;
   readonly getCurrentCoordinates: () => Promise<Coordinates | undefined>;
 }
@@ -76,7 +77,12 @@ export function useAtlasWebMcp(
     const lifecycle = new AbortController();
     const tools = createAtlasWebMcpTools({
       application: browserAtlasApplication,
-      items: actions.items,
+      items: canEdit
+        ? actions.items
+        : actions.items.filter(
+            (item) => item.verificationStatus === 'verified',
+          ),
+      catalogProfile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
       selectItem: actions.selectItem,
       getCurrentCoordinates: readBrowserCoordinates,
     });
@@ -92,6 +98,7 @@ export function useAtlasWebMcp(
 export function createAtlasWebMcpTools({
   application,
   items,
+  catalogProfile = 'verified_catalog',
   selectItem,
   getCurrentCoordinates,
 }: AtlasWebMcpToolDependencies): readonly ModelContextTool[] {
@@ -106,16 +113,22 @@ export function createAtlasWebMcpTools({
       async execute() {
         const currentItems = await application.execute({
           key: browserOperationHttpCatalog['catalog.list'].key,
-          input: { profile: 'full_merged_catalog' },
+          input: { profile: catalogProfile },
         });
-        return currentItems.map((item) => ({
-          id: item.id,
-          title: item.title,
-          kind: item.kind,
-          area: item.area,
-          verificationStatus: item.verificationStatus,
-          tabelogScore: item.tabelog?.score,
-        }));
+        return currentItems
+          .filter(
+            (item) =>
+              catalogProfile === 'full_merged_catalog' ||
+              item.verificationStatus === 'verified',
+          )
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            kind: item.kind,
+            area: item.area,
+            verificationStatus: item.verificationStatus,
+            tabelogScore: item.tabelog?.score,
+          }));
       },
     },
     {

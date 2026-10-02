@@ -13,6 +13,7 @@ import type {
 import { isAtlasItem } from './catalog-projection.ts';
 import type { CatalogRead } from './catalog-read.ts';
 import type { CatalogRecordState } from './catalog-state.ts';
+import { withRestaurantClassification } from './restaurant-classification.ts';
 
 export interface ListCatalogInput {
   readonly profile: CatalogProfile;
@@ -112,7 +113,10 @@ export function createCatalogOperationGroup(
     async handle(item, execution) {
       try {
         const storedAt = writeDependencies.clock.now();
-        const stored = { ...item, updatedAt: storedAt };
+        const stored = withRestaurantClassification({
+          ...item,
+          updatedAt: storedAt,
+        });
         await writeDependencies.state.saveDynamicItem(
           stored,
           storedAt,

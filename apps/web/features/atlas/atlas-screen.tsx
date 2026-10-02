@@ -27,10 +27,10 @@ import {
   Heart,
   ImagePlus,
   ListFilter,
-  LocateFixed,
   MapPin,
   NotebookPen,
   Pencil,
+  Plus,
   Search,
   Sparkles,
   Star,
@@ -42,7 +42,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { researchRegion } from '@/product/application/catalog/research-region';
 
 import type {
   AtlasItem,
@@ -63,8 +62,8 @@ import {
 import { normalizeRating, parseOptionalRating } from './rating';
 import { searchCatalogRestaurantsByName } from '@/product/application/decision/search-policy';
 import { useAtlasViewModel } from './use-atlas-view-model';
-import { CatalogIntakePanel } from './catalog-intake-panel';
-import { RecommendSearch } from './recommend-search';
+import { CatalogTable } from './catalog-table';
+import { OwnerWorkspace, type OwnerWorkspaceTool } from './owner-workspace';
 import { OwnerAccessButton, OwnerAccessPanel } from './owner-access';
 import { useOwnerSession } from './use-owner-session';
 
@@ -88,13 +87,19 @@ const kindLabel: Record<AtlasItemKind, string> = {
 const navItems: readonly { value: AtlasView; label: string }[] = [
   { value: 'map', label: 'Map' },
   { value: 'journal', label: 'Journal' },
+  { value: 'table', label: 'Table' },
 ];
 
 export function AtlasScreen() {
   const owner = useOwnerSession();
   const canEdit = owner.state.authenticated === true;
   const vm = useAtlasViewModel(canEdit);
-  const [nearbyFocusRequest, setNearbyFocusRequest] = useState(0);
+  const [activeTool, setActiveTool] = useState<OwnerWorkspaceTool>();
+  function openSavedPlace(id: string) {
+    vm.setView('map');
+    vm.selectItem(id);
+    setActiveTool(undefined);
+  }
 
   return (
     <main className="atlas-shell">
@@ -126,22 +131,42 @@ export function AtlasScreen() {
         <div className="header-actions">
           <OwnerAccessButton owner={owner} />
           {canEdit ? (
-            <Button
-              className="ask-button"
-              aria-label="Ask for a saved restaurant recommendation"
-              onClick={() => {
-                vm.setView('map');
-                setNearbyFocusRequest((request) => request + 1);
-              }}
-            >
-              <Sparkles data-icon="inline-start" />
-              <span className="header-action-label">Ask Recommend</span>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                aria-label="Add a place"
+                aria-haspopup="dialog"
+                aria-controls="owner-workspace"
+                onClick={() => setActiveTool('add')}
+              >
+                <Plus data-icon="inline-start" />
+                <span className="header-action-label">Add place</span>
+              </Button>
+              <Button
+                className="ask-button"
+                aria-label="Ask for a saved restaurant recommendation"
+                aria-haspopup="dialog"
+                aria-controls="owner-workspace"
+                onClick={() => setActiveTool('recommend')}
+              >
+                <Sparkles data-icon="inline-start" />
+                <span className="header-action-label">Ask Recommend</span>
+              </Button>
+            </>
           ) : null}
         </div>
       </header>
 
       <OwnerAccessPanel owner={owner} />
+      {canEdit ? (
+        <OwnerWorkspace
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+          onClose={() => setActiveTool(undefined)}
+          onCommitted={vm.reloadCatalogViews}
+          onSelect={openSavedPlace}
+        />
+      ) : null}
 
       <section className="system-strip" aria-label="System status">
         <span>
@@ -154,15 +179,20 @@ export function AtlasScreen() {
 
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}
 
-      {vm.view === 'map' ? (
-        <MapWorkspace
-          vm={vm}
-          nearbyFocusRequest={nearbyFocusRequest}
-          canEdit={canEdit}
-        />
-      ) : null}
+      {vm.view === 'map' ? <MapWorkspace vm={vm} canEdit={canEdit} /> : null}
       {vm.view === 'journal' ? (
         <JournalWorkspace vm={vm} canEdit={canEdit} />
+      ) : null}
+      {vm.view === 'table' ? (
+        <CatalogTable
+          items={vm.items.filter(
+            (item) => canEdit || item.verificationStatus === 'verified',
+          )}
+          visits={vm.visits}
+          media={vm.media}
+          onSelect={openSavedPlace}
+          googleRatings={vm.googleRatings}
+        />
       ) : null}
       <footer className="site-footer">
         <span>Japan Atlas · personal field guide</span>
@@ -180,11 +210,9 @@ type LayoutVariant = 'floating' | 'split' | 'bottom';
 
 function MapWorkspace({
   vm,
-  nearbyFocusRequest,
   canEdit,
 }: {
   readonly vm: AtlasViewModel;
-  readonly nearbyFocusRequest: number;
   readonly canEdit: boolean;
 }) {
   const [listOpen, setListOpen] = useState(true);
@@ -207,17 +235,6 @@ function MapWorkspace({
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (!nearbyFocusRequest) return;
-    const frame = window.requestAnimationFrame(() => {
-      setListOpen(true);
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLInputElement>('#nearby-location')?.focus();
-      });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [nearbyFocusRequest]);
 
   const layoutClass =
     layoutVariant === 'split'
@@ -270,16 +287,6 @@ function MapWorkspace({
               <X />
             </Button>
           </div>
-
-          {canEdit ? (
-            <>
-              <CatalogIntakePanel
-                onCommitted={vm.reloadCatalogViews}
-                onOpenSaved={vm.selectItem}
-              />
-              <RecommendSearch onSelect={vm.selectItem} />
-            </>
-          ) : null}
 
           <div className="summary-row">
             <Summary label="Saved" value={vm.summary.saved} />
@@ -367,11 +374,6 @@ function MapWorkspace({
               <p className="eyebrow">Tokyo · source checked 2026-09-06</p>
               <h2>{vm.visibleItems.length} real records</h2>
             </div>
-            {canEdit ? (
-              <a className="nearby-jump" href="#nearby-location">
-                <LocateFixed aria-hidden="true" /> Recommend
-              </a>
-            ) : null}
           </div>
 
           <div className="search-field">
@@ -884,48 +886,11 @@ function PlaceDetail({
   readonly canEdit: boolean;
 }) {
   const item = vm.selectedItem!;
-  const storedGoogleRating =
-    researchRegion(item.address) === 'mainland_china'
-      ? undefined
-      : item.googleRating;
-  const [liveGoogleRating, setLiveGoogleRating] = useState<{
-    score: number;
-    reviewCount?: number;
-    url: string;
-  }>();
+  const storedGoogleRating = item.googleRating;
+  const loadGoogleRating = vm.googleRatings.load;
   useEffect(() => {
-    if (!canEdit || item.kind !== 'food') return;
-    const controller = new AbortController();
-    void fetch(`/api/items/${encodeURIComponent(item.id)}/google-rating`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then((response) =>
-        response.ok && response.status === 200 ? response.json() : undefined,
-      )
-      .then((value: unknown) => {
-        if (
-          !controller.signal.aborted &&
-          value !== null &&
-          typeof value === 'object' &&
-          'score' in value &&
-          'url' in value &&
-          typeof value.score === 'number' &&
-          (!('reviewCount' in value) ||
-            typeof value.reviewCount === 'number') &&
-          typeof value.url === 'string'
-        )
-          setLiveGoogleRating({
-            score: value.score,
-            ...('reviewCount' in value
-              ? { reviewCount: value.reviewCount as number }
-              : {}),
-            url: value.url,
-          });
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [canEdit, item.id, item.kind]);
+    if (canEdit) void loadGoogleRating(item);
+  }, [canEdit, item, loadGoogleRating]);
   const itemVisits = vm.visits.filter((visit) => visit.itemId === item.id);
   const overallCheckedAt = [
     item.verifiedAt,
@@ -1104,17 +1069,15 @@ function PlaceDetail({
                   </small>
                 </a>
               ) : null}
-              {(liveGoogleRating ?? storedGoogleRating) ? (
+              {storedGoogleRating ? (
                 <a
                   className="rating-strip-item"
-                  href={(liveGoogleRating ?? storedGoogleRating)!.url}
+                  href={storedGoogleRating!.url}
                   target="_blank"
                   rel="noreferrer"
                 >
                   <span translate="no">Google Maps</span>
-                  <strong>
-                    {(liveGoogleRating ?? storedGoogleRating)!.score.toFixed(1)}
-                  </strong>
+                  <strong>{storedGoogleRating!.score.toFixed(1)}</strong>
                 </a>
               ) : null}
               <span className="rating-visit-count">

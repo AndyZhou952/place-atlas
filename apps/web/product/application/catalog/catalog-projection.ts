@@ -7,6 +7,7 @@ import type { CatalogStateSnapshot } from './catalog-state.ts';
 import { isEffectivelyVisited } from '../assessments/effective-visited.ts';
 import { hasCanonicalCatalogIntakeWarningOrder } from '../catalog-intake/catalog-intake-warning-policy.ts';
 import { validateEnrichedProfile } from '../catalog-intake/catalog-intake-coordinator.ts';
+import { isRestaurantClassification } from './restaurant-classification.ts';
 
 export function projectCatalog(
   snapshot: CatalogStateSnapshot,
@@ -112,6 +113,7 @@ export function isAtlasReviewCandidate(
         'isFavorite',
         'hasVisited',
         'tags',
+        'classification',
         'reviewEvidence',
         'updatedAt',
       ],
@@ -144,6 +146,8 @@ export function isAtlasReviewCandidate(
     (value.hasVisited !== undefined && typeof value.hasVisited !== 'boolean') ||
     !Array.isArray(value.tags) ||
     !value.tags.every((tag) => typeof tag === 'string') ||
+    (value.classification !== undefined &&
+      !isRestaurantClassification(value.classification)) ||
     !isIsoTimestamp(value.updatedAt)
   ) {
     return false;
@@ -556,6 +560,8 @@ export function isAtlasItem(value: unknown): value is AtlasItem {
     (value.hasVisited === undefined || typeof value.hasVisited === 'boolean') &&
     Array.isArray(value.tags) &&
     value.tags.every((tag) => typeof tag === 'string') &&
+    (value.classification === undefined ||
+      isRestaurantClassification(value.classification)) &&
     Array.isArray(value.sources) &&
     value.sources.every(isSourceLink) &&
     (value.intakeEvidence === undefined ||

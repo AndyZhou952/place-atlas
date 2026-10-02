@@ -149,6 +149,15 @@ test('the D1 catalog adapter persists a needs-review item with the application t
   assert.deepEqual(JSON.parse(statements[0].values[1]), {
     ...storedItem,
     updatedAt: '2026-09-12T13:00:00.000Z',
+    classification: {
+      cuisines: [],
+      geography: {
+        countryCode: 'JP',
+        subdivisionCode: 'JP-13',
+        subdivisionName: '東京都',
+      },
+      basis: { cuisineLabels: [], address: 'Tokyo address' },
+    },
   });
   assert.deepEqual(statements[0].values.slice(2), [
     'needs_review',

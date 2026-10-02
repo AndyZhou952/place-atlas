@@ -23,7 +23,8 @@ const css = await readFile(
 );
 
 test('Map exposes one natural-language Recommend field without browser geolocation', () => {
-  assert.match(screen, /<RecommendSearch onSelect=\{vm\.selectItem\}/u);
+  assert.match(screen, /<OwnerWorkspace/u);
+  assert.doesNotMatch(screen, /nearby-jump|nearbyFocusRequest/u);
   assert.match(screen, /Ask Recommend/u);
   assert.match(search, /<form className="nearby-search"/u);
   assert.match(search, /htmlFor="nearby-location"/u);

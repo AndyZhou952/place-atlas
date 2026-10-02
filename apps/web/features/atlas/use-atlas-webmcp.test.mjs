@@ -74,6 +74,7 @@ function createTools(overrides = {}) {
   };
   const tools = createAtlasWebMcpTools({
     application,
+    catalogProfile: 'full_merged_catalog',
     items: [item],
     selectItem: (id) => selected.push(id),
     getCurrentCoordinates: async () => ({ latitude: 35.68, longitude: 139.76 }),
@@ -349,3 +350,15 @@ function contract(
     annotations,
   };
 }
+
+test('anonymous catalog tool uses only the public verified profile and excludes unpublished entries', async () => {
+  const { calls, tools } = createTools({ catalogProfile: 'verified_catalog' });
+  const listed = await tools
+    .find((tool) => tool.name === 'list_atlas_items')
+    .execute({});
+  assert.deepEqual(calls[0].input, { profile: 'verified_catalog' });
+  assert.deepEqual(
+    listed.map((entry) => entry.id),
+    ['place-1'],
+  );
+});

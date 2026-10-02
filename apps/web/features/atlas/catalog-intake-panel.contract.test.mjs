@@ -22,7 +22,7 @@ test('save receipts are collapsed and long tokens cannot grow the Add grid', asy
   );
 });
 
-test('Owner Add panel is a separate accessible intake surface before collection search', async () => {
+test('Owner Add panel is a separate accessible intake surface outside collection search', async () => {
   const [panel, screen, hook] = await Promise.all([
     readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./atlas-screen.tsx', import.meta.url), 'utf8'),
@@ -40,14 +40,8 @@ test('Owner Add panel is a separate accessible intake surface before collection 
   assert.match(panel, /disabled/u);
   assert.match(panel, /tabIndex=\{-1\}/u);
   assert.match(panel, /role="alert"/u);
-  assert.ok(
-    screen.indexOf('<CatalogIntakePanel') >
-      screen.indexOf('className="collection-heading"'),
-  );
-  assert.ok(
-    screen.indexOf('<CatalogIntakePanel') <
-      screen.indexOf('className="search-field"'),
-  );
+  assert.doesNotMatch(screen, /<CatalogIntakePanel/u);
+  assert.match(screen, /<OwnerWorkspace/u);
   assert.match(screen, /inert=\{!listOpen\}/u);
   for (const forbidden of [
     '/api/items',
@@ -143,7 +137,7 @@ test('Web preview and confirm-refresh conflict use the shared closed evidence pr
 test('a committed Add refreshes the saved catalog', async () => {
   const [panel, screen, hook, viewModel] = await Promise.all([
     readFile(new URL('./catalog-intake-panel.tsx', import.meta.url), 'utf8'),
-    readFile(new URL('./atlas-screen.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./owner-workspace.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./use-catalog-intake.ts', import.meta.url), 'utf8'),
     readFile(new URL('./use-atlas-view-model.ts', import.meta.url), 'utf8'),
   ]);
@@ -152,7 +146,7 @@ test('a committed Add refreshes the saved catalog', async () => {
   assert.match(hook, /onCommitted\?\.\(output\)/u);
   assert.match(
     screen,
-    /<CatalogIntakePanel\s+onCommitted=\{vm\.reloadCatalogViews\}\s+onOpenSaved=\{vm\.selectItem\}\s*\/>/u,
+    /<CatalogIntakePanel\s+onCommitted=\{onCommitted\}\s+onOpenSaved=\{onSelect\}\s*\/>/u,
   );
   assert.match(viewModel, /key: 'catalog\.list'/u);
   assert.match(viewModel, /reloadCatalogViews/u);

@@ -214,3 +214,24 @@
     gap: 0.25rem;
   }
 }
+
+.catalog-intake-preview .catalog-intake-owner-fields {
+  gap: 0.45rem;
+}
+
+.catalog-intake-preview textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.catalog-intake-preview textarea:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

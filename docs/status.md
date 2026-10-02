@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-10-01. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
+Updated: 2026-10-02. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
 
 `[x]` records completed implementation or verification. `[ ]` records work still open. Local tests and model-only benchmarks do not replace deployed website acceptance.
 
@@ -52,6 +52,21 @@ Updated: 2026-10-01. This is the development progress tracker. System boundaries
 - [x] The root README has a first-use sequence for credentials, Cloudflare resources, migrations, preflighted deployment, Owner login, model settings and the Add/Record/Recommend journeys; it includes a read-only media integrity audit for updates.
 - [x] The finite Add, Record and Recommend deployment gates passed. The live Add report separates sourced facts, duplicate identity and provider failures; Recommend separates live-model journeys from controlled failure scenarios. Unknown identity, ratings, route times and booking rules remain unverified.
 - [x] Final branch CI passed and PR #32 was merged into `main` as `01de91f`. The accepted runtime is deployed as Worker version `b6928e90-9afe-4fd0-8f99-8e89a9570767`; the PoC release gates are complete.
+
+## 0.1 owner acceptance — acceptance candidate
+
+- [x] Edit Add proposal values directly in place with sourced values prefilled; send only explicit Owner changes, invalidate old coordinates on an address change, and require a refreshed preview before publication.
+- [x] Move Add and Recommend into a shared right-side workspace opened from the header. Keep Places for list/search/filter browsing and retain drafts when switching tools or closing the workspace.
+- [x] Add a Table tab for stored place details, external/personal ratings, latest visit, notes/media and sources. Support stable sorting and specific cuisine and country/first administrative subdivision filters. Keep the additional classification out of Map, Journal and restaurant cards.
+- [x] Persist a controlled cuisine taxonomy and country/subdivision fields from evidence, backfill current records without changing existing tags or personal data, and classify future Add saves. Uncertain fields remain unknown. Production backfill on 2026-10-02 added classification to all 58 stored places; readback matched every planned classification and every other payload field remained identical. The evidence taxonomy has 10 internal families and 39 specific categories. Table exposes only the specific categories as one cuisine filter/column; broad families are not displayed.
+- [x] Provide a complete manual acceptance checklist covering login, every core workflow, table filtering/sorting, failure recovery, keyboard/mobile use and public/Owner access. The acceptance checklist is provided in chat only.
+- [x] Acceptance candidate passes 967 local regressions, lint, typecheck, format and production build. Browser checks cover Table composition/sorting, 320-pixel layout, modal switching/draft retention, and a real deployed Agent preview → name edit → refresh → cancel journey. The website is updated as an acceptance candidate, not a formal 0.1 release.
+- [x] Map and Table share current Google score responses without persisting Places API content. The closed catalog DTO retains only a validated Google Place ID for lookup; Table queries current filtered records only on an explicit Owner action, with bounded concurrency. Japan may show Tabelog and Google independently; mainland China remains excluded. Regression tests cover scoring, sorting, identity changes and the full read DTO roundtrip. Deployed Table→Map→Table acceptance returned the same 4.2 Google score for an existing Japanese restaurant without changing its 3.40 Tabelog or personal score.
+- [x] Public Visit DTOs preserve valid creation/update timestamps separately from the Visit date; a roundtrip regression protects Journal entry-time ordering. Table no longer labels a fallback visit date as its entry timestamp.
+- [x] The CI and release checklists are provided in chat only. The single CI job now also checks the actual migration package without touching production.
+- [x] The acceptance candidate passed all remote CI steps, including the added current migration gate. The latest acceptance Worker is `c42f8ff3-26a4-4ade-b640-f37aaf2953b2`; real Google lookup, shared Map/Table scores, one-level cuisine UI, anonymous read-only access and the added query control at 320 pixels passed deployed checks.
+- [x] Public documentation, PR narrative, source comments and Table controls use English; the two obsolete Chinese PR-description revisions were deleted. Table cuisine and subdivision display labels are English; original names, established Japanese Map/Journal labels, user records and multilingual matching data are preserved. Additional interface languages are deferred.
+- [ ] Owner completes the manual acceptance checklist; formal 0.1 publication waits for that acceptance.
 
 ## Next
 

@@ -85,6 +85,10 @@ Updated: 2026-10-03. This is the development progress tracker. System boundaries
 4. **Bulk Google reference save/replacement**
    - [ ] Add an Owner-only action beside Load Google ratings to save all eligible loaded references, with an explicit replacement option for existing references.
    - [ ] Operate on valid identity-bound loaded responses without another Google lookup. Keep refresh separate from saving, retain dates/provenance, report each row's outcome and make partial-failure retries duplicate-safe. Add API, persistence and interface regressions.
+5. **Agent frameworks and messaging channels**
+   - [ ] Prepare integration interfaces for agent frameworks such as Pi, Hermes and OpenClaw, so users can operate their own deployment through conversational tools.
+   - [ ] Explore messaging adapters for Telegram, WhatsApp, WeChat, LINE and other channels, allowing users to add restaurants and record visits, notes, photos and videos through chat.
+   - [ ] Carry clarification, preview and confirmation through the conversation; authenticate the deployment Owner, preserve write validation and retry safeguards, and keep provider credentials on the server. Validate each framework and channel before claiming support.
 
 ### Additional follow-up quality work
 

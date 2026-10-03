@@ -76,6 +76,7 @@ export interface AtlasItem {
   readonly officialUrl?: string;
   readonly tabelog?: TabelogSnapshot;
   readonly googleRating?: TabelogSnapshot;
+  readonly googlePlaceId?: string;
   readonly reservation: ReservationSnapshot;
   readonly event?: EventSchedule;
   readonly personalState: PersonalState;
@@ -83,6 +84,7 @@ export interface AtlasItem {
   readonly isFavorite?: boolean;
   readonly hasVisited?: boolean;
   readonly tags: readonly string[];
+  readonly classification?: RestaurantClassification;
   readonly sources: readonly SourceLink[];
   readonly intakeEvidence?: AtlasIntakeEvidence;
   readonly updatedAt?: string;
@@ -101,6 +103,7 @@ export interface AtlasReviewCandidate {
   readonly isFavorite?: boolean;
   readonly hasVisited?: boolean;
   readonly tags: readonly string[];
+  readonly classification?: RestaurantClassification;
   readonly reviewEvidence: AtlasIntakeEvidence;
   readonly updatedAt: string;
 }
@@ -134,3 +137,4 @@ import type {
   CatalogIntakeTitleProposal,
   CatalogIntakeWarning,
 } from '../catalog-intake/catalog-intake-coordinator.ts';
+import type { RestaurantClassification } from './restaurant-classification-types.ts';

@@ -23,7 +23,7 @@ import type {
 } from '@/product/application/visits/visit';
 
 export type AtlasItemKind = CoreAtlasItemKind;
-export type AtlasView = 'map' | 'journal';
+export type AtlasView = 'map' | 'journal' | 'table';
 export type AtlasKindFilter = 'all' | AtlasItemKind;
 export type AtlasPersonalFilter = 'all' | 'unvisited' | 'visited';
 export type PersonalState = CorePersonalState;

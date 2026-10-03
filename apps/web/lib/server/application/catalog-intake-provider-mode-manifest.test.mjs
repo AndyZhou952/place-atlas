@@ -33,6 +33,7 @@ test('provider modes configure deterministic discovery and geocoding', () => {
 test('the shared runtime projection maps only the reviewed catalog-intake bindings', () => {
   assert.deepEqual(
     projectOwnerPocCatalogIntakeRuntime({
+      ATLAS_PUBLIC_URL: 'https://atlas.example',
       GOOGLE_PLACES_API_KEY: 'server-secret',
       CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
       CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
@@ -44,6 +45,7 @@ test('the shared runtime projection maps only the reviewed catalog-intake bindin
       FIRECRAWL_API_KEY: 'reader-key',
     }),
     {
+      publicUrl: 'https://atlas.example',
       browser: undefined,
       sourceReaderProvider: 'firecrawl',
       firecrawlApiKey: 'reader-key',

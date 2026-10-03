@@ -104,6 +104,9 @@ export class D1DestructiveState implements DestructiveRecordState {
       this.#database
         .prepare('DELETE FROM atlas_review_candidates WHERE id = ?')
         .bind(id),
+      this.#database
+        .prepare('DELETE FROM atlas_google_rating_references WHERE item_id = ?')
+        .bind(id),
       this.#database.prepare('DELETE FROM atlas_items WHERE id = ?').bind(id),
       this.#database
         .prepare(

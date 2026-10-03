@@ -77,6 +77,10 @@ test('complete researched profile survives D1 publication and public projection 
   );
   const projected = createPublicReadManifest().project('catalog.get', stored);
   assert.deepEqual(projected.tags, ['洋食', 'Oysters']);
+  assert.deepEqual(stored.classification.cuisines, [
+    { familyId: 'japanese', categoryId: 'japanese.yoshoku' },
+  ]);
+  assert.deepEqual(projected.classification, stored.classification);
   assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
   assert.equal(projected.googleRating.score, 4.2);
@@ -1501,6 +1505,102 @@ test('deterministic Agent Add publishes a verified D1 item that Catalog and Near
   );
 });
 
+test('Add commits its Google reference atomically, retains its original date on replay, and deletes it with the place', async () => {
+  const sqlite = await migratedDatabase();
+  const preview = verifiedPreview();
+  const mutationKey = 'a'.repeat(64);
+  insertPreviewSession(sqlite, preview, mutationKey);
+  const reference = {
+    placeId: preview.candidateIdentity.placeId,
+    score: 4.5,
+    reviewCount: 123,
+    url:
+      'https://www.google.com/maps/search/?api=1&query_place_id=' +
+      preview.candidateIdentity.placeId,
+    observedAt: '2026-09-23T01:58:00.000Z',
+    source: 'google_places_api',
+  };
+  sqlite
+    .prepare(
+      'UPDATE catalog_intake_sessions SET google_rating_reference_json = ? WHERE session_id = ?',
+    )
+    .run(JSON.stringify(reference), preview.sessionId);
+  const database = toD1(sqlite);
+  const publisher = new D1AtlasCatalogIntakePublisher(database, {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'place-with-reference',
+  });
+  const saved = await publisher.publish(preview, mutationKey, 2, 'catalog-r1');
+  assert.equal(saved.status, 'committed_verified');
+  const stored = () =>
+    JSON.parse(
+      sqlite
+        .prepare('SELECT reference_json FROM atlas_google_rating_references')
+        .get().reference_json,
+    );
+  assert.deepEqual(stored(), {
+    ...reference,
+    itemId: saved.itemId,
+    capturedAt: '2026-09-23T02:00:00.000Z',
+  });
+  assert.equal(
+    (await publisher.publish(preview, mutationKey, 2, 'catalog-r1')).replayed,
+    true,
+  );
+  assert.equal(stored().score, 4.5);
+  assert.equal(count(sqlite, 'catalog_intake_sessions'), 0);
+  await new D1DestructiveState(database).commitItemDeletion(
+    saved.itemId,
+    '2026-09-24T00:00:00.000Z',
+  );
+  assert.equal(count(sqlite, 'atlas_google_rating_references'), 0);
+});
+
+test('a stale branch reference and a failed Add never create saved Google references', async () => {
+  for (const fail of [false, true]) {
+    const sqlite = await migratedDatabase();
+    const preview = verifiedPreview();
+    const mutationKey = 'b'.repeat(64);
+    insertPreviewSession(sqlite, preview, mutationKey);
+    sqlite
+      .prepare(
+        'UPDATE catalog_intake_sessions SET google_rating_reference_json = ? WHERE session_id = ?',
+      )
+      .run(
+        JSON.stringify({
+          placeId: fail ? preview.candidateIdentity.placeId : 'another-branch',
+          score: 4.5,
+          url: 'https://www.google.com/maps/',
+          observedAt: '2026-09-23T01:58:00.000Z',
+          source: 'google_places_api',
+        }),
+        preview.sessionId,
+      );
+    const database = toD1(sqlite, fail ? { failBatch: true } : {});
+    // Use a SQLite trigger to force a real transaction failure after the item insert.
+    if (fail)
+      sqlite.exec(
+        "CREATE TRIGGER reject_reference BEFORE INSERT ON atlas_google_rating_references BEGIN SELECT RAISE(ABORT, 'unavailable'); END",
+      );
+    const publisher = new D1AtlasCatalogIntakePublisher(database, {
+      now: () => new Date('2026-09-23T02:00:00.000Z'),
+      nextId: () => 'must-not-save-reference',
+    });
+    const result = await publisher.publish(
+      preview,
+      mutationKey,
+      2,
+      'catalog-r1',
+    );
+    assert.equal(
+      result.status,
+      fail ? 'failed_no_write' : 'committed_verified',
+    );
+    assert.equal(count(sqlite, 'atlas_google_rating_references'), 0);
+    assert.equal(count(sqlite, 'atlas_items'), fail ? 0 : 1);
+  }
+});
+
 async function migratedDatabase() {
   const sqlite = new DatabaseSync(':memory:');
   for (const migration of [
@@ -1508,6 +1608,10 @@ async function migratedDatabase() {
     sessionMigration,
     publicationMigration,
     researchAllowanceMigration,
+    new URL(
+      '../../../migrations/owner-poc/0012_google_rating_references.sql',
+      import.meta.url,
+    ),
   ]) {
     sqlite.exec(await readFile(migration, 'utf8'));
   }

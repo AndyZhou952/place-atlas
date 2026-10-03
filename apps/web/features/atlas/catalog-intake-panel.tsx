@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { presentCatalogIntakePreview } from '@/product/application/catalog-intake/catalog-intake-preview-presenter';
-import { compactRestaurantCategories } from '@/product/application/catalog-intake/restaurant-profile-presentation';
 
 import { useCatalogIntake } from './use-catalog-intake';
 import {
@@ -468,6 +467,7 @@ function PreviewStep({
     readonly reviewCount?: number;
     readonly url: string;
   }>();
+  const [googleLookupCompleteKey, setGoogleLookupCompleteKey] = useState('');
   const liveGoogleRating =
     fetchedGoogleRating?.previewKey === previewKey
       ? fetchedGoogleRating
@@ -480,7 +480,10 @@ function PreviewStep({
       {
         credentials: 'same-origin',
         cache: 'no-store',
-        signal: controller.signal,
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(15000),
+        ]),
       },
     )
       .then(async (response) => {
@@ -504,7 +507,10 @@ function PreviewStep({
           });
       })
       .catch(() => {
-        // A provider failure must not change the Add preview or its save gate.
+        // A failed lookup leaves the rating unknown and does not prevent saving.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setGoogleLookupCompleteKey(previewKey);
       });
     return () => controller.abort();
   }, [preview.sessionId, previewKey, hasStrongDuplicate]);
@@ -577,79 +583,83 @@ function PreviewStep({
   return (
     <div className="catalog-intake-preview">
       <p className="catalog-intake-note">{presentation.versionLabel}</p>
-      {liveGoogleRating ||
-      preview.profile ||
-      preview.ownerFields.categories ||
-      preview.ownerFields.signatureDishes ||
-      preview.ownerFields.summary ? (
-        <section
-          className="catalog-intake-preview-group"
-          aria-label="Restaurant profile"
-        >
-          {preview.ownerFields.categories || preview.profile?.categories ? (
-            <p>
-              {compactRestaurantCategories(
-                preview.ownerFields.categories ??
-                  preview.profile?.categories?.value ??
-                  [],
-              ).join(' · ')}
-            </p>
-          ) : null}
-          {preview.ownerFields.summary || preview.profile?.summary ? (
-            <p>
-              {preview.ownerFields.summary ?? preview.profile?.summary?.value}
-            </p>
-          ) : null}
-          {(
-            preview.ownerFields.signatureDishes ??
-            preview.profile?.signatureDishes?.value
-          )?.length ? (
-            <p>
-              Recommended dishes:{' '}
-              {(
-                preview.ownerFields.signatureDishes ??
-                preview.profile?.signatureDishes?.value ??
-                []
-              ).join(', ')}
-            </p>
-          ) : null}
-          {liveGoogleRating ? (
-            <p>
-              <a href={liveGoogleRating.url} target="_blank" rel="noreferrer">
-                <span translate="no">Google Maps</span>
-              </a>{' '}
-              {liveGoogleRating.score.toFixed(1)}
-              {liveGoogleRating.reviewCount === undefined
-                ? ''
-                : ` (${liveGoogleRating.reviewCount} reviews)`}
-            </p>
-          ) : preview.profile?.googleRating ? (
-            <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
-          ) : null}
-          {preview.profile?.officialWebsite ? (
-            <p>
-              <a
-                href={preview.profile.officialWebsite.value}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Official website
-              </a>
-            </p>
-          ) : null}
-          {preview.profile?.bookingLink ? (
-            <p>
-              <a
-                href={preview.profile.bookingLink.value}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Booking
-              </a>
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      <section
+        className="catalog-intake-preview-group catalog-intake-owner-fields"
+        aria-label="Restaurant profile"
+      >
+        <h5>Restaurant profile</h5>
+        <label htmlFor="catalog-intake-preview-categories">
+          Cuisine labels (separate with commas)
+        </label>
+        <Input
+          id="catalog-intake-preview-categories"
+          value={intake.state.categories}
+          onChange={(event) =>
+            intake.setField('categories', event.target.value)
+          }
+          placeholder="Unknown — add cuisine labels"
+          disabled={busy}
+        />
+        <label htmlFor="catalog-intake-preview-signature-dishes">
+          Signature dishes (separate with commas)
+        </label>
+        <Input
+          id="catalog-intake-preview-signature-dishes"
+          value={intake.state.signatureDishes}
+          onChange={(event) =>
+            intake.setField('signatureDishes', event.target.value)
+          }
+          placeholder="Optional menu items"
+          disabled={busy}
+        />
+        <label htmlFor="catalog-intake-preview-summary">Short overview</label>
+        <textarea
+          id="catalog-intake-preview-summary"
+          value={intake.state.summary}
+          onChange={(event) => intake.setField('summary', event.target.value)}
+          placeholder="Optional, in your preferred language"
+          rows={3}
+          disabled={busy}
+        />
+        {liveGoogleRating ? (
+          <p>
+            <a href={liveGoogleRating.url} target="_blank" rel="noreferrer">
+              <span translate="no">Google Maps</span>
+            </a>{' '}
+            {liveGoogleRating.score.toFixed(1)}
+            <small>
+              Saved as a dated reference when you confirm this place.
+            </small>
+            {liveGoogleRating.reviewCount === undefined
+              ? ''
+              : ` (${liveGoogleRating.reviewCount} reviews)`}
+          </p>
+        ) : preview.profile?.googleRating ? (
+          <p>Google: {preview.profile.googleRating.value.score.toFixed(1)}</p>
+        ) : null}
+        {preview.profile?.officialWebsite ? (
+          <p>
+            <a
+              href={preview.profile.officialWebsite.value}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Official website
+            </a>
+          </p>
+        ) : null}
+        {preview.profile?.bookingLink ? (
+          <p>
+            <a
+              href={preview.profile.bookingLink.value}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Booking
+            </a>
+          </p>
+        ) : null}
+      </section>
       {groups.map((group) => (
         <section
           key={group.id}
@@ -661,11 +671,174 @@ function PreviewStep({
             {presentation.fields.map((item) =>
               group.keys.some((groupKey) => groupKey === item.key) ? (
                 <div key={item.key}>
-                  <dt>{item.label}</dt>
-                  <dd>{item.value}</dd>
+                  <dt>
+                    {item.key === 'identity' ||
+                    item.key === 'coordinates' ||
+                    item.key === 'tabelog' ? (
+                      item.label
+                    ) : (
+                      <label htmlFor={`catalog-intake-preview-${item.key}`}>
+                        {item.label}
+                      </label>
+                    )}
+                  </dt>
+                  <dd className="catalog-intake-owner-fields">
+                    {item.key === 'title' ||
+                    item.key === 'area' ||
+                    item.key === 'address' ? (
+                      <Input
+                        id={`catalog-intake-preview-${item.key}`}
+                        value={intake.state[item.key]}
+                        onChange={(event) =>
+                          intake.setField(
+                            item.key as 'title' | 'area' | 'address',
+                            event.target.value,
+                          )
+                        }
+                        placeholder={
+                          item.value.startsWith('Unknown')
+                            ? item.value
+                            : undefined
+                        }
+                        disabled={busy}
+                      />
+                    ) : item.key === 'coordinates' ? (
+                      <div
+                        className="catalog-intake-coordinate-row"
+                        id="catalog-intake-preview-coordinates"
+                      >
+                        <div>
+                          <label htmlFor="catalog-intake-preview-latitude">
+                            Latitude
+                          </label>
+                          <Input
+                            id="catalog-intake-preview-latitude"
+                            type="number"
+                            step="any"
+                            value={intake.state.latitude}
+                            onChange={(event) =>
+                              intake.setField('latitude', event.target.value)
+                            }
+                            placeholder="Unknown"
+                            disabled={busy}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="catalog-intake-preview-longitude">
+                            Longitude
+                          </label>
+                          <Input
+                            id="catalog-intake-preview-longitude"
+                            type="number"
+                            step="any"
+                            value={intake.state.longitude}
+                            onChange={(event) =>
+                              intake.setField('longitude', event.target.value)
+                            }
+                            placeholder="Unknown"
+                            disabled={busy}
+                          />
+                        </div>
+                      </div>
+                    ) : item.key === 'tabelog' ? (
+                      <>
+                        <label htmlFor="catalog-intake-preview-tabelog-score">
+                          Tabelog score
+                        </label>
+                        <Input
+                          id="catalog-intake-preview-tabelog-score"
+                          type="number"
+                          min="0"
+                          max="5"
+                          step="0.01"
+                          value={intake.state.tabelogScore}
+                          onChange={(event) =>
+                            intake.setField('tabelogScore', event.target.value)
+                          }
+                          placeholder="Unknown"
+                          disabled={busy}
+                        />
+                        <label htmlFor="catalog-intake-preview-tabelog-url">
+                          Tabelog main listing URL
+                        </label>
+                        <Input
+                          id="catalog-intake-preview-tabelog-url"
+                          type="url"
+                          value={intake.state.tabelogUrl}
+                          onChange={(event) =>
+                            intake.setField('tabelogUrl', event.target.value)
+                          }
+                          placeholder="https://tabelog.com/..."
+                          disabled={busy}
+                        />
+                      </>
+                    ) : item.key === 'reservation' ? (
+                      <>
+                        <select
+                          id="catalog-intake-preview-reservation"
+                          aria-label="Reservation rule"
+                          value={intake.state.reservationMode}
+                          onChange={(event) =>
+                            intake.setField(
+                              'reservationMode',
+                              event.target.value,
+                            )
+                          }
+                          disabled={busy}
+                        >
+                          <option value="unknown">Unknown</option>
+                          <option value="reservable">
+                            Reservations accepted
+                          </option>
+                          <option value="reservation_required">
+                            Reservation required
+                          </option>
+                          <option value="not_reservable">
+                            Reservations unavailable
+                          </option>
+                        </select>
+                        <label htmlFor="catalog-intake-preview-reservation-label">
+                          Source-supported explanation
+                        </label>
+                        <Input
+                          id="catalog-intake-preview-reservation-label"
+                          value={intake.state.reservationLabel}
+                          onChange={(event) =>
+                            intake.setField(
+                              'reservationLabel',
+                              event.target.value,
+                            )
+                          }
+                          disabled={busy}
+                        />
+                        <label htmlFor="catalog-intake-preview-reservation-url">
+                          Reservation source URL
+                        </label>
+                        <Input
+                          id="catalog-intake-preview-reservation-url"
+                          type="url"
+                          value={intake.state.reservationUrl}
+                          onChange={(event) =>
+                            intake.setField(
+                              'reservationUrl',
+                              event.target.value,
+                            )
+                          }
+                          placeholder="https://..."
+                          disabled={busy}
+                        />
+                      </>
+                    ) : (
+                      item.value
+                    )}
+                  </dd>
                   <dd className="catalog-intake-source">
                     <details>
-                      <summary>Evidence</summary>
+                      <summary>
+                        {intake.state.previewNeedsRefresh
+                          ? 'Evidence from previous preview'
+                          : 'Evidence'}
+                      </summary>
                       <span>
                         {item.evidence}
                         {item.evidenceAt
@@ -738,181 +911,13 @@ function PreviewStep({
       </section>
       <section
         className="catalog-intake-preview-group"
-        aria-label="Complete or correct details"
+        aria-label="Update edited details"
       >
-        <h5>Complete or correct details</h5>
         <p className="catalog-intake-note">
-          Enter the correct address and refresh the preview. If the address
-          lookup still cannot locate this place, enter its map coordinates too.
-          Ratings and reservation rules can remain unknown.
+          Edit the fields above, then update the preview before saving. Ratings
+          and reservation rules can remain unknown. A changed address is looked
+          up again; enter coordinates only if lookup fails.
         </p>
-        <div className="catalog-intake-owner-fields">
-          <label htmlFor="catalog-intake-preview-title">Confirmed name</label>
-          <Input
-            id="catalog-intake-preview-title"
-            value={intake.state.title}
-            onChange={(event) => intake.setField('title', event.target.value)}
-            placeholder="Use the restaurant's exact branch name"
-            disabled={busy}
-          />
-          <label htmlFor="catalog-intake-preview-area">Area</label>
-          <Input
-            id="catalog-intake-preview-area"
-            value={intake.state.area}
-            onChange={(event) => intake.setField('area', event.target.value)}
-            placeholder="e.g. Shinjuku"
-            disabled={busy}
-          />
-          <label htmlFor="catalog-intake-preview-address">Address</label>
-          <Input
-            id="catalog-intake-preview-address"
-            value={intake.state.address}
-            onChange={(event) => intake.setField('address', event.target.value)}
-            placeholder="Street address"
-            disabled={busy}
-          />
-          <label htmlFor="catalog-intake-preview-categories">
-            Cuisine labels (separate with commas)
-          </label>
-          <Input
-            id="catalog-intake-preview-categories"
-            value={intake.state.categories}
-            onChange={(event) =>
-              intake.setField('categories', event.target.value)
-            }
-            placeholder="e.g. 焼鳥"
-            disabled={busy}
-          />
-          <label htmlFor="catalog-intake-preview-dishes">
-            Signature dishes (separate with commas)
-          </label>
-          <Input
-            id="catalog-intake-preview-dishes"
-            value={intake.state.signatureDishes}
-            onChange={(event) =>
-              intake.setField('signatureDishes', event.target.value)
-            }
-            placeholder="Optional menu items"
-            disabled={busy}
-          />
-          <label htmlFor="catalog-intake-preview-summary">Short overview</label>
-          <Input
-            id="catalog-intake-preview-summary"
-            value={intake.state.summary}
-            onChange={(event) => intake.setField('summary', event.target.value)}
-            placeholder="Optional, in your preferred language"
-            disabled={busy}
-          />
-          <div className="catalog-intake-coordinate-row">
-            <div>
-              <label htmlFor="catalog-intake-preview-latitude">
-                Latitude (if lookup fails)
-              </label>
-              <Input
-                id="catalog-intake-preview-latitude"
-                type="number"
-                step="any"
-                value={intake.state.latitude}
-                onChange={(event) =>
-                  intake.setField('latitude', event.target.value)
-                }
-                placeholder="35.000000"
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label htmlFor="catalog-intake-preview-longitude">
-                Longitude
-              </label>
-              <Input
-                id="catalog-intake-preview-longitude"
-                type="number"
-                step="any"
-                value={intake.state.longitude}
-                onChange={(event) =>
-                  intake.setField('longitude', event.target.value)
-                }
-                placeholder="139.000000"
-                disabled={busy}
-              />
-            </div>
-          </div>
-          <details className="catalog-intake-corrections">
-            <summary>Optional source-backed facts</summary>
-            <p className="catalog-intake-note">
-              Only enter facts you can verify from the linked source.
-            </p>
-            <label htmlFor="catalog-intake-preview-tabelog-score">
-              Tabelog score
-            </label>
-            <Input
-              id="catalog-intake-preview-tabelog-score"
-              type="number"
-              min="0"
-              max="5"
-              step="0.01"
-              value={intake.state.tabelogScore}
-              onChange={(event) =>
-                intake.setField('tabelogScore', event.target.value)
-              }
-              placeholder="0–5"
-              disabled={busy}
-            />
-            <label htmlFor="catalog-intake-preview-tabelog-url">
-              Tabelog main listing URL
-            </label>
-            <Input
-              id="catalog-intake-preview-tabelog-url"
-              type="url"
-              value={intake.state.tabelogUrl}
-              onChange={(event) =>
-                intake.setField('tabelogUrl', event.target.value)
-              }
-              placeholder="https://tabelog.com/..."
-              disabled={busy}
-            />
-            <label htmlFor="catalog-intake-preview-reservation-mode">
-              Reservation rule
-            </label>
-            <select
-              id="catalog-intake-preview-reservation-mode"
-              value={intake.state.reservationMode}
-              onChange={(event) =>
-                intake.setField('reservationMode', event.target.value)
-              }
-              disabled={busy}
-            >
-              <option value="unknown">Unknown</option>
-              <option value="reservable">Reservations accepted</option>
-              <option value="reservation_required">Reservation required</option>
-              <option value="not_reservable">Reservations unavailable</option>
-            </select>
-            <label htmlFor="catalog-intake-preview-reservation-label">
-              Source-supported explanation
-            </label>
-            <Input
-              id="catalog-intake-preview-reservation-label"
-              value={intake.state.reservationLabel}
-              onChange={(event) =>
-                intake.setField('reservationLabel', event.target.value)
-              }
-              disabled={busy}
-            />
-            <label htmlFor="catalog-intake-preview-reservation-url">
-              Reservation source URL
-            </label>
-            <Input
-              id="catalog-intake-preview-reservation-url"
-              type="url"
-              value={intake.state.reservationUrl}
-              onChange={(event) =>
-                intake.setField('reservationUrl', event.target.value)
-              }
-              placeholder="https://..."
-              disabled={busy}
-            />
-          </details>
-        </div>
         {manualError ? (
           <p className="catalog-field-error" role="alert">
             {manualError}
@@ -920,7 +925,7 @@ function PreviewStep({
         ) : null}
         {intake.state.previewNeedsRefresh ? (
           <output className="catalog-intake-note">
-            Your edits are not in this preview yet. Refresh it before saving.
+            Your edits need to be checked. Update the preview before saving.
           </output>
         ) : null}
         <Button
@@ -929,7 +934,7 @@ function PreviewStep({
           onClick={() => void intake.select()}
           disabled={busy || Boolean(manualError) || !hasManualInput}
         >
-          Refresh preview with these details
+          Update preview
         </Button>
       </section>
       <div className="catalog-intake-actions">
@@ -949,6 +954,7 @@ function PreviewStep({
           onClick={() => void onConfirm()}
           disabled={
             busy ||
+            googleLookupCompleteKey !== previewKey ||
             intake.state.previewNeedsRefresh ||
             preview.locationEvidence.status === 'unknown' ||
             preview.suspectedDuplicates.some((item) => item.match === 'strong')
@@ -956,7 +962,9 @@ function PreviewStep({
         >
           {preview.suspectedDuplicates.some((item) => item.match === 'strong')
             ? 'Already saved'
-            : confirmLabel}
+            : googleLookupCompleteKey !== previewKey
+              ? 'Checking Google rating…'
+              : confirmLabel}
         </Button>
         <Button
           type="button"

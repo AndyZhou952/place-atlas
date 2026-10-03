@@ -57,9 +57,11 @@ test('a changed manual detail requires a refreshed preview before publish', () =
   });
   assert.equal(state.previewNeedsRefresh, true);
   assert.equal(state.preview?.previewVersion, 3);
+  const refreshed = previewOutput();
+  refreshed.preview.ownerFields = { address: state.address };
   state = reduceCatalogIntakeUi(state, {
     type: 'select_succeeded',
-    output: previewOutput(),
+    output: refreshed,
   });
   assert.equal(state.previewNeedsRefresh, false);
   assert.equal(state.address, '東京都渋谷区代々木2丁目2−1');

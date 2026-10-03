@@ -15,6 +15,11 @@ const closedRouteSurface = [
   route('catalog-intake/confirm/route.ts', ['POST'], 'owner_cookie'),
   route('catalog-intake/discover/route.ts', ['POST'], 'owner_cookie'),
   route('catalog-intake/select/route.ts', ['POST'], 'owner_cookie'),
+  route(
+    'items/[id]/google-rating-reference/route.ts',
+    ['POST'],
+    'owner_cookie',
+  ),
   route('items/[id]/personal/route.ts', ['PATCH'], 'owner_cookie'),
   route('items/[id]/route.ts', ['DELETE', 'PATCH'], 'owner_cookie'),
   route('items/route.ts', ['POST'], 'owner_cookie'),

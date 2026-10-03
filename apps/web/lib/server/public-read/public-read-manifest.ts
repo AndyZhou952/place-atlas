@@ -1,3 +1,8 @@
+import {
+  isRestaurantClassification,
+  type RestaurantClassification,
+} from '../../../product/application/catalog/restaurant-classification.ts';
+
 export type PublicReadPrincipal =
   | { readonly kind: 'anonymous' }
   | { readonly kind: 'owner'; readonly subject?: string };
@@ -26,9 +31,11 @@ export interface PublicCatalogItemV1 {
   readonly longitude: number;
   readonly verificationStatus: 'verified' | 'needs_review';
   readonly verifiedAt?: string;
+  readonly updatedAt?: string;
   readonly officialUrl?: string;
   readonly tabelog?: PublicTabelogEvidenceV1;
   readonly googleRating?: PublicTabelogEvidenceV1;
+  readonly googlePlaceId?: string;
   readonly reservation: PublicReservationEvidenceV1;
   readonly event?: {
     readonly startDate: string;
@@ -36,6 +43,7 @@ export interface PublicCatalogItemV1 {
     readonly displayDate: string;
   };
   readonly tags: readonly string[];
+  readonly classification?: RestaurantClassification;
   readonly sources: readonly PublicSourceEvidenceV1[];
 }
 
@@ -167,6 +175,8 @@ export interface PublicVisitV1 {
   readonly id: string;
   readonly itemId: string;
   readonly visitedOn: string;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
   readonly displayNote?: string;
   readonly media: readonly PublicVisitMediaV1[];
 }
@@ -286,14 +296,32 @@ export async function executePublicMediaRead({
 }
 
 function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
+  const reviewCandidate = source.recordType === 'review_candidate';
   const intakeEvidence =
-    source.intakeEvidence === undefined
+    (source.intakeEvidence ??
+      (reviewCandidate ? source.reviewEvidence : undefined)) === undefined
       ? undefined
-      : asRecord(source.intakeEvidence);
+      : asRecord(source.intakeEvidence ?? source.reviewEvidence);
+  const candidateIdentity =
+    intakeEvidence?.candidateIdentity &&
+    typeof intakeEvidence.candidateIdentity === 'object'
+      ? asRecord(intakeEvidence.candidateIdentity)
+      : undefined;
   const intakeTabelog = intakeEvidence
     ? asRecord(intakeEvidence.tabelog)
     : undefined;
-  const reservation = asRecord(source.reservation);
+  const reviewFields =
+    reviewCandidate && intakeEvidence
+      ? asRecord(intakeEvidence.ownerFields)
+      : undefined;
+  const reviewAddressProposal =
+    reviewCandidate && intakeEvidence?.addressProposal
+      ? asRecord(intakeEvidence.addressProposal)
+      : undefined;
+  const reservation =
+    source.reservation === undefined && reviewCandidate
+      ? { status: 'unknown' }
+      : asRecord(source.reservation);
   const projected: PublicCatalogItemV1 = {
     id: asString(source.id),
     kind: asCatalogKind(source.kind),
@@ -301,15 +329,31 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     ...(optionalString(source.alternateTitle) === undefined
       ? {}
       : { alternateTitle: optionalString(source.alternateTitle) }),
-    area: asString(source.area),
-    address: asString(source.address),
+    area: asString(
+      source.area ?? reviewFields?.area ?? (reviewCandidate ? '' : undefined),
+    ),
+    address: asString(
+      source.address ??
+        reviewFields?.address ??
+        reviewAddressProposal?.value ??
+        (reviewCandidate ? '' : undefined),
+    ),
     description: asString(source.description),
-    latitude: asNumber(source.latitude),
-    longitude: asNumber(source.longitude),
+    ...(candidateIdentity?.providerNamespace === 'google-places' &&
+    typeof candidateIdentity.placeId === 'string' &&
+    /^[A-Za-z0-9_-]{10,500}$/u.test(candidateIdentity.placeId)
+      ? { googlePlaceId: candidateIdentity.placeId }
+      : {}),
+    latitude: asNumber(source.latitude ?? (reviewCandidate ? 0 : undefined)),
+    longitude: asNumber(source.longitude ?? (reviewCandidate ? 0 : undefined)),
     verificationStatus: asVerificationStatus(source.verificationStatus),
     ...(optionalString(source.verifiedAt) === undefined
       ? {}
       : { verifiedAt: optionalString(source.verifiedAt) }),
+    ...(typeof source.updatedAt !== 'string' ||
+    !Number.isFinite(Date.parse(source.updatedAt))
+      ? {}
+      : { updatedAt: source.updatedAt }),
     ...(optionalString(source.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(source.officialUrl) }),
@@ -330,6 +374,39 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
       ? {}
       : { event: projectEvent(asRecord(source.event)) }),
     tags: asArray(source.tags).map(asString),
+    ...(isRestaurantClassification(source.classification)
+      ? {
+          classification: {
+            cuisines: source.classification.cuisines.map(
+              ({ familyId, categoryId }) => ({
+                familyId,
+                ...(categoryId ? { categoryId } : {}),
+              }),
+            ),
+            geography: {
+              ...(source.classification.geography.countryCode
+                ? { countryCode: source.classification.geography.countryCode }
+                : {}),
+              ...(source.classification.geography.subdivisionCode
+                ? {
+                    subdivisionCode:
+                      source.classification.geography.subdivisionCode,
+                  }
+                : {}),
+              ...(source.classification.geography.subdivisionName
+                ? {
+                    subdivisionName:
+                      source.classification.geography.subdivisionName,
+                  }
+                : {}),
+            },
+            basis: {
+              cuisineLabels: [...source.classification.basis.cuisineLabels],
+              address: source.classification.basis.address,
+            },
+          },
+        }
+      : {}),
     sources: intakeEvidence
       ? projectIntakeSources(intakeEvidence)
       : asArray(source.sources).map((entry) => projectSource(asRecord(entry))),
@@ -444,6 +521,14 @@ function projectVisit(
     id: asString(source.id),
     itemId: asString(source.itemId),
     visitedOn: asString(source.visitedAt),
+    ...(typeof source.createdAt === 'string' &&
+    Number.isFinite(Date.parse(source.createdAt))
+      ? { createdAt: source.createdAt }
+      : {}),
+    ...(typeof source.updatedAt === 'string' &&
+    Number.isFinite(Date.parse(source.updatedAt))
+      ? { updatedAt: source.updatedAt }
+      : {}),
     ...(optionalString(source.note) === undefined
       ? {}
       : { displayNote: optionalString(source.note) }),

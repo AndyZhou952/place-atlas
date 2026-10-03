@@ -24,7 +24,7 @@ function fold(value) {
     value
       .normalize('NFKD')
       // Preserve Japanese dakuten/handakuten; stripping every combining mark
-      // turns ド into ト and makes a correct candidate look like a miss.
+      // changes voiced kana into different characters, incorrectly rejecting valid candidates.
       .replace(/(?<![\p{Script=Hiragana}\p{Script=Katakana}])\p{M}/gu, '')
       .normalize('NFC')
       .toLowerCase()

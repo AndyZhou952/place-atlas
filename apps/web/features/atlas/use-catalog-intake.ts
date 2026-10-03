@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useReducer } from 'react';
+import { catalogIntakeSelectionDetails } from './catalog-intake-editor';
 
 import {
   browserAtlasApplication,
@@ -8,7 +9,6 @@ import {
 } from './atlas-api-client';
 import {
   catalogIntakeInitialState,
-  catalogIntakeManualLabels,
   catalogIntakeManualCompletionError,
   reduceCatalogIntakeUi,
   type CatalogIntakeUiError,
@@ -98,35 +98,7 @@ export function useCatalogIntake(
           sessionId: state.sessionId,
           expectedSessionVersion: state.sessionVersion,
           ordinal: state.selectedOrdinal,
-          ownerFields: compactOwnerFields({
-            title: state.title,
-            area: state.area,
-            address: state.address,
-            categories: state.categories,
-            signatureDishes: state.signatureDishes,
-            summary: state.summary,
-            latitude: state.latitude,
-            longitude: state.longitude,
-          }),
-          ...(state.tabelogScore.trim() && state.tabelogUrl.trim()
-            ? {
-                tabelog: {
-                  score: Number(state.tabelogScore),
-                  url: state.tabelogUrl.trim(),
-                },
-              }
-            : {}),
-          ...(state.reservationMode !== 'unknown' &&
-          state.reservationLabel.trim() &&
-          state.reservationUrl.trim()
-            ? {
-                reservation: {
-                  mode: state.reservationMode,
-                  label: state.reservationLabel.trim(),
-                  url: state.reservationUrl.trim(),
-                },
-              }
-            : {}),
+          ...catalogIntakeSelectionDetails(state),
           requestResearch: true,
         },
       });
@@ -217,40 +189,6 @@ export function useCatalogIntake(
     ) => dispatch({ type: 'field_changed', field, value }),
     selectCandidate: (ordinal: number) =>
       dispatch({ type: 'candidate_selected', ordinal }),
-  };
-}
-
-function compactOwnerFields(fields: {
-  readonly title: string;
-  readonly area: string;
-  readonly address: string;
-  readonly categories: string;
-  readonly signatureDishes: string;
-  readonly summary: string;
-  readonly latitude: string;
-  readonly longitude: string;
-}) {
-  const title = fields.title.normalize('NFC').trim();
-  const area = fields.area.normalize('NFC').trim();
-  const address = fields.address.normalize('NFC').trim();
-  const categories = catalogIntakeManualLabels(fields.categories);
-  const signatureDishes = catalogIntakeManualLabels(fields.signatureDishes);
-  const summary = fields.summary.normalize('NFC').trim();
-  const latitude = Number(fields.latitude);
-  const longitude = Number(fields.longitude);
-  return {
-    ...(title ? { title } : {}),
-    ...(area ? { area } : {}),
-    ...(address ? { address } : {}),
-    ...(categories.length ? { categories } : {}),
-    ...(signatureDishes.length ? { signatureDishes } : {}),
-    ...(summary ? { summary } : {}),
-    ...(fields.latitude.trim() &&
-    fields.longitude.trim() &&
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude)
-      ? { coordinates: { latitude, longitude } }
-      : {}),
   };
 }
 

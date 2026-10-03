@@ -5,6 +5,7 @@ import {
   createPublicReadManifest,
   executePublicJsonRead,
 } from '../../lib/server/public-read/public-read-manifest.ts';
+import { sortJournalVisits } from './journal-filter.ts';
 import { loadPublicCatalog, loadPublicMedia } from './public-read-client.ts';
 
 void test('public assessment overallComment enters the browser catalog model', async () => {
@@ -220,3 +221,124 @@ function intakeCatalogItem(id, evidence) {
     },
   };
 }
+
+void test('Owner full catalog retains classification and skips unpublished candidate assessments', async () => {
+  const urls = [];
+  const classification = {
+    cuisines: [{ familyId: 'japanese', categoryId: 'japanese.ramen' }],
+    geography: {
+      countryCode: 'JP',
+      subdivisionCode: 'JP-13',
+      subdivisionName: '東京都',
+    },
+    basis: { cuisineLabels: ['ラーメン'], address: '東京都新宿区' },
+  };
+  const items = await loadPublicCatalog(
+    {
+      async request(url) {
+        urls.push(url);
+        if (url === '/api/items?profile=full_merged_catalog')
+          return Response.json([
+            {
+              id: 'candidate',
+              kind: 'food',
+              title: 'Unpublished',
+              area: '',
+              address: '',
+              description: '',
+              latitude: 0,
+              longitude: 0,
+              verificationStatus: 'needs_review',
+              reservation: { status: 'unknown' },
+              tags: [],
+              sources: [],
+              classification,
+              updatedAt: '2026-10-02T00:00:00Z',
+            },
+          ]);
+        throw new Error('Candidate must not request a public assessment');
+      },
+    },
+    'full_merged_catalog',
+  );
+  assert.deepEqual(urls, ['/api/items?profile=full_merged_catalog']);
+  assert.deepEqual(items[0].classification, classification);
+  assert.equal(items[0].updatedAt, '2026-10-02T00:00:00Z');
+  assert.equal(items[0].verifiedAt, '');
+  assert.equal(items[0].personalRating, undefined);
+});
+
+void test('public Journal roundtrip retains entry timestamps independently of visit date', async () => {
+  const raw = [
+    {
+      id: 'visit-later-entry',
+      itemId: 'item-1',
+      visitedAt: '2020-01-01',
+      createdAt: '2026-10-02T10:00:00Z',
+      updatedAt: '2026-10-02T11:00:00Z',
+      media: [],
+    },
+    {
+      id: 'visit-earlier-entry',
+      itemId: 'item-1',
+      visitedAt: '2026-10-02',
+      createdAt: '2026-10-01T10:00:00Z',
+      updatedAt: '2026-10-01T10:00:00Z',
+      media: [],
+    },
+  ];
+  const response = await executePublicJsonRead({
+    manifest: createPublicReadManifest(),
+    operation: 'visit.listDisplay',
+    principal: { kind: 'anonymous' },
+    async load() {
+      return raw;
+    },
+  });
+  assert.equal(response.status, 200);
+  const { loadPublicVisits } = await import('./public-read-client.ts');
+  const visits = await loadPublicVisits({
+    async request(url) {
+      return url === '/api/journal'
+        ? response
+        : Response.json({ title: 'Atlas' });
+    },
+  });
+  assert.equal(visits[0].createdAt, raw[0].createdAt);
+  assert.equal(visits[0].updatedAt, raw[0].updatedAt);
+  assert.equal(visits[0].visitedAt, raw[0].visitedAt);
+  assert.deepEqual(
+    sortJournalVisits(visits, 'recorded-asc').map((v) => v.id),
+    ['visit-earlier-entry', 'visit-later-entry'],
+  );
+});
+
+void test('saved Google Place ID survives the closed catalog projection for Map and Table lookup', async () => {
+  const source = intakeCatalogItem('google-id', {
+    tabelog: { status: 'unknown' },
+    reservation: { status: 'unknown' },
+  });
+  source.intakeEvidence.candidateIdentity = {
+    providerNamespace: 'google-places',
+    placeId: 'ChIJ1234567890',
+  };
+  const response = await executePublicJsonRead({
+    manifest: createPublicReadManifest(),
+    operation: 'catalog.list',
+    principal: { kind: 'anonymous' },
+    async load() {
+      return [source];
+    },
+  });
+  const catalog = await loadPublicCatalog({
+    async request(url) {
+      return url === '/api/items'
+        ? response
+        : Response.json({ favorite: false, effectiveVisited: false });
+    },
+  });
+  const { ratingPlaceId } = await import('../../agent/google-rating-policy.ts');
+  assert.equal(catalog[0].googlePlaceId, 'ChIJ1234567890');
+  assert.equal(ratingPlaceId(catalog[0]), 'ChIJ1234567890');
+  assert.equal(catalog[0].intakeEvidence, undefined);
+});

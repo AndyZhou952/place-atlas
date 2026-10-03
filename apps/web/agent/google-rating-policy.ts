@@ -5,12 +5,14 @@ import { researchRegion } from '../product/application/catalog/research-region.t
 export function ratingPlaceId(item: AtlasItem): string | undefined {
   if (item.kind !== 'food') return undefined;
   const region = researchRegion(item.address);
-  if (region === 'mainland_china' || (region === 'japan' && item.tabelog))
-    return undefined;
+  if (region === 'mainland_china') return undefined;
   const identity = item.intakeEvidence?.candidateIdentity;
-  return identity?.providerNamespace === 'google-places' &&
-    /^[A-Za-z0-9_-]{10,500}$/u.test(identity.placeId)
-    ? identity.placeId
+  const placeId =
+    identity?.providerNamespace === 'google-places'
+      ? identity.placeId
+      : item.googlePlaceId;
+  return typeof placeId === 'string' && /^[A-Za-z0-9_-]{10,500}$/u.test(placeId)
+    ? placeId
     : undefined;
 }
 
@@ -33,10 +35,6 @@ export function previewRatingPlaceId(
       .filter(Boolean)
       .join(' '),
   );
-  if (
-    region === 'mainland_china' ||
-    (region === 'japan' && preview.tabelog.status === 'known')
-  )
-    return undefined;
+  if (region === 'mainland_china') return undefined;
   return identity.placeId;
 }

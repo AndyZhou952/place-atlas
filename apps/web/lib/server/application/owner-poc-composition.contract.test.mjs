@@ -6,9 +6,43 @@ import test from 'node:test';
 import { createAtlasApplication } from '../../../product/application/atlas-application.ts';
 import { createPlaceAssessmentOperationGroup } from '../../../product/application/assessments/place-assessment-operations.ts';
 import { createCatalogReadOperationGroup } from '../../../product/application/catalog/catalog-operations.ts';
-import { createOwnerPocComposition } from './owner-poc-composition.ts';
+import {
+  createOwnerPocComposition,
+  nominatimIdentityForDeployment,
+  ownerPocNominatimIdentity,
+} from './owner-poc-composition.ts';
 
 const ownerRoot = new URL('../../../migrations/owner-poc/', import.meta.url);
+
+test('independent deployments identify their own public URL without changing the geocoder endpoint', () => {
+  for (const origin of [
+    'https://atlas-one.example',
+    'https://atlas-two.example',
+  ]) {
+    const identity = nominatimIdentityForDeployment(origin);
+    assert.equal(identity.endpoint, ownerPocNominatimIdentity.endpoint);
+    assert.equal(identity.referer, `${origin}/`);
+    assert.equal(
+      identity.identifyingUserAgent,
+      `JapanAtlas/0.1.0 (+${origin}/terms)`,
+    );
+  }
+  for (const invalid of [
+    undefined,
+    'invalid',
+    'http://atlas.example',
+    'https://user:password@atlas.example',
+    'https://atlas.example/?secret=value',
+    'https://atlas.example/#fragment',
+    'https://atlas.example:8443',
+    'https://atlas.example/private',
+  ]) {
+    assert.deepEqual(
+      nominatimIdentityForDeployment(invalid),
+      ownerPocNominatimIdentity,
+    );
+  }
+});
 
 const cases = [
   {

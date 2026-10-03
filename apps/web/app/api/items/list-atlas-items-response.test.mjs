@@ -83,3 +83,53 @@ function reviewCandidate(id) {
     updatedAt: '2026-09-23T12:00:00.000Z',
   };
 }
+
+test('full catalog profile requires Owner auth and exposes review candidates only to the authorized request', async () => {
+  const { listAtlasItemsForRequest } =
+    await import('./list-atlas-items-response.ts');
+  const application = createAtlasApplication(
+    createCatalogReadOperationGroup(
+      createCatalogRead(
+        new InMemoryCatalogState({
+          dynamicPayloads: [JSON.stringify(candidate)],
+          overrides: [],
+          assessments: [],
+          tombstoneIds: [],
+          visitCounts: [],
+        }),
+        [verified],
+      ),
+    ),
+  );
+  const request = new Request(
+    'https://atlas.test/api/items?profile=full_merged_catalog',
+  );
+  const denied = await listAtlasItemsForRequest(
+    request,
+    application,
+    async () => new Response('Owner login required', { status: 401 }),
+  );
+  assert.equal(denied.status, 401);
+  const accepted = await listAtlasItemsForRequest(
+    request,
+    application,
+    async () => undefined,
+  );
+  assert.equal(accepted.status, 200);
+  const items = await accepted.json();
+  assert.equal(items.length, 2);
+  const review = items.find((item) => item.id === candidate.id);
+  assert.equal(review.verificationStatus, 'needs_review');
+  assert.equal(review.address, '');
+  assert.equal(review.verifiedAt, undefined);
+  assert.deepEqual(review.reservation, { status: 'unknown' });
+  assert.equal(JSON.stringify(review).includes('ownerFields'), false);
+  const invalid = await listAtlasItemsForRequest(
+    new Request('https://atlas.test/api/items?profile=private'),
+    application,
+    async () => {
+      throw new Error('Should not authorize invalid profile');
+    },
+  );
+  assert.equal(invalid.status, 400);
+});

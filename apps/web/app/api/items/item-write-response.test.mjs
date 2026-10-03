@@ -47,6 +47,15 @@ test('the Items POST adapter preserves 201 and rejects verified collector public
   assert.deepEqual(await created.json(), {
     ...candidate,
     updatedAt: '2026-09-12T15:00:00.000Z',
+    classification: {
+      cuisines: [],
+      geography: {
+        countryCode: 'JP',
+        subdivisionCode: 'JP-13',
+        subdivisionName: '東京都',
+      },
+      basis: { cuisineLabels: [], address: 'Tokyo address' },
+    },
   });
 
   const rejected = await saveDiscoveredItemResponse(application, {

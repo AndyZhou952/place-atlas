@@ -21,6 +21,7 @@ import {
   createAtlasViewModelState,
   reduceAtlasViewModelState,
 } from './atlas-view-model-state';
+import { useGoogleRatingDisplay } from './use-google-rating-display';
 import { verifiedAtlasItems } from './verified-items';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
@@ -32,7 +33,9 @@ export function useAtlasViewModel(canEdit: boolean) {
     reduceAtlasViewModelState,
     createAtlasViewModelState({ items: verifiedAtlasItems }),
   );
-  const { items, media, visits } = state;
+  const { items: storedItems, media, visits } = state;
+  const googleRatings = useGoogleRatingDisplay(storedItems, canEdit);
+  const items = googleRatings.items;
   const [kind, setKind] = useState<AtlasKindFilter>('all');
   const [personalFilter, setPersonalFilter] =
     useState<AtlasPersonalFilter>('all');
@@ -74,7 +77,9 @@ export function useAtlasViewModel(canEdit: boolean) {
       browserAtlasApplication
         .execute({
           key: 'catalog.list',
-          input: { profile: 'full_merged_catalog' },
+          input: {
+            profile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
+          },
         })
         .then((loadedItems) =>
           dispatch({
@@ -106,7 +111,7 @@ export function useAtlasViewModel(canEdit: boolean) {
         'Local preview is using verified source data; cloud records reconnect after publish.',
       );
     });
-  }, []);
+  }, [canEdit]);
 
   const reloadCatalogViews = useCallback(() => {
     const loadId = crypto.randomUUID();
@@ -114,7 +119,9 @@ export function useAtlasViewModel(canEdit: boolean) {
     void browserAtlasApplication
       .execute({
         key: 'catalog.list',
-        input: { profile: 'full_merged_catalog' },
+        input: {
+          profile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
+        },
       })
       .then((loadedItems) =>
         dispatch({ type: 'items.loaded', loadId, items: loadedItems }),
@@ -122,7 +129,7 @@ export function useAtlasViewModel(canEdit: boolean) {
       .catch(() => {
         setNotice('The place was saved, but the map could not refresh yet.');
       });
-  }, []);
+  }, [canEdit]);
 
   const setMediaVisitPending = useCallback(
     (visitId: string, pending: boolean) => {
@@ -172,6 +179,10 @@ export function useAtlasViewModel(canEdit: boolean) {
 
   const selectItem = useCallback((id: string) => {
     setSelectedId(id);
+    setQuery('');
+    setKind('all');
+    setPersonalFilter('all');
+    setFavoriteOnly(false);
     setView('map');
   }, []);
 
@@ -675,6 +686,7 @@ export function useAtlasViewModel(canEdit: boolean) {
   useAtlasWebMcp(webMcpActions, canEdit);
 
   return {
+    googleRatings,
     addVisit,
     addVisitMedia,
     editVisit,

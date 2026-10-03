@@ -4,9 +4,17 @@ A self-hosted restaurant map for saving places, recording visits and media, and 
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
-This is an evolving PoC. Add researches sourced restaurant profiles, presents a preview, and saves after owner confirmation. Categories, signature dishes, descriptions, ratings and official links flow to the saved card when sources supply them. Missing information stays unknown. Recommend searches the saved catalog and asks for a starting point when a travel-time request needs one. Live source coverage varies; the benchmark alone does not demonstrate live provider coverage.
+Version 0.1.0 is restaurant-focused. Add researches sourced profiles, presents an editable preview and saves after Owner confirmation. Missing facts remain unknown; the Owner can complete location information and refresh the preview. Recommend uses the saved collection. Source availability varies, and the current restaurant collection is in Japan; broader international, architecture and event intake validation is planned for the next version.
 
-Live check (2026-09-26): the Cloudflare PoC used DeepSeek and a Firecrawl listing reader to research Tokyo Mentsudan, confirm it, and display the saved restaurant with Tabelog 3.54, location, cuisine/dishes, official website and reservation policy after refresh. Repeating confirmation returned the same item without a duplicate. Two source listings were read successfully from Cloudflare. This is a limited live acceptance result, not proof that every restaurant or ambiguous hint works. Anonymous reader quotas, broader live benchmarks and official-site booking research remain open. A model key alone does not guarantee source access; a preview without usable coordinates still cannot be saved, but the owner can now complete the address or coordinates and refresh the preview.
+## Who can use it?
+
+| Role | Access |
+| --- | --- |
+| Visitor to an existing deployment | Browse published places, personal ratings/comments, Visits, photos and videos without logging in. |
+| Owner of a deployment | Add/edit records, configure the deployment's model key, use Recommend and explicitly load Google ratings. |
+| Person cloning this repository | Deploy a separate copy in their own Cloudflare account, choose their own Owner password and provide their own API keys. Their database, media and credentials are independent. |
+
+There is one Owner identity and one model configuration per deployment. There is no registration, per-user collection or bring-your-own-key visitor account on someone else's instance. Anyone given an instance's Owner password has the same full Owner access and uses that instance's provider configuration. For your own collection and billing, create your own deployment; cloning the repository does not copy another deployment's Cloudflare resources, secrets or personal records.
 
 First-time setup order: prepare credentials → create Cloudflare resources → configure owner secrets → deploy → log in → test and save model settings → use Add. Model settings may alternatively be configured as deployment secrets. Local development is optional and described after deployment and usage instructions.
 
@@ -22,9 +30,11 @@ Provider usage can incur charges. Set quotas and budget alerts in your accounts.
 
 ## Cloudflare setup
 
-Clone this repository, then run:
+Clone or fork the repository, then run:
 
 ```sh
+git clone https://github.com/AndyZhou952/jp-food-event-map.git
+cd jp-food-event-map
 cd apps/web
 npm ci
 cp wrangler.owner-poc.jsonc wrangler.owner-poc.local.jsonc
@@ -34,6 +44,14 @@ npx wrangler r2 bucket create japan-atlas-owner-poc-media
 ```
 
 Edit `wrangler.owner-poc.local.jsonc`: replace the placeholder `database_id` with the ID returned by D1 creation. Keep the `DB` and `MEDIA` binding names. The existing `owner-poc` resource names are created in your own account; they do not refer to someone else's deployment.
+
+**Choose the optional services before your first deploy.** The template includes Google matching and a private route Worker binding, so copying it without adjusting those settings is not a complete minimal setup:
+
+- **Without Google:** set `vars.CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `"disabled"` and remove the `services` entry for `ROUTE_SIDECAR`. Keep `CATALOG_INTAKE_DURABLE_GEOCODER_MODE` enabled for the bounded address lookup. Japanese Add can use Tabelog discovery; Google scores, Google matching and verified walking routes are unavailable.
+- **With Google:** keep matching enabled, set your own `GOOGLE_PLACES_API_KEY`, and either deploy the route Worker as described below or remove its binding until ready.
+- The `browser` binding is optional with the default Firecrawl reader. Remove it if you do not want Cloudflare Browser Run enabled.
+
+Keep the supplied Worker/resource names, environment guards, migration directory and observability settings for the supported setup. The preflight checks those names within your account. The ignored local configuration is preferred automatically when building; never replace it with another person's database ID.
 
 Apply the schema:
 
@@ -47,7 +65,7 @@ Before upgrading an existing deployment, export its database:
 npx wrangler d1 export japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --output atlas-backup.sql
 ```
 
-Keep exports private and outside Git. Historical migrations may seed demonstration places on an empty database; review the catalog before entering personal data.
+Keep exports private and outside Git. A fresh database starts with five demonstration places, not the existing Owner's collection, Visits, media or credentials. Review the demonstration catalog before entering personal data.
 
 ### Owner and model settings
 
@@ -59,6 +77,19 @@ npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.l
 ```
 
 Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32` (at least 32 characters). The password is configured here as a server secret; there is no registration page. After deployment, Owner login checks this password. To change it later, repeat the password secret command. Never use a `NEXT_PUBLIC_` variable for secrets.
+
+For a new account, Wrangler may ask to create the named Worker when setting its first secret. Confirm creation in your own account. These are the only secrets required for the minimal first deployment; you can add your model key through Owner settings afterward.
+
+| Credential | Where to configure it | Required for |
+| --- | --- | --- |
+| `ATLAS_OWNER_PASSWORD` | Main Worker secret | Owner login. |
+| `ATLAS_OWNER_SESSION_SECRET` | Main Worker secret | Signed sessions and default credential encryption; use an independent random value. |
+| Model API key, base URL and model | Owner → Agent API settings, or deployment settings below | Add research and Recommend; ordinary browsing and Visit recording do not require model calls. |
+| `GOOGLE_PLACES_API_KEY` | Main Worker secret | Optional Google matching/ratings; required if Google matching mode is enabled. |
+| `GOOGLE_MAPS_API_KEY` | Private route Worker secret | Optional origin geocoding and verified walking routes; do not put it on the main Worker. |
+| `SEARCH_API_KEY` | Main Worker secret | Optional Tavily search instead of the no-key providers. |
+| `FIRECRAWL_API_KEY` | Main Worker secret | Optional authenticated listing-reader quota. |
+| `AGENT_SETTINGS_SECRET` | Main Worker secret, before saving settings | Optional independent encryption key. |
 
 Recommended: after deployment, log in and open **Owner active → Agent API settings**. Enter your model API key, base URL and model, then choose **Test & save**. DeepSeek defaults are `https://api.deepseek.com` and `deepseek-flash`; `https://api.openai.com/v1` is also allowed, but individual OpenAI models are not all tested. The server first checks tool-call support, then encrypts the settings in D1. Keys are never returned to the browser or saved in browser storage. Only the owner can view configuration status or change settings. Leave the key blank to keep it when the endpoint is unchanged; changing providers requires a new key.
 
@@ -141,7 +172,29 @@ npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json >
 npm run deploy:owner-poc
 ```
 
-The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open your own URL printed by Wrangler, rather than the original Owner's website. Log in with the password you configured and use Agent API settings to test/save your own model key if not already configured. Add one restaurant, confirm, refresh, and check that it remains visible. Test a personal rating and a photo separately. An unavailable source must remain unknown.
+
+### Your deployment URL
+
+After the first deploy, add `"ATLAS_PUBLIC_URL": "https://your-worker.your-subdomain.workers.dev"` to the local configuration's `vars`, using the URL Wrangler printed or your configured custom domain. This identifies your deployment for address lookup; it is public configuration, not a secret. To generate social-preview URLs for your site, set `NEXT_PUBLIC_SITE_URL` to the same URL when building, for example:
+
+```sh
+NEXT_PUBLIC_SITE_URL=https://your-worker.your-subdomain.workers.dev npm run deploy:owner-poc
+```
+
+Replace the example URL with yours. Without these settings, branding is generic, address lookup identifies the public repository, and deployment-specific social images are omitted. Existing installations keep their own local settings when pulling code updates.
+
+### Common first-setup problems
+
+| Symptom | Check |
+| --- | --- |
+| Preflight rejects the database ID | Replace the template placeholder with the D1 ID created in your account. |
+| A required Google secret is missing | Supply your Places key, or disable Google matching in the local configuration. |
+| Deployment references a missing route Worker | Deploy the private route Worker, or remove its `services` binding. |
+| Owner login fails | Use your configured Owner password; verify both Owner secrets are set. |
+| Agent research is unavailable | In Owner settings, test/save a model endpoint and key with tool-call support. |
+| Research finds a place but facts are unknown | Check the source-reader/search availability; correct supported fields and refresh the preview rather than assuming the model key provides web access. |
+| Photos or video uploads fail | Verify your R2 bucket, `MEDIA` binding, supported format and file-size limit. |
 
 After an update to an existing deployment, run `ALLOW_PRODUCTION_MEDIA_AUDIT=yes npm run audit:media-integrity` from `apps/web` to compare each Visit media row with its R2 object's byte count and SHA-256 without saving media locally. The audit is read-only and requires the Wrangler login and ignored local configuration used for deployment.
 
@@ -153,10 +206,13 @@ Start here only after completing configuration and deployment above. Visitors ca
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
-2. Open **Add a place**, enter a restaurant name or short hint, and select **Find matches**. For a chain or an ambiguous name, keep the name and fill **Area, station or branch (optional)**, then select **Find matches** again. Choose the intended candidate; multiple matches are never preselected. Research shows a waiting indicator while checking sources. If location research is incomplete, use **Complete or correct details** to enter a verified address; add coordinates only if address lookup still fails. Refresh the preview before confirming. Ratings, reservation rules and other unsupported facts may remain unknown.
+2. Open **Add place** in the top-right workspace, enter a restaurant name or short hint, and select **Find matches**. For a chain or an ambiguous name, keep the name and fill **Area, station or branch (optional)**, then select **Find matches** again. Choose the intended candidate; multiple matches are never preselected. Research shows a waiting indicator while checking sources. If location research is incomplete, edit the original preview fields directly to enter a verified address; add coordinates only if address lookup still fails. Select **Update preview** before confirming. Researched values are prefilled, and unchanged sourced facts are not converted into owner assertions. Ratings, reservation rules and other unsupported facts may remain unknown.
 3. Review the proposed name, address, ratings, and reservation information. Confirm, then check that the place appears in the list and map. A preview is not a saved record. Unknown fields mean the sources did not establish those facts.
 4. Use the heart to mark a favorite and the visited control to mark a place as visited. For a dated record, use **Add a visit** in the restaurant card or **Journal**. A date is enough; notes, photos, videos and a rating are optional. MP4 and WebM videos can be up to 50 MB each. **Overall マイスコア** updates your overall restaurant score, not a historical per-visit score, and remains separate from external ratings. After saving, the form is ready for another visit. If a media upload fails, add the missing files to the saved visit rather than creating it again. Open media to edit its caption; press Enter or leave the caption field to save. **Edit** on the restaurant header edits restaurant metadata; the pencil beside a Visit edits that dated record, including its restaurant. Changing a Visit's restaurant moves its note and media without changing either restaurant's overall score. The Journal sort menu orders all visits across restaurants by visit date or entry time, oldest or newest first.
-5. Use **Recommend** to find a saved restaurant from a place, area, cuisine, or travel preference. An area-only request can return saved restaurants in that area. Without a travel mode, nearby ranking uses straight-line distance and labels travel time unverified. A timed walking request needs a specific origin and a verified route.
+5. Open **Ask Recommend** in the same top-right workspace to find a saved restaurant from a place, area, cuisine, or travel preference. An area-only request can return saved restaurants in that area. Without a travel mode, nearby ranking uses straight-line distance and labels travel time unverified. A timed walking request needs a specific origin and a verified route. Switching Add/Recommend or closing the workspace preserves each draft. Places contains catalog search, filters and the saved list.
+6. Open **Table** to browse ratings, overview, reservation information, sources and expandable Visit notes/media. Sort by name, last Visit, personal score, Tabelog or Google score; unknown values remain last in both directions. Combine specific cuisine filters with country and first administrative subdivision filters. These classifications are stored separately from the original card tags. Japan prefectures, mainland China provincial divisions and US states are supported; unsupported or uncertain subdivisions remain unknown. The owner can also inspect historical unpublished candidates here; public visitors see published records only.
+
+Google scores fetched by the Owner are shared between Map and Table for the current page. The Owner can explicitly query Google Maps ratings for the current filtered rows; opening, filtering and sorting never trigger a bulk provider query. Queries may incur Google API usage. The live response disappears on reload/logout. The Owner can save a separate Google rating reference with its source, observation date and save date; this reference is private and survives reloads. Add confirmation saves the initial successfully fetched Google score with the restaurant. Loading newer ratings never overwrites the reference: use **Replace reference** explicitly. A failed lookup preserves the existing reference. Published stored research ratings remain readable by visitors. Unqueried scores and unavailable sources have distinct states.
 
 ### Calling Add from an integration
 
@@ -164,7 +220,7 @@ Start here only after completing configuration and deployment above. Visitors ca
 
 1. `POST /api/catalog-intake/discover`: send `query` and a retry-stable `requestToken`; receive candidates and a session/version.
 2. `POST /api/catalog-intake/select`: send the session ID, expected session version and chosen `ordinal`; receive clarification or a preview.
-3. `POST /api/catalog-intake/confirm`: only after explicit owner approval, send the session ID and expected preview version. A preview without usable location evidence returns `failed_no_write`; retry research instead of creating a hidden candidate. Handle conflicts rather than silently confirming a changed preview. Historical `committed_needs_review` receipts may still replay, but there is no Review tab or candidate-list API.
+3. `POST /api/catalog-intake/confirm`: only after explicit owner approval, send the session ID and expected preview version. A preview without usable location evidence returns `failed_no_write`; retry research instead of creating a hidden candidate. Handle conflicts rather than silently confirming a changed preview. Historical `committed_needs_review` receipts may still replay, but new incomplete previews cannot create another hidden candidate. Historical candidates are available to the owner through Table, not to anonymous readers or Map/Journal.
 4. `POST /api/catalog-intake/cancel`: cancel with the session ID and expected session version.
 
 These website endpoints require the owner session cookie and same-origin checks. Read the `x-atlas-web-conversation-id` response header from discovery and echo it on later requests using the same session. A model API key is not an application login credential. The built-in model proposes research facts; application code validates them, and confirmation authorizes persistence. Do not send inferred facts as owner assertions or write directly to the database.
@@ -222,3 +278,7 @@ node --experimental-strip-types --env-file=.env evals/run-add-enrichment.mjs eva
 ```
 
 This makes one model request per benchmark case (currently ten), with a 4,500 output-token cap and a 60-second limit per request. It uses supplied, labelled source fixtures rather than live search, and a separate experimental full-profile extraction prompt rather than the current production Add prompt. It tests identity/address/coordinates, categories, summary/dishes, ratings, official/booking links, and reservation rules. Expected answers are withheld from the model. Results include per-field failures, token usage when available, latency, and the production workflow's unsupported fields. Failed cases are retained. Output is private and Git-ignored; choose a new filename for another run. Passing extraction is not full Add acceptance: live retrieval, description review, confirmation, database persistence and map rendering still require separate checks. No restaurant is written by this command.
+
+## Public language
+
+Use English for documentation, pull requests, code comments and interface text. Preserve restaurant names, the established Japanese Map and Journal labels, original user content and multilingual matching or evaluation data. Additional interface languages are deferred. Acceptance and CI checklists are shared in chat only.

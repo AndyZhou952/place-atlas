@@ -9,6 +9,7 @@ import type {
   ReservationSnapshot,
 } from '../../../product/application/catalog/atlas-item.ts';
 import { compactRestaurantTags } from '../../../product/application/catalog-intake/restaurant-profile-presentation.ts';
+import { withRestaurantClassification } from '../../../product/application/catalog/restaurant-classification.ts';
 
 interface ReceiptRow {
   readonly outcome_json: string;
@@ -255,6 +256,16 @@ export class D1AtlasCatalogIntakePublisher implements AtlasCatalogIntakePort {
               catalogRevision,
               now.getTime(),
             ),
+          ),
+        this.#database
+          .prepare(insertGoogleReferenceSql)
+          .bind(
+            promotionId ?? itemId,
+            now.toISOString(),
+            now.toISOString(),
+            preview.sessionId,
+            mutationKey,
+            preview.candidateIdentity.placeId,
           ),
         this.#database
           .prepare(insertCommittedTerminalSql)
@@ -644,7 +655,7 @@ function toAtlasItem(
   if (!location || !title || !address) {
     throw new Error('Verified publication requires complete durable evidence.');
   }
-  return {
+  return withRestaurantClassification({
     id: itemId,
     kind: 'food',
     title,
@@ -701,7 +712,7 @@ function toAtlasItem(
     ],
     intakeEvidence: intakeEvidence(preview),
     updatedAt: now.toISOString(),
-  };
+  });
 }
 
 function toReviewCandidate(
@@ -713,7 +724,7 @@ function toReviewCandidate(
   if (!title) {
     throw new Error('Review Candidate requires a durable title proposal.');
   }
-  return {
+  return withRestaurantClassification({
     recordType: 'review_candidate',
     id: itemId,
     kind: 'food',
@@ -725,7 +736,7 @@ function toReviewCandidate(
     tags: [],
     reviewEvidence: intakeEvidence(preview),
     updatedAt: now.toISOString(),
-  };
+  });
 }
 
 function intakeEvidence(preview: CatalogIntakePreview) {
@@ -813,3 +824,15 @@ function canonicalJson(value: unknown): string {
     '}'
   );
 }
+
+// The same transaction publishes the preview's rating and place. A failed or
+// cancelled Add cannot leave a saved reference; duplicate replay cannot replace it.
+const insertGoogleReferenceSql = `INSERT INTO atlas_google_rating_references (item_id, reference_json, updated_at)
+  SELECT r.item_id, json_set(s.google_rating_reference_json, '$.itemId', ?, '$.capturedAt', ?), ?
+  FROM catalog_intake_sessions AS s JOIN catalog_intake_publish_receipts AS r
+    ON r.session_id = s.session_id
+  WHERE s.session_id = ? AND r.mutation_key = ?
+    AND json_extract(r.outcome_json, '$.status') = 'committed_verified'
+    AND json_extract(s.google_rating_reference_json, '$.placeId') = ?
+    AND EXISTS (SELECT 1 FROM atlas_items WHERE id = r.item_id AND verification_status = 'verified')
+  ON CONFLICT(item_id) DO NOTHING`;

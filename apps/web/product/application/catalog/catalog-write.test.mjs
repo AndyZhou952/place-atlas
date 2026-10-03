@@ -5,6 +5,7 @@ import { createAtlasApplication } from '../atlas-application.ts';
 import { createCatalogOperationGroup } from './catalog-operations.ts';
 import { createCatalogRead } from './catalog-read.ts';
 import { InMemoryCatalogState } from './in-memory-catalog-state.ts';
+import { withRestaurantClassification } from './restaurant-classification.ts';
 
 const clock = { now: () => '2026-09-12T12:00:00.000Z' };
 
@@ -63,7 +64,10 @@ test('collector writes reject verified publication and save only needs-review ca
     }),
     {
       ok: true,
-      value: { ...candidate, updatedAt: '2026-09-12T12:00:00.000Z' },
+      value: withRestaurantClassification({
+        ...candidate,
+        updatedAt: '2026-09-12T12:00:00.000Z',
+      }),
     },
   );
   assert.deepEqual(
@@ -74,7 +78,7 @@ test('collector writes reject verified publication and save only needs-review ca
     {
       ok: true,
       value: {
-        ...candidate,
+        ...withRestaurantClassification(candidate),
         updatedAt: '2026-09-12T12:00:00.000Z',
         personalRating: undefined,
         isFavorite: false,

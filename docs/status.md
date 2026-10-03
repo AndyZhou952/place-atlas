@@ -1,6 +1,6 @@
 # PoC delivery checklist
 
-Updated: 2026-10-01. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
+Updated: 2026-10-03. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
 
 `[x]` records completed implementation or verification. `[ ]` records work still open. Local tests and model-only benchmarks do not replace deployed website acceptance.
 
@@ -16,6 +16,8 @@ Updated: 2026-10-01. This is the development progress tracker. System boundaries
 - [x] Owner model settings, encrypted server-side credentials, no-key search fallback and bounded source readers are implemented. The model proposes facts; the application validates them and controls writes. Provider blocks and challenges surface as incomplete research, with owner completion available.
 - [x] Deployed Add previews and publication have shown refreshed catalog visibility, location, branch-specific rating, reservation details and duplicate detection. The reported failure for a numeric-branch restaurant was not retained in a production trace; its exact stage remains unproven. The branch-spelling robustness fix and negative controls are implemented.
 - [ ] Measure ongoing live source reliability and broader branch disambiguation beyond the named set. Unsupported menu details and booking lead times must remain unknown.
+
+- [x] Successful Add captures its initial Google score as a dated, Owner-only reference in the same D1 transaction as the restaurant. Existing places support explicit save/replacement; live refreshes preserve the reference. Atomic publication/replay, rollback, wrong-branch rejection, regional policy and anonymous denial have regressions. Deployed checks verified real Add preview staging/cancellation, reference save/reload and refresh isolation.
 
 ## Record — personal visits and media
 
@@ -53,7 +55,37 @@ Updated: 2026-10-01. This is the development progress tracker. System boundaries
 - [x] The finite Add, Record and Recommend deployment gates passed. The live Add report separates sourced facts, duplicate identity and provider failures; Recommend separates live-model journeys from controlled failure scenarios. Unknown identity, ratings, route times and booking rules remain unverified.
 - [x] Final branch CI passed and PR #32 was merged into `main` as `01de91f`. The accepted runtime is deployed as Worker version `b6928e90-9afe-4fd0-8f99-8e89a9570767`; the PoC release gates are complete.
 
-## Next
+## 0.1 release acceptance
 
-1. Continue measuring source availability and broader branch disambiguation as follow-up quality work; the finite release cases do not prove universal availability.
-2. Collect labelled screenshots before starting image-based location understanding. Keep raw runs ignored and curated benchmarks in `apps/web/evals/`.
+- [x] Edit Add proposal values directly in place with sourced values prefilled; send only explicit Owner changes, invalidate old coordinates on an address change, and require a refreshed preview before publication.
+- [x] Move Add and Recommend into a shared right-side workspace opened from the header. Keep Places for list/search/filter browsing and retain drafts when switching tools or closing the workspace. Primary navigation is ordered Map → Table → Journal; deployed navigation checks passed for all three tabs.
+- [x] Add a Table tab for stored place details, external/personal ratings, latest visit, notes/media and sources. Support stable sorting and specific cuisine and country/first administrative subdivision filters. Keep the additional classification out of Map, Journal and restaurant cards.
+- [x] Persist a controlled cuisine taxonomy and country/subdivision fields from evidence, backfill current records without changing existing tags or personal data, and classify future Add saves. Uncertain fields remain unknown. Production backfill on 2026-10-02 added classification to all 58 stored places; readback matched every planned classification and every other payload field remained identical. The evidence taxonomy has 10 internal families and 39 specific categories. Table exposes only the specific categories as one cuisine filter/column; broad families are not displayed.
+- [x] Provide a complete manual acceptance checklist covering login, every core workflow, table filtering/sorting, failure recovery, keyboard/mobile use and public/Owner access. The acceptance checklist is provided in chat only.
+- [x] Acceptance candidate passes 975 local regressions, lint, typecheck, format and production build. Browser checks cover Table composition/sorting, 320-pixel layout, modal switching/draft retention, and a real deployed Agent preview → name edit → refresh → cancel journey. The website is updated as an acceptance candidate, not a formal 0.1 release.
+- [x] Map and Table share current Google score responses; live refreshes do not write to the database. Explicit Owner reference saves and initial Add capture use the separate private reference store. The closed catalog DTO retains only a validated Google Place ID for lookup; Table queries current filtered records only on an explicit Owner action, with bounded concurrency. Japan may show Tabelog and Google independently; mainland China remains excluded. Regression tests cover scoring, sorting, identity changes and the full read DTO roundtrip. Deployed Table→Map→Table acceptance returned the same 4.2 Google score for an existing Japanese restaurant without changing its 3.40 Tabelog or personal score.
+- [x] Public Visit DTOs preserve valid creation/update timestamps separately from the Visit date; a roundtrip regression protects Journal entry-time ordering. Table no longer labels a fallback visit date as its entry timestamp.
+- [x] The CI and release checklists are provided in chat only. The single CI job now also checks the actual migration package without touching production.
+- [x] The acceptance candidate passed all remote CI steps, including the added current migration gate. The latest acceptance Worker is `9585e98f-170b-4771-a693-c9f3e532a77e`; real Google lookup, shared Map/Table scores, one-level cuisine UI, anonymous read-only access and the added query control at 320 pixels passed deployed checks. The 2026-10-03 navigation and independent self-hosting updates passed build and deployment preflight and required no database migration; Map, Table and Journal navigation was verified on the deployed website.
+- [x] Public documentation, PR narrative, source comments and Table controls use English; the two obsolete Chinese PR-description revisions were deleted. Table cuisine and subdivision display labels are English; original names, established Japanese Map/Journal labels, user records and multilingual matching data are preserved. Additional interface languages are deferred.
+- [x] Independent self-hosting is documented: each deployment has one Owner, its own Cloudflare database/media, password and model credentials, with public read-only visitors. README covers a minimal no-Google setup, optional services, credentials, configuration and first-use recovery. Generic page metadata and configurable public lookup identity remove inherited personal-site defaults; fresh migrations do not import Owner records or credentials, and deployment/session regressions protect this setup.
+- [x] On 2026-10-03, the Owner accepted the current release scope and authorized merging the release PR and preparing the first release. This approval does not claim that every manual checklist row was newly exercised; implementation, automated checks and recorded deployed verification remain the release evidence.
+
+## Next version
+
+1. **iOS front end**
+   - [ ] Build an iOS interface equivalent to the current web front end, including Map, Table, Journal, Owner authentication, Add, Recommend and visit media, using the existing application boundaries.
+2. **Architecture and event intake**
+   - [ ] Design entity-specific research, source validation and review behavior for architecture and events. The current Add harness and most live acceptance focus on restaurants; existing non-food records do not establish equivalent intake coverage.
+   - [ ] Build dedicated benchmarks and deployed journeys for architecture identity/location and event venue/date information, retaining the restaurant regression set.
+3. **Restaurant coverage outside Japan**
+   - [ ] Validate and expand the international restaurant collection. All current restaurants are in Japan; overseas policy and controlled fixtures are not proof of real catalog coverage.
+   - [ ] Verify country-specific addresses, booking sources, rating policy, classification and cross-language duplicates through real Add journeys, preserving Japanese restaurant behavior.
+4. **Bulk Google reference save/replacement**
+   - [ ] Add an Owner-only action beside Load Google ratings to save all eligible loaded references, with an explicit replacement option for existing references.
+   - [ ] Operate on valid identity-bound loaded responses without another Google lookup. Keep refresh separate from saving, retain dates/provenance, report each row's outcome and make partial-failure retries duplicate-safe. Add API, persistence and interface regressions.
+
+### Additional follow-up quality work
+
+- [ ] Continue measuring source availability and broader branch disambiguation; the finite release cases do not prove universal availability.
+- [ ] Collect labelled screenshots before starting image-based location understanding. Keep raw runs ignored and curated benchmarks in `apps/web/evals/`.

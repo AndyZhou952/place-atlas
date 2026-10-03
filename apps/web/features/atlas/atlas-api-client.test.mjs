@@ -55,7 +55,8 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
   const application = createBrowserAtlasApplication({
     async request(url, init) {
       calls.push({ url, init });
-      if (url === '/api/items') return Response.json([item]);
+      if (url === '/api/items?profile=full_merged_catalog')
+        return Response.json([item]);
       if (init?.method === undefined) {
         return Response.json({
           favorite: false,
@@ -96,7 +97,7 @@ test('Browser AtlasApplication maps typed operations through an injected transpo
     },
   ]);
   assert.deepEqual(updated, { ...item, personalRating: undefined });
-  assert.equal(calls[0].url, '/api/items');
+  assert.equal(calls[0].url, '/api/items?profile=full_merged_catalog');
   assert.equal(calls[0].init?.method, undefined);
   assert.equal(calls[1].url, '/api/items/place-1/personal');
   assert.equal(calls[1].init?.method, undefined);

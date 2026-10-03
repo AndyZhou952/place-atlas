@@ -1391,7 +1391,7 @@ function matchesSelectedBranch(
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
   const aliasesByLocality: Record<string, string> = {
     // Google commonly renders Tokyo wards as English "City" while Japanese
-    // listings use 区. Street number plus selected name are also required above.
+    // listings use the Japanese ward suffix. Street number and selected name are also required above.
     adachi: '足立区',
     arakawa: '荒川区',
     bunkyo: '文京区',

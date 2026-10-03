@@ -12,6 +12,58 @@ const secrets = {
   ATLAS_OWNER_SESSION_SECRET: 'dummy-session-secret-with-at-least-32-bytes',
 };
 
+test('an independent deployment uses its own password and cannot accept another deployment session', async () => {
+  const clock = { now: () => new Date('2026-10-03T00:00:00.000Z') };
+  const first = createOwnerAuth(secrets, clock);
+  const second = createOwnerAuth(
+    {
+      ATLAS_OWNER_PASSWORD: 'another-owner-password',
+      ATLAS_OWNER_SESSION_SECRET:
+        'another-independent-session-secret-at-least-32-characters',
+    },
+    clock,
+  );
+  const firstLogin = await first.login(
+    jsonRequest('https://first-atlas.example/api/auth/owner', {
+      password: secrets.ATLAS_OWNER_PASSWORD,
+    }),
+  );
+  const firstCookie = (firstLogin.headers.get('set-cookie') ?? '').split(
+    ';',
+    1,
+  )[0];
+  const secondLogin = await second.login(
+    jsonRequest('https://second-atlas.example/api/auth/owner', {
+      password: 'another-owner-password',
+    }),
+  );
+  assert.equal(firstLogin.status, 200);
+  assert.equal(secondLogin.status, 200);
+  const secondCookie = (secondLogin.headers.get('set-cookie') ?? '').split(
+    ';',
+    1,
+  )[0];
+  assert.deepEqual(await statusJson(second, firstCookie), {
+    authenticated: false,
+  });
+  assert.deepEqual(await statusJson(first, secondCookie), {
+    authenticated: false,
+  });
+  assert.deepEqual(await statusJson(second, secondCookie), {
+    authenticated: true,
+  });
+  assert.equal(
+    (
+      await second.login(
+        jsonRequest('https://second-atlas.example/api/auth/owner', {
+          password: secrets.ATLAS_OWNER_PASSWORD,
+        }),
+      )
+    ).status,
+    401,
+  );
+});
+
 void test('the owner can log in and the signed cookie authenticates a later request', async () => {
   const auth = createOwnerAuth(secrets, {
     now: () => new Date('2026-09-21T12:00:00.000Z'),

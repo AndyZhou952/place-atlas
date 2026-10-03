@@ -2,6 +2,8 @@
 
 The browser reads the published catalog, personal ratings and comments, visits, and their published photo/video display links without login. Adding or changing places and records, and calling Recommend or other metered Agent operations, requires an Owner session. Internal storage keys, credentials, sessions, and audit records are never public. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
 
+Each deployment has one Owner identity and one encrypted model configuration. Independent users deploy separate copies in their own Cloudflare accounts, with their own D1/R2 resources, password and provider credentials; there is no shared-instance registration or per-user collection. `ATLAS_PUBLIC_URL` identifies that deployment in durable address-lookup headers, with the public repository as the default contact. Optional build-time `NEXT_PUBLIC_SITE_URL` sets social-preview URLs. Default branding is generic and contains no original Owner deployment URL.
+
 ## Add
 
 1. Accept a short restaurant hint and optional neighborhood.

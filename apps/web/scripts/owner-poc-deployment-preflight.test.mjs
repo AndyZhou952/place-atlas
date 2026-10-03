@@ -6,6 +6,27 @@ import { inspectOwnerPocDeployment } from './owner-poc-deployment-preflight.ts';
 
 const configUrl = new URL('../wrangler.owner-poc.jsonc', import.meta.url);
 
+test('a fresh deployment needs only Owner secrets before configuring the model in the website', async () => {
+  const template = JSON.parse(
+    (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),
+  );
+  template.d1_databases[0].database_id = '11111111-2222-4333-8444-555555555555';
+  template.vars.CATALOG_INTAKE_GOOGLE_PLACES_MODE = 'disabled';
+  template.vars.ATLAS_PUBLIC_URL = 'https://independent-atlas.example';
+  delete template.services;
+  delete template.browser;
+  assert.deepEqual(
+    inspectOwnerPocDeployment({
+      sourceConfig: template,
+      builtConfig: structuredClone(template),
+      remoteSecrets: ['ATLAS_OWNER_PASSWORD', 'ATLAS_OWNER_SESSION_SECRET'].map(
+        (name) => ({ name, type: 'secret_text' }),
+      ),
+    }),
+    { ready: true, blockers: [] },
+  );
+});
+
 test('standalone agent deployment accepts model and search credentials without Google or route sidecar', async () => {
   const template = JSON.parse(
     (await readFile(configUrl, 'utf8')).replace(/,\s*([}\]])/gu, '$1'),

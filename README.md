@@ -4,9 +4,17 @@ A self-hosted restaurant map for saving places, recording visits and media, and 
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
-This is an evolving PoC. Add researches sourced restaurant profiles, presents a preview, and saves after owner confirmation. Categories, signature dishes, descriptions, ratings and official links flow to the saved card when sources supply them. Missing information stays unknown. Recommend searches the saved catalog and asks for a starting point when a travel-time request needs one. Live source coverage varies; the benchmark alone does not demonstrate live provider coverage.
+Version 0.1.0 is restaurant-focused. Add researches sourced profiles, presents an editable preview and saves after Owner confirmation. Missing facts remain unknown; the Owner can complete location information and refresh the preview. Recommend uses the saved collection. Source availability varies, and the current restaurant collection is in Japan; broader international, architecture and event intake validation is planned for the next version.
 
-Live check (2026-09-26): the Cloudflare PoC used DeepSeek and a Firecrawl listing reader to research Tokyo Mentsudan, confirm it, and display the saved restaurant with Tabelog 3.54, location, cuisine/dishes, official website and reservation policy after refresh. Repeating confirmation returned the same item without a duplicate. Two source listings were read successfully from Cloudflare. This is a limited live acceptance result, not proof that every restaurant or ambiguous hint works. Anonymous reader quotas, broader live benchmarks and official-site booking research remain open. A model key alone does not guarantee source access; a preview without usable coordinates still cannot be saved, but the owner can now complete the address or coordinates and refresh the preview.
+## Who can use it?
+
+| Role | Access |
+| --- | --- |
+| Visitor to an existing deployment | Browse published places, personal ratings/comments, Visits, photos and videos without logging in. |
+| Owner of a deployment | Add/edit records, configure the deployment's model key, use Recommend and explicitly load Google ratings. |
+| Person cloning this repository | Deploy a separate copy in their own Cloudflare account, choose their own Owner password and provide their own API keys. Their database, media and credentials are independent. |
+
+There is one Owner identity and one model configuration per deployment. There is no registration, per-user collection or bring-your-own-key visitor account on someone else's instance. Anyone given an instance's Owner password has the same full Owner access and uses that instance's provider configuration. For your own collection and billing, create your own deployment; cloning the repository does not copy another deployment's Cloudflare resources, secrets or personal records.
 
 First-time setup order: prepare credentials → create Cloudflare resources → configure owner secrets → deploy → log in → test and save model settings → use Add. Model settings may alternatively be configured as deployment secrets. Local development is optional and described after deployment and usage instructions.
 
@@ -22,9 +30,11 @@ Provider usage can incur charges. Set quotas and budget alerts in your accounts.
 
 ## Cloudflare setup
 
-Clone this repository, then run:
+Clone or fork the repository, then run:
 
 ```sh
+git clone https://github.com/AndyZhou952/jp-food-event-map.git
+cd jp-food-event-map
 cd apps/web
 npm ci
 cp wrangler.owner-poc.jsonc wrangler.owner-poc.local.jsonc
@@ -34,6 +44,14 @@ npx wrangler r2 bucket create japan-atlas-owner-poc-media
 ```
 
 Edit `wrangler.owner-poc.local.jsonc`: replace the placeholder `database_id` with the ID returned by D1 creation. Keep the `DB` and `MEDIA` binding names. The existing `owner-poc` resource names are created in your own account; they do not refer to someone else's deployment.
+
+**Choose the optional services before your first deploy.** The template includes Google matching and a private route Worker binding, so copying it without adjusting those settings is not a complete minimal setup:
+
+- **Without Google:** set `vars.CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `"disabled"` and remove the `services` entry for `ROUTE_SIDECAR`. Keep `CATALOG_INTAKE_DURABLE_GEOCODER_MODE` enabled for the bounded address lookup. Japanese Add can use Tabelog discovery; Google scores, Google matching and verified walking routes are unavailable.
+- **With Google:** keep matching enabled, set your own `GOOGLE_PLACES_API_KEY`, and either deploy the route Worker as described below or remove its binding until ready.
+- The `browser` binding is optional with the default Firecrawl reader. Remove it if you do not want Cloudflare Browser Run enabled.
+
+Keep the supplied Worker/resource names, environment guards, migration directory and observability settings for the supported setup. The preflight checks those names within your account. The ignored local configuration is preferred automatically when building; never replace it with another person's database ID.
 
 Apply the schema:
 
@@ -47,7 +65,7 @@ Before upgrading an existing deployment, export its database:
 npx wrangler d1 export japan-atlas-owner-poc --remote --config wrangler.owner-poc.local.jsonc --output atlas-backup.sql
 ```
 
-Keep exports private and outside Git. Historical migrations may seed demonstration places on an empty database; review the catalog before entering personal data.
+Keep exports private and outside Git. A fresh database starts with five demonstration places, not the existing Owner's collection, Visits, media or credentials. Review the demonstration catalog before entering personal data.
 
 ### Owner and model settings
 
@@ -59,6 +77,19 @@ npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.l
 ```
 
 Choose your owner password and independently generate a random session secret, for example using `openssl rand -hex 32` (at least 32 characters). The password is configured here as a server secret; there is no registration page. After deployment, Owner login checks this password. To change it later, repeat the password secret command. Never use a `NEXT_PUBLIC_` variable for secrets.
+
+For a new account, Wrangler may ask to create the named Worker when setting its first secret. Confirm creation in your own account. These are the only secrets required for the minimal first deployment; you can add your model key through Owner settings afterward.
+
+| Credential | Where to configure it | Required for |
+| --- | --- | --- |
+| `ATLAS_OWNER_PASSWORD` | Main Worker secret | Owner login. |
+| `ATLAS_OWNER_SESSION_SECRET` | Main Worker secret | Signed sessions and default credential encryption; use an independent random value. |
+| Model API key, base URL and model | Owner → Agent API settings, or deployment settings below | Add research and Recommend; ordinary browsing and Visit recording do not require model calls. |
+| `GOOGLE_PLACES_API_KEY` | Main Worker secret | Optional Google matching/ratings; required if Google matching mode is enabled. |
+| `GOOGLE_MAPS_API_KEY` | Private route Worker secret | Optional origin geocoding and verified walking routes; do not put it on the main Worker. |
+| `SEARCH_API_KEY` | Main Worker secret | Optional Tavily search instead of the no-key providers. |
+| `FIRECRAWL_API_KEY` | Main Worker secret | Optional authenticated listing-reader quota. |
+| `AGENT_SETTINGS_SECRET` | Main Worker secret, before saving settings | Optional independent encryption key. |
 
 Recommended: after deployment, log in and open **Owner active → Agent API settings**. Enter your model API key, base URL and model, then choose **Test & save**. DeepSeek defaults are `https://api.deepseek.com` and `deepseek-flash`; `https://api.openai.com/v1` is also allowed, but individual OpenAI models are not all tested. The server first checks tool-call support, then encrypts the settings in D1. Keys are never returned to the browser or saved in browser storage. Only the owner can view configuration status or change settings. Leave the key blank to keep it when the endpoint is unchanged; changing providers requires a new key.
 
@@ -141,7 +172,29 @@ npx wrangler secret list --config wrangler.owner-poc.local.jsonc --format json >
 npm run deploy:owner-poc
 ```
 
-The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open the URL printed by Wrangler. Log in, add one restaurant, confirm, refresh, and check that the saved record remains visible. Test a personal rating and a photo separately. If research fails, inspect provider configuration and the source error before retrying. An unavailable score must remain unknown.
+The ignored `.wrangler/owner-poc-secret-names.json` contains secret names, not values, and is required by deployment preflight. Refresh it after changing Worker secrets. Open your own URL printed by Wrangler, rather than the original Owner's website. Log in with the password you configured and use Agent API settings to test/save your own model key if not already configured. Add one restaurant, confirm, refresh, and check that it remains visible. Test a personal rating and a photo separately. An unavailable source must remain unknown.
+
+### Your deployment URL
+
+After the first deploy, add `"ATLAS_PUBLIC_URL": "https://your-worker.your-subdomain.workers.dev"` to the local configuration's `vars`, using the URL Wrangler printed or your configured custom domain. This identifies your deployment for address lookup; it is public configuration, not a secret. To generate social-preview URLs for your site, set `NEXT_PUBLIC_SITE_URL` to the same URL when building, for example:
+
+```sh
+NEXT_PUBLIC_SITE_URL=https://your-worker.your-subdomain.workers.dev npm run deploy:owner-poc
+```
+
+Replace the example URL with yours. Without these settings, branding is generic, address lookup identifies the public repository, and deployment-specific social images are omitted. Existing installations keep their own local settings when pulling code updates.
+
+### Common first-setup problems
+
+| Symptom | Check |
+| --- | --- |
+| Preflight rejects the database ID | Replace the template placeholder with the D1 ID created in your account. |
+| A required Google secret is missing | Supply your Places key, or disable Google matching in the local configuration. |
+| Deployment references a missing route Worker | Deploy the private route Worker, or remove its `services` binding. |
+| Owner login fails | Use your configured Owner password; verify both Owner secrets are set. |
+| Agent research is unavailable | In Owner settings, test/save a model endpoint and key with tool-call support. |
+| Research finds a place but facts are unknown | Check the source-reader/search availability; correct supported fields and refresh the preview rather than assuming the model key provides web access. |
+| Photos or video uploads fail | Verify your R2 bucket, `MEDIA` binding, supported format and file-size limit. |
 
 After an update to an existing deployment, run `ALLOW_PRODUCTION_MEDIA_AUDIT=yes npm run audit:media-integrity` from `apps/web` to compare each Visit media row with its R2 object's byte count and SHA-256 without saving media locally. The audit is read-only and requires the Wrangler login and ignored local configuration used for deployment.
 

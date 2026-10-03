@@ -41,6 +41,7 @@ import {
 } from './catalog-intake-provider-mode-manifest.ts';
 
 export interface OwnerPocCatalogIntakeOptions {
+  readonly publicUrl?: string;
   readonly sourceReaderProvider?: string;
   readonly firecrawlApiKey?: string;
   readonly browser?: BrowserContentBinding;
@@ -59,9 +60,34 @@ export interface OwnerPocCatalogIntakeOptions {
 export const ownerPocNominatimIdentity = {
   endpoint: 'https://nominatim.openstreetmap.org/search',
   identifyingUserAgent:
-    'JapanAtlasOwnerPoC/1.0 (+https://japan-atlas-owner-poc.japan-atlas-poc.workers.dev/terms)',
-  referer: 'https://japan-atlas-owner-poc.japan-atlas-poc.workers.dev/',
+    'JapanAtlas/0.1.0 (+https://github.com/AndyZhou952/jp-food-event-map)',
+  referer: 'https://github.com/AndyZhou952/jp-food-event-map',
 } as const;
+
+export function nominatimIdentityForDeployment(publicUrl?: string) {
+  if (!publicUrl) return ownerPocNominatimIdentity;
+  try {
+    const url = new URL(publicUrl);
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.port ||
+      url.pathname !== '/'
+    ) {
+      return ownerPocNominatimIdentity;
+    }
+    return {
+      endpoint: ownerPocNominatimIdentity.endpoint,
+      identifyingUserAgent: `JapanAtlas/0.1.0 (+${url.origin}/terms)`,
+      referer: `${url.origin}/`,
+    };
+  } catch {
+    return ownerPocNominatimIdentity;
+  }
+}
 
 export function createOwnerPocComposition(
   database: D1Database,
@@ -150,7 +176,7 @@ export function createOwnerPocComposition(
   const durableGeocoder =
     providerModes.durableGeocoder === 'enabled'
       ? createNominatimDurableGeocoderAdapter({
-          ...ownerPocNominatimIdentity,
+          ...nominatimIdentityForDeployment(intakeOptions.publicUrl),
           transport: createNominatimFixedEndpointTransport(
             intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {},
           ),

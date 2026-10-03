@@ -2,10 +2,9 @@ import type { Metadata } from 'next';
 import { Geist_Mono } from 'next/font/google';
 import './globals.css';
 
-const siteUrl = new URL(
-  process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://andy-japan-atlas.jzhoubc.chatgpt.site',
-);
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
+  : undefined;
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
@@ -14,20 +13,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
-  title: 'Japan Atlas — Andy’s personal field guide',
+  title: 'Japan Atlas — Your personal field guide',
   description:
-    'A private map of saved food, events, and architecture in Japan, connected to a personal assistant.',
+    'A personal collection of restaurants, visits, photos and videos, with public browsing and Owner-controlled agents.',
   openGraph: {
     title: 'Japan Atlas',
     description: 'Your personal field guide to food, events & architecture.',
-    images: [{ url: '/og.png', width: 1200, height: 630 }],
+    images: siteUrl
+      ? [{ url: '/og.png', width: 1200, height: 630 }]
+      : undefined,
     type: 'website',
   },
   twitter: {
-    card: 'summary_large_image',
+    card: siteUrl ? 'summary_large_image' : 'summary',
     title: 'Japan Atlas',
     description: 'Your personal field guide to food, events & architecture.',
-    images: ['/og.png'],
+    images: siteUrl ? ['/og.png'] : undefined,
   },
 };
 

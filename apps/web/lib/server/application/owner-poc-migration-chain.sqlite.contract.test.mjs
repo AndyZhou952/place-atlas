@@ -46,6 +46,19 @@ test('owner-poc append-only 0001-0012 chain replays from two empty databases', a
       database.prepare('SELECT COUNT(*) AS count FROM atlas_items').get().count,
       5,
     );
+    for (const table of [
+      'owner_agent_settings',
+      'place_assessments',
+      'visits',
+      'visit_media',
+      'atlas_google_rating_references',
+    ]) {
+      assert.equal(
+        database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count,
+        0,
+        `a fresh deployment must not inherit another Owner's ${table}`,
+      );
+    }
     assert.equal(
       database
         .prepare(

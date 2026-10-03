@@ -24,6 +24,7 @@ const items = [
     address: '大阪府',
     area: '大阪',
     personalRating: 4.5,
+    tabelog: { score: 3.8 },
     googleRating: { score: 4.8 },
     classification: {
       cuisines: [
@@ -39,7 +40,6 @@ const items = [
     title: 'C Dumplings',
     address: '上海市',
     area: '上海',
-    tabelog: { score: 3.8 },
     classification: {
       cuisines: [{ familyId: 'chinese', categoryId: 'chinese.dim-sum' }],
       geography: { countryCode: 'CN', subdivisionCode: 'CN-SH' },
@@ -94,7 +94,8 @@ test('last visit uses actual visit dates across places, keeps unvisited last in 
 test('score sorting distinguishes zero from unknown and never puts unknown first', () => {
   assert.deepEqual(ids({}, 'personalRating', true), ['a', 'b', 'c', 'd', 'e']);
   assert.deepEqual(ids({}, 'personalRating', false), ['b', 'a', 'c', 'd', 'e']);
-  assert.deepEqual(ids({}, 'tabelog', false), ['c', 'a', 'b', 'd', 'e']);
+  assert.deepEqual(ids({}, 'tabelog', true), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(ids({}, 'tabelog', false), ['b', 'a', 'c', 'd', 'e']);
   assert.deepEqual(ids({}, 'google', false), ['b', 'a', 'c', 'd', 'e']);
 });
 

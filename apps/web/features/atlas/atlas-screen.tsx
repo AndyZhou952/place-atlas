@@ -86,8 +86,8 @@ const kindLabel: Record<AtlasItemKind, string> = {
 
 const navItems: readonly { value: AtlasView; label: string }[] = [
   { value: 'map', label: 'Map' },
-  { value: 'journal', label: 'Journal' },
   { value: 'table', label: 'Table' },
+  { value: 'journal', label: 'Journal' },
 ];
 
 export function AtlasScreen() {

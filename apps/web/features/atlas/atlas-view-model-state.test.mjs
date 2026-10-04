@@ -15,6 +15,25 @@ const item = {
   hasVisited: false,
 };
 
+test('catalog view model remains empty until the durable initial load completes', () => {
+  let state = createAtlasViewModelState();
+  assert.deepEqual(state.items, []);
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'items.load.started',
+    loadId: 'initial',
+  });
+  assert.deepEqual(state.items, []);
+
+  state = reduceAtlasViewModelState(state, {
+    type: 'items.loaded',
+    loadId: 'initial',
+    items: [{ ...item, title: 'Durable catalog result' }],
+  });
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].title, 'Durable catalog result');
+});
+
 test('optimistic item mutations converge on success and roll back independently on failure', () => {
   let state = createAtlasViewModelState({ items: [item] });
 

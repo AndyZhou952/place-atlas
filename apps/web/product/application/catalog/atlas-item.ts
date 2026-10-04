@@ -69,6 +69,14 @@ export interface AtlasItem {
   readonly area: string;
   readonly address: string;
   readonly description: string;
+  readonly openingHours?: CatalogIntakeSourcedValue<string>;
+  readonly regularClosingDays?: CatalogIntakeSourcedValue<string>;
+  readonly closingNotes?: CatalogIntakeSourcedValue<string>;
+  readonly scheduleCheck?: {
+    readonly openingHours: 'known' | 'unavailable';
+    readonly regularClosingDays: 'known' | 'unavailable';
+    readonly checkedAt: string;
+  };
   readonly latitude: number;
   readonly longitude: number;
   readonly verificationStatus: VerificationStatus;
@@ -128,6 +136,7 @@ export interface NearbyAtlasItem {
   readonly reservation: ReservationSnapshot;
 }
 import type {
+  CatalogIntakeSourcedValue,
   CatalogIntakeEnrichedProfile,
   CatalogIntakeAddressProposal,
   CatalogIntakeLocationEvidence,

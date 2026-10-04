@@ -156,6 +156,7 @@ void test('intake catalog projection preserves exact provenance, time, license, 
         longitude: 139.765,
         verificationStatus: 'verified',
         verifiedAt: '2026-09-23T12:00:00.000Z',
+        officialUrl: 'https://legacy-official.example/',
         tabelog: {
           score: 4.12,
           url: 'https://tabelog.com/tokyo/A0000/A000000/00000000/',
@@ -221,6 +222,11 @@ void test('intake catalog projection preserves exact provenance, time, license, 
   assert.deepEqual(projected.reservation, { status: 'unknown' });
   assert.deepEqual(projected.sources, [
     {
+      role: 'official',
+      label: 'Official website',
+      url: 'https://legacy-official.example/',
+    },
+    {
       role: 'location',
       label: 'OpenStreetMap Nominatim',
       url: 'https://nominatim.openstreetmap.org/ui/details.html?place_id=1',
@@ -240,6 +246,177 @@ void test('intake catalog projection preserves exact provenance, time, license, 
     JSON.stringify(projected).includes('checkedAt":"2026-09-23T12'),
     false,
   );
+});
+
+void test('verified booking destination replaces the Tabelog policy URL in public links', () => {
+  const projected = createPublicReadManifest().project('catalog.get', {
+    id: 'booking-place',
+    kind: 'food',
+    title: 'Booking place',
+    area: 'Tokyo',
+    address: '1 Tokyo',
+    description: 'Restaurant',
+    latitude: 35.6,
+    longitude: 139.7,
+    verificationStatus: 'verified',
+    reservation: {
+      mode: 'advance',
+      label: '完全予約制',
+      url: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
+      checkedAt: '2026-10-04T00:00:00.000Z',
+    },
+    tabelog: {
+      score: 3.8,
+      url: 'https://tabelog.com/tokyo/A1300/A130001/12345678/',
+      checkedAt: '2026-10-04T00:00:00.000Z',
+    },
+    tags: [],
+    sources: [],
+    intakeEvidence: {
+      profile: {
+        bookingLink: {
+          value: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
+          sourceUrl: 'https://official.example/reserve',
+          observedAt: '2026-10-04T00:00:00.000Z',
+        },
+      },
+      tabelog: {
+        status: 'known',
+        score: 3.8,
+        url: 'https://tabelog.com/tokyo/A1300/A130001/12345678/',
+        provenance: 'agent_observed',
+        observedAt: '2026-10-04T00:00:00.000Z',
+        freshness: 'fresh',
+      },
+      reservation: {
+        status: 'known',
+        mode: 'reservation_required',
+        label: '完全予約制',
+        url: 'https://tabelog.com/tokyo/A1300/A130001/12345678/',
+        provenance: 'agent_observed',
+        observedAt: '2026-10-04T00:00:00.000Z',
+        freshness: 'fresh',
+      },
+    },
+  });
+
+  assert.equal(
+    projected.reservation.url,
+    'https://yoyaku.toreta.in/fixture-kitchen/#/',
+  );
+  assert.deepEqual(
+    projected.sources.filter((source) => source.role === 'reservation'),
+    [
+      {
+        role: 'reservation',
+        label: 'Booking',
+        url: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
+      },
+    ],
+  );
+});
+
+void test('legacy Tabelog policy URL is not projected as an actionable reservation link', () => {
+  const listingUrl = 'https://tabelog.com/tokyo/A1300/A130001/12345678/';
+  const projected = createPublicReadManifest().project('catalog.get', {
+    id: 'legacy-booking-place',
+    kind: 'food',
+    title: 'Legacy booking place',
+    area: 'Tokyo',
+    address: '1 Tokyo',
+    description: 'Restaurant',
+    latitude: 35.6,
+    longitude: 139.7,
+    verificationStatus: 'verified',
+    reservation: {
+      mode: 'advance',
+      label: '予約可',
+      url: listingUrl,
+      checkedAt: '2026-10-04T00:00:00.000Z',
+    },
+    tabelog: {
+      score: 3.8,
+      url: listingUrl,
+      checkedAt: '2026-10-04T00:00:00.000Z',
+    },
+    tags: [],
+    sources: [
+      { role: 'tabelog', label: 'Tabelog', url: listingUrl },
+      { role: 'reservation', label: '予約可', url: listingUrl },
+    ],
+  });
+
+  assert.equal(projected.reservation.url, undefined);
+  assert.deepEqual(projected.sources, [
+    { role: 'tabelog', label: 'Tabelog', url: listingUrl },
+  ]);
+});
+
+void test('sourced hours survive public projection and legacy root hours are safely supported', () => {
+  const claim = (value) => ({
+    value,
+    sourceUrl: 'https://example.com/access',
+    observedAt: '2026-09-23T01:59:00.000Z',
+  });
+  const project = (extra) =>
+    createPublicReadManifest().project('catalog.get', {
+      id: 'hours-place',
+      kind: 'food',
+      title: 'Hours place',
+      area: 'Tokyo',
+      address: 'Tokyo',
+      description: '',
+      latitude: 35.6,
+      longitude: 139.7,
+      verificationStatus: 'verified',
+      verifiedAt: '2026-09-23T01:59:00.000Z',
+      reservation: {
+        mode: 'unknown',
+        label: 'Unknown',
+        checkedAt: '2026-09-23T01:59:00.000Z',
+      },
+      tags: [],
+      sources: [],
+      ...extra,
+    });
+  const fromProfile = project({
+    intakeEvidence: {
+      candidateIdentity: {
+        providerNamespace: 'google-places',
+        placeId: 'hours-1',
+      },
+      ownerFields: {},
+      locationEvidence: { status: 'unknown' },
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+      unknownFields: [],
+      warnings: [],
+      profile: {
+        openingHours: claim('昼 11:30–14:30; 夜 17:00–22:00'),
+        regularClosingDays: claim('火曜日'),
+      },
+    },
+  });
+  assert.deepEqual(
+    fromProfile.openingHours,
+    claim('昼 11:30–14:30; 夜 17:00–22:00'),
+  );
+  assert.deepEqual(fromProfile.regularClosingDays, claim('火曜日'));
+  const legacy = project({
+    openingHours: claim('Lunch 11:00–14:00; Dinner 17:00–21:30'),
+    regularClosingDays: claim('Wednesdays'),
+  });
+  assert.deepEqual(
+    legacy.openingHours,
+    claim('Lunch 11:00–14:00; Dinner 17:00–21:30'),
+  );
+  assert.deepEqual(legacy.regularClosingDays, claim('Wednesdays'));
+  const malformed = project({
+    openingHours: { ...claim('Unknown'), privateNote: 'drop' },
+    regularClosingDays: claim('x'.repeat(501)),
+  });
+  assert.equal(malformed.openingHours, undefined);
+  assert.equal(malformed.regularClosingDays, undefined);
 });
 
 void test('authoritative intake unknown evidence never falls back to inconsistent legacy fields', async () => {

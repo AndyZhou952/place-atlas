@@ -659,6 +659,55 @@ function PreviewStep({
             </a>
           </p>
         ) : null}
+        <div className="catalog-intake-profile-hours">
+          <h5>Operating schedule</h5>
+          <p>
+            Leave unavailable information empty. Keep lunch, dinner, weekday
+            differences and last-order times in the source wording.
+          </p>
+          {(
+            [
+              [
+                'openingHours',
+                'openingHoursSourceUrl',
+                '営業時間 / Opening hours',
+                1200,
+              ],
+              [
+                'regularClosingDays',
+                'regularClosingDaysSourceUrl',
+                '定休日 / Closing days',
+                500,
+              ],
+            ] as const
+          ).map(([field, sourceField, label, limit]) => (
+            <div key={field}>
+              <label htmlFor={`catalog-intake-preview-${field}`}>{label}</label>
+              <textarea
+                id={`catalog-intake-preview-${field}`}
+                value={intake.state[field]}
+                onChange={(event) => intake.setField(field, event.target.value)}
+                maxLength={limit}
+                rows={3}
+                placeholder="Unavailable"
+                disabled={busy}
+              />
+              <label htmlFor={`catalog-intake-preview-${sourceField}`}>
+                {label} source URL
+              </label>
+              <Input
+                id={`catalog-intake-preview-${sourceField}`}
+                type="url"
+                value={intake.state[sourceField]}
+                onChange={(event) =>
+                  intake.setField(sourceField, event.target.value)
+                }
+                placeholder="https://..."
+                disabled={busy}
+              />
+            </div>
+          ))}
+        </div>
       </section>
       {groups.map((group) => (
         <section

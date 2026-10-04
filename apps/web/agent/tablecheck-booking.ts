@@ -6,7 +6,7 @@ export interface TableCheckBookingEvidence extends SearchEvidence {
     readonly name: string;
     readonly address?: string;
     readonly officialWebsiteHost?: string;
-    readonly bookingWindowLabel: string;
+    readonly bookingWindowLabel?: string;
     readonly advanceDays?: number;
     readonly releaseNote?: string;
   };
@@ -60,11 +60,35 @@ export async function readTableCheckBookingPage(
 ): Promise<TableCheckReadResult> {
   if (!isTableCheckBookingPage(url)) return { kind: 'invalid_source' };
   try {
-    const response = await fetcher(url, {
+    const signal = AbortSignal.any([parentSignal, AbortSignal.timeout(6000)]);
+    const request = {
       redirect: 'manual',
-      signal: AbortSignal.any([parentSignal, AbortSignal.timeout(6000)]),
+      signal,
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
-    });
+    } as const;
+    let target = url;
+    let response = await fetcher(target, request);
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      const next = location
+        ? canonicalTableCheckBookingUrl(new URL(location, target).href)
+        : undefined;
+      const merchantPath = (value: string) =>
+        new URL(value).pathname
+          .replace(/^\/[a-z]{2}(?:-[a-z]{2})?\//iu, '/')
+          .replace(/\/$/u, '');
+      await response.body?.cancel();
+      // One language redirect on the fixed provider, preserving the exact shop.
+      // A second redirect, another shop, or another host supplies no evidence.
+      if (
+        !next ||
+        next === target ||
+        merchantPath(next) !== merchantPath(target)
+      )
+        return { kind: 'invalid_source' };
+      target = next;
+      response = await fetcher(target, request);
+    }
     if ([401, 403, 429].includes(response.status)) {
       await response.body?.cancel();
       return { kind: 'blocked' };
@@ -79,7 +103,7 @@ export async function readTableCheckBookingPage(
     const html = await readBoundedText(response, 1_048_576);
     if (/cf-chl-|cf_chl_|<title[^>]*>\s*Just a moment/iu.test(html))
       return { kind: 'blocked' };
-    const evidence = parseTableCheckBookingPage(html, url);
+    const evidence = parseTableCheckBookingPage(html, target);
     return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
   } catch {
     return { kind: 'unavailable' };
@@ -120,28 +144,49 @@ export function parseTableCheckBookingPage(
       ' ',
     );
     const timing = explicitReservationTiming(policyText);
-    if (!timing.bookingWindowLabel || !timing.releaseNote) return undefined;
+    // A working booking form need not publish a booking window. Keep the
+    // branch address separately from policy so timing never gates the URL.
+    const address =
+      /class=["'][^"']*resreview-sidebar-content[^"']*["'][^>]*>\s*〒\d{3}-\d{4}\s*([^<]{8,220})<\/div>/iu.exec(
+        html,
+      )?.[1];
     const officialWebsiteHost = [
-      ...policy.matchAll(/\bhref=["'](https:\/\/[^"']+)["']/giu),
+      ...policy.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/giu),
     ]
-      .map((match) => {
+      .flatMap((match) => {
+        const label = decode(match[2].replace(/<[^>]*>/gu, ' ')).trim();
+        if (
+          !/(?:official\s*(?:website|site)|公式(?:サイト|ホームページ|hp)|ホームページ)/iu.test(
+            label,
+          )
+        )
+          return [];
+        const href = /\bhref\s*=\s*(["'])(https:\/\/[^"']+)\1/iu.exec(
+          match[1],
+        )?.[2];
+        if (!href) return [];
         try {
-          return new URL(decode(match[1])).hostname.replace(/^www\./u, '');
+          const url = new URL(decode(href));
+          return url.username || url.password || url.port
+            ? []
+            : [url.hostname.replace(/^www\./u, '')];
         } catch {
-          return undefined;
+          return [];
         }
       })
-      .find((host) => host && host !== 'tablecheck.com');
-    if (!officialWebsiteHost) return undefined;
+      .find(
+        (host) => host !== 'tablecheck.com' && host !== 'www.tablecheck.com',
+      );
+    if (!officialWebsiteHost && !address) return undefined;
     return {
       url: sourceUrl,
       title: name,
-      content: `${name}\n${timing.bookingWindowLabel}\n${timing.releaseNote}`,
+      content: `${name} ${address ? decode(address).trim() : ''}\nBooking page: ${sourceUrl}\n${policyText.slice(0, 4000)}`,
       booking: {
         name,
-        officialWebsiteHost,
-        bookingWindowLabel: timing.bookingWindowLabel,
-        releaseNote: timing.releaseNote,
+        ...(address ? { address: decode(address).trim() } : {}),
+        ...(officialWebsiteHost ? { officialWebsiteHost } : {}),
+        ...timing,
       },
     };
   }

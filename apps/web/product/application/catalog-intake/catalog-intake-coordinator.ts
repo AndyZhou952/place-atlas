@@ -116,6 +116,9 @@ export interface CatalogIntakeEnrichedProfile {
   readonly categories?: CatalogIntakeSourcedValue<readonly string[]>;
   readonly signatureDishes?: CatalogIntakeSourcedValue<readonly string[]>;
   readonly summary?: CatalogIntakeSourcedValue<string>;
+  readonly openingHours?: CatalogIntakeSourcedValue<string>;
+  readonly regularClosingDays?: CatalogIntakeSourcedValue<string>;
+  readonly closingNotes?: CatalogIntakeSourcedValue<string>;
   readonly officialWebsite?: CatalogIntakeSourcedValue<string>;
   readonly bookingLink?: CatalogIntakeSourcedValue<string>;
   readonly googleRating?: CatalogIntakeSourcedValue<{
@@ -239,6 +242,14 @@ export interface CatalogIntakeOwnerFields {
   readonly categories?: readonly string[];
   readonly signatureDishes?: readonly string[];
   readonly summary?: string;
+  readonly openingHours?: {
+    readonly value: string;
+    readonly sourceUrl: string;
+  };
+  readonly regularClosingDays?: {
+    readonly value: string;
+    readonly sourceUrl: string;
+  };
   readonly coordinates?: {
     readonly latitude: number;
     readonly longitude: number;
@@ -1173,11 +1184,15 @@ export function createCatalogIntakeModule(options: {
             researched = normalizedResearch;
           }
         }
-        const profile =
-          researched.profile ??
-          (session.state === 'preview_ready'
+        const priorProfile =
+          session.state === 'preview_ready' &&
+          sameCandidateIdentity(session.preview.candidateIdentity, {
+            providerNamespace: candidate.providerNamespace,
+            placeId: candidate.placeId,
+          })
             ? session.preview.profile
-            : undefined);
+            : undefined;
+        const profile = mergeEnrichedProfile(researched.profile, priorProfile);
         if (!ownerFields.title && profile?.name) {
           titleProposal = { provenance: 'agent_observed', ...profile.name };
         }
@@ -1611,6 +1626,12 @@ export function createCatalogIntakeModule(options: {
         );
         let confirmResearchAttempted = false;
         let confirmResearchApplied = false;
+        let refreshedProfile = sameCandidateIdentity(
+          session.preview.candidateIdentity,
+          refreshedCandidate.durableIdentity,
+        )
+          ? session.preview.profile
+          : undefined;
         if (
           options.enrichmentPolicy !== 'disabled' &&
           options.webResearchPort &&
@@ -1668,6 +1689,10 @@ export function createCatalogIntakeModule(options: {
             );
             refreshedTabelog = stableResearch.tabelog;
             refreshedReservation = stableResearch.reservation;
+            refreshedProfile = mergeEnrichedProfile(
+              normalizedResearch.profile,
+              refreshedProfile,
+            );
           }
         }
         const providerRefreshEnabled = Boolean(
@@ -1690,6 +1715,8 @@ export function createCatalogIntakeModule(options: {
             canonicalJson(session.preview.tabelog) ||
           canonicalJson(refreshedReservation) !==
             canonicalJson(session.preview.reservation) ||
+          canonicalJson(refreshedProfile) !==
+            canonicalJson(session.preview.profile) ||
           canonicalJson(refreshedWarnings) !==
             canonicalJson(session.preview.warnings)
         ) {
@@ -1697,12 +1724,14 @@ export function createCatalogIntakeModule(options: {
           const {
             evidenceDigest: _priorDigest,
             addressProposal: _priorAddress,
+            profile: _priorProfile,
             ...priorWithoutDigest
           } = session.preview;
           const previewWithoutDigest = {
             ...priorWithoutDigest,
             previewVersion: session.preview.previewVersion + 1,
             ...(refreshedAddress ? { addressProposal: refreshedAddress } : {}),
+            ...(refreshedProfile ? { profile: refreshedProfile } : {}),
             locationEvidence: refreshedLocation,
             tabelog: refreshedTabelog,
             reservation: refreshedReservation,
@@ -2857,6 +2886,8 @@ function validateOwnerFields(
         'categories',
         'signatureDishes',
         'summary',
+        'openingHours',
+        'regularClosingDays',
       ],
       [],
     )
@@ -2891,6 +2922,11 @@ function validateOwnerFields(
     value.coordinates === undefined
       ? undefined
       : validateCoordinates(value.coordinates);
+  const openingHours = validateOwnerSchedule(value.openingHours, 1200);
+  const regularClosingDays = validateOwnerSchedule(
+    value.regularClosingDays,
+    500,
+  );
   if (
     (value.title !== undefined && !title) ||
     (value.address !== undefined && !address) ||
@@ -2898,6 +2934,8 @@ function validateOwnerFields(
     (value.categories !== undefined && !categories) ||
     (value.signatureDishes !== undefined && !signatureDishes) ||
     (value.summary !== undefined && !summary) ||
+    (value.openingHours !== undefined && !openingHours) ||
+    (value.regularClosingDays !== undefined && !regularClosingDays) ||
     (value.coordinates !== undefined && !coordinates)
   ) {
     return undefined;
@@ -2909,8 +2947,35 @@ function validateOwnerFields(
     ...(categories ? { categories } : {}),
     ...(signatureDishes ? { signatureDishes } : {}),
     ...(summary ? { summary } : {}),
+    ...(openingHours ? { openingHours } : {}),
+    ...(regularClosingDays ? { regularClosingDays } : {}),
     ...(coordinates ? { coordinates } : {}),
   };
+}
+
+function validateOwnerSchedule(value: unknown, limit: number) {
+  if (value === undefined) return undefined;
+  if (
+    !isRecordWithAllowedKeys(
+      value,
+      ['value', 'sourceUrl'],
+      ['value', 'sourceUrl'],
+    )
+  )
+    return undefined;
+  if (
+    typeof value.value !== 'string' ||
+    !value.value.trim() ||
+    value.value.length > limit ||
+    /\p{Cc}/u.test(value.value.replace(/[\r\n\t]/gu, ''))
+  )
+    return undefined;
+  const sourceUrl = isCanonicalHttpsUrl(value.sourceUrl)
+    ? value.sourceUrl
+    : undefined;
+  return sourceUrl
+    ? { value: value.value.normalize('NFC').trim(), sourceUrl }
+    : undefined;
 }
 
 function validateOwnerLabels(value: unknown): readonly string[] | undefined {
@@ -3003,7 +3068,7 @@ export function validateOwnerReservation(
     !isOptionalBoundedText(bookingWindowLabel, 0, 500) ||
     !isOptionalBoundedText(releaseNote, 0, 500) ||
     !isOptionalBoundedText(channel, 0, 120) ||
-    !isCanonicalHttpsUrl(url)
+    !isCanonicalHttpsUrl(url, true)
   ) {
     return undefined;
   }
@@ -3069,6 +3134,9 @@ export function validateEnrichedProfile(
     'categories',
     'signatureDishes',
     'summary',
+    'openingHours',
+    'regularClosingDays',
+    'closingNotes',
     'officialWebsite',
     'bookingLink',
     'googleRating',
@@ -3130,7 +3198,17 @@ export function validateEnrichedProfile(
         return undefined;
     } else if (key === 'officialWebsite' || key === 'bookingLink') {
       if (!webUrl(field)) return undefined;
-    } else if (!text(field, key === 'summary' ? 1200 : 500)) return undefined;
+    } else if (
+      !text(
+        field,
+        key === 'summary' || key === 'openingHours'
+          ? 1200
+          : key === 'regularClosingDays'
+            ? 500
+            : 500,
+      )
+    )
+      return undefined;
   }
   // Every allowed field, sourced wrapper, and value shape was checked above.
   return value as CatalogIntakeEnrichedProfile;
@@ -3312,7 +3390,10 @@ function isOptionalBoundedText(
   );
 }
 
-function isCanonicalHttpsUrl(value: unknown): value is string {
+function isCanonicalHttpsUrl(
+  value: unknown,
+  allowFragment = false,
+): value is string {
   if (typeof value !== 'string') return false;
   try {
     const parsed = new URL(value);
@@ -3320,7 +3401,7 @@ function isCanonicalHttpsUrl(value: unknown): value is string {
       parsed.protocol === 'https:' &&
       !parsed.username &&
       !parsed.password &&
-      !parsed.hash &&
+      (allowFragment || !parsed.hash) &&
       parsed.toString() === value
     );
   } catch {
@@ -3515,6 +3596,24 @@ function sameAgentObservedFacts(left: unknown, right: unknown): boolean {
   const { observedAt: _leftObservedAt, ...leftFacts } = left;
   const { observedAt: _rightObservedAt, ...rightFacts } = right;
   return canonicalJson(leftFacts) === canonicalJson(rightFacts);
+}
+
+function sameCandidateIdentity(
+  left: CatalogIntakePreview['candidateIdentity'],
+  right: CatalogIntakePreview['candidateIdentity'],
+): boolean {
+  return (
+    left.providerNamespace === right.providerNamespace &&
+    left.placeId === right.placeId
+  );
+}
+
+function mergeEnrichedProfile(
+  refreshed: CatalogIntakeEnrichedProfile | undefined,
+  prior: CatalogIntakeEnrichedProfile | undefined,
+): CatalogIntakeEnrichedProfile | undefined {
+  if (!refreshed && !prior) return undefined;
+  return { ...prior, ...refreshed };
 }
 
 async function digestCanonical(value: unknown): Promise<string> {

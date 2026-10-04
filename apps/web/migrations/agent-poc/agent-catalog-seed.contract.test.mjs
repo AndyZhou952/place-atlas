@@ -5,42 +5,23 @@ import { DatabaseSync } from 'node:sqlite';
 
 const migrationUrl = new URL('./0002_agent_catalog_seed.sql', import.meta.url);
 const candidate = {
-  id: 'fixture-place',
-  kind: 'food',
-  verificationStatus: 'verified',
-  latitude: 35.68,
-  longitude: 139.76,
+  id: 'fixture-place', kind: 'food', verificationStatus: 'verified',
+  latitude: 35.68, longitude: 139.76,
 };
 
 test('legacy catalog schema starts empty and replay preserves existing records', async () => {
   const database = new DatabaseSync(':memory:');
   const migration = await readFile(migrationUrl, 'utf8');
   database.exec(migration);
-  assert.equal(
-    database.prepare('SELECT COUNT(*) AS count FROM agent_catalog_items').get()
-      .count,
-    0,
-  );
-  database
-    .prepare(`INSERT INTO agent_catalog_items
+  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM agent_catalog_items').get().count, 0);
+  database.prepare(`INSERT INTO agent_catalog_items
     (id, kind, verification_status, latitude, longitude, payload_json, record_origin, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'catalog_intake', 'created', 'updated')`)
-    .run(
-      candidate.id,
-      candidate.kind,
-      candidate.verificationStatus,
-      candidate.latitude,
-      candidate.longitude,
-      JSON.stringify(candidate),
-    );
-  database.exec(migration);
-  assert.deepEqual(
-    JSON.parse(
-      database.prepare('SELECT payload_json FROM agent_catalog_items').get()
-        .payload_json,
-    ),
-    candidate,
+    VALUES (?, ?, ?, ?, ?, ?, 'catalog_intake', 'created', 'updated')`).run(
+    candidate.id, candidate.kind, candidate.verificationStatus, candidate.latitude, candidate.longitude,
+    JSON.stringify(candidate),
   );
+  database.exec(migration);
+  assert.deepEqual(JSON.parse(database.prepare('SELECT payload_json FROM agent_catalog_items').get().payload_json), candidate);
   database.close();
 });
 

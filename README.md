@@ -16,7 +16,7 @@ You need **Node.js 22.13+**, npm, and a Cloudflare account with Workers, D1 and 
 ### 1. Install and create resources
 
 ```sh
-git clone --branch 0.1.0rc1 https://github.com/AndyZhou952/place-atlas.git
+git clone https://github.com/AndyZhou952/place-atlas.git
 cd place-atlas/apps/web
 npm ci
 cp wrangler.owner-poc.jsonc wrangler.owner-poc.local.jsonc
@@ -27,7 +27,7 @@ npx wrangler r2 bucket create place-atlas-media
 
 Edit `wrangler.owner-poc.local.jsonc`: replace `d1_databases[0].database_id` with the ID printed by D1 creation. If those names are already in use in your account, choose new names in the creation commands and update the Worker `name`, D1 `database_name` and R2 `bucket_name` in this file. Keep the `DB`/`MEDIA` binding names, migration directory, environment guards and logging settings.
 
-The default template needs no Google key, route Worker or browser service. The local configuration is ignored by Git and used automatically when building. **A fresh database starts empty. This tag preserves the earlier 0.1.0rc1 application; use the stable 0.1.0 tag for the completed release.**
+The default template needs no Google key, route Worker or browser service. The local configuration is ignored by Git and used automatically when building. **A fresh database starts empty.**
 
 ### 2. Apply the schema and set Owner credentials
 
@@ -70,7 +70,7 @@ npm run migration:check
 
 For local development, put `ATLAS_OWNER_PASSWORD` and `ATLAS_OWNER_SESSION_SECRET` in an ignored `.dev.vars` file, apply the same migrations with `--local`, then run `npm run dev`. Add model credentials through Owner settings or local environment configuration when testing research.
 
-Benchmarks in this release candidate live in `apps/web/evals/`; see the README files in its individual suites. Live results and catalog captures stay in ignored output directories.
+Benchmarks live separately in [`benchmarks/`](benchmarks/README.md). Its unified guide covers offline checks, scorer examples, opt-in live runs and adding cases. Live results and catalog captures stay in ignored output directories.
 
 ## Optional services and upgrades
 

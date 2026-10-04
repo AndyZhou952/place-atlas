@@ -30,6 +30,20 @@ export function catalogIntakeEditorValues(preview: CatalogIntakePreview) {
       []
     ).join(', '),
     summary: owner.summary ?? preview.profile?.summary?.value ?? '',
+    openingHours:
+      owner.openingHours?.value ?? preview.profile?.openingHours?.value ?? '',
+    openingHoursSourceUrl:
+      owner.openingHours?.sourceUrl ??
+      preview.profile?.openingHours?.sourceUrl ??
+      '',
+    regularClosingDays:
+      owner.regularClosingDays?.value ??
+      preview.profile?.regularClosingDays?.value ??
+      '',
+    regularClosingDaysSourceUrl:
+      owner.regularClosingDays?.sourceUrl ??
+      preview.profile?.regularClosingDays?.sourceUrl ??
+      '',
     latitude: coordinates ? String(coordinates.latitude) : '',
     longitude: coordinates ? String(coordinates.longitude) : '',
     tabelogScore:
@@ -89,6 +103,18 @@ export function catalogIntakeSelectionDetails(
       };
   }
   const ownerFields = fields as CatalogIntakeOwnerFields;
+  for (const [key, urlKey] of [
+    ['openingHours', 'openingHoursSourceUrl'],
+    ['regularClosingDays', 'regularClosingDaysSourceUrl'],
+  ] as const) {
+    if (!changed(key) && !changed(urlKey)) continue;
+    delete fields[key];
+    if (state[key].trim() && state[urlKey].trim())
+      fields[key] = {
+        value: state[key].normalize('NFC').trim(),
+        sourceUrl: state[urlKey].trim(),
+      };
+  }
   const tabelogChanged = changed('tabelogScore') || changed('tabelogUrl');
   const reservationChanged =
     changed('reservationMode') ||

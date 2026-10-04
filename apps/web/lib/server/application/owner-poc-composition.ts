@@ -203,6 +203,14 @@ export function createOwnerPocComposition(
             }).getWebsiteUri(placeId);
             return result.ok ? result.value : undefined;
           },
+          operatingScheduleForPlaceId: async (placeId: string) => {
+            const result = await createGooglePlaceRatingClient({
+              apiKey: intakeOptions.googlePlacesApiKey,
+              usage,
+              ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+            }).getOperatingSchedule(placeId);
+            return result.ok ? result.value : undefined;
+          },
         }
       : {}),
   };

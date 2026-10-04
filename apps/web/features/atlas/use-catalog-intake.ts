@@ -184,7 +184,11 @@ export function useCatalogIntake(
         | 'tabelogUrl'
         | 'reservationMode'
         | 'reservationLabel'
-        | 'reservationUrl',
+        | 'reservationUrl'
+        | 'openingHours'
+        | 'openingHoursSourceUrl'
+        | 'regularClosingDays'
+        | 'regularClosingDaysSourceUrl',
       value: string,
     ) => dispatch({ type: 'field_changed', field, value }),
     selectCandidate: (ordinal: number) =>

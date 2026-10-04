@@ -196,6 +196,70 @@ export function createGooglePlaceRatingClient(options: {
         ? { ok: true as const, value: value.websiteUri }
         : unavailable();
     },
+    async getOperatingSchedule(placeId: string) {
+      if (!apiKey || !options.usage || !validText(placeId, 1, 500))
+        return unavailable();
+      const reserved = await options.usage.reserve({
+        providerId: 'google-places-new',
+        sku: 'places.details_rating.requests',
+        units: 1,
+        requests: 1,
+        costUsd: 0.02,
+        hardRequestLimit: 1000,
+        hardUnitLimit: 1000,
+        hardCostLimitUsd: 20,
+      });
+      if (reserved !== 'reserved') return unavailable();
+      const response = await fetchBoundedJson(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=ja`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask':
+              'id,displayName,formattedAddress,googleMapsUri,regularOpeningHours.weekdayDescriptions',
+          },
+        },
+        { fetch: fetchImpl, timeoutMs, maximumBytes: maximumResponseBytes },
+      );
+      if (!response.ok || !isRecord(response.value)) return unavailable();
+      const value = response.value;
+      const hours = isRecord(value.regularOpeningHours)
+        ? value.regularOpeningHours.weekdayDescriptions
+        : undefined;
+      if (
+        value.id !== placeId ||
+        !isRecord(value.displayName) ||
+        typeof value.displayName.text !== 'string' ||
+        !validText(value.displayName.text, 1, 200) ||
+        typeof value.formattedAddress !== 'string' ||
+        !validText(value.formattedAddress, 1, 500) ||
+        typeof value.googleMapsUri !== 'string' ||
+        !isGoogleMapsLink(value.googleMapsUri) ||
+        !Array.isArray(hours) ||
+        hours.length < 1 ||
+        hours.length > 7 ||
+        !hours.every((line) => validText(line, 1, 170))
+      )
+        return unavailable();
+      const closures = hours.filter((line: string) =>
+        /(?:曜日|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[：:]\s*(?:定休日|休業|Closed)\s*$/iu.test(
+          line,
+        ),
+      );
+      return {
+        ok: true as const,
+        value: {
+          name: value.displayName.text,
+          address: value.formattedAddress,
+          sourceUrl: value.googleMapsUri,
+          openingHours: hours.join('\n'),
+          ...(closures.length
+            ? { regularClosingDays: closures.join(' / ') }
+            : {}),
+        },
+      };
+    },
   };
 }
 

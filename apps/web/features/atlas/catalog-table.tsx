@@ -17,6 +17,7 @@ import {
 } from './catalog-table-policy';
 import { ratingPlaceId } from '../../agent/google-rating-policy';
 import { googleRatingIdentity } from './google-rating-display';
+import { restaurantLinks } from './restaurant-links';
 import type { useGoogleRatingDisplay } from './use-google-rating-display';
 import './catalog-table.css';
 
@@ -498,7 +499,7 @@ export function CatalogTable({
                           ]
                             .filter(Boolean)
                             .join(' · ') || '—'}
-                          {item.reservation.url ? (
+                          {item.kind !== 'food' && item.reservation.url ? (
                             <>
                               {' '}
                               ·{' '}
@@ -512,6 +513,28 @@ export function CatalogTable({
                             </>
                           ) : null}
                         </dd>
+                        {item.kind === 'food' ? (
+                          <>
+                            <dt>営業時間 / Opening hours</dt>
+                            <dd>{item.openingHours?.value ?? 'Unavailable'}</dd>
+                            <dt>定休日 / Closing days</dt>
+                            <dd>
+                              {item.regularClosingDays?.value ?? 'Unavailable'}
+                            </dd>
+                            {item.closingNotes ? (
+                              <>
+                                <dt>Closure notes</dt>
+                                <dd>{item.closingNotes.value}</dd>
+                              </>
+                            ) : null}
+                            <dt>Schedule checked</dt>
+                            <dd>
+                              {item.scheduleCheck?.checkedAt ??
+                                item.openingHours?.observedAt ??
+                                'Unavailable'}
+                            </dd>
+                          </>
+                        ) : null}
                         <dt>Location</dt>
                         <dd>
                           {item.verificationStatus === 'verified'
@@ -548,19 +571,9 @@ export function CatalogTable({
                         ) : null}
                         <dt>Sources</dt>
                         <dd>
-                          {item.officialUrl ? (
-                            <a
-                              href={item.officialUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Official website
-                            </a>
-                          ) : null}
-                          {item.sources.map((source, index) => (
+                          {restaurantLinks(item).map((source, index) => (
                             <span key={`${source.url}-${index}`}>
-                              {' '}
-                              ·{' '}
+                              {index > 0 ? ' · ' : ''}
                               <a
                                 href={source.url}
                                 target="_blank"

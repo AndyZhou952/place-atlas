@@ -2,18 +2,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { scoreRecommendDecision } from '../../../evals/recommend/score-decision.mjs';
+import { scoreRecommendDecision } from '../../../../../benchmarks/recommend/score-decision.mjs';
 import { decideRecommend } from './recommend-decision.ts';
 
 const dataset = JSON.parse(
   readFileSync(
-    new URL('../../../evals/recommend/decision-gold.v1.json', import.meta.url),
+    new URL(
+      '../../../../../benchmarks/recommend/decision-gold.v1.json',
+      import.meta.url,
+    ),
     'utf8',
   ),
 );
 const entryDataset = JSON.parse(
   readFileSync(
-    new URL('../../../evals/recommend/decision-entry.v1.json', import.meta.url),
+    new URL(
+      '../../../../../benchmarks/recommend/decision-entry.v1.json',
+      import.meta.url,
+    ),
     'utf8',
   ),
 );

@@ -6,7 +6,7 @@ import test from 'node:test';
 const legacyRoot = new URL('../../migrations/agent-poc/', import.meta.url);
 const ownerRoot = new URL('../../migrations/owner-poc/', import.meta.url);
 
-void test('the owner-poc migration chain seeds five canonical records from an empty blue-green database', async () => {
+void test('the owner-poc migration chain starts empty without inherited canonical records', async () => {
   const database = new DatabaseSync(':memory:');
   for (const name of [
     '0001_owner_poc_schema.sql',
@@ -20,11 +20,11 @@ void test('the owner-poc migration chain seeds five canonical records from an em
   assert.equal(
     database.prepare('SELECT COUNT(*) AS count FROM agent_catalog_items').get()
       .count,
-    5,
+    0,
   );
   assert.equal(
     database.prepare('SELECT COUNT(*) AS count FROM atlas_items').get().count,
-    5,
+    0,
   );
 });
 
@@ -45,6 +45,18 @@ void test('owner-poc migrations preserve legacy Agent state, create the writable
       'utf8',
     ),
   );
+  const legacy = {
+    id: 'legacy-place',
+    kind: 'food',
+    verificationStatus: 'verified',
+    latitude: 35.68,
+    longitude: 139.76,
+  };
+  database
+    .prepare(`INSERT INTO agent_catalog_items
+    (id, kind, verification_status, latitude, longitude, payload_json, record_origin, created_at, updated_at)
+    VALUES (?, 'food', 'verified', ?, ?, ?, 'catalog_intake', 'created', 'updated')`)
+    .run(legacy.id, legacy.latitude, legacy.longitude, JSON.stringify(legacy));
   database.exec(
     `INSERT INTO agent_gateway_audit (
       project_id, key_id, actor_id, channel, conversation_id, operation,
@@ -120,11 +132,11 @@ void test('owner-poc migrations preserve legacy Agent state, create the writable
   assert.equal(
     database.prepare('SELECT COUNT(*) AS count FROM agent_catalog_items').get()
       .count,
-    5,
+    1,
   );
   assert.equal(
     database.prepare('SELECT COUNT(*) AS count FROM atlas_items').get().count,
-    5,
+    1,
   );
   assert.equal(
     database.prepare('SELECT COUNT(*) AS count FROM agent_gateway_audit').get()

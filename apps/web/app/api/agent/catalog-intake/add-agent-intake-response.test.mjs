@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { addAgentIntakeResponse } from './add-agent-intake-response.ts';
 
-const token = 'abcdefghijklmnopABCDEFGHIJKLMNOP01234567';
+const token = 'synthetic-add-agent-test-token-32-characters';
 const secrets = {
   ATLAS_ADD_AGENT_TOKEN: token,
   ATLAS_OWNER_SESSION_SECRET:

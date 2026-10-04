@@ -8,3 +8,4 @@ artifacts/
 evals/runs/
 apps/web/evals/runs/
 *.log
+benchmarks/runs/

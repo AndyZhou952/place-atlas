@@ -2929,7 +2929,7 @@ test('Shake Shack Shinjuku: a transient Google match can be completed with durab
   const benchmark = JSON.parse(
     await readFile(
       new URL(
-        '../../../evals/add-behavior/manual-completion.v1.json',
+        '../../../../../benchmarks/add-behavior/manual-completion.v1.json',
         import.meta.url,
       ),
       'utf8',
@@ -3056,7 +3056,7 @@ test('source failure or no-match permits owner coordinates and one verified publ
   const benchmark = JSON.parse(
     await readFile(
       new URL(
-        '../../../evals/add-behavior/manual-completion.v1.json',
+        '../../../../../benchmarks/add-behavior/manual-completion.v1.json',
         import.meta.url,
       ),
       'utf8',

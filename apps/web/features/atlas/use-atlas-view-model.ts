@@ -24,7 +24,7 @@ import {
 import { useGoogleRatingDisplay } from './use-google-rating-display';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
-const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
+const DEFAULT_ITEM_ID = '';
 
 export function useAtlasViewModel(canEdit: boolean) {
   const [view, setView] = useState<AtlasView>('map');

@@ -1,22 +1,23 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "japan-atlas-owner-poc",
+  "name": "place-atlas",
   "main": "owner-poc-worker.ts",
   "compatibility_date": "2026-09-21",
-  "compatibility_flags": ["nodejs_compat"],
-  "browser": { "binding": "BROWSER" },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "preview_urls": false,
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",
-    "binding": "ASSETS",
+    "binding": "ASSETS"
   },
   "vars": {
     "ATLAS_DATASET": "owner-poc",
     "RESTAURANT_SOURCE_READER": "firecrawl",
     "ATLAS_DEPLOYMENT_ENV": "owner-poc",
-    "CATALOG_INTAKE_GOOGLE_PLACES_MODE": "enabled",
-    "CATALOG_INTAKE_DURABLE_GEOCODER_MODE": "enabled",
+    "CATALOG_INTAKE_GOOGLE_PLACES_MODE": "disabled",
+    "CATALOG_INTAKE_DURABLE_GEOCODER_MODE": "enabled"
   },
   "observability": {
     "enabled": true,
@@ -25,30 +26,26 @@
     "logs": {
       "enabled": true,
       "head_sampling_rate": 0.05,
-      "invocation_logs": false,
-    },
+      "invocation_logs": false
+    }
   },
   "triggers": {
-    "crons": ["0 3 * * *"],
+    "crons": [
+      "0 3 * * *"
+    ]
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "japan-atlas-owner-poc",
+      "database_name": "place-atlas",
       "database_id": "00000000-0000-4000-8000-000000000000",
-      "migrations_dir": "migrations/owner-poc",
-    },
+      "migrations_dir": "migrations/owner-poc"
+    }
   ],
   "r2_buckets": [
     {
       "binding": "MEDIA",
-      "bucket_name": "japan-atlas-owner-poc-media",
-    },
-  ],
-  "services": [
-    {
-      "binding": "ROUTE_SIDECAR",
-      "service": "japan-atlas-route-sidecar",
-    },
-  ],
+      "bucket_name": "place-atlas-media"
+    }
+  ]
 }

@@ -7,6 +7,8 @@
 - Use README for setup and product usage, `docs/architecture.md` for boundaries and design, and `docs/status.md` for concise implemented/planned status. Do not add project reports or extra documents unless the user explicitly requests them. Existing evaluation READMEs should describe generic protocols, not named production incidents.
 - Prefer synthetic, minimal fixtures for general behavior. Preserve multilingual input where it is the behavior under test; do not turn a conversation's restaurant examples into public fixtures or documentation.
 
+- Before publication, audit current files and reachable Git history, release assets, issue/PR content and retained artifacts. Deleting a file from the current tree does not erase its earlier versions.
+
 ## Cleanup before a pull request is ready
 
 - Inspect changed files and their references. Remove superseded benchmark versions, research batches, generated reports, unused helpers/runners and completed one-time repair tooling. Do not keep intermediate artifacts merely as an archive.

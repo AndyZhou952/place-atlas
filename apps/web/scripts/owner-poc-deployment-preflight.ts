@@ -1,9 +1,3 @@
-const seedEvidenceMaximumAgeMs = 5 * 60 * 1000;
-
-const workerName = 'japan-atlas-owner-poc';
-const databaseName = 'japan-atlas-owner-poc';
-const bucketName = 'japan-atlas-owner-poc-media';
-
 const requiredSecretNames = [
   'ATLAS_OWNER_PASSWORD',
   'ATLAS_OWNER_SESSION_SECRET',
@@ -17,6 +11,7 @@ const optionalSecretNames = [
   'AGENT_SETTINGS_SECRET',
   'FIRECRAWL_API_KEY',
   'ATLAS_ADD_AGENT_TOKEN',
+  'GOOGLE_PLACES_API_KEY',
 ] as const;
 
 interface WranglerConfig {
@@ -44,12 +39,12 @@ export function inspectOwnerPocDeployment(input: {
   const builtDatabase = findBinding(input.builtConfig.d1_databases, 'DB');
   const builtBucket = findBinding(input.builtConfig.r2_buckets, 'MEDIA');
 
-  if (input.sourceConfig.name !== workerName) {
+  if (!isResourceName(input.sourceConfig.name)) {
     blockers.push('source_worker_not_owner_poc');
   }
   if (
-    sourceDatabase?.database_name !== databaseName ||
-    sourceBucket?.bucket_name !== bucketName ||
+    !isResourceName(sourceDatabase?.database_name) ||
+    !isResourceName(sourceBucket?.bucket_name) ||
     !hasOwnerPocGuard(input.sourceConfig.vars)
   ) {
     blockers.push('source_bindings_not_owner_poc');
@@ -63,17 +58,25 @@ export function inspectOwnerPocDeployment(input: {
   if (isPlaceholderId(sourceDatabase?.database_id)) {
     blockers.push('d1_database_id_placeholder');
   }
-  if (input.builtConfig.name !== workerName) {
+  if (input.builtConfig.name !== input.sourceConfig.name) {
     blockers.push('built_worker_not_owner_poc');
   } else if (
-    builtDatabase?.database_name !== databaseName ||
+    builtDatabase?.database_name !== sourceDatabase?.database_name ||
     builtDatabase?.database_id !== sourceDatabase?.database_id ||
-    builtBucket?.bucket_name !== bucketName ||
+    builtBucket?.bucket_name !== sourceBucket?.bucket_name ||
     !hasOwnerPocGuard(input.builtConfig.vars)
   ) {
     blockers.push('built_bindings_not_owner_poc');
   }
   if (!hasExactRouteSidecarBinding(input.builtConfig.services)) {
+    blockers.push('built_route_sidecar_binding_invalid');
+  }
+  if (
+    hasExactRouteSidecarBinding(input.sourceConfig.services) &&
+    hasExactRouteSidecarBinding(input.builtConfig.services) &&
+    findBinding(input.sourceConfig.services, 'ROUTE_SIDECAR')?.service !==
+      findBinding(input.builtConfig.services, 'ROUTE_SIDECAR')?.service
+  ) {
     blockers.push('built_route_sidecar_binding_invalid');
   }
   if (!hasSafeObservability(input.builtConfig)) {
@@ -119,188 +122,27 @@ export function inspectOwnerPocDeployment(input: {
   return { ready: blockers.length === 0, blockers };
 }
 
-export function inspectOwnerPocSeed(input: {
-  readonly manifest: unknown;
-  readonly evidence: unknown;
-  readonly sourceArtifactSha256: string;
-  readonly targetDatabaseId: string;
-  readonly now: Date;
-}): { readonly ready: boolean; readonly blockers: readonly string[] } {
-  const manifest = parseSeedManifest(input.manifest);
-  const evidence = parseSeedEvidence(input.evidence);
-  if (!manifest || !evidence) return seedMismatch();
-  const capturedAt = Date.parse(evidence.capturedAt);
-  const now = input.now.getTime();
-  if (
-    evidence.databaseId !== input.targetDatabaseId ||
-    !Number.isFinite(capturedAt) ||
-    new Date(capturedAt).toISOString() !== evidence.capturedAt ||
-    !Number.isFinite(now) ||
-    capturedAt > now ||
-    now - capturedAt > seedEvidenceMaximumAgeMs
-  ) {
-    return seedMismatch();
-  }
-  const rows = evidence.rows;
-  if (
-    manifest.version !== 'owner-poc-seed-v1' ||
-    manifest.sourceArtifact !== 'apps/web/features/atlas/verified-items.ts' ||
-    manifest.recordCount !== 5 ||
-    manifest.sourceSha256 !== input.sourceArtifactSha256 ||
-    rows.length !== manifest.recordCount
-  ) {
-    return seedMismatch();
-  }
-  const expected = new Map(
-    manifest.records.map((record) => [record.id, record.payloadSha256]),
-  );
-  if (expected.size !== manifest.recordCount) return seedMismatch();
-  for (const row of rows) {
-    const digest = expected.get(row.id);
-    if (
-      !digest ||
-      digest !== row.payloadSha256 ||
-      digest !== sha256(row.payloadJson) ||
-      row.seedVersion !== manifest.version ||
-      row.sourceArtifact !== manifest.sourceArtifact ||
-      row.recordCount !== manifest.recordCount ||
-      row.sourceSha256 !== manifest.sourceSha256 ||
-      row.payloadAggregateSha256 !== manifest.payloadAggregateSha256
-    ) {
-      return seedMismatch();
-    }
-  }
-  const aggregate = rows
-    .toSorted((left, right) => left.id.localeCompare(right.id))
-    .map((row) => `${row.id}\n${row.payloadJson}`)
-    .join('\n');
-  return sha256(aggregate) === manifest.payloadAggregateSha256
-    ? { ready: true, blockers: [] }
-    : seedMismatch();
-}
-
-function parseSeedManifest(value: unknown) {
-  if (!isRecord(value) || !Array.isArray(value.records)) return undefined;
-  const records = value.records.flatMap((record) => {
-    if (
-      !isRecord(record) ||
-      typeof record.id !== 'string' ||
-      typeof record.payloadSha256 !== 'string'
-    ) {
-      return [];
-    }
-    return [{ id: record.id, payloadSha256: record.payloadSha256 }];
-  });
-  if (
-    records.length !== value.records.length ||
-    typeof value.version !== 'string' ||
-    typeof value.sourceArtifact !== 'string' ||
-    !Number.isSafeInteger(value.recordCount) ||
-    typeof value.sourceSha256 !== 'string' ||
-    typeof value.payloadAggregateSha256 !== 'string'
-  ) {
-    return undefined;
-  }
-  return {
-    version: value.version,
-    sourceArtifact: value.sourceArtifact,
-    recordCount: value.recordCount as number,
-    sourceSha256: value.sourceSha256,
-    payloadAggregateSha256: value.payloadAggregateSha256,
-    records,
-  };
-}
-
-function parseSeedEvidence(value: unknown) {
-  if (
-    !isRecord(value) ||
-    typeof value.databaseId !== 'string' ||
-    typeof value.capturedAt !== 'string' ||
-    !Array.isArray(value.results)
-  ) {
-    return undefined;
-  }
-  const rowsValue = value.results;
-  const rows = rowsValue.flatMap((row) => {
-    if (
-      !isRecord(row) ||
-      typeof row.seed_version !== 'string' ||
-      typeof row.source_artifact !== 'string' ||
-      !Number.isSafeInteger(row.record_count) ||
-      typeof row.source_sha256 !== 'string' ||
-      typeof row.payload_aggregate_sha256 !== 'string' ||
-      typeof row.id !== 'string' ||
-      typeof row.payload_sha256 !== 'string' ||
-      typeof row.payload_json !== 'string'
-    ) {
-      return [];
-    }
-    return [
-      {
-        seedVersion: row.seed_version,
-        sourceArtifact: row.source_artifact,
-        recordCount: row.record_count as number,
-        sourceSha256: row.source_sha256,
-        payloadAggregateSha256: row.payload_aggregate_sha256,
-        id: row.id,
-        payloadSha256: row.payload_sha256,
-        payloadJson: row.payload_json,
-      },
-    ];
-  });
-  return rows.length === rowsValue.length
-    ? { databaseId: value.databaseId, capturedAt: value.capturedAt, rows }
-    : undefined;
-}
-
-function seedMismatch() {
-  return { ready: false as const, blockers: ['seed_manifest_mismatch'] };
-}
-
-function sha256(value: string | Uint8Array): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 async function main(): Promise<void> {
   const parsed = parseArgs({
     options: {
       config: { type: 'string' },
       'built-config': { type: 'string' },
       'secret-list': { type: 'string' },
-      'seed-manifest': { type: 'string' },
-      'seed-evidence': { type: 'string' },
     },
     strict: true,
   });
   const configPath = parsed.values.config;
   const builtConfigPath = parsed.values['built-config'];
   const secretListPath = parsed.values['secret-list'];
-  const seedManifestPath = parsed.values['seed-manifest'];
-  const seedEvidencePath = parsed.values['seed-evidence'];
   if (!configPath || !builtConfigPath || !secretListPath) {
     throw new Error(
       'Deployment requires config, built config, and secret names.',
     );
   }
-  if (Boolean(seedManifestPath) !== Boolean(seedEvidencePath)) {
-    throw new Error(
-      'Optional seed validation requires both seed manifest and remote seed evidence.',
-    );
-  }
-  const [
-    sourceConfig,
-    builtConfig,
-    remoteSecrets,
-    seedManifest,
-    seedEvidence,
-    sourceArtifact,
-  ] = await Promise.all([
+  const [sourceConfig, builtConfig, remoteSecrets] = await Promise.all([
     readJsonc(configPath),
     readJsonc(builtConfigPath),
     readJsonc(secretListPath),
-    seedManifestPath ? readJsonc(seedManifestPath) : undefined,
-    seedEvidencePath ? readJsonc(seedEvidencePath) : undefined,
-    readFile(new URL('../features/atlas/verified-items.ts', import.meta.url)),
   ]);
   if (
     !isRecord(sourceConfig) ||
@@ -314,22 +156,7 @@ async function main(): Promise<void> {
     builtConfig,
     remoteSecrets,
   });
-  const sourceDatabase = findBinding(sourceConfig.d1_databases, 'DB');
-  const targetDatabaseId =
-    typeof sourceDatabase?.database_id === 'string'
-      ? sourceDatabase.database_id
-      : '';
-  const seedResult =
-    seedManifestPath && seedEvidencePath
-      ? inspectOwnerPocSeed({
-          manifest: seedManifest,
-          evidence: seedEvidence,
-          sourceArtifactSha256: sha256(sourceArtifact),
-          targetDatabaseId,
-          now: new Date(),
-        })
-      : { ready: true, blockers: [] };
-  const blockers = [...result.blockers, ...seedResult.blockers];
+  const blockers = result.blockers;
   if (blockers.length > 0) {
     throw new Error(`Owner PoC deploy blocked: ${blockers.join(', ')}`);
   }
@@ -392,7 +219,13 @@ function hasExactRouteSidecarBinding(value: unknown): boolean {
     (binding.environment === undefined ||
       binding.environment === 'production') &&
     binding.binding === 'ROUTE_SIDECAR' &&
-    binding.service === 'japan-atlas-route-sidecar'
+    isResourceName(binding.service)
+  );
+}
+
+function isResourceName(value: unknown): boolean {
+  return (
+    typeof value === 'string' && /^[a-z][a-z0-9-]{1,61}[a-z0-9]$/u.test(value)
   );
 }
 
@@ -422,7 +255,6 @@ if (
 ) {
   await main();
 }
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';

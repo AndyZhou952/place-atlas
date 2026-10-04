@@ -503,7 +503,7 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
   const dataset = JSON.parse(
     readFileSync(
       new URL(
-        '../evals/place-enrichment/selected-place-regressions.v1.json',
+        '../../../benchmarks/place-enrichment/selected-place-regressions.v1.json',
         import.meta.url,
       ),
       'utf8',
@@ -630,7 +630,7 @@ test('selected chain research ranks branch evidence, recovers failed reads and r
   const dataset = JSON.parse(
     readFileSync(
       new URL(
-        '../evals/place-enrichment/selected-chain-regressions.v1.json',
+        '../../../benchmarks/place-enrichment/selected-chain-regressions.v1.json',
         import.meta.url,
       ),
       'utf8',

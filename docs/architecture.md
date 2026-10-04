@@ -1,6 +1,6 @@
 # Place Atlas application architecture
 
-Place Atlas covers restaurants, architecture and events across regions. The catalog domain supports all three record types; automated Add research, recommendation and visit workflows currently focus on restaurants. The current collection is Japanese, but Japan and WeChat are not application boundaries. Released, post-release and planned capabilities are distinguished below and in [development status](status.md).
+Place Atlas covers restaurants, architecture and events across regions. The catalog domain supports all three record types; automated Add research, recommendation and visit workflows currently focus on restaurants. Japanese restaurant sources currently have the strongest support; geographic regions and messaging platforms are not application boundaries. Released, post-release and planned capabilities are distinguished below and in [development status](status.md).
 
 The browser reads the published catalog, personal ratings and comments, visits, and their published photo/video display links without login. Adding or changing places and records, and calling Recommend or other metered Agent operations, requires an Owner session. Internal storage keys, credentials, sessions, and audit records are never public. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
 
@@ -8,7 +8,7 @@ Each deployment has one Owner identity and one encrypted model configuration. In
 
 ## Scope and release boundaries
 
-The 0.1.0 source tag contains Map, Table and restaurant Journal views, confirmed restaurant Add, saved-restaurant recommendations, visits/media, independent personal/external ratings and per-restaurant private Google references. Architecture and event records are browsable, but their automatic intake has not received equivalent validation. International source paths exist; the current collection and strongest live research validation are Japanese.
+The 0.1.0 source tag contains Map, Table and restaurant Journal views, confirmed restaurant Add, saved-restaurant recommendations, visits/media, independent personal/external ratings and per-restaurant private Google references. Architecture and event records are browsable, but their automatic intake has not received equivalent validation. International source paths exist; Japanese source adapters have received the most validation.
 
 Verified alternative booking destinations, sourced hours/rest days and real-catalog loading are post-release improvements. The website and scoped external Add API are implemented. Framework packages, messaging adapters, automatic image interpretation, iOS and bulk Google-reference replacement remain planned. Each deployment has one Owner, its own data/media and server-side credentials; shared-instance user accounts are absent.
 
@@ -47,7 +47,7 @@ When an origin lookup returns multiple places, the UI sends the user's selected 
 - `apps/web/adapters`: storage, model, search, and external integrations.
 - `apps/web/agent`: the bounded model/search loop, evidence checks, and live smoke runner.
 - `apps/web/route-sidecar`: optional private route-provider Worker.
-- `apps/web/evals`: benchmark datasets and scorers.
+- `benchmarks`: benchmark datasets and scorers.
 
 The application runs its research adapter inside the Worker. External clients can use application interfaces without a required messaging platform. A dedicated Bearer token permits only the four Add operations through `/api/agent/catalog-intake`. The token is checked before request parsing or application creation, and its conversation is separate from browser owner-cookie conversations. The external route calls the same Add coordinator and confirmation service; it does not expose general catalog, personal or media writes. Browser tools use the active website session; they are not a standalone remote MCP service. Framework adapters, channel pairing, bot receivers and conversational Visit/media APIs are proposed next-version work, not existing integrations. The root README contains setup instructions; the integration direction below describes the future boundary. These notes describe ownership boundaries, not a claim that every enrichment field has passed live evaluation.
 
@@ -82,3 +82,31 @@ Future clients should call the same application operations used by the website. 
 The existing external Add route provides discover/select/confirm/cancel operations only. Extending it to Recommend, Visits and media requires scoped Owner authentication, independent conversation identities, bounded uploads, confirmation and replay protection. Provider credentials remain server-side. A channel transports a request; the application continues to validate evidence and control persistence. Automatic interpretation of uploaded images is separate planned work from the existing manual upload/display feature.
 
 Each advertised framework/channel path needs its own live acceptance for clarification, review, confirmed writes, interrupted uploads and retries, alongside independent regression fixtures. The initial conversational scope is restaurant workflows. Architecture/event intake, broader regional research and their chat journeys require separate validation. No framework/channel support should be inferred solely from an external framework capability list.
+
+## Deployment options
+
+The checked-in Worker template is a minimal independent installation: D1 stores records, R2 stores media, and optional Google/browser/route capabilities are disabled. Choose resource names in the ignored local configuration. Deployment preflight verifies that the built artifact uses the same Worker, D1 ID/name, bucket and optional route target as that configuration, retains environment and logging guards, and has the required secret names. It does not copy another deployment's resources. Fresh installations start empty; existing applied migrations and saved records remain intact.
+
+### Model, search and reader configuration
+
+Owner → Agent API settings tests and encrypts a model key, API base URL and model name. The form accepts official DeepSeek and OpenAI endpoints; compatibility requires chat completions and tool calls. An empty key preserves a saved key only while keeping its endpoint. **Use deployment settings** removes the saved override.
+
+For a server-managed OpenAI-compatible endpoint, set `AGENT_API_KEY` with `wrangler secret put` and add `AGENT_BASE_URL` and `AGENT_MODEL` to local Wrangler `vars`. All three are required. Arbitrary compatible endpoints are an operator configuration choice; the web form does not accept them. The application supplies its own search tool.
+
+Stored model credentials use `AGENT_SETTINGS_SECRET`, falling back to `ATLAS_OWNER_SESSION_SECRET`. To rotate encryption independently, configure a random 32+ character `AGENT_SETTINGS_SECRET` before saving model settings. Changing the encryption secret requires re-entering previously saved credentials.
+
+`SEARCH_API_KEY` optionally selects Tavily instead of public search. `FIRECRAWL_API_KEY` optionally authenticates the default Japanese listing reader. Quota errors and challenge pages remain unavailable evidence. Removing `RESTAURANT_SOURCE_READER` selects ordinary reads; an optional `browser: { "binding": "BROWSER" }` enables Cloudflare Browser Run fallback. These providers have independent quotas and billing.
+
+### Google and walking routes
+
+To enable Google matching, set the main Worker's `GOOGLE_PLACES_API_KEY` secret for Places API (New), then set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled`. Leaving the mode disabled requires no Google credential. Without Google, Japanese restaurant discovery can use Tabelog; worldwide discovery is not guaranteed.
+
+For verified walking routes, create an ignored local copy of `wrangler.route-sidecar.jsonc`, choose a unique route Worker name, and set that Worker's `GOOGLE_MAPS_API_KEY` secret for Geocoding API and Routes API. Deploy it with Wrangler, then add a main Worker `services` entry with `binding: "ROUTE_SIDECAR"` and its chosen `service` name. The route Worker stays private, with no public routes. Keep its key off the main Worker. Without it, Recommend uses straight-line distance and cannot supply verified walking times.
+
+Refresh `.wrangler/owner-poc-secret-names.json` after changing main Worker secrets, then rebuild and deploy. Runtime keys, `.dev.vars`, local configuration, backups and live captures must remain outside tracked files.
+
+### External Add API
+
+`GET /api/agent/capabilities` describes the Add inputs. A dedicated random 32–128 character URL-safe `ATLAS_ADD_AGENT_TOKEN` main Worker secret enables `POST /api/agent/catalog-intake`. Use bearer authentication and JSON `{ "operation": "catalog.intake.discover", "input": { "query": "restaurant name", "requestToken": "stable retry ID" } }`. Continue with `catalog.intake.select`, `catalog.intake.confirm` or `catalog.intake.cancel`, echoing the returned `x-atlas-agent-conversation-id` header and expected session/preview version.
+
+Present the current preview for human review before confirmation; changed previews require renewed review. The token only grants Add operations, not Visits, media or personal metadata edits. Human corrections use the website. Both entry points share evidence, duplicate, version and idempotency checks. Incomplete location evidence returns `failed_no_write`; historical receipts remain replayable for compatibility.

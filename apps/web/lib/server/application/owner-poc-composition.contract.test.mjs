@@ -59,6 +59,7 @@ const cases = [
       '0003_copy_legacy_catalog.sql',
     ],
     arrange(database) {
+      insertFixtureCatalog(database);
       database.exec(
         `DELETE FROM atlas_items
          WHERE id = (SELECT id FROM atlas_items ORDER BY id LIMIT 1)`,
@@ -74,6 +75,7 @@ const cases = [
       '0003_copy_legacy_catalog.sql',
     ],
     arrange(database) {
+      insertFixtureCatalog(database);
       database.exec(
         `UPDATE atlas_items
          SET payload_json = json_set(payload_json, '$.id', 'tampered-id')
@@ -83,13 +85,15 @@ const cases = [
     expectedCount: 4,
   },
   {
-    name: 'the normal canonical seed',
+    name: 'normal canonical records',
     migrate: [
       '0001_owner_poc_schema.sql',
       '0002_owner_poc_catalog_seed.sql',
       '0003_copy_legacy_catalog.sql',
     ],
-    arrange() {},
+    arrange(database) {
+      insertFixtureCatalog(database);
+    },
     expectedCount: 5,
   },
 ];
@@ -161,7 +165,7 @@ void test('owner-poc mutation lookup does not fall back to a missing static seed
   const result = await application.execute({
     key: 'assessment.update',
     input: {
-      itemId: 'koffee-mameya-kakeru',
+      itemId: 'missing-place',
       patch: { isFavorite: true },
     },
   });
@@ -401,6 +405,35 @@ void test('owner-poc RouteEvidencePort fails closed without a binding and reserv
     ['walking', 1],
   ]);
 });
+
+function insertFixtureCatalog(database) {
+  const insert = database.prepare(`INSERT INTO atlas_items
+    (id, payload_json, verification_status, created_at, updated_at)
+    VALUES (?, ?, 'verified', 'created', 'updated')`);
+  for (let index = 0; index < 5; index += 1) {
+    const item = {
+      id: `fixture-place-${index}`,
+      kind: 'food',
+      title: `Fixture place ${index}`,
+      area: 'Fixture area',
+      address: 'Fixture address',
+      description: 'Fixture description',
+      latitude: 35.68,
+      longitude: 139.76,
+      verificationStatus: 'verified',
+      verifiedAt: '2026-09-01',
+      reservation: {
+        mode: 'unknown',
+        label: 'Unknown',
+        checkedAt: '2026-09-01',
+      },
+      personalState: 'candidate',
+      tags: [],
+      sources: [],
+    };
+    insert.run(item.id, JSON.stringify(item));
+  }
+}
 
 function toD1(database) {
   return {

@@ -44,7 +44,7 @@ test('owner-poc append-only 0001-0012 chain replays from two empty databases', a
     }
     assert.equal(
       database.prepare('SELECT COUNT(*) AS count FROM atlas_items').get().count,
-      5,
+      0,
     );
     for (const table of [
       'owner_agent_settings',
@@ -112,6 +112,31 @@ test('media score migration preserves existing rows and rejects out-of-range val
         .prepare('UPDATE visit_media SET score = 5.1 WHERE id = ?')
         .run('old'),
     /CHECK constraint failed/u,
+  );
+  database.close();
+});
+
+test('migration replay preserves previously installed catalog records', async () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(await readFile(new URL(migrations[0], root), 'utf8'));
+  const payload = JSON.stringify({
+    id: 'saved-place',
+    kind: 'food',
+    title: 'Owner saved place',
+  });
+  database
+    .prepare(`INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
+    VALUES (?, ?, 'verified', 'created', 'updated')`)
+    .run('saved-place', payload);
+  for (const migration of migrations.slice(1)) {
+    database.exec(await readFile(new URL(migration, root), 'utf8'));
+  }
+  assert.deepEqual(
+    database.prepare('SELECT id, payload_json FROM atlas_items').get(),
+    Object.assign(Object.create(null), {
+      id: 'saved-place',
+      payload_json: payload,
+    }),
   );
   database.close();
 });

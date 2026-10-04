@@ -8,7 +8,6 @@ import {
 } from './route-sidecar-deployment-preflight.ts';
 
 const configUrl = new URL('../wrangler.route-sidecar.jsonc', import.meta.url);
-const runbookUrl = new URL('../../../README.md', import.meta.url);
 
 async function template() {
   return JSON.parse(
@@ -24,22 +23,6 @@ void test('route sidecar preflight accepts only the isolated private runtime and
     }),
     { ready: true, blockers: [] },
   );
-});
-
-void test('root README includes optional route credentials and deployment setup', async () => {
-  const source = await readFile(runbookUrl, 'utf8');
-  assert.ok(
-    source.includes(
-      'npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc',
-    ),
-  );
-  assert.ok(
-    source.includes(
-      'npx wrangler deploy --config wrangler.route-sidecar.jsonc',
-    ),
-  );
-  assert.match(source, /Geocoding API and Routes API/u);
-  assert.match(source, /ROUTE_SIDECAR/u);
 });
 
 void test('route sidecar preflight rejects every public route, owner storage, service, and unrelated secret capability', async () => {

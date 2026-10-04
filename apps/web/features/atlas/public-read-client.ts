@@ -128,6 +128,14 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
     ...(optionalString(value.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(value.officialUrl) }),
+    ...(value.openingHours === undefined
+      ? {}
+      : { openingHours: decodeSourcedText(value.openingHours, 1200) }),
+    ...(value.regularClosingDays === undefined
+      ? {}
+      : {
+          regularClosingDays: decodeSourcedText(value.regularClosingDays, 500),
+        }),
     ...(typeof value.googlePlaceId === 'string' &&
     /^[A-Za-z0-9_-]{10,500}$/u.test(value.googlePlaceId)
       ? { googlePlaceId: value.googlePlaceId }
@@ -144,6 +152,27 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
     tags: stringArray(value.tags),
     sources: decodeSources(value.sources),
   };
+}
+
+function decodeSourcedText(
+  value: unknown,
+  maxLength: number,
+): NonNullable<AtlasItem['openingHours']> {
+  if (!isRecord(value)) throw new TypeError('Invalid sourced text.');
+  const text = requiredString(value.value);
+  const sourceUrl = requiredString(value.sourceUrl);
+  const observedAt = requiredString(value.observedAt);
+  const url = new URL(sourceUrl);
+  if (
+    !text.trim() ||
+    text.length > maxLength ||
+    !['https:', 'http:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    !Number.isFinite(Date.parse(observedAt))
+  )
+    throw new TypeError('Invalid sourced text.');
+  return { value: text, sourceUrl, observedAt };
 }
 
 function decodeTabelog(
@@ -203,7 +232,9 @@ function decodeReservation(
         ...(optionalString(value.channel) === undefined
           ? {}
           : { channel: optionalString(value.channel) }),
-        url: requiredString(value.url),
+        ...(optionalString(value.url) === undefined
+          ? {}
+          : { url: optionalString(value.url) }),
         ...(value.advanceDays === undefined
           ? {}
           : { advanceDays: finiteNumber(value.advanceDays) }),

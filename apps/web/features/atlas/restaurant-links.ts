@@ -6,7 +6,8 @@ export function restaurantLinks(item: AtlasItem): readonly SourceLink[] {
   const tabelog =
     item.tabelog?.url ??
     item.sources.find((source) => source.role === 'tabelog')?.url ??
-    (isTabelog(item.officialUrl) ? item.officialUrl : undefined);
+    (isTabelog(item.officialUrl) ? item.officialUrl : undefined) ??
+    savedTabelogScheduleUrl(item);
   const official =
     item.officialUrl ??
     item.sources.find((source) => source.role === 'official')?.url;
@@ -28,6 +29,38 @@ export function restaurantLinks(item: AtlasItem): readonly SourceLink[] {
       ? [{ role: 'reservation' as const, label: 'Booking', url: booking }]
       : []),
   ]);
+}
+
+function savedTabelogScheduleUrl(item: AtlasItem): string | undefined {
+  const claims = [
+    item.scheduleCheck?.openingHours === 'unavailable'
+      ? undefined
+      : item.openingHours?.sourceUrl,
+    item.scheduleCheck?.regularClosingDays === 'unavailable'
+      ? undefined
+      : item.regularClosingDays?.sourceUrl,
+    item.closingNotes?.sourceUrl,
+  ];
+  return claims.find(isTabelogMainListing);
+}
+
+function isTabelogMainListing(value?: string): value is string {
+  try {
+    const url = new URL(value ?? '');
+    return (
+      url.protocol === 'https:' &&
+      url.origin === 'https://tabelog.com' &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      /^\/(?:en\/|cn\/|tw\/|kr\/)?[a-z]+\/A\d+\/A\d+\/\d{7,8}\/?$/u.test(
+        url.pathname,
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isTabelog(value?: string): boolean {

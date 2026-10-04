@@ -3,7 +3,7 @@
   "verifiedOn": "2026-10-04",
   "scope": "all_56_existing_restaurants",
   "interpretation": "Strict acceptance requires verified identity, expected schedule semantics and preferred evidence URL. A verified Google fallback failing preferred-source equality is not, by itself, a false fact. These finite runs do not establish general model reliability or historical blame.",
-  "grader": "Both full reports rescored with the same final deterministic scorer and corrected canonical manifest; original runner counts affected by formatting/identity scorer defects are superseded.",
+  "grader": "Both full reports were rescored against the same corrected multi-source manifest archived with this report. Counts are historical and are not acceptance of the later Tabelog-only policy.",
   "database": {
     "restaurants": 56,
     "hours": 56,
@@ -1715,5 +1715,8 @@
       }
     ]
   },
-  "finalFullCoverageAcceptance": false
+  "finalFullCoverageAcceptance": false,
+  "reportStatus": "historical_multi_source_policy",
+  "goldManifest": "historical/catalog-hours.multi-source.2026-10-04.json",
+  "supersededByBenchmarkId": "catalog-hours-tabelog-only-2026-10-04-v2"
 }

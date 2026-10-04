@@ -524,6 +524,21 @@ function isIsoTimestamp(value) {
   );
 }
 
+function aliasSupportedBySourceEvidence(sample, alias) {
+  if (!alias?.sourceUrl || !alias?.evidenceQuote) return false;
+  const expectedAliasQuote = normalize(alias.evidenceQuote);
+  const expectedAddressQuote = alias.addressQuote
+    ? normalize(alias.addressQuote)
+    : '';
+  return (sample.evidence ?? []).some(
+    (entry) =>
+      entry.sourceUrl === alias.sourceUrl &&
+      normalize(entry.quote).includes(expectedAliasQuote) &&
+      (!expectedAddressQuote ||
+        normalize(entry.quote).includes(expectedAddressQuote)),
+  );
+}
+
 function claimCheck(field, expected, observed, expectedStatus) {
   if (expectedStatus === 'unavailable') {
     const pass = observed === undefined || observed === null;
@@ -595,6 +610,12 @@ export function validateCatalogHoursContract(manifest, inventory) {
   const inventoryCases = inventory?.cases;
   if (manifest?.schemaVersion !== 1)
     errors.push('manifest schemaVersion must be 1');
+  const tabelogOnly = manifest?.scheduleSourcePolicy === 'tabelog_only';
+  if (
+    manifest?.scheduleSourcePolicy !== undefined &&
+    manifest.scheduleSourcePolicy !== 'tabelog_only'
+  )
+    errors.push('unsupported scheduleSourcePolicy');
   if (!Array.isArray(cases)) errors.push('manifest cases must be an array');
   if (!Array.isArray(inventoryCases))
     errors.push('inventory cases must be an array');
@@ -632,19 +653,37 @@ export function validateCatalogHoursContract(manifest, inventory) {
       errors.push(`${sample.itemId}: name differs from inventory`);
     if ((sample.listingUrl ?? null) !== (item.listingUrl ?? null))
       errors.push(`${sample.itemId}: listingUrl differs from inventory`);
+    if (
+      tabelogOnly &&
+      sample.listingUrl !== null &&
+      !sample.listingUrl.startsWith('https://tabelog.com/')
+    )
+      errors.push(
+        `${sample.itemId}: listingUrl must be the exact Tabelog listing`,
+      );
     if (!['known', 'unavailable'].includes(sample.hoursStatus))
       errors.push(`${sample.itemId}: invalid hoursStatus`);
     if (!['known', 'unavailable'].includes(sample.weeklyClosureStatus))
       errors.push(`${sample.itemId}: invalid weeklyClosureStatus`);
     if (
       !Array.isArray(sample.evidence) ||
-      !sample.evidence.length ||
+      (!sample.evidence.length &&
+        !(tabelogOnly && sample.listingUrl === null)) ||
       sample.evidence.some(
         (e) => !e.sourceUrl || typeof e.quote !== 'string' || !e.quote.trim(),
       )
     )
       errors.push(
         `${sample.itemId}: evidence requires sourceUrl and non-empty quote`,
+      );
+    if (
+      tabelogOnly &&
+      (sample.evidence ?? []).some(
+        (entry) => entry.sourceUrl !== sample.listingUrl,
+      )
+    )
+      errors.push(
+        `${sample.itemId}: Tabelog-only evidence must use its exact listingUrl`,
       );
     for (const field of ['openingHours', 'regularClosingDays']) {
       const status =
@@ -665,6 +704,10 @@ export function validateCatalogHoursContract(manifest, inventory) {
         )
           errors.push(
             `${sample.itemId}: ${field} source is absent from evidence`,
+          );
+        if (tabelogOnly && claim && claim.sourceUrl !== sample.listingUrl)
+          errors.push(
+            `${sample.itemId}: ${field} source must be its exact Tabelog listingUrl`,
           );
         if (
           field === 'openingHours' &&
@@ -692,8 +735,11 @@ export function validateCatalogHoursContract(manifest, inventory) {
         alias.sourceUrl !== sample.listingUrl ||
         !alias.evidenceQuote ||
         !normalize(alias.evidenceQuote).includes(normalize(alias.value)) ||
-        !normalize(alias.evidenceQuote).includes(normalize(sample.name)) ||
-        !sample.evidence?.some((e) => e.sourceUrl === alias.sourceUrl)
+        (!normalize(alias.evidenceQuote).includes(normalize(sample.name)) &&
+          (!alias.addressQuote ||
+            normalizeCatalogAddress(alias.addressQuote) !==
+              normalizeCatalogAddress(sample.address))) ||
+        !aliasSupportedBySourceEvidence(sample, alias)
       )
         errors.push(
           `${sample.itemId}: verified name alias lacks exact-source evidence`,
@@ -716,6 +762,10 @@ export function validateCatalogHoursContract(manifest, inventory) {
       )
         errors.push(
           `${sample.itemId}: closingNotes source is absent from evidence`,
+        );
+      if (tabelogOnly && sample.closingNotes.sourceUrl !== sample.listingUrl)
+        errors.push(
+          `${sample.itemId}: closingNotes source must be its exact Tabelog listingUrl`,
         );
     }
   }
@@ -822,7 +872,11 @@ export function exactProfileIdentityMatch(sample, profile) {
         normalizeCatalogIdentityPart(entry.value) &&
       profile?.name?.sourceUrl === entry.sourceUrl &&
       normalize(entry.evidenceQuote).includes(normalize(entry.value)) &&
-      normalize(entry.evidenceQuote).includes(normalize(sample.name)),
+      aliasSupportedBySourceEvidence(sample, entry) &&
+      (normalize(entry.evidenceQuote).includes(normalize(sample.name)) ||
+        (entry.addressQuote &&
+          normalizeCatalogAddress(entry.addressQuote) ===
+            normalizeCatalogAddress(sample.address))),
   );
   return Boolean(
     (canonicalNameMatch || verifiedAlias) &&

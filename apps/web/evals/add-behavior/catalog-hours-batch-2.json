@@ -58,25 +58,16 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "Everyday（毎日営業）",
-        "sourceUrl": "https://vervecoffee.jp/pages/locations",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
           "quote": "07:00 - 21:00",
-          "note": "Raw current business-information row matches the official location schedule. Listing address matches the 六本木 branch."
-        },
-        {
-          "sourceUrl": "https://vervecoffee.jp/pages/locations",
-          "quote": "ROPPONGI; 東京都港区六本木5-16-7; Everyday / 7:00 am - 9:00 pm",
-          "note": "Official location page exactly matches the branch name, address, and hours; its explicit Everyday schedule establishes no fixed weekly closure."
+          "note": "Current Tabelog business-information row is tied to the exact 六本木 branch listing address."
         }
-      ]
+      ],
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "katsutori-shibuya-hours",
@@ -120,25 +111,16 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13120708/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "無し",
-        "sourceUrl": "https://gonokamiseisakusho.com/shinjyuku.html",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13120708/",
           "quote": "11:00 - 21:30 L.O. 21:00",
           "note": "Raw current business-information row matches the assigned 千駄ヶ谷 / Shinjuku-gyoen branch."
-        },
-        {
-          "sourceUrl": "https://gonokamiseisakusho.com/shinjyuku.html",
-          "quote": "住所 東京都渋谷区千駄ヶ谷5-33-16; 営業時間 11:00～21:30(L.O 21:00); 定休日 無し",
-          "note": "Official branch page matches the listing address and explicitly states no regular closing day."
         }
-      ]
+      ],
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "tokyo-mentsudan-hours",
@@ -288,24 +270,15 @@
       },
       "hoursStatus": "known",
       "weeklyClosureStatus": "unavailable",
-      "unavailableReason": "The current exact-branch Tabelog page does not state a regular weekly closing day; alternate exact-address results only report a seasonal closure.",
-      "closingNotes": {
-        "value": "年末年始",
-        "sourceUrl": "https://autoreserve.com/ja/restaurants/XUT9e96tXRCHFnQYxgwu",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
+      "unavailableReason": "The exact-branch Tabelog page does not state a regular weekly closing day.",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13285959/",
           "quote": "月〜金 11:00 - 14:30（L.O. 14:00）/ 17:30 - 22:00（L.O. 21:30）; 土・日・祝日 11:00 - 15:30（L.O. 15:00）/ 17:30 - 22:00（L.O. 21:30）",
           "note": "Listing address matches 昭和イーティングビル 1F. Tabelog says service was extended until 22:00; it gives no regular closing day."
-        },
-        {
-          "sourceUrl": "https://autoreserve.com/ja/restaurants/XUT9e96tXRCHFnQYxgwu",
-          "quote": "東京都中央区銀座6丁目3-15 昭和イーティングビル1F; 定休日：年末年始",
-          "note": "Exact-address secondary listing supports an annual closure note, not a regular weekly closing day. No official exact-branch closing schedule was found; the official Tsukiji branch is a different address and was excluded."
         }
-      ]
+      ],
+      "closingNotesUnavailableReason": "This closing note is not stated on the exact Tabelog listing."
     },
     {
       "id": "kokomadeyaruka-hours",
@@ -342,25 +315,16 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1302/A130201/13232095/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "なし",
-        "sourceUrl": "https://www.tomita-cocoro.jp/store/",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1302/A130201/13232095/",
           "quote": "月・火・水・木・金 11:00 - 22:00 L.O. 料理21:30; 土・日・祝日 11:00 - 21:00 L.O. 料理20:30",
           "note": "Raw current Tabelog row is primary for schedule; address matches KITTE丸の内 B1F."
-        },
-        {
-          "sourceUrl": "https://www.tomita-cocoro.jp/store/",
-          "quote": "松戸富田麺絆; 東京都千代田区丸の内2-7-2 KITTE丸の内 B1F; 営業時間 月～金 11:00～21:30 土・日・祝 11:00～20:30; 定休日 なし",
-          "note": "Official group page exactly matches branch address and explicitly states no closure. Its hours conflict with Tabelog (21:30 vs 22:00 weekday close, and 20:30 vs 21:00 weekend close); the preferred current Tabelog schedule is retained."
         }
-      ]
+      ],
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "yakiniku-jumbo-hanare-hours",
@@ -444,12 +408,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
           "quote": "月・火・水・木・金 17:00 - 23:00; 土 12:00 - 14:00 L.O. 13:00 / 17:00 - 23:00; 日・祝日 12:00 - 14:00 L.O. 13:00 / 17:00 - 22:00; 月〜金 最終入店21:30; 土 日 祝 ディナー 最終入店21:00; 定休日 年末年始",
-          "note": "Current detailed row matches the assigned Naka-meguro Prea Tower 1F branch. Tabelog's Sunday/holiday dinner closing time and weekend dinner last entry differ from the official page."
-        },
-        {
-          "sourceUrl": "https://gf-restaurant.jp/rodeo/nakameguro",
-          "quote": "月〜金：17:00 - 23:00 / 土・日・祝：12:00〜14:00 ※L.O. 13:00、17:00 - 23:00 / ※全日最終入店 21:30 / 定休日 年末年始",
-          "note": "Official branch page lists 23:00 Sunday/holiday dinner close and 21:30 last entry every day. Tabelog lists 22:00 on Sunday/holidays and 21:00 weekend/holiday dinner last entry; schedules are kept separate."
+          "note": "The Tabelog business-information row preserves this branch’s weekday/weekend dinner and last-entry distinctions."
         }
       ]
     },
@@ -528,5 +487,7 @@
         }
       ]
     }
-  ]
+  ],
+  "scheduleSourcePolicy": "tabelog_only",
+  "sourcePriority": ["current_exact_branch_tabelog"]
 }

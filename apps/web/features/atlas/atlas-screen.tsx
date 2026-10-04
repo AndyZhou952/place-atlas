@@ -180,20 +180,42 @@ export function AtlasScreen() {
 
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}
 
-      {vm.view === 'map' ? <MapWorkspace vm={vm} canEdit={canEdit} /> : null}
-      {vm.view === 'journal' ? (
-        <JournalWorkspace vm={vm} canEdit={canEdit} />
+      {vm.catalogLoading ? (
+        <output className="notice-bar" aria-live="polite">
+          {vm.catalogLoaded
+            ? 'Refreshing Atlas records…'
+            : 'Loading saved Atlas records…'}
+        </output>
       ) : null}
-      {vm.view === 'table' ? (
-        <CatalogTable
-          items={vm.items.filter(
-            (item) => canEdit || item.verificationStatus === 'verified',
-          )}
-          visits={vm.visits}
-          media={vm.media}
-          onSelect={openSavedPlace}
-          googleRatings={vm.googleRatings}
-        />
+      {vm.catalogError ? (
+        <div className="notice-bar" role="alert">
+          <span>{vm.catalogError}</span>{' '}
+          <Button size="sm" variant="outline" onClick={vm.reloadCatalogViews}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      {vm.catalogLoaded ? (
+        <>
+          {vm.view === 'map' ? (
+            <MapWorkspace vm={vm} canEdit={canEdit} />
+          ) : null}
+          {vm.view === 'journal' ? (
+            <JournalWorkspace vm={vm} canEdit={canEdit} />
+          ) : null}
+          {vm.view === 'table' ? (
+            <CatalogTable
+              items={vm.items.filter(
+                (item) => canEdit || item.verificationStatus === 'verified',
+              )}
+              visits={vm.visits}
+              media={vm.media}
+              onSelect={openSavedPlace}
+              googleRatings={vm.googleRatings}
+            />
+          ) : null}
+        </>
       ) : null}
       <footer className="site-footer">
         <span>Japan Atlas · personal field guide</span>

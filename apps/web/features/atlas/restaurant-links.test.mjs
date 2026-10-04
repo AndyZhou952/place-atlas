@@ -71,3 +71,92 @@ test('ordinary section anchors do not create duplicate website buttons', () => {
     ],
   );
 });
+
+test('known Tabelog schedule provenance supplies the listing link when rating and source links are absent', () => {
+  const scheduleListing = 'https://tabelog.com/tokyo/A1303/A130301/13292348/';
+  const official = 'https://recoco.cafe/';
+  assert.deepEqual(
+    restaurantLinks({
+      kind: 'food',
+      officialUrl: official,
+      reservation: { label: 'Unknown' },
+      sources: [],
+      openingHours: {
+        value: '11:00–20:00',
+        sourceUrl: scheduleListing,
+        observedAt: '2026-10-04T00:00:00.000Z',
+      },
+      scheduleCheck: {
+        openingHours: 'known',
+        regularClosingDays: 'unavailable',
+        checkedAt: '2026-10-04T00:00:00.000Z',
+      },
+    }),
+    [
+      { role: 'tabelog', label: 'Tabelog', url: scheduleListing },
+      { role: 'official', label: 'Official website', url: official },
+    ],
+  );
+});
+
+test('schedule-link fallback rejects non-listing Tabelog URLs and unavailable claims', () => {
+  const official = 'https://recoco.cafe/';
+  const base = {
+    kind: 'food',
+    officialUrl: official,
+    reservation: { label: 'Unknown' },
+    sources: [],
+  };
+  for (const sourceUrl of [
+    'https://tabelog.com/tokyo/A1301/A130101/13157424/dtlrvwlst/',
+    'https://tabelog.com/rst/ranking/',
+    'https://www.tabelog.com/tokyo/A1301/A130101/13157424/',
+    'http://tabelog.com/tokyo/A1301/A130101/13157424/',
+  ]) {
+    assert.deepEqual(
+      restaurantLinks({
+        ...base,
+        openingHours: {
+          value: '11:00–20:00',
+          sourceUrl,
+          observedAt: '2026-10-04T00:00:00.000Z',
+        },
+      }),
+      [{ role: 'official', label: 'Official website', url: official }],
+      sourceUrl,
+    );
+  }
+  assert.deepEqual(
+    restaurantLinks({
+      ...base,
+      openingHours: {
+        value: '11:00–20:00',
+        sourceUrl: 'https://tabelog.com/tokyo/A1301/A130101/13157424/',
+        observedAt: '2026-10-04T00:00:00.000Z',
+      },
+      scheduleCheck: {
+        openingHours: 'unavailable',
+        regularClosingDays: 'unavailable',
+        checkedAt: '2026-10-04T00:00:00.000Z',
+      },
+    }),
+    [{ role: 'official', label: 'Official website', url: official }],
+  );
+});
+
+test('schedule-source fallback also recognizes seven-digit regional Tabelog listings', () => {
+  const sourceUrl = 'https://tabelog.com/aomori/A0201/A020101/2000092/';
+  assert.deepEqual(
+    restaurantLinks({
+      kind: 'food',
+      reservation: { label: 'Unknown' },
+      sources: [],
+      openingHours: {
+        value: '10:00–18:00',
+        sourceUrl,
+        observedAt: '2026-10-04T00:00:00.000Z',
+      },
+    }),
+    [{ role: 'tabelog', label: 'Tabelog', url: sourceUrl }],
+  );
+});

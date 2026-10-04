@@ -23,12 +23,7 @@
         {
           "sourceUrl": "https://tabelog.com/kanagawa/A1409/A140901/14081631/",
           "quote": "[月]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[火]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[水]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[木]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[金]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[土]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[日]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n\n\n■ 定休日\n施設に準ずる",
-          "note": "Tabelog row differs from official Minaka page: official lists lunch 11:00–15:30 (L.O.14:30); exact Tabelog business row prioritized."
-        },
-        {
-          "sourceUrl": "https://www.minaka-odawara.jp/0035/",
-          "quote": "営業時間 11:00～15:30 (L.O.14:30)／17:00～21:00 (L.O.20:00); 定休日 -",
-          "note": "Official facility restaurant page differs on lunch closing time from Tabelog; Tabelog row retained as preferred source."
+          "note": "The exact Tabelog business-information row states the listed lunch interval and last order."
         }
       ]
     },
@@ -233,25 +228,16 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13144260/",
         "observedAt": "2026-10-04T05:55:27.000Z"
       },
-      "regularClosingDays": {
-        "value": "年中無休",
-        "sourceUrl": "https://www.tonkotsukun.com/tenpo",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13144260/",
           "quote": "[月]\n　11:00 - 01:00\n[火]\n　11:00 - 01:00\n[水]\n　11:00 - 01:00\n[木]\n　11:00 - 01:00\n[金]\n　11:00 - 01:00\n[土]\n　11:00 - 01:00\n[日]\n　11:00 - 01:00",
           "note": "Exact listing row checked; branch name/address matched the assigned listing."
-        },
-        {
-          "sourceUrl": "https://www.tonkotsukun.com/tenpo",
-          "quote": "博多ラーメン長浜や 上野店／定休日 年中無休",
-          "note": "Official Nagahamaya branch table identifies 博多ラーメン長浜や 上野店 and states 年中無休."
         }
-      ]
+      ],
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "diwali-umeda",
@@ -387,24 +373,29 @@
       "id": "recoco-shibuya",
       "itemId": "8cab882f-8320-429a-8039-fd8708b8dda3",
       "name": "Recoco Record Cafe",
-      "listingUrl": null,
+      "listingUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
       "openingHours": {
-        "value": "11:00～21:00（L.O.20:30）",
-        "sourceUrl": "https://recoco.cafe/",
-        "observedAt": "2026-10-04T06:04:45.000Z"
-      },
-      "regularClosingDays": {
-        "value": "なし（年末年始は店休日あり）",
-        "sourceUrl": "https://recoco.cafe/",
-        "observedAt": "2026-10-04T06:04:45.000Z"
+        "value": "[月] 11:00 - 21:00（L.O. 20:30） [火] 11:00 - 21:00（L.O. 20:30） [水] 11:00 - 21:00（L.O. 20:30） [木] 11:00 - 21:00（L.O. 20:30） [金] 11:00 - 21:00（L.O. 20:30） [土] 11:00 - 21:00（L.O. 20:30） [日] 11:00 - 21:00（L.O. 20:30）",
+        "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+        "observedAt": "2026-10-04T07:38:37.000Z"
       },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
-          "sourceUrl": "https://recoco.cafe/",
-          "quote": "RECOCO渋谷／営業時間 11:00～21:00 (LO 20:30)／定休日 なし　（年末年始は店休日あり）／住所 〒150-0002 東京都渋谷区渋谷３丁目１−１０ IRIE FIRST PLAZA 1階",
-          "note": "Official page section #access_map gives this row under 渋谷店 and labels the branch RECOCO渋谷. Its exact address matches the assigned Shibuya location. The explicit 定休日 row states なし with a year-end exception; this does not rely on the all-week hours row."
+          "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+          "quote": "店名 RECOCO （レココ）; 住所 東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F; 営業時間 11:00 - 21:00（L.O. 20:30）",
+          "note": "Exact Tabelog listing identity and current business information row; the listed address matches the assigned Shibuya branch."
+        }
+      ],
+      "unavailableReason": "The exact Tabelog listing has weekday hours but does not explicitly state a regular weekly closure policy.",
+      "closingNotesUnavailableReason": "No separate closing note is stated on the exact Tabelog listing.",
+      "verifiedNameAliases": [
+        {
+          "value": "RECOCO",
+          "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+          "evidenceQuote": "RECOCO （レココ）",
+          "addressQuote": "東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F"
         }
       ]
     },
@@ -418,25 +409,16 @@
         "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2013517/",
         "observedAt": "2026-10-04T05:55:27.000Z"
       },
-      "regularClosingDays": {
-        "value": "年中無休",
-        "sourceUrl": "https://naviaomori.com/017-757-9255/",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2013517/",
           "quote": "[月]\n　11:00 - 00:00\n[火]\n　11:00 - 00:00\n[水]\n　11:00 - 00:00\n[木]\n　11:00 - 00:00\n[金]\n　11:00 - 00:00\n[土]\n　11:00 - 00:00\n[日]\n　11:00 - 00:00",
-          "note": "Alternate branch listing matches exact phone and states year-round; Tabelog itself has no regular closure row."
-        },
-        {
-          "sourceUrl": "https://naviaomori.com/017-757-9255/",
-          "quote": "青森 帆立家【住所】青森県青森市新町1-11-17 丸倉新町ビル1階【電話】017-757-9255／年中無休",
-          "note": "Alternate listing identifies 青森 帆立家 at the exact input address and phone, and states 年中無休. Tabelog main page has no closure row."
+          "note": "A different branch was excluded; the exact Tabelog listing has no regular closure row."
         }
-      ]
+      ],
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "shogun-burger-shinjuku",
@@ -486,24 +468,10 @@
           "sourceUrl": "https://tabelog.com/tokyo/A1318/A131802/13012546/",
           "quote": "[月]\n　12:00 - 19:00\n[火]\n　12:00 - 19:00\n[水]\n　12:00 - 19:00\n[木]\n　12:00 - 19:00\n[金]\n　12:00 - 19:00\n[土]\n　12:00 - 19:00\n[日]\n　12:00 - 19:00\n\n2025年1月より営業時間変更、全日12時〜19時",
           "note": "The local merchants association branch listing gives 元日のみ but older hours that conflict with current Tabelog; use only its closure wording."
-        },
-        {
-          "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-          "quote": "いーはとーぼ ... 世田谷区北沢2-34-9トキワビル2Ｆ ... 定休日 元日のみ",
-          "note": "Local Shimokitazawa merchants association listing matches branch address and states New Year's Day only; its displayed hours (12:00–翌1:00) conflict with current Tabelog hours, so only closure wording is used."
-        },
-        {
-          "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-          "quote": "元日のみ",
-          "note": "The local merchants association page matches the restaurant address and telephone. It reports only 元日のみ; its opening-hours value is older than current Tabelog, so only the holiday closure note is retained."
         }
       ],
       "unavailableReason": "The checked source states only an annual/holiday closure and does not state a fixed weekly closure day.",
-      "closingNotes": {
-        "value": "元日のみ",
-        "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      }
+      "closingNotesUnavailableReason": "This closing note is not stated on the exact Tabelog listing."
     },
     {
       "id": "onibus-nakameguro",
@@ -530,5 +498,7 @@
         }
       ]
     }
-  ]
+  ],
+  "scheduleSourcePolicy": "tabelog_only",
+  "sourcePriority": ["current_exact_branch_tabelog"]
 }

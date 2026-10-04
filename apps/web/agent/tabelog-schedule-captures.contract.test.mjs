@@ -33,8 +33,8 @@ const gold = JSON.parse(
 ).cases;
 const goldById = new Map(gold.map((item) => [item.itemId, item]));
 
-test('all 55 independently captured exact listings supply bounded hours through the production reader', async () => {
-  assert.equal(captures.length, 55);
+test('all 56 independently captured exact listings supply bounded hours through the production reader', async () => {
+  assert.equal(captures.length, 56);
   assert.deepEqual(
     new Set(captures.map((c) => c.itemId)),
     new Set(inventory.filter((c) => c.listingUrl).map((c) => c.itemId)),

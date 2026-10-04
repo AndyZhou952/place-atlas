@@ -1,13 +1,9 @@
 {
   "schemaVersion": 1,
-  "benchmarkId": "catalog-hours-2026-10-04-v1",
+  "benchmarkId": "catalog-hours-tabelog-only-2026-10-04-v2",
   "scope": "all_existing_restaurants",
   "observedDate": "2026-10-04",
-  "sourcePriority": [
-    "current_exact_branch_tabelog",
-    "current_exact_branch_official",
-    "current_exact_branch_google_places"
-  ],
+  "sourcePriority": ["current_exact_branch_tabelog"],
   "inventoryId": "catalog-hours-inventory-2026-10-04-v1",
   "cases": [
     {
@@ -98,27 +94,18 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13120708/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "無し",
-        "sourceUrl": "https://gonokamiseisakusho.com/shinjyuku.html",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13120708/",
           "quote": "11:00 - 21:30 L.O. 21:00",
           "note": "Raw current business-information row matches the assigned 千駄ヶ谷 / Shinjuku-gyoen branch."
-        },
-        {
-          "sourceUrl": "https://gonokamiseisakusho.com/shinjyuku.html",
-          "quote": "住所 東京都渋谷区千駄ヶ谷5-33-16; 営業時間 11:00～21:30(L.O 21:00); 定休日 無し",
-          "note": "Official branch page matches the listing address and explicitly states no regular closing day."
         }
       ],
       "address": "東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F",
-      "observedAt": "2026-10-04T05:57:16.000Z"
+      "observedAt": "2026-10-04T05:57:16.000Z",
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "akha-ama-kagurazaka",
@@ -217,27 +204,18 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1302/A130201/13232095/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "なし",
-        "sourceUrl": "https://www.tomita-cocoro.jp/store/",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1302/A130201/13232095/",
           "quote": "月・火・水・木・金 11:00 - 22:00 L.O. 料理21:30; 土・日・祝日 11:00 - 21:00 L.O. 料理20:30",
           "note": "Raw current Tabelog row is primary for schedule; address matches KITTE丸の内 B1F."
-        },
-        {
-          "sourceUrl": "https://www.tomita-cocoro.jp/store/",
-          "quote": "松戸富田麺絆; 東京都千代田区丸の内2-7-2 KITTE丸の内 B1F; 営業時間 月～金 11:00～21:30 土・日・祝 11:00～20:30; 定休日 なし",
-          "note": "Official group page exactly matches branch address and explicitly states no closure. Its hours conflict with Tabelog (21:30 vs 22:00 weekday close, and 20:30 vs 21:00 weekend close); the preferred current Tabelog schedule is retained."
         }
       ],
       "address": "東京都千代田区丸の内２丁目７−２ KITTE丸の内 KITTE GRANCHE",
-      "observedAt": "2026-10-04T05:57:16.000Z"
+      "observedAt": "2026-10-04T05:57:16.000Z",
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "ramen-kai-kuramae-hours",
@@ -287,7 +265,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
           "quote": "[月]～[日] 24時間営業; 年中無休",
-          "note": "The same listing cautions hours may change and points to the official site. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+          "note": "The exact Tabelog listing cautions that hours may change; full-page HTML captured at 2026-10-04T05:45:41.000Z."
         },
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
@@ -647,6 +625,11 @@
           "sourceUrl": "https://tabelog.com/tokyo/A1323/A132301/13147756/",
           "quote": "火・水・木・金・土・日・祝日 11:00 - 22:00; 月 定休日; L.O.：22:00; 月曜（祝日の場合は営業、休みが後ろにずれます）",
           "note": "Listing address is 中里1-3-3 板橋ビル 1F, matching the assigned branch; weekday closure substitution is retained."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1323/A132301/13147756/",
+          "quote": "ガンコンヌードル （GANCON NOODLE）; 住所 中里1-3-3 板橋ビル（青山ビル）1F",
+          "note": "The exact Tabelog listing page names the restaurant and gives the branch address matching the saved catalog location."
         }
       ],
       "address": "東京都北区中里１丁目３−３ 板橋ビル(青山ビル 1階",
@@ -696,27 +679,18 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
         "observedAt": "2026-10-04T05:57:16.000Z"
       },
-      "regularClosingDays": {
-        "value": "Everyday（毎日営業）",
-        "sourceUrl": "https://vervecoffee.jp/pages/locations",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
           "quote": "07:00 - 21:00",
-          "note": "Raw current business-information row matches the official location schedule. Listing address matches the 六本木 branch."
-        },
-        {
-          "sourceUrl": "https://vervecoffee.jp/pages/locations",
-          "quote": "ROPPONGI; 東京都港区六本木5-16-7; Everyday / 7:00 am - 9:00 pm",
-          "note": "Official location page exactly matches the branch name, address, and hours; its explicit Everyday schedule establishes no fixed weekly closure."
+          "note": "Current Tabelog business-information row is tied to the exact 六本木 branch listing address."
         }
       ],
       "address": "東京都港区六本木5-16-7",
-      "observedAt": "2026-10-04T05:57:16.000Z"
+      "observedAt": "2026-10-04T05:57:16.000Z",
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "ginza-miyoshi-hours",
@@ -730,26 +704,17 @@
       },
       "hoursStatus": "known",
       "weeklyClosureStatus": "unavailable",
-      "unavailableReason": "The current exact-branch Tabelog page does not state a regular weekly closing day; alternate exact-address results only report a seasonal closure.",
-      "closingNotes": {
-        "value": "年末年始",
-        "sourceUrl": "https://autoreserve.com/ja/restaurants/XUT9e96tXRCHFnQYxgwu",
-        "observedAt": "2026-10-04T05:57:16.000Z"
-      },
+      "unavailableReason": "The exact-branch Tabelog page does not state a regular weekly closing day.",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13285959/",
           "quote": "月〜金 11:00 - 14:30（L.O. 14:00）/ 17:30 - 22:00（L.O. 21:30）; 土・日・祝日 11:00 - 15:30（L.O. 15:00）/ 17:30 - 22:00（L.O. 21:30）",
           "note": "Listing address matches 昭和イーティングビル 1F. Tabelog says service was extended until 22:00; it gives no regular closing day."
-        },
-        {
-          "sourceUrl": "https://autoreserve.com/ja/restaurants/XUT9e96tXRCHFnQYxgwu",
-          "quote": "東京都中央区銀座6丁目3-15 昭和イーティングビル1F; 定休日：年末年始",
-          "note": "Exact-address secondary listing supports an annual closure note, not a regular weekly closing day. No official exact-branch closing schedule was found; the official Tsukiji branch is a different address and was excluded."
         }
       ],
       "address": "東京都中央区銀座６丁目３−１５ 昭和イーティングビル １階",
-      "observedAt": "2026-10-04T05:57:16.000Z"
+      "observedAt": "2026-10-04T05:57:16.000Z",
+      "closingNotesUnavailableReason": "This closing note is not stated on the exact Tabelog listing."
     },
     {
       "id": "mendokoro-tenho",
@@ -795,12 +760,7 @@
         {
           "sourceUrl": "https://tabelog.com/kanagawa/A1409/A140901/14081631/",
           "quote": "[月]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[火]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[水]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[木]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[金]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[土]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n[日]\n　11:00 - 14:30\n　17:00 - 21:00（L.O. 20:00）\n\n\n■ 定休日\n施設に準ずる",
-          "note": "Tabelog row differs from official Minaka page: official lists lunch 11:00–15:30 (L.O.14:30); exact Tabelog business row prioritized."
-        },
-        {
-          "sourceUrl": "https://www.minaka-odawara.jp/0035/",
-          "quote": "営業時間 11:00～15:30 (L.O.14:30)／17:00～21:00 (L.O.20:00); 定休日 -",
-          "note": "Official facility restaurant page differs on lunch closing time from Tabelog; Tabelog row retained as preferred source."
+          "note": "The exact Tabelog business-information row states the listed lunch interval and last order."
         }
       ],
       "address": "神奈川県小田原市栄町1-1-15 ミナカ小田原 2F",
@@ -883,26 +843,12 @@
           "sourceUrl": "https://tabelog.com/tokyo/A1318/A131802/13012546/",
           "quote": "[月]\n　12:00 - 19:00\n[火]\n　12:00 - 19:00\n[水]\n　12:00 - 19:00\n[木]\n　12:00 - 19:00\n[金]\n　12:00 - 19:00\n[土]\n　12:00 - 19:00\n[日]\n　12:00 - 19:00\n\n2025年1月より営業時間変更、全日12時〜19時",
           "note": "The local merchants association branch listing gives 元日のみ but older hours that conflict with current Tabelog; use only its closure wording."
-        },
-        {
-          "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-          "quote": "いーはとーぼ ... 世田谷区北沢2-34-9トキワビル2Ｆ ... 定休日 元日のみ",
-          "note": "Local Shimokitazawa merchants association listing matches branch address and states New Year's Day only; its displayed hours (12:00–翌1:00) conflict with current Tabelog hours, so only closure wording is used."
-        },
-        {
-          "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-          "quote": "元日のみ",
-          "note": "The local merchants association page matches the restaurant address and telephone. It reports only 元日のみ; its opening-hours value is older than current Tabelog, so only the holiday closure note is retained."
         }
       ],
       "unavailableReason": "The checked source states only an annual/holiday closure and does not state a fixed weekly closure day.",
-      "closingNotes": {
-        "value": "元日のみ",
-        "sourceUrl": "https://shimokita1ban.com/%E3%81%84%E3%83%BC%E3%81%AF%E3%81%A8%E3%83%BC%E3%81%BC/",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      },
       "address": "東京都世田谷区北沢２丁目３４−９ 第１トキワビル 2F",
-      "observedAt": "2026-10-04T05:55:27.000Z"
+      "observedAt": "2026-10-04T05:55:27.000Z",
+      "closingNotesUnavailableReason": "This closing note is not stated on the exact Tabelog listing."
     },
     {
       "id": "aldebaran-azabujuban-hours",
@@ -935,28 +881,33 @@
       "id": "recoco-shibuya",
       "itemId": "8cab882f-8320-429a-8039-fd8708b8dda3",
       "name": "Recoco Record Cafe",
-      "listingUrl": null,
+      "listingUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
       "openingHours": {
-        "value": "11:00～21:00（L.O.20:30）",
-        "sourceUrl": "https://recoco.cafe/",
-        "observedAt": "2026-10-04T06:04:45.000Z"
-      },
-      "regularClosingDays": {
-        "value": "なし（年末年始は店休日あり）",
-        "sourceUrl": "https://recoco.cafe/",
-        "observedAt": "2026-10-04T06:04:45.000Z"
+        "value": "[月] 11:00 - 21:00（L.O. 20:30） [火] 11:00 - 21:00（L.O. 20:30） [水] 11:00 - 21:00（L.O. 20:30） [木] 11:00 - 21:00（L.O. 20:30） [金] 11:00 - 21:00（L.O. 20:30） [土] 11:00 - 21:00（L.O. 20:30） [日] 11:00 - 21:00（L.O. 20:30）",
+        "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+        "observedAt": "2026-10-04T07:38:37.000Z"
       },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
-          "sourceUrl": "https://recoco.cafe/",
-          "quote": "RECOCO渋谷／営業時間 11:00～21:00 (LO 20:30)／定休日 なし　（年末年始は店休日あり）／住所 〒150-0002 東京都渋谷区渋谷３丁目１−１０ IRIE FIRST PLAZA 1階",
-          "note": "Official page section #access_map gives this row under 渋谷店 and labels the branch RECOCO渋谷. Its exact address matches the assigned Shibuya location. The explicit 定休日 row states なし with a year-end exception; this does not rely on the all-week hours row."
+          "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+          "quote": "店名 RECOCO （レココ）; 住所 東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F; 営業時間 11:00 - 21:00（L.O. 20:30）",
+          "note": "Exact Tabelog listing identity and current business information row; the listed address matches the assigned Shibuya branch."
         }
       ],
       "address": "東京都渋谷区渋谷３丁目１−１０ PLAZA1階",
-      "observedAt": "2026-10-04T06:04:45.000Z"
+      "observedAt": "2026-10-04T06:04:45.000Z",
+      "unavailableReason": "The exact Tabelog listing has weekday hours but does not explicitly state a regular weekly closure policy.",
+      "closingNotesUnavailableReason": "No separate closing note is stated on the exact Tabelog listing.",
+      "verifiedNameAliases": [
+        {
+          "value": "RECOCO",
+          "sourceUrl": "https://tabelog.com/tokyo/A1303/A130301/13292348/",
+          "evidenceQuote": "RECOCO （レココ）",
+          "addressQuote": "東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F"
+        }
+      ]
     },
     {
       "id": "nagahamaya-ueno",
@@ -968,27 +919,18 @@
         "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13144260/",
         "observedAt": "2026-10-04T05:55:27.000Z"
       },
-      "regularClosingDays": {
-        "value": "年中無休",
-        "sourceUrl": "https://www.tonkotsukun.com/tenpo",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13144260/",
           "quote": "[月]\n　11:00 - 01:00\n[火]\n　11:00 - 01:00\n[水]\n　11:00 - 01:00\n[木]\n　11:00 - 01:00\n[金]\n　11:00 - 01:00\n[土]\n　11:00 - 01:00\n[日]\n　11:00 - 01:00",
           "note": "Exact listing row checked; branch name/address matched the assigned listing."
-        },
-        {
-          "sourceUrl": "https://www.tonkotsukun.com/tenpo",
-          "quote": "博多ラーメン長浜や 上野店／定休日 年中無休",
-          "note": "Official Nagahamaya branch table identifies 博多ラーメン長浜や 上野店 and states 年中無休."
         }
       ],
       "address": "東京都台東区上野７丁目２−１ 昭栄ビル １階",
-      "observedAt": "2026-10-04T05:55:27.000Z"
+      "observedAt": "2026-10-04T05:55:27.000Z",
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "shogun-burger-shinjuku",
@@ -1068,12 +1010,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
           "quote": "月・火・水・木・金 17:00 - 23:00; 土 12:00 - 14:00 L.O. 13:00 / 17:00 - 23:00; 日・祝日 12:00 - 14:00 L.O. 13:00 / 17:00 - 22:00; 月〜金 最終入店21:30; 土 日 祝 ディナー 最終入店21:00; 定休日 年末年始",
-          "note": "Current detailed row matches the assigned Naka-meguro Prea Tower 1F branch. Tabelog's Sunday/holiday dinner closing time and weekend dinner last entry differ from the official page."
-        },
-        {
-          "sourceUrl": "https://gf-restaurant.jp/rodeo/nakameguro",
-          "quote": "月〜金：17:00 - 23:00 / 土・日・祝：12:00〜14:00 ※L.O. 13:00、17:00 - 23:00 / ※全日最終入店 21:30 / 定休日 年末年始",
-          "note": "Official branch page lists 23:00 Sunday/holiday dinner close and 21:30 last entry every day. Tabelog lists 22:00 on Sunday/holidays and 21:00 weekend/holiday dinner last entry; schedules are kept separate."
+          "note": "The Tabelog business-information row preserves this branch’s weekday/weekend dinner and last-entry distinctions."
         }
       ],
       "address": "東京都目黒区中目黒３丁目５−１",
@@ -1186,7 +1123,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
           "quote": "月～金 11:30 - 15:00 / 18:00 - 22:30 L.O. 22:00; 土・日・祝日 11:30 - 20:00 L.O. 19:30; 定休日 不定休でお休みを頂く場合があります。",
-          "note": "Listing requests checking Google business hours for irregular closures, retained verbatim. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+          "note": "The exact Tabelog listing records its guidance for irregular closures; full-page HTML captured at 2026-10-04T05:45:41.000Z."
         },
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
@@ -1370,27 +1307,18 @@
         "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2013517/",
         "observedAt": "2026-10-04T05:55:27.000Z"
       },
-      "regularClosingDays": {
-        "value": "年中無休",
-        "sourceUrl": "https://naviaomori.com/017-757-9255/",
-        "observedAt": "2026-10-04T05:55:27.000Z"
-      },
       "hoursStatus": "known",
-      "weeklyClosureStatus": "known",
+      "weeklyClosureStatus": "unavailable",
       "evidence": [
         {
           "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2013517/",
           "quote": "[月]\n　11:00 - 00:00\n[火]\n　11:00 - 00:00\n[水]\n　11:00 - 00:00\n[木]\n　11:00 - 00:00\n[金]\n　11:00 - 00:00\n[土]\n　11:00 - 00:00\n[日]\n　11:00 - 00:00",
-          "note": "Alternate branch listing matches exact phone and states year-round; Tabelog itself has no regular closure row."
-        },
-        {
-          "sourceUrl": "https://naviaomori.com/017-757-9255/",
-          "quote": "青森 帆立家【住所】青森県青森市新町1-11-17 丸倉新町ビル1階【電話】017-757-9255／年中無休",
-          "note": "Alternate listing identifies 青森 帆立家 at the exact input address and phone, and states 年中無休. Tabelog main page has no closure row."
+          "note": "A different branch was excluded; the exact Tabelog listing has no regular closure row."
         }
       ],
       "address": "青森県青森市新町１丁目１１−１７ 丸倉新町ビル 1階",
-      "observedAt": "2026-10-04T05:55:27.000Z"
+      "observedAt": "2026-10-04T05:55:27.000Z",
+      "unavailableReason": "The exact Tabelog listing does not explicitly state a regular weekly closure policy."
     },
     {
       "id": "yotsuya-takeda",
@@ -1661,5 +1589,6 @@
       "address": "東京都杉並区成田東4-33-9",
       "observedAt": "2026-10-04T05:57:16.000Z"
     }
-  ]
+  ],
+  "scheduleSourcePolicy": "tabelog_only"
 }

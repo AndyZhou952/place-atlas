@@ -125,7 +125,7 @@ test('model cannot turn RODEO seasonal New Year closure into regularClosingDays'
   assert.equal(result.value.profile.regularClosingDays, undefined);
 });
 
-test('official group JSON-LD is only a branch-navigation hint; matching branch hours require a refetch', async () => {
+test('official group JSON-LD can guide branch navigation but never supplies Japanese schedule fields', async () => {
   const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13213575/';
   const groupUrl = 'https://gf-restaurant.example/';
   const branchUrl = 'https://gf-restaurant.example/rodeo/nakameguro';
@@ -231,11 +231,7 @@ test('official group JSON-LD is only a branch-navigation hint; matching branch h
     assert.equal(result.kind, 'observed', variant);
     if (variant === 'matching_refetched') {
       assert.deepEqual(fetched, [branchUrl]);
-      assert.match(
-        result.value.profile.openingHours.value,
-        /月・火・水・木・金 17:00 - 23:00/u,
-      );
-      assert.equal(result.value.profile.openingHours.sourceUrl, branchUrl);
+      assert.equal(result.value.profile.openingHours, undefined);
     } else {
       assert.deepEqual(
         fetched,

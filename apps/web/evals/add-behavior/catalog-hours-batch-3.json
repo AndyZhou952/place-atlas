@@ -100,7 +100,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
           "quote": "[月]～[日] 24時間営業; 年中無休",
-          "note": "The same listing cautions hours may change and points to the official site. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+          "note": "The exact Tabelog listing cautions that hours may change; full-page HTML captured at 2026-10-04T05:45:41.000Z."
         },
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
@@ -335,7 +335,7 @@
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
           "quote": "月～金 11:30 - 15:00 / 18:00 - 22:30 L.O. 22:00; 土・日・祝日 11:30 - 20:00 L.O. 19:30; 定休日 不定休でお休みを頂く場合があります。",
-          "note": "Listing requests checking Google business hours for irregular closures, retained verbatim. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+          "note": "The exact Tabelog listing records its guidance for irregular closures; full-page HTML captured at 2026-10-04T05:45:41.000Z."
         },
         {
           "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
@@ -467,5 +467,7 @@
         }
       ]
     }
-  ]
+  ],
+  "scheduleSourcePolicy": "tabelog_only",
+  "sourcePriority": ["current_exact_branch_tabelog"]
 }

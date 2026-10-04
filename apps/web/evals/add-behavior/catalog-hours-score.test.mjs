@@ -454,6 +454,12 @@ test('candidate selection requires exact normalized branch name and full address
         evidenceQuote: 'ガンコンヌードル （GANCON NOODLE）',
       },
     ],
+    evidence: [
+      {
+        sourceUrl: 'https://tabelog.com/tokyo/A1323/A132301/13147756/',
+        quote: 'ガンコンヌードル （GANCON NOODLE）',
+      },
+    ],
   };
   assert.equal(
     exactProfileIdentityMatch(gancon, {
@@ -464,6 +470,62 @@ test('candidate selection requires exact normalized branch name and full address
       address: { value: gancon.address },
     }),
     true,
+  );
+  const primaryNamedBranch = {
+    name: 'Saved Cafe Name',
+    listingUrl: 'https://tabelog.com/tokyo/A1303/A130301/13292348/',
+    address: '東京都渋谷区渋谷3-1-10 PLAZA 1F',
+    verifiedNameAliases: [
+      {
+        value: 'RECOCO',
+        sourceUrl: 'https://tabelog.com/tokyo/A1303/A130301/13292348/',
+        evidenceQuote: 'RECOCO （レココ）',
+        addressQuote: '東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F',
+      },
+    ],
+    evidence: [
+      {
+        sourceUrl: 'https://tabelog.com/tokyo/A1303/A130301/13292348/',
+        quote:
+          'RECOCO （レココ）; 住所 東京都渋谷区渋谷3-1-10 ザホライゾン渋谷 1F',
+      },
+    ],
+  };
+  assert.equal(
+    exactProfileIdentityMatch(primaryNamedBranch, {
+      name: { value: 'RECOCO', sourceUrl: primaryNamedBranch.listingUrl },
+      address: {
+        value: primaryNamedBranch.verifiedNameAliases[0].addressQuote,
+      },
+    }),
+    true,
+  );
+  const detachedAddressAlias = {
+    ...primaryNamedBranch,
+    verifiedNameAliases: [
+      {
+        ...primaryNamedBranch.verifiedNameAliases[0],
+        addressQuote: '東京都渋谷区渋谷9-9-9 別の建物 1F',
+      },
+    ],
+  };
+  assert.equal(
+    exactProfileIdentityMatch(detachedAddressAlias, {
+      name: { value: 'RECOCO', sourceUrl: primaryNamedBranch.listingUrl },
+      address: {
+        value: primaryNamedBranch.verifiedNameAliases[0].addressQuote,
+      },
+    }),
+    false,
+  );
+  assert.equal(
+    exactProfileIdentityMatch(primaryNamedBranch, {
+      name: { value: 'RECOCO', sourceUrl: 'https://tabelog.com/other-branch/' },
+      address: {
+        value: primaryNamedBranch.verifiedNameAliases[0].addressQuote,
+      },
+    }),
+    false,
   );
   assert.equal(
     exactProfileIdentityMatch(

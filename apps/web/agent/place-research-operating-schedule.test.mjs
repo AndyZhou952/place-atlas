@@ -3,20 +3,18 @@ import test from 'node:test';
 
 import { createPlaceResearchAgent } from './place-research.ts';
 
-const subject = {
+const japanSubject = {
   ownerQuery: '焼鳥 にしき 湯島',
   providerNamespace: 'google-places',
   placeId: 'google-yushima-branch',
   transientName: '焼鳥 にしき',
   transientAddress: '東京都文京区湯島3-36-12',
 };
-const input = {
-  phase: 'initial',
-  selectedSubject: subject,
-  scope: { ownerId: 'owner', channel: 'web', conversationId: 'hours-test' },
-  sessionId: 'hours-session',
-  expectedSessionVersion: 1,
-  queryOrUrlsDigest: 'unused',
+const selectedBranch = {
+  name: '焼鳥 にしき',
+  address: '東京都文京区湯島3-36-12 TSKビル 1F',
+  area: '東京都文京区湯島',
+  categories: ['焼き鳥'],
 };
 const listingUrl = 'https://tabelog.com/tokyo/A1311/A131101/13297763/';
 const modelTool = {
@@ -27,14 +25,8 @@ const modelTool = {
     arguments: JSON.stringify({ query: '焼鳥 にしき 湯島 食べログ' }),
   },
 };
-const selectedBranch = {
-  name: '焼鳥 にしき',
-  address: '東京都文京区湯島3-36-12 TSKビル 1F',
-  area: '東京都文京区湯島',
-  categories: ['焼き鳥'],
-};
 
-test('Tabelog schedule takes precedence over a conflicting Google schedule', async () => {
+test('Japan schedule fields come from the verified Tabelog row and skip Google', async () => {
   let googleScheduleCalls = 0;
   const result = await research({
     listing: {
@@ -55,65 +47,107 @@ test('Tabelog schedule takes precedence over a conflicting Google schedule', asy
   });
 
   assert.equal(result.kind, 'observed');
-  assert.equal(result.value.profile.openingHours.value, listingSchedule());
+  assert.equal(
+    result.value.profile.openingHours.value,
+    '月〜土 18:00 - 22:30; 日・祝 定休日',
+  );
   assert.equal(result.value.profile.openingHours.sourceUrl, listingUrl);
   assert.equal(result.value.profile.regularClosingDays.value, '日曜日、祝日');
   assert.equal(result.value.profile.regularClosingDays.sourceUrl, listingUrl);
   assert.equal(googleScheduleCalls, 0);
 });
 
-test('Google schedule fills hours when the verified Tabelog listing has none', async () => {
+test('Japan keeps schedules unknown when Tabelog omits them despite official and model claims', async () => {
+  const officialUrl = 'https://gonokamiseisakusho.com/shinjyuku.html';
+  const name = 'つけ麺 五ノ神製作所';
+  const address = '東京都渋谷区千駄ヶ谷5-33-16';
+  const hours = '11:00～21:30(L.O 21:00)';
+  const identityQuote = `${name} ${address}`;
   const result = await research({
-    listing: selectedBranch,
-    googleSchedule: async (placeId) => {
-      assert.equal(placeId, subject.placeId);
-      return {
-        name: selectedBranch.name,
-        address: selectedBranch.address,
-        sourceUrl: 'https://maps.google.com/?cid=google-hours',
-        openingHours: '月曜日: 定休日\n火曜日: 17:00 - 23:00',
-        regularClosingDays: '月曜日: 定休日',
-      };
+    selectedSubject: {
+      ...japanSubject,
+      ownerQuery: `${name} 千駄ヶ谷`,
+      transientName: name,
+      transientAddress: `${address} シャトレー新宿御苑第一 1F`,
+    },
+    listing: {
+      ...selectedBranch,
+      name,
+      address: `${address} シャトレー新宿御苑第一 1F`,
+      officialWebsite: officialUrl,
+    },
+    googleSchedule: async () => ({
+      name,
+      address,
+      sourceUrl: 'https://maps.google.com/?cid=conflicting-hours',
+      openingHours: 'Every day: 11:00 - 22:00',
+      regularClosingDays: '火曜日',
+    }),
+    officialHtml: `<title>${name}</title><p>${identityQuote}</p><table><tr><td>営業時間</td><td>${hours}</td></tr><tr><td>定休日</td><td>無し</td></tr></table>`,
+    modelProposal: {
+      profile: {
+        openingHours: hours,
+        regularClosingDays: '無し',
+        closingNotes: '年末年始',
+      },
+      evidence: {
+        openingHours: {
+          url: officialUrl,
+          quote: hours,
+          identityQuote,
+        },
+        regularClosingDays: {
+          url: officialUrl,
+          quote: '無し',
+          identityQuote,
+        },
+        closingNotes: {
+          url: officialUrl,
+          quote: '年末年始',
+          identityQuote,
+        },
+      },
     },
   });
 
   assert.equal(result.kind, 'observed');
-  assert.equal(
-    result.value.profile.openingHours.value,
-    '月曜日: 定休日\n火曜日: 17:00 - 23:00',
-  );
-  assert.equal(
-    result.value.profile.openingHours.sourceUrl,
-    'https://maps.google.com/?cid=google-hours',
-  );
-  assert.equal(result.value.profile.regularClosingDays.value, '月曜日: 定休日');
+  assert.equal(result.value.profile.openingHours, undefined);
+  assert.equal(result.value.profile.regularClosingDays, undefined);
+  assert.equal(result.value.profile.closingNotes, undefined);
 });
 
-function listingSchedule() {
-  return '月〜土 18:00 - 22:30; 日・祝 定休日';
-}
-
-test('a branch-verified Google fallback retains sourced identity when listing and model are unavailable', async () => {
+test('non-Japanese schedule fields come from the selected Google Maps place', async () => {
+  const overseasSubject = {
+    ownerQuery: 'Burnt Ends Singapore',
+    providerNamespace: 'google-places',
+    placeId: 'google-burnt-ends',
+    transientName: 'Burnt Ends',
+    transientAddress: '7 Dempsey Road, Singapore 249679',
+  };
   const schedule = {
-    name: selectedBranch.name,
-    address: selectedBranch.address,
-    sourceUrl: 'https://maps.google.com/?cid=google-hours',
-    openingHours: '月曜日: 定休日\n火曜日: 17:00 - 23:00',
-    regularClosingDays: '月曜日: 定休日',
+    name: 'Burnt Ends',
+    address: '7 Dempsey Road, Singapore 249679',
+    sourceUrl: 'https://maps.google.com/?cid=burnt-ends',
+    openingHours: 'Monday: 12:00–14:00, 18:00–22:00',
+    regularClosingDays: 'Tuesday',
   };
   const result = await research({
-    listing: selectedBranch,
-    googleSchedule: async () => schedule,
+    selectedSubject: overseasSubject,
+    listing: {
+      name: overseasSubject.transientName,
+      address: overseasSubject.transientAddress,
+      area: 'Singapore',
+    },
+    googleSchedule: async (placeId) => {
+      assert.equal(placeId, overseasSubject.placeId);
+      return schedule;
+    },
     sourceUnavailable: true,
     modelUnavailable: true,
   });
+
   assert.equal(result.kind, 'observed');
-  for (const field of [
-    'name',
-    'address',
-    'openingHours',
-    'regularClosingDays',
-  ]) {
+  for (const field of ['openingHours', 'regularClosingDays']) {
     assert.equal(result.value.profile[field].value, schedule[field]);
     assert.equal(result.value.profile[field].sourceUrl, schedule.sourceUrl);
   }
@@ -121,67 +155,38 @@ test('a branch-verified Google fallback retains sourced identity when listing an
   assert.equal(result.value.reservation.status, 'unknown');
 });
 
-test('branch-verified official closure policy fills an absent Tabelog field and beats Google', async () => {
-  const officialUrl = 'https://gonokamiseisakusho.com/shinjyuku.html';
-  const officialRecord = {
-    '@type': 'Restaurant',
-    url: officialUrl,
-    name: 'つけ麺 五ノ神製作所',
-    address: {
-      addressRegion: '東京都',
-      addressLocality: '渋谷区',
-      streetAddress: '千駄ヶ谷5-33-16',
-    },
-    openingHoursSpecification: [
-      {
-        dayOfWeek: [
-          'Monday',
-          'Tuesday',
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-          'Sunday',
-        ],
-        opens: '11:00',
-        closes: '21:30',
-      },
-    ],
+test('Google schedule provider failure does not discard other verified overseas research', async () => {
+  const overseasSubject = {
+    ownerQuery: 'Burnt Ends Singapore',
+    providerNamespace: 'google-places',
+    placeId: 'google-burnt-ends',
+    transientName: 'Burnt Ends',
+    transientAddress: '7 Dempsey Road, Singapore 249679',
   };
   const result = await research({
-    selectedSubject: {
-      ...subject,
-      ownerQuery: 'つけ麺 五ノ神製作所 千駄ヶ谷',
-      transientName: 'つけ麺 五ノ神製作所',
-      transientAddress: '東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F',
-    },
+    selectedSubject: overseasSubject,
     listing: {
-      ...selectedBranch,
-      name: 'つけ麺 五ノ神製作所',
-      address: '東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F',
-      officialWebsite: officialUrl,
-      openingHours: '11:00 - 21:30',
+      name: 'Burnt Ends',
+      address: overseasSubject.transientAddress,
+      area: 'Singapore',
     },
-    googleSchedule: async () => ({
-      name: 'つけ麺 五ノ神製作所',
-      address: '東京都渋谷区千駄ヶ谷5-33-16',
-      sourceUrl: 'https://maps.google.com/?cid=conflicting-hours',
-      openingHours: '毎日 11:00 - 22:00',
-      regularClosingDays: '火曜日',
-    }),
-    officialHtml: `<title>つけ麺 五ノ神製作所</title><p>東京都渋谷区千駄ヶ谷5-33-16</p><table><tr><th>定休日</th><td>無し</td></tr></table><script type="application/ld+json">${JSON.stringify(officialRecord)}</script>`,
+    googleSchedule: async () => {
+      throw new Error('Google unavailable');
+    },
+    modelUnavailable: true,
   });
 
   assert.equal(result.kind, 'observed');
-  assert.equal(result.value.profile.regularClosingDays.value, '無し');
-  assert.equal(result.value.profile.regularClosingDays.sourceUrl, officialUrl);
+  assert.equal(result.value.profile.name.value, 'Burnt Ends');
+  assert.equal(result.value.profile.openingHours, undefined);
 });
 
 async function research({
-  selectedSubject = subject,
+  selectedSubject = japanSubject,
   listing,
   googleSchedule,
   officialHtml,
+  modelProposal,
   sourceUnavailable = false,
   modelUnavailable = false,
 }) {
@@ -232,6 +237,7 @@ async function research({
                       subjectMatch: 'matched',
                       tabelog: { status: 'unknown' },
                       reservation: { status: 'unknown' },
+                      ...modelProposal,
                     }),
                   },
           },
@@ -239,5 +245,12 @@ async function research({
       });
     },
   });
-  return agent.research({ ...input, selectedSubject });
+  return agent.research({
+    phase: 'initial',
+    selectedSubject,
+    scope: { ownerId: 'owner', channel: 'web', conversationId: 'hours-test' },
+    sessionId: 'hours-session',
+    expectedSessionVersion: 1,
+    queryOrUrlsDigest: 'unused',
+  });
 }

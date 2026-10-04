@@ -222,6 +222,77 @@ function intakeCatalogItem(id, evidence) {
   };
 }
 
+void test('the browser loads a mixed catalog with policy-only reservations and sourced schedules', async () => {
+  const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13000001/';
+  const observedAt = '2026-10-04T00:00:00.000Z';
+  const facts = {
+    tabelog: {
+      status: 'known',
+      score: 3.5,
+      url: listingUrl,
+      provenance: 'agent_observed',
+      observedAt,
+      freshness: 'fresh',
+    },
+    reservation: {
+      status: 'known',
+      mode: 'reservable',
+      label: '予約可',
+      url: listingUrl,
+      provenance: 'agent_observed',
+      observedAt,
+      freshness: 'fresh',
+    },
+  };
+  const hours = {
+    value: '月〜金 17:00 - 23:00; 土・日 12:00 - 14:00',
+    sourceUrl: 'https://restaurant.example/branch',
+    observedAt,
+  };
+  const closed = {
+    value: '祝日',
+    sourceUrl: 'https://restaurant.example/branch',
+    observedAt,
+  };
+  const response = await executePublicJsonRead({
+    manifest: createPublicReadManifest(),
+    operation: 'catalog.list',
+    principal: { kind: 'anonymous' },
+    async load() {
+      return [
+        intakeCatalogItem('policy-only', facts),
+        intakeCatalogItem('with-hours', {
+          ...facts,
+          profile: {
+            bookingLink: {
+              value: 'https://yoyaku.toreta.in/restaurant-branch/#/',
+              sourceUrl: 'https://yoyaku.toreta.in/restaurant-branch/#/',
+              observedAt,
+            },
+            openingHours: hours,
+            regularClosingDays: closed,
+          },
+        }),
+      ];
+    },
+  });
+  const items = await loadPublicCatalog({
+    async request(url) {
+      if (url === '/api/items') return response;
+      return Response.json({ favorite: false, effectiveVisited: false });
+    },
+  });
+  assert.equal(items.length, 2);
+  assert.equal(items[0].reservation.url, undefined);
+  assert.equal(items[0].reservation.label, '予約可');
+  assert.equal(
+    items[1].reservation.url,
+    'https://yoyaku.toreta.in/restaurant-branch/#/',
+  );
+  assert.deepEqual(items[1].openingHours, hours);
+  assert.deepEqual(items[1].regularClosingDays, closed);
+});
+
 void test('Owner full catalog retains classification and skips unpublished candidate assessments', async () => {
   const urls = [];
   const classification = {

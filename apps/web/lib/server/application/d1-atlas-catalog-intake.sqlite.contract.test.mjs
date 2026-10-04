@@ -10,6 +10,7 @@ import {
   createCatalogIntakeOperationGroup,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createCatalogRead } from '../../../product/application/catalog/catalog-read.ts';
+import { isAtlasItem } from '../../../product/application/catalog/catalog-projection.ts';
 import { createNearbyRecommendationOperationGroup } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
@@ -49,6 +50,8 @@ test('complete researched profile survives D1 publication and public projection 
       categories: claim(['洋食']),
       signatureDishes: claim(['Oysters']),
       summary: claim('A small restaurant.'),
+      openingHours: claim('Lunch 11:30–14:30; Dinner 17:00–22:00'),
+      regularClosingDays: claim('火曜日・第3水曜日'),
       officialWebsite: claim('https://example.com/'),
       bookingLink: claim('https://example.com/book'),
       googleRating: claim({ score: 4.2, reviewCount: 10 }),
@@ -83,14 +86,59 @@ test('complete researched profile survives D1 publication and public projection 
   assert.deepEqual(projected.classification, stored.classification);
   assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
+  assert.deepEqual(projected.openingHours, preview.profile.openingHours);
+  assert.deepEqual(
+    projected.regularClosingDays,
+    preview.profile.regularClosingDays,
+  );
+  assert.deepEqual(stored.openingHours, preview.profile.openingHours);
+  assert.deepEqual(
+    stored.regularClosingDays,
+    preview.profile.regularClosingDays,
+  );
   assert.equal(projected.googleRating.score, 4.2);
   assert.equal(projected.reservation.mode, 'not_reservable');
+  assert.equal(projected.reservation.url, 'https://example.com/book');
+  assert.equal(stored.reservation.url, 'https://example.com/book');
+  assert.equal(
+    stored.intakeEvidence.reservation.url,
+    'https://example.com/menu',
+  );
   assert.ok(
     projected.sources.some(
       (source) => source.url === 'https://example.com/book',
     ),
   );
   assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  assert.deepEqual(stored.scheduleCheck, {
+    openingHours: 'known',
+    regularClosingDays: 'known',
+    checkedAt: '2026-09-23T02:00:00.000Z',
+  });
+  assert.deepEqual(projected.scheduleCheck, stored.scheduleCheck);
+  const toreta = structuredClone(stored);
+  const toretaUrl = 'https://yoyaku.toreta.in/fixture-kitchen/#/';
+  toreta.intakeEvidence.reservation = {
+    ...toreta.intakeEvidence.reservation,
+    mode: 'reservable',
+    label: 'Reservations available',
+    url: toretaUrl,
+  };
+  toreta.intakeEvidence.profile.bookingLink = claim(toretaUrl);
+  toreta.reservation = {
+    ...toreta.reservation,
+    mode: 'advance',
+    label: 'Reservations available',
+    url: toretaUrl,
+  };
+  assert.equal(isAtlasItem(toreta), true);
+  assert.equal(
+    createPublicReadManifest().project('catalog.get', toreta).reservation.url,
+    toretaUrl,
+  );
+  const invalidToreta = structuredClone(toreta);
+  invalidToreta.intakeEvidence.reservation.url = `${toretaUrl}untrusted`;
+  assert.equal(isAtlasItem(invalidToreta), false);
   const catalog = createCatalogRead(new D1CatalogState(toD1(sqlite)), []);
   assert.equal((await catalog.list('verified_catalog'))[0]?.id, 'profile-item');
   const browserItems = await loadPublicCatalog({
@@ -103,6 +151,94 @@ test('complete researched profile survives D1 publication and public projection 
   assert.equal(browserItems[0].googleRating.score, 4.2);
   assert.equal(browserItems[0].reservation.mode, 'unavailable');
   assert.deepEqual(browserItems[0].tags, ['洋食', 'Oysters']);
+});
+
+test('Owner schedule corrections survive publication and the browser over earlier model facts', async () => {
+  const sqlite = await migratedDatabase();
+  const preview = withDigest({
+    ...verifiedPreview(),
+    ownerFields: {
+      ...verifiedPreview().ownerFields,
+      openingHours: {
+        value: '月・火 11:00 - 14:00\n17:00 - 21:00',
+        sourceUrl: 'https://example.com/current-hours',
+      },
+      regularClosingDays: {
+        value: '水曜日',
+        sourceUrl: 'https://example.com/current-hours',
+      },
+    },
+    profile: {
+      openingHours: {
+        value: '毎日 08:00 - 22:00',
+        sourceUrl: 'https://example.com/old',
+        observedAt: '2026-09-22T00:00:00.000Z',
+      },
+    },
+  });
+  insertPreviewSession(sqlite, preview, 'b'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'schedule-owner-item',
+  });
+  assert.equal(
+    (await publisher.publish(preview, 'b'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.equal(isAtlasItem(stored), true);
+  const projected = createPublicReadManifest().project('catalog.get', stored);
+  assert.equal(
+    projected.openingHours.value,
+    preview.ownerFields.openingHours.value,
+  );
+  assert.equal(projected.regularClosingDays.value, '水曜日');
+  const browser = await loadPublicCatalog({
+    request: async (url) =>
+      url === '/api/items'
+        ? Response.json([projected])
+        : Response.json({
+            itemId: stored.id,
+            favorite: false,
+            manualVisited: false,
+            effectiveVisited: false,
+          }),
+  });
+  assert.deepEqual(browser[0].openingHours, stored.openingHours);
+  assert.deepEqual(browser[0].scheduleCheck, stored.scheduleCheck);
+  assert.deepEqual(stored.intakeEvidence.ownerFields, preview.ownerFields);
+  sqlite.close();
+});
+
+test('unavailable schedules are explicitly recorded without fabricated hours', async () => {
+  const sqlite = await migratedDatabase();
+  const preview = verifiedPreview();
+  insertPreviewSession(sqlite, preview, 'b'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'schedule-unavailable-item',
+  });
+  assert.equal(
+    (await publisher.publish(preview, 'b'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.deepEqual(stored.scheduleCheck, {
+    openingHours: 'unavailable',
+    regularClosingDays: 'unavailable',
+    checkedAt: '2026-09-23T02:00:00.000Z',
+  });
+  assert.equal(stored.openingHours, undefined);
+  assert.equal(stored.regularClosingDays, undefined);
+  assert.deepEqual(
+    createPublicReadManifest().project('catalog.get', stored).scheduleCheck,
+    stored.scheduleCheck,
+  );
+  sqlite.close();
 });
 
 test('owner-completed profile publishes with explicit owner provenance and compact tags', async () => {
@@ -776,11 +912,18 @@ test('D1 Atlas Catalog rebuilds a revision-raced second session before reusing t
     },
   );
 
-  const [committed, raced] = await Promise.all([
+  const outcomes = await Promise.all([
     publisher.publish(first, firstKey, 2, 'catalog-r1'),
     publisher.publish(second, secondKey, 2, 'catalog-r1'),
   ]);
+  // Either concurrent writer may win; assert the resulting serialization.
+  const committed = outcomes.find(
+    ({ status }) => status === 'committed_verified',
+  );
+  const raced = outcomes.find(({ status }) => status === 'conflict');
 
+  assert.ok(committed);
+  assert.ok(raced);
   assert.equal(committed.status, 'committed_verified');
   assert.equal(raced.status, 'conflict');
   assert.equal(raced.newPreview.catalogRevision, 'catalog-r2');

@@ -101,3 +101,53 @@ test('source-backed edits are explicit and clearing a rating sends unknown', () 
     { score: 3.8, url: s.tabelogUrl },
   );
 });
+
+test('schedule edits keep value and citation together without promoting unchanged research', () => {
+  const p = preview();
+  p.profile.openingHours = {
+    value: '月〜金 11:30 - 14:30 / 17:00 - 22:00',
+    sourceUrl: p.tabelog.url,
+  };
+  const s = {
+    ...catalogIntakeInitialState(),
+    ...catalogIntakeEditorValues(p),
+    preview: p,
+  };
+  assert.deepEqual(catalogIntakeSelectionDetails(s), { ownerFields: {} });
+  const edited = {
+    ...s,
+    openingHours: '月〜金 11:30 - 14:00 / 17:00 - 22:00',
+    regularClosingDays: '水曜日',
+    regularClosingDaysSourceUrl: p.tabelog.url,
+  };
+  const details = catalogIntakeSelectionDetails(edited);
+  assert.deepEqual(details.ownerFields.openingHours, {
+    value: edited.openingHours,
+    sourceUrl: p.tabelog.url,
+  });
+  assert.deepEqual(details.ownerFields.regularClosingDays, {
+    value: '水曜日',
+    sourceUrl: p.tabelog.url,
+  });
+  p.ownerFields = details.ownerFields;
+  assert.equal(catalogIntakeEditorValues(p).openingHours, edited.openingHours);
+});
+
+test('restart after a failed request preserves manual schedule text and citations', () => {
+  const edited = {
+    ...state(),
+    stage: 'error',
+    openingHours: 'Lunch 11:00 - 14:00',
+    openingHoursSourceUrl: 'https://restaurant.example/hours',
+    regularClosingDays: 'Monday',
+    regularClosingDaysSourceUrl: 'https://restaurant.example/hours',
+  };
+  const restarted = reduceCatalogIntakeUi(edited, { type: 'restart' });
+  for (const field of [
+    'openingHours',
+    'openingHoursSourceUrl',
+    'regularClosingDays',
+    'regularClosingDaysSourceUrl',
+  ])
+    assert.equal(restarted[field], edited[field]);
+});

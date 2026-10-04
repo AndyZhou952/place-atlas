@@ -60,8 +60,8 @@ export interface OwnerPocCatalogIntakeOptions {
 export const ownerPocNominatimIdentity = {
   endpoint: 'https://nominatim.openstreetmap.org/search',
   identifyingUserAgent:
-    'JapanAtlas/0.1.0 (+https://github.com/AndyZhou952/jp-food-event-map)',
-  referer: 'https://github.com/AndyZhou952/jp-food-event-map',
+    'JapanAtlas/0.1.0 (+https://github.com/AndyZhou952/place-atlas)',
+  referer: 'https://github.com/AndyZhou952/place-atlas',
 } as const;
 
 export function nominatimIdentityForDeployment(publicUrl?: string) {
@@ -201,6 +201,14 @@ export function createOwnerPocComposition(
               usage,
               ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
             }).getWebsiteUri(placeId);
+            return result.ok ? result.value : undefined;
+          },
+          operatingScheduleForPlaceId: async (placeId: string) => {
+            const result = await createGooglePlaceRatingClient({
+              apiKey: intakeOptions.googlePlacesApiKey,
+              usage,
+              ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+            }).getOperatingSchedule(placeId);
             return result.ok ? result.value : undefined;
           },
         }

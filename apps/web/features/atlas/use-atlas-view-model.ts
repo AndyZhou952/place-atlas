@@ -22,7 +22,6 @@ import {
   reduceAtlasViewModelState,
 } from './atlas-view-model-state';
 import { useGoogleRatingDisplay } from './use-google-rating-display';
-import { verifiedAtlasItems } from './verified-items';
 import type { NearbyRecommendResult } from '../../product/application/decision/agent-nearby-operation';
 
 const DEFAULT_ITEM_ID = 'koffee-mameya-kakeru';
@@ -31,7 +30,7 @@ export function useAtlasViewModel(canEdit: boolean) {
   const [view, setView] = useState<AtlasView>('map');
   const [state, dispatch] = useReducer(
     reduceAtlasViewModelState,
-    createAtlasViewModelState({ items: verifiedAtlasItems }),
+    createAtlasViewModelState(),
   );
   const { items: storedItems, media, visits } = state;
   const googleRatings = useGoogleRatingDisplay(storedItems, canEdit);
@@ -55,6 +54,11 @@ export function useAtlasViewModel(canEdit: boolean) {
     ReadonlySet<string>
   >(new Set());
   const [notice, setNotice] = useState('');
+  const [catalogLoad, setCatalogLoad] = useState({
+    loaded: false,
+    loading: true,
+    error: '',
+  });
   const setItemPending = useCallback((id: string, pending: boolean) => {
     setPendingItemIds((current) => {
       const next = new Set(current);
@@ -65,6 +69,7 @@ export function useAtlasViewModel(canEdit: boolean) {
   }, []);
 
   useEffect(() => {
+    let current = true;
     const loadIds = {
       items: crypto.randomUUID(),
       visits: crypto.randomUUID(),
@@ -73,49 +78,6 @@ export function useAtlasViewModel(canEdit: boolean) {
     dispatch({ type: 'items.load.started', loadId: loadIds.items });
     dispatch({ type: 'visits.load.started', loadId: loadIds.visits });
     dispatch({ type: 'media.load.started', loadId: loadIds.media });
-    void Promise.all([
-      browserAtlasApplication
-        .execute({
-          key: 'catalog.list',
-          input: {
-            profile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
-          },
-        })
-        .then((loadedItems) =>
-          dispatch({
-            type: 'items.loaded',
-            loadId: loadIds.items,
-            items: loadedItems,
-          }),
-        ),
-      browserAtlasApplication
-        .execute({ key: 'visit.list', input: {} })
-        .then((loadedVisits) =>
-          dispatch({
-            type: 'visits.loaded',
-            loadId: loadIds.visits,
-            visits: loadedVisits,
-          }),
-        ),
-      browserAtlasApplication
-        .execute({ key: 'media.list', input: {} })
-        .then((loadedMedia) =>
-          dispatch({
-            type: 'media.loaded',
-            loadId: loadIds.media,
-            media: loadedMedia,
-          }),
-        ),
-    ]).catch(() => {
-      setNotice(
-        'Local preview is using verified source data; cloud records reconnect after publish.',
-      );
-    });
-  }, [canEdit]);
-
-  const reloadCatalogViews = useCallback(() => {
-    const loadId = crypto.randomUUID();
-    dispatch({ type: 'items.load.started', loadId });
     void browserAtlasApplication
       .execute({
         key: 'catalog.list',
@@ -123,11 +85,80 @@ export function useAtlasViewModel(canEdit: boolean) {
           profile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
         },
       })
-      .then((loadedItems) =>
-        dispatch({ type: 'items.loaded', loadId, items: loadedItems }),
+      .then((loadedItems) => {
+        dispatch({
+          type: 'items.loaded',
+          loadId: loadIds.items,
+          items: loadedItems,
+        });
+        if (current)
+          setCatalogLoad({ loaded: true, loading: false, error: '' });
+      })
+      .catch(() => {
+        if (current)
+          setCatalogLoad((previous) => ({
+            ...previous,
+            loading: false,
+            error:
+              'Could not load Atlas records. Check your connection and retry.',
+          }));
+      });
+    void browserAtlasApplication
+      .execute({ key: 'visit.list', input: {} })
+      .then((loadedVisits) =>
+        dispatch({
+          type: 'visits.loaded',
+          loadId: loadIds.visits,
+          visits: loadedVisits,
+        }),
       )
       .catch(() => {
-        setNotice('The place was saved, but the map could not refresh yet.');
+        if (current) setNotice('Journal records could not be loaded.');
+      });
+    void browserAtlasApplication
+      .execute({ key: 'media.list', input: {} })
+      .then((loadedMedia) =>
+        dispatch({
+          type: 'media.loaded',
+          loadId: loadIds.media,
+          media: loadedMedia,
+        }),
+      )
+      .catch(() => {
+        if (current) setNotice('Visit photos could not be loaded.');
+      });
+    return () => {
+      current = false;
+    };
+  }, [canEdit]);
+
+  const reloadCatalogViews = useCallback(() => {
+    const loadId = crypto.randomUUID();
+    dispatch({ type: 'items.load.started', loadId });
+    setCatalogLoad((previous) => ({
+      ...previous,
+      loading: true,
+      error: '',
+    }));
+    void browserAtlasApplication
+      .execute({
+        key: 'catalog.list',
+        input: {
+          profile: canEdit ? 'full_merged_catalog' : 'verified_catalog',
+        },
+      })
+      .then((loadedItems) => {
+        dispatch({ type: 'items.loaded', loadId, items: loadedItems });
+        setCatalogLoad({ loaded: true, loading: false, error: '' });
+      })
+      .catch(() => {
+        setCatalogLoad((previous) => ({
+          ...previous,
+          loading: false,
+          error: previous.loaded
+            ? 'The catalog could not be refreshed; showing the last loaded records.'
+            : 'Could not load Atlas records. Check your connection and retry.',
+        }));
       });
   }, [canEdit]);
 
@@ -686,6 +717,9 @@ export function useAtlasViewModel(canEdit: boolean) {
   useAtlasWebMcp(webMcpActions, canEdit);
 
   return {
+    catalogError: catalogLoad.error,
+    catalogLoaded: catalogLoad.loaded,
+    catalogLoading: catalogLoad.loading,
     googleRatings,
     addVisit,
     addVisitMedia,

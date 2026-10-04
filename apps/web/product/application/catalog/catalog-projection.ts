@@ -219,6 +219,8 @@ function isReviewOwnerFields(value: unknown): boolean {
         'categories',
         'signatureDishes',
         'summary',
+        'openingHours',
+        'regularClosingDays',
       ],
       [],
     ) &&
@@ -229,7 +231,21 @@ function isReviewOwnerFields(value: unknown): boolean {
     (value.categories === undefined || isReviewOwnerLabels(value.categories)) &&
     (value.signatureDishes === undefined ||
       isReviewOwnerLabels(value.signatureDishes)) &&
-    (value.summary === undefined || typeof value.summary === 'string')
+    (value.summary === undefined || typeof value.summary === 'string') &&
+    (value.openingHours === undefined ||
+      isOwnerSchedule(value.openingHours, 1200)) &&
+    (value.regularClosingDays === undefined ||
+      isOwnerSchedule(value.regularClosingDays, 500))
+  );
+}
+
+function isOwnerSchedule(value: unknown, maxLength: number): boolean {
+  return (
+    hasExactKeys(value, ['value', 'sourceUrl']) &&
+    typeof value.value === 'string' &&
+    value.value.trim().length > 0 &&
+    value.value.length <= maxLength &&
+    isCanonicalHttpsUrl(value.sourceUrl)
   );
 }
 
@@ -396,6 +412,27 @@ function isReviewTabelog(value: unknown): boolean {
   );
 }
 
+function isCanonicalReservationUrl(value: unknown): value is string {
+  if (isCanonicalHttpsUrl(value)) return true;
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.hostname === 'yoyaku.toreta.in' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.port &&
+      !parsed.search &&
+      /^\/[a-z0-9-]{3,120}\/$/u.test(parsed.pathname) &&
+      parsed.hash === '#/' &&
+      parsed.toString() === value
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isReviewReservation(value: unknown): boolean {
   if (hasExactKeys(value, ['status'])) return value.status === 'unknown';
   if (!isRecord(value) || value.status !== 'known') return false;
@@ -437,7 +474,7 @@ function isReviewReservation(value: unknown): boolean {
     (value.releaseNote === undefined ||
       typeof value.releaseNote === 'string') &&
     (value.channel === undefined || typeof value.channel === 'string') &&
-    isCanonicalHttpsUrl(value.url) &&
+    isCanonicalReservationUrl(value.url) &&
     isIsoTimestamp(value[timeKey]) &&
     (value.freshness === 'fresh' || value.freshness === 'stale'),
   );
@@ -549,6 +586,26 @@ export function isAtlasItem(value: unknown): value is AtlasItem {
     typeof value.verifiedAt === 'string' &&
     (value.officialUrl === undefined ||
       typeof value.officialUrl === 'string') &&
+    (value.openingHours === undefined ||
+      isSourcedText(value.openingHours, 1200)) &&
+    (value.regularClosingDays === undefined ||
+      isSourcedText(value.regularClosingDays, 500)) &&
+    (value.closingNotes === undefined ||
+      isSourcedText(value.closingNotes, 500)) &&
+    (value.scheduleCheck === undefined ||
+      (hasAllowedKeys(
+        value.scheduleCheck,
+        ['openingHours', 'regularClosingDays', 'checkedAt'],
+        ['openingHours', 'regularClosingDays', 'checkedAt'],
+      ) &&
+        ['known', 'unavailable'].includes(
+          String(value.scheduleCheck.openingHours),
+        ) &&
+        ['known', 'unavailable'].includes(
+          String(value.scheduleCheck.regularClosingDays),
+        ) &&
+        typeof value.scheduleCheck.checkedAt === 'string' &&
+        Number.isFinite(Date.parse(value.scheduleCheck.checkedAt)))) &&
     (value.tabelog === undefined || isTabelog(value.tabelog)) &&
     isReservation(value.reservation) &&
     (value.event === undefined || isEventSchedule(value.event)) &&
@@ -567,6 +624,19 @@ export function isAtlasItem(value: unknown): value is AtlasItem {
     (value.intakeEvidence === undefined ||
       isReviewEvidence(value.intakeEvidence)) &&
     (value.updatedAt === undefined || typeof value.updatedAt === 'string')
+  );
+}
+
+function isSourcedText(value: unknown, maxLength: number): boolean {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['value', 'sourceUrl', 'observedAt']) &&
+    typeof value.value === 'string' &&
+    value.value.trim().length > 0 &&
+    value.value.length <= maxLength &&
+    isCanonicalHttpsUrl(value.sourceUrl) &&
+    typeof value.observedAt === 'string' &&
+    Number.isFinite(Date.parse(value.observedAt))
   );
 }
 

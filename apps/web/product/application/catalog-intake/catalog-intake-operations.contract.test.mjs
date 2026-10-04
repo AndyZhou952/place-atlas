@@ -12,6 +12,7 @@ import {
   createInMemoryCatalogIntakeStatePort,
   createUnavailableCatalogIntakeModule,
   deriveCatalogIntakeResearchInputDigest,
+  validateEnrichedProfile,
   validateWebResearchOutput,
 } from './catalog-intake-coordinator.ts';
 
@@ -22,6 +23,33 @@ const ownerConversation = {
     conversationId: 'conversation-1',
   },
 };
+
+test('sourced opening hours accept longer exact schedules and validate both strings', () => {
+  const claim = (value) => ({
+    value,
+    sourceUrl: 'https://example.com/hours',
+    observedAt: '2026-10-04T00:00:00.000Z',
+  });
+  const longHours = `昼 ${'11:30–14:30; 夜 17:00–22:00; '.repeat(35)}`.slice(
+    0,
+    1199,
+  );
+  assert.equal(
+    validateEnrichedProfile({
+      openingHours: claim(longHours),
+      regularClosingDays: claim('火曜日・第3水曜日'),
+    })?.openingHours?.value,
+    longHours,
+  );
+  assert.equal(
+    validateEnrichedProfile({ openingHours: claim('x'.repeat(1201)) }),
+    undefined,
+  );
+  assert.equal(
+    validateEnrichedProfile({ regularClosingDays: claim('x'.repeat(501)) }),
+    undefined,
+  );
+});
 
 test('saved provider identity is disclosed in preview and confirm cannot publish it again', async () => {
   let publications = 0;
@@ -133,7 +161,20 @@ test('complete sourced research yields map-ready preview without owner retyping;
     ),
     undefined,
   );
-  for (const ownerFields of [{}, { title: 'My title' }]) {
+  for (const ownerFields of [
+    {},
+    {
+      title: 'My title',
+      openingHours: {
+        value: '昼 11:00 - 14:00\n夜 17:00 - 22:00',
+        sourceUrl: 'https://restaurant.example/hours',
+      },
+      regularClosingDays: {
+        value: '水曜日',
+        sourceUrl: 'https://restaurant.example/hours',
+      },
+    },
+  ]) {
     const app = createFixtureApplication({
       discoveryPort: discoveryFixture(),
       enrichmentPolicy: 'enrich_if_available',
@@ -172,12 +213,241 @@ test('complete sourced research yields map-ready preview without owner retyping;
         result.value.preview.titleProposal.value,
       ownerFields.title ?? profile.name.value,
     );
+    assert.deepEqual(
+      result.value.preview.ownerFields.openingHours,
+      ownerFields.openingHours,
+    );
+    assert.deepEqual(
+      result.value.preview.ownerFields.regularClosingDays,
+      ownerFields.regularClosingDays,
+    );
     assert.deepEqual(result.value.preview.profile, profile);
     assert.equal(
       result.value.preview.unknownFields.includes('coordinates'),
       false,
     );
   }
+});
+
+test('same-branch partial refresh preserves sourced profile fields and presents changed booking links before publication', async () => {
+  const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
+  const oldBookingUrl =
+    'https://www.tablecheck.com/en/example-old/reserve/landing';
+  const newBookingUrl =
+    'https://www.tablecheck.com/en/example-new/reserve/landing';
+  const claim = (value, sourceUrl = 'https://official.example/branch') => ({
+    value,
+    sourceUrl,
+    observedAt: '2026-09-22T10:00:00.000Z',
+  });
+  const publications = [];
+  const application = createFixtureApplication({
+    discoveryPort: discoveryFixture(),
+    enrichmentPolicy: 'enrich_if_available',
+    webResearchPort: {
+      async research(input) {
+        if (input.phase === 'confirm') {
+          return {
+            kind: 'observed',
+            value: {
+              tabelog: input.preview.tabelog,
+              reservation: input.preview.reservation,
+              profile: {
+                summary: claim('Updated branch summary'),
+                bookingLink: claim(newBookingUrl),
+              },
+            },
+          };
+        }
+        return {
+          kind: 'observed',
+          value: {
+            tabelog: agentTabelog(4.2, tabelogUrl),
+            reservation: {
+              status: 'known',
+              mode: 'reservable',
+              label: '予約可',
+              url: oldBookingUrl,
+              provenance: 'agent_observed',
+              observedAt: '2026-09-22T10:00:00.000Z',
+              freshness: 'fresh',
+            },
+            profile: {
+              area: claim('Nakameguro'),
+              signatureDishes: claim(['Roast beef']),
+              bookingLink: claim(oldBookingUrl),
+            },
+          },
+        };
+      },
+    },
+    atlasCatalogIntakePort: {
+      async publish(preview) {
+        publications.push(preview);
+        return {
+          status: 'committed_verified',
+          itemId: 'profile-merge-item',
+          receiptRef: 'profile-merge-receipt',
+          replayed: false,
+        };
+      },
+    },
+  });
+
+  const discovered = await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: 'restaurant', requestToken: 'profile-merge' },
+  });
+  const ownerFields = {
+    title: 'Selected branch',
+    address: 'Tokyo address 1-2-3',
+    coordinates: { latitude: 35.6, longitude: 139.7 },
+  };
+  const first = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: discovered.value.sessionId,
+      expectedSessionVersion: discovered.value.sessionVersion,
+      ordinal: 1,
+      ownerFields,
+      requestResearch: true,
+    },
+  });
+  assert.equal(first.value.preview.profile.bookingLink.value, oldBookingUrl);
+
+  const refreshed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: {
+      sessionId: first.value.sessionId,
+      expectedPreviewVersion: first.value.preview.previewVersion,
+    },
+  });
+  assert.equal(refreshed.ok, true);
+  assert.equal(refreshed.value.status, 'conflict');
+  assert.equal(
+    refreshed.value.newPreview.profile.bookingLink.value,
+    newBookingUrl,
+  );
+  assert.equal(
+    refreshed.value.newPreview.profile.signatureDishes.value[0],
+    'Roast beef',
+  );
+  assert.equal(refreshed.value.newPreview.profile.area.value, 'Nakameguro');
+  assert.equal(
+    refreshed.value.newPreview.profile.summary.value,
+    'Updated branch summary',
+  );
+  assert.equal(publications.length, 0);
+
+  const confirmed = await application.execute({
+    key: 'catalog.intake.confirm',
+    input: {
+      sessionId: first.value.sessionId,
+      expectedPreviewVersion: refreshed.value.newPreview.previewVersion,
+    },
+  });
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.value.status, 'committed_verified');
+  assert.equal(publications[0].profile.bookingLink.value, newBookingUrl);
+});
+
+test('a profile from another selected candidate is never carried into the new branch preview', async () => {
+  const firstCandidate = discoveryCandidate();
+  const secondCandidate = {
+    ...discoveryCandidate(),
+    durableIdentity: {
+      providerNamespace: 'google-places',
+      placeId: 'place-2',
+      ordinal: 2,
+    },
+    transientPresentation: {
+      ...discoveryCandidate().transientPresentation,
+      name: 'A different restaurant branch',
+      address: 'Tokyo address 9-9-9',
+    },
+  };
+  const candidates = [firstCandidate, secondCandidate];
+  let researchCalls = 0;
+  const application = createFixtureApplication({
+    discoveryPort: {
+      async discover() {
+        return { ok: true, value: { candidates, hasMore: false } };
+      },
+      async refetch({ placeId }) {
+        const candidate = candidates.find(
+          ({ durableIdentity }) => durableIdentity.placeId === placeId,
+        );
+        return candidate
+          ? { ok: true, value: candidate }
+          : { ok: false, error: { kind: 'not_found', message: 'missing' } };
+      },
+    },
+    enrichmentPolicy: 'enrich_if_available',
+    webResearchPort: {
+      async research(input) {
+        researchCalls++;
+        return {
+          kind: 'observed',
+          value:
+            input.selectedSubject.placeId === 'place-1'
+              ? {
+                  tabelog: { status: 'unknown' },
+                  reservation: { status: 'unknown' },
+                  profile: {
+                    bookingLink: {
+                      value:
+                        'https://www.tablecheck.com/en/branch-one/reserve/landing',
+                      sourceUrl: 'https://official.example/branch-one',
+                      observedAt: '2026-09-22T10:00:00.000Z',
+                    },
+                  },
+                }
+              : {
+                  tabelog: { status: 'unknown' },
+                  reservation: { status: 'unknown' },
+                },
+        };
+      },
+    },
+  });
+  const discovered = await application.execute({
+    key: 'catalog.intake.discover',
+    input: { query: 'restaurant', requestToken: 'branch-profile-scope' },
+  });
+  const first = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: discovered.value.sessionId,
+      expectedSessionVersion: discovered.value.sessionVersion,
+      ordinal: 1,
+      ownerFields: {
+        title: 'Branch one',
+        address: 'Tokyo address 1-2-3',
+        coordinates: { latitude: 35.6, longitude: 139.7 },
+      },
+      requestResearch: true,
+    },
+  });
+  assert.ok(first.value.preview.profile.bookingLink);
+  const second = await application.execute({
+    key: 'catalog.intake.select',
+    input: {
+      sessionId: first.value.sessionId,
+      expectedSessionVersion: first.value.sessionVersion,
+      ordinal: 2,
+      ownerFields: {
+        title: 'Branch two',
+        address: 'Tokyo address 9-9-9',
+        coordinates: { latitude: 35.7, longitude: 139.8 },
+      },
+      requestResearch: true,
+    },
+  });
+
+  assert.equal(second.ok, true);
+  assert.equal(second.value.preview.candidateIdentity.placeId, 'place-2');
+  assert.equal(second.value.preview.profile, undefined);
+  assert.equal(researchCalls, 1);
 });
 
 test('AtlasApplication awaits rejected handlers and returns one sanitized failure', async () => {
@@ -1633,6 +1903,43 @@ test('catalog.intake.confirm rejects illegal Web research URL, time, range, prov
     assert.equal(publishCalls, 0);
     assert.deepEqual(state.sessions.get('session-1'), before);
   }
+});
+
+test('Toreta reservation URLs retain their canonical fragment while credentials remain forbidden', () => {
+  const bookingUrl = 'https://yoyaku.toreta.in/fixture-kitchen/#/';
+  const value = {
+    tabelog: { status: 'unknown' },
+    reservation: {
+      status: 'known',
+      mode: 'reservable',
+      label: '予約可',
+      url: bookingUrl,
+      provenance: 'agent_observed',
+      observedAt: '2026-09-22T10:00:00.000Z',
+      freshness: 'fresh',
+    },
+  };
+  const preview = {
+    tabelog: { status: 'unknown' },
+    reservation: { status: 'unknown' },
+  };
+  assert.equal(
+    validateWebResearchOutput(value, preview)?.reservation.url,
+    bookingUrl,
+  );
+  assert.equal(
+    validateWebResearchOutput(
+      {
+        ...value,
+        reservation: {
+          ...value.reservation,
+          url: 'https://user:password@yoyaku.toreta.in/fixture-kitchen/#/',
+        },
+      },
+      preview,
+    ),
+    undefined,
+  );
 });
 
 test('catalog.intake.confirm refreshes durable geocoder evidence and conflicts instead of publishing changed coordinates', async () => {

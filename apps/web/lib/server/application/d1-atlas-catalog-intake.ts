@@ -655,6 +655,15 @@ function toAtlasItem(
   if (!location || !title || !address) {
     throw new Error('Verified publication requires complete durable evidence.');
   }
+  const openingHours = preview.ownerFields.openingHours
+    ? { ...preview.ownerFields.openingHours, observedAt: now.toISOString() }
+    : preview.profile?.openingHours;
+  const regularClosingDays = preview.ownerFields.regularClosingDays
+    ? {
+        ...preview.ownerFields.regularClosingDays,
+        observedAt: now.toISOString(),
+      }
+    : preview.profile?.regularClosingDays;
   return withRestaurantClassification({
     id: itemId,
     kind: 'food',
@@ -663,6 +672,16 @@ function toAtlasItem(
     address,
     description:
       preview.ownerFields.summary ?? preview.profile?.summary?.value ?? '',
+    ...(openingHours ? { openingHours } : {}),
+    ...(regularClosingDays ? { regularClosingDays } : {}),
+    ...(preview.profile?.closingNotes
+      ? { closingNotes: preview.profile.closingNotes }
+      : {}),
+    scheduleCheck: {
+      openingHours: openingHours ? 'known' : 'unavailable',
+      regularClosingDays: regularClosingDays ? 'known' : 'unavailable',
+      checkedAt: now.toISOString(),
+    },
     ...(preview.profile?.officialWebsite
       ? { officialUrl: preview.profile.officialWebsite.value }
       : {}),
@@ -759,10 +778,12 @@ function intakeEvidence(preview: CatalogIntakePreview) {
 function reservationSnapshot(
   preview: CatalogIntakePreview,
 ): ReservationSnapshot {
+  const bookingUrl = preview.profile?.bookingLink?.value;
   if (preview.reservation.status === 'unknown') {
     return {
       mode: 'unknown',
       label: 'Reservation status is unknown.',
+      ...(bookingUrl ? { url: bookingUrl } : {}),
     };
   }
   return {
@@ -776,7 +797,9 @@ function reservationSnapshot(
     ...(preview.reservation.channel
       ? { channel: preview.reservation.channel }
       : {}),
-    url: preview.reservation.url,
+    // Keep the researched reservation policy in intakeEvidence, while the
+    // public reservation snapshot points at the verified booking destination.
+    url: bookingUrl ?? preview.reservation.url,
     ...(preview.reservation.advanceDays === undefined
       ? {}
       : { advanceDays: preview.reservation.advanceDays }),

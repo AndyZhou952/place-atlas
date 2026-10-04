@@ -82,3 +82,21 @@ test('official reader rejects private and redirected destinations', async () => 
   );
   assert.equal(calls, 1);
 });
+test('booking anchors preserve required query parameters and client-side routes', async () => {
+  const sources = await readOfficialSite(
+    'https://restaurant.example/branch',
+    new AbortController().signal,
+    async () =>
+      new Response(
+        '<title>Restaurant Branch</title><p>Restaurant Branch Tokyo 3-5-1</p><a href="https://booking.example/shop?venue=123&amp;service=dinner#/reserve">予約する</a>',
+        { headers: { 'content-type': 'text/html' } },
+      ),
+  );
+  assert.deepEqual(sources[0].bookingLinks, [
+    {
+      label: '予約する',
+      url: 'https://booking.example/shop?venue=123&service=dinner#/reserve',
+    },
+  ]);
+  assert.match(sources[0].content, /service=dinner#\/reserve/u);
+});

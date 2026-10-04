@@ -53,6 +53,7 @@ import type {
   VisitMediaRecord,
 } from './model';
 import { maxMediaFilesPerSelection } from './media-constraints';
+import { restaurantLinks } from './restaurant-links';
 import { AtlasMap } from './atlas-map';
 import {
   filterJournalVisits,
@@ -179,20 +180,42 @@ export function AtlasScreen() {
 
       {vm.notice ? <p className="notice-bar">{vm.notice}</p> : null}
 
-      {vm.view === 'map' ? <MapWorkspace vm={vm} canEdit={canEdit} /> : null}
-      {vm.view === 'journal' ? (
-        <JournalWorkspace vm={vm} canEdit={canEdit} />
+      {vm.catalogLoading ? (
+        <output className="notice-bar" aria-live="polite">
+          {vm.catalogLoaded
+            ? 'Refreshing Atlas records…'
+            : 'Loading saved Atlas records…'}
+        </output>
       ) : null}
-      {vm.view === 'table' ? (
-        <CatalogTable
-          items={vm.items.filter(
-            (item) => canEdit || item.verificationStatus === 'verified',
-          )}
-          visits={vm.visits}
-          media={vm.media}
-          onSelect={openSavedPlace}
-          googleRatings={vm.googleRatings}
-        />
+      {vm.catalogError ? (
+        <div className="notice-bar" role="alert">
+          <span>{vm.catalogError}</span>{' '}
+          <Button size="sm" variant="outline" onClick={vm.reloadCatalogViews}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      {vm.catalogLoaded ? (
+        <>
+          {vm.view === 'map' ? (
+            <MapWorkspace vm={vm} canEdit={canEdit} />
+          ) : null}
+          {vm.view === 'journal' ? (
+            <JournalWorkspace vm={vm} canEdit={canEdit} />
+          ) : null}
+          {vm.view === 'table' ? (
+            <CatalogTable
+              items={vm.items.filter(
+                (item) => canEdit || item.verificationStatus === 'verified',
+              )}
+              visits={vm.visits}
+              media={vm.media}
+              onSelect={openSavedPlace}
+              googleRatings={vm.googleRatings}
+            />
+          ) : null}
+        </>
       ) : null}
       <footer className="site-footer">
         <span>Japan Atlas · personal field guide</span>
@@ -1125,6 +1148,35 @@ function PlaceDetail({
                   <small>Official schedule</small>
                 </div>
               ) : null}
+              {item.kind === 'food' ? (
+                <div className="fact-card schedule-card">
+                  <span>営業時間</span>
+                  <strong>{item.openingHours?.value ?? 'Unavailable'}</strong>
+                  {item.openingHours ? (
+                    <small>
+                      {new URL(item.openingHours.sourceUrl).hostname} ·{' '}
+                      {item.openingHours.observedAt.slice(0, 10)}
+                    </small>
+                  ) : null}
+                </div>
+              ) : null}
+              {item.kind === 'food' ? (
+                <div className="fact-card schedule-card">
+                  <span>定休日</span>
+                  <strong>
+                    {item.regularClosingDays?.value ?? 'Unavailable'}
+                  </strong>
+                  {item.closingNotes ? (
+                    <small>{item.closingNotes.value}</small>
+                  ) : null}
+                  {item.regularClosingDays ? (
+                    <small>
+                      {new URL(item.regularClosingDays.sourceUrl).hostname} ·{' '}
+                      {item.regularClosingDays.observedAt.slice(0, 10)}
+                    </small>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             {item.reservation.releaseNote ? (
@@ -1168,7 +1220,7 @@ function PlaceDetail({
             </section>
 
             <div className="source-links">
-              {item.sources.map((source) => (
+              {restaurantLinks(item).map((source) => (
                 <a
                   key={`${source.role}-${source.url}`}
                   href={source.url}

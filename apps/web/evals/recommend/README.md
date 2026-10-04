@@ -1,5 +1,7 @@
 # Recommend evaluation
 
+These suites evaluate Place Atlas recommendations from saved restaurants. They do not establish architecture/event recommendations, image understanding or framework/chat integration. See [architecture](../../../../docs/architecture.md).
+
 The model-only benchmark has 79 cases covering saved restaurants, straight-line distance and explicit walking. The 14 application contracts and later decision extensions are tracked separately. The `../nearby/` suite contributes 11 policy and 10 station cases.
 
 ## Gates and evidence
@@ -63,4 +65,4 @@ The `branch-choice`, `empty-catalog` and `provider-failure` modes exercise the p
 node --experimental-strip-types evals/recommend/score-captured-contract.mjs evals/runs/UNIQUE-CAPTURE
 ```
 
-The scorer requires a contiguous captured request sequence, browser observations and exact current saved identity for every returned restaurant. Missing evidence fails. The 2026-10-01 release acceptance passed 14/14: 11 deployed model/service journeys and three isolated application scenarios. Exploratory attempts remain in the raw traces; the scorer uses the latest matching acceptance sequence. This is a functional acceptance report, not first-attempt reliability or repeated-run stability. No result from a controlled dependency is counted as a live-model success.
+The scorer requires a contiguous captured request sequence, browser observations and exact current saved identity for every returned restaurant. Missing evidence fails. Reports and observed results remain in chat or ignored local output. Controlled-dependency results must never be counted as live-model successes.

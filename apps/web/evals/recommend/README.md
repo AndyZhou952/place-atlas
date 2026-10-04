@@ -1,5 +1,7 @@
 # Recommend evaluation
 
+These suites evaluate Place Atlas recommendations from saved restaurants. They do not establish architecture/event recommendations, image understanding or framework/chat integration. See [project scope](../../../../docs/project-scope.md).
+
 The model-only benchmark has 79 cases covering saved restaurants, straight-line distance and explicit walking. The 14 application contracts and later decision extensions are tracked separately. The `../nearby/` suite contributes 11 policy and 10 station cases.
 
 ## Gates and evidence

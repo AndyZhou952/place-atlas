@@ -1,18 +1,36 @@
-# Japan Personal Atlas
+# Place Atlas
 
-A self-hosted restaurant map for saving places, recording visits and media, and finding saved restaurants nearby. Visitors can read published places, personal ratings and comments, visits, photos and videos without logging in. Only the owner can add or change data or run Recommend and other Agent operations that may incur provider usage. Each deployment uses its own database, storage, model credentials, and optional map credentials.
+A self-hosted atlas for restaurants, architecture and events across regions. Save places on a map, browse detailed records, record restaurant visits with notes and media, and get recommendations from your saved restaurants. Visitors can read published places, personal ratings and comments, visits, photos and videos without logging in. Only the owner can add or change data or run Recommend and other Agent operations that may incur provider usage. Each deployment uses its own database, storage, model credentials, and optional map credentials.
 
 The application owns the Agent workflow. You provide an OpenAI-compatible model endpoint; the backend uses its built-in web search tool to research a restaurant, validate structured information, and save it after confirmation. Search defaults to a no-key provider. A model API key authenticates model calls; the application supplies the separate search tool.
 
-Version 0.1.0 is restaurant-focused. Add researches sourced profiles, presents an editable preview and saves after Owner confirmation. Missing facts remain unknown; the Owner can complete location information and refresh the preview. Recommend uses the saved collection. Source availability varies, and the current restaurant collection is in Japan; broader international, architecture and event intake validation is planned for the next version.
+The project is independent of any messaging platform. Its current interface is the website, with a scoped external Add API as an integration foundation. Connections to agent frameworks such as Hermes, OpenClaw and Pi, and chat channels such as WhatsApp, WeChat, Telegram and LINE, are planned. There are no shipped bot adapters or certified framework integrations yet.
+
+## What is available?
+
+The [0.1.0 release](https://github.com/AndyZhou952/place-atlas/releases/tag/0.1.0) is the first restaurant-focused implementation of this broader atlas. Geographic scope is not restricted to Japan, but the current saved restaurant collection and most live validation are Japanese. Overseas discovery and research paths exist; their presence does not establish worldwide reliability.
+
+| Area                  | Implemented                                                                                                             | Remaining work                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Place collection      | Restaurant, architecture and event records; Map and Table browsing, search and filters                                  | Equivalent automated research and benchmarks for architecture/events                                           |
+| Restaurant Add        | Discover an exact branch, research sourced facts, edit a preview and confirm a save; missing facts stay unknown         | Broader international validation and source reliability                                                        |
+| Visits and media      | Restaurant visit journal, notes, photos/videos, captions and personal ratings                                           | Automatic extraction of place/visit facts from images                                                          |
+| Recommend             | Suggestions from verified saved restaurants, clarification, straight-line distance and optional verified walking routes | Driving and image-based origin recognition                                                                     |
+| Self-hosting          | One Owner per deployment, public browsing, independent Cloudflare data/media and server-side model credentials          | Shared-instance registration and per-user collections                                                          |
+| Agent and chat access | Scoped discover/select/confirm/cancel Add API and browser tools                                                         | Framework packages, chat adapters, pairing, conversational Visit/media workflows and live compatibility checks |
+| Other roadmap items   | Per-restaurant Google reference save/replacement                                                                        | Bulk reference replacement and an iOS client                                                                   |
+
+Post-release restaurant work on the current development branch adds verified official/alternative booking links, sourced hours and rest days, and a loading state for the real catalog. Japanese schedules use only the exact Tabelog listing; schedules elsewhere use the selected Google Maps place. These improvements are documented separately from the immutable 0.1.0 source tag in the [development status](docs/status.md) and [restaurant regression report](docs/restaurant-enrichment-regression.md).
+
+See [project scope](docs/project-scope.md) for released, current and planned capabilities, and [architecture](docs/architecture.md) for application responsibilities and the planned integration boundary.
 
 ## Who can use it?
 
-| Role | Access |
-| --- | --- |
-| Visitor to an existing deployment | Browse published places, personal ratings/comments, Visits, photos and videos without logging in. |
-| Owner of a deployment | Add/edit records, configure the deployment's model key, use Recommend and explicitly load Google ratings. |
-| Person cloning this repository | Deploy a separate copy in their own Cloudflare account, choose their own Owner password and provide their own API keys. Their database, media and credentials are independent. |
+| Role                              | Access                                                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Visitor to an existing deployment | Browse published places, personal ratings/comments, Visits, photos and videos without logging in.                                                                              |
+| Owner of a deployment             | Add/edit records, configure the deployment's model key, use Recommend and explicitly load Google ratings.                                                                      |
+| Person cloning this repository    | Deploy a separate copy in their own Cloudflare account, choose their own Owner password and provide their own API keys. Their database, media and credentials are independent. |
 
 There is one Owner identity and one model configuration per deployment. There is no registration, per-user collection or bring-your-own-key visitor account on someone else's instance. Anyone given an instance's Owner password has the same full Owner access and uses that instance's provider configuration. For your own collection and billing, create your own deployment; cloning the repository does not copy another deployment's Cloudflare resources, secrets or personal records.
 
@@ -33,8 +51,8 @@ Provider usage can incur charges. Set quotas and budget alerts in your accounts.
 Clone or fork the repository, then run:
 
 ```sh
-git clone https://github.com/AndyZhou952/jp-food-event-map.git
-cd jp-food-event-map
+git clone https://github.com/AndyZhou952/place-atlas.git
+cd place-atlas
 cd apps/web
 npm ci
 cp wrangler.owner-poc.jsonc wrangler.owner-poc.local.jsonc
@@ -52,6 +70,8 @@ Edit `wrangler.owner-poc.local.jsonc`: replace the placeholder `database_id` wit
 - The `browser` binding is optional with the default Firecrawl reader. Remove it if you do not want Cloudflare Browser Run enabled.
 
 Keep the supplied Worker/resource names, environment guards, migration directory and observability settings for the supported setup. The preflight checks those names within your account. The ignored local configuration is preferred automatically when building; never replace it with another person's database ID.
+
+The repository was previously named `jp-food-event-map`. The 0.1 website still displays Japan Atlas, and existing `japan-atlas-*` resource names and internal package names are retained for compatibility. These legacy names describe the original implementation, not a geographic or messaging restriction. Renaming the repository does not rename a deployed Worker, database or media bucket.
 
 Apply the schema:
 
@@ -80,16 +100,16 @@ Choose your owner password and independently generate a random session secret, f
 
 For a new account, Wrangler may ask to create the named Worker when setting its first secret. Confirm creation in your own account. These are the only secrets required for the minimal first deployment; you can add your model key through Owner settings afterward.
 
-| Credential | Where to configure it | Required for |
-| --- | --- | --- |
-| `ATLAS_OWNER_PASSWORD` | Main Worker secret | Owner login. |
-| `ATLAS_OWNER_SESSION_SECRET` | Main Worker secret | Signed sessions and default credential encryption; use an independent random value. |
+| Credential                        | Where to configure it                                    | Required for                                                                                  |
+| --------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `ATLAS_OWNER_PASSWORD`            | Main Worker secret                                       | Owner login.                                                                                  |
+| `ATLAS_OWNER_SESSION_SECRET`      | Main Worker secret                                       | Signed sessions and default credential encryption; use an independent random value.           |
 | Model API key, base URL and model | Owner → Agent API settings, or deployment settings below | Add research and Recommend; ordinary browsing and Visit recording do not require model calls. |
-| `GOOGLE_PLACES_API_KEY` | Main Worker secret | Optional Google matching/ratings; required if Google matching mode is enabled. |
-| `GOOGLE_MAPS_API_KEY` | Private route Worker secret | Optional origin geocoding and verified walking routes; do not put it on the main Worker. |
-| `SEARCH_API_KEY` | Main Worker secret | Optional Tavily search instead of the no-key providers. |
-| `FIRECRAWL_API_KEY` | Main Worker secret | Optional authenticated listing-reader quota. |
-| `AGENT_SETTINGS_SECRET` | Main Worker secret, before saving settings | Optional independent encryption key. |
+| `GOOGLE_PLACES_API_KEY`           | Main Worker secret                                       | Optional Google matching/ratings; required if Google matching mode is enabled.                |
+| `GOOGLE_MAPS_API_KEY`             | Private route Worker secret                              | Optional origin geocoding and verified walking routes; do not put it on the main Worker.      |
+| `SEARCH_API_KEY`                  | Main Worker secret                                       | Optional Tavily search instead of the no-key providers.                                       |
+| `FIRECRAWL_API_KEY`               | Main Worker secret                                       | Optional authenticated listing-reader quota.                                                  |
+| `AGENT_SETTINGS_SECRET`           | Main Worker secret, before saving settings               | Optional independent encryption key.                                                          |
 
 Recommended: after deployment, log in and open **Owner active → Agent API settings**. Enter your model API key, base URL and model, then choose **Test & save**. DeepSeek defaults are `https://api.deepseek.com` and `deepseek-flash`; `https://api.openai.com/v1` is also allowed, but individual OpenAI models are not all tested. The server first checks tool-call support, then encrypts the settings in D1. Keys are never returned to the browser or saved in browser storage. Only the owner can view configuration status or change settings. Leave the key blank to keep it when the endpoint is unchanged; changing providers requires a new key.
 
@@ -114,7 +134,7 @@ Add these model settings to the local Wrangler configuration's `vars`:
 
 This is an example endpoint/model pair. Replace both with your provider's documented values. The model must support chat completions with function/tool calls. Enter the API base URL, not a consumer chat website URL. Set all three model settings (`AGENT_API_KEY`, `AGENT_BASE_URL`, and `AGENT_MODEL`) together: incomplete configuration returns research unavailable. Test your chosen combination before relying on automatic enrichment.
 
-Search works without a separate key using Yahoo Japan for Japanese/Tabelog queries and DuckDuckGo for other queries. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or invent facts. It reads discovered Tabelog main listings for branch identity, address, coordinates, cuisine, aggregate rating, explicit reservation rules, restaurant introductions and official website links. Individual review scores are excluded. The model extracts sourced dishes; the application builds a concise description from validated categories, area and dishes. Official-source search is supported, but arbitrary full-page official-site browsing is not; missing booking lead times remain unknown. A failed source does not discard independently supported facts.
+Search works without a separate key using Yahoo Japan for Japanese/Tabelog queries and DuckDuckGo for other queries. This is best effort: page changes, rate limits, or a challenge against your deployment's IP can temporarily prevent research. The application does not bypass challenges or invent facts. It reads discovered Tabelog main listings for branch identity, address, coordinates, cuisine, aggregate rating, explicit reservation rules, restaurant introductions and official website links. Individual review scores are excluded. The model extracts sourced dishes; the application builds a concise description from validated categories, area and dishes. Official-source search and bounded reads of selected official/booking pages are supported; missing booking lead times remain unknown. A failed source does not discard independently supported facts.
 
 ### Restaurant page reader
 
@@ -186,15 +206,15 @@ Replace the example URL with yours. Without these settings, branding is generic,
 
 ### Common first-setup problems
 
-| Symptom | Check |
-| --- | --- |
-| Preflight rejects the database ID | Replace the template placeholder with the D1 ID created in your account. |
-| A required Google secret is missing | Supply your Places key, or disable Google matching in the local configuration. |
-| Deployment references a missing route Worker | Deploy the private route Worker, or remove its `services` binding. |
-| Owner login fails | Use your configured Owner password; verify both Owner secrets are set. |
-| Agent research is unavailable | In Owner settings, test/save a model endpoint and key with tool-call support. |
+| Symptom                                      | Check                                                                                                                                                 |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preflight rejects the database ID            | Replace the template placeholder with the D1 ID created in your account.                                                                              |
+| A required Google secret is missing          | Supply your Places key, or disable Google matching in the local configuration.                                                                        |
+| Deployment references a missing route Worker | Deploy the private route Worker, or remove its `services` binding.                                                                                    |
+| Owner login fails                            | Use your configured Owner password; verify both Owner secrets are set.                                                                                |
+| Agent research is unavailable                | In Owner settings, test/save a model endpoint and key with tool-call support.                                                                         |
 | Research finds a place but facts are unknown | Check the source-reader/search availability; correct supported fields and refresh the preview rather than assuming the model key provides web access. |
-| Photos or video uploads fail | Verify your R2 bucket, `MEDIA` binding, supported format and file-size limit. |
+| Photos or video uploads fail                 | Verify your R2 bucket, `MEDIA` binding, supported format and file-size limit.                                                                         |
 
 After an update to an existing deployment, run `ALLOW_PRODUCTION_MEDIA_AUDIT=yes npm run audit:media-integrity` from `apps/web` to compare each Visit media row with its R2 object's byte count and SHA-256 without saving media locally. The audit is read-only and requires the Wrangler login and ignored local configuration used for deployment.
 
@@ -202,7 +222,7 @@ For updates, apply new migrations, rebuild, and deploy. Preserve D1 and R2 resou
 
 ## Using the website
 
-Start here only after completing configuration and deployment above. Visitors can read published restaurants, personal ratings and comments, visits, photos and videos without logging in. Adding or changing data and running Recommend require the owner password.
+Start here only after completing configuration and deployment above. Visitors can browse published restaurants, architecture and events, plus personal ratings and comments, restaurant visits, photos and videos without logging in. Add and Recommend currently focus on restaurants. Adding or changing data and running Recommend require the owner password.
 
 1. Open the deployed URL, select **Owner login**, and enter the password you configured as `ATLAS_OWNER_PASSWORD`.
    If the model was not configured during deployment, open **Owner active → Agent API settings**, enter your key/model/base URL, and select **Test & save**.
@@ -278,7 +298,3 @@ node --experimental-strip-types --env-file=.env evals/run-add-enrichment.mjs eva
 ```
 
 This makes one model request per benchmark case (currently ten), with a 4,500 output-token cap and a 60-second limit per request. It uses supplied, labelled source fixtures rather than live search, and a separate experimental full-profile extraction prompt rather than the current production Add prompt. It tests identity/address/coordinates, categories, summary/dishes, ratings, official/booking links, and reservation rules. Expected answers are withheld from the model. Results include per-field failures, token usage when available, latency, and the production workflow's unsupported fields. Failed cases are retained. Output is private and Git-ignored; choose a new filename for another run. Passing extraction is not full Add acceptance: live retrieval, description review, confirmation, database persistence and map rendering still require separate checks. No restaurant is written by this command.
-
-## Public language
-
-Use English for documentation, pull requests, code comments and interface text. Preserve restaurant names, the established Japanese Map and Journal labels, original user content and multilingual matching or evaluation data. Additional interface languages are deferred. Acceptance and CI checklists are shared in chat only.

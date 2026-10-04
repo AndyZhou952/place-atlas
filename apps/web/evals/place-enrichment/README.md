@@ -1,6 +1,8 @@
 # Place-enrichment benchmark v2 (Complete Add)
 
-Production incident regressions are also tracked in `selected-place-regressions.v1.json`, consumed by `agent/place-research.test.mjs`. The six Keita controls test selected-name search anchoring and branch isolation through the production research function with mock tools/model. They are not live name-resolution or full-profile success measurements. Current acceptance is tracked in `docs/status.md` at the repository root.
+This evaluates a restaurant enrichment contract for Place Atlas, not the full atlas or a shipped architecture/event or chat workflow. See [project scope](../../../../docs/project-scope.md) for implementation boundaries.
+
+Production incident regressions are also tracked in `selected-place-regressions.v1.json`, consumed by `agent/place-research.test.mjs`. The six Keita controls test selected-name search anchoring and branch isolation through the production research function with mock tools/model. They are not live name-resolution or full-profile success measurements. Current acceptance is tracked in [development status](../../../../docs/status.md).
 
 This package evaluates the complete Add profile after one concrete restaurant branch has already been resolved. It asks whether an enrichment worker can turn captured evidence into a source-backed restaurant profile without inventing missing facts.
 
@@ -14,7 +16,6 @@ Each case supplies a resolved branch and a minimal, structured evidence bundle c
 - cuisine/category labels (the former `category` field is now `categoryLabels`);
 - a grounded short summary and signature dishes;
 - official website and booking link when present;
-- signature dishes;
 - Tabelog rating policy for Japan;
 - Google review rating policy outside mainland China;
 - reservation mode (`reservation_required`, `mixed`, `walk_in`), explicit lead time, and evidence-based difficulty;

@@ -1,12 +1,18 @@
-# PoC delivery checklist
+# Place Atlas development status
 
-Updated: 2026-10-04. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
+Updated: 2026-10-04. This is the development progress tracker for a self-hosted atlas of restaurants, architecture and events across regions. The published 0.1.0 release focuses on restaurant workflows; post-release work is identified below. Framework/channel integrations remain planned. See [project scope](project-scope.md) for the feature boundaries. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
 
 `[x]` records completed implementation or verification. `[ ]` records work still open. Local tests and model-only benchmarks do not replace deployed website acceptance.
 
 ## Add — research, review and save a restaurant
 
+### Post-release improvements
+
+The following changes are on the current restaurant branch and recorded Owner deployment, outside the 0.1.0 source tag.
+
 - [x] Independently benchmarked and repaired RODEO and らぁ麺や 嶋 booking/official links, then expanded sourced hours to all 56 existing restaurants. Three GPT-6 Luna agents built the active Tabelog-only benchmark. D1 contains 56 hours, 30 regular closing policies, 26 unavailable policies and nine separate calendar notes. Future Add schedules use exact-branch Tabelog for Japan and selected Google Maps elsewhere, with no model or official-site schedule fallback. Policy labels stay plain; distinct website/alternative booking links remain separate. Initial browser loading now shows a loading state instead of five demonstration records, then all 58 saved records. All 1,077 tests, lint, typecheck, format, migration packaging and Owner build/preflight pass; the captured-reader gate covers all 56 Tabelog listings and D1 readback matches the benchmark. Final deployed version `e0dabd9b-7926-4cc2-a1e5-c04933383a3a` retains the existing D1/R2/sidecar bindings, daily schedule and disabled preview URLs. Current-policy live checks pass RODEO and fail 嶋 at its known Google/Tabelog address conflict (1/2 partial check); earlier full multi-source results are archived as historical. See [the regression report](restaurant-enrichment-regression.md). PR #34 remains open.
+
+### Released foundations
 
 - [x] Discover → choose a branch → research → preview → owner-confirmed publication is implemented. Session versions, duplicate-safe replay, location validation, source evidence and public catalog readback are covered by tests and live Add journeys. A failed lookup cannot silently publish an unlocated restaurant.
 - [x] If research leaves fields unknown, the owner can correct details and refresh the preview; an address or coordinates are still required for publication. The separate Review tab and candidate publication path have been retired; historical schema and receipts remain readable.
@@ -72,9 +78,9 @@ Updated: 2026-10-04. This is the development progress tracker. System boundaries
 - [x] Public documentation, PR narrative, source comments and Table controls use English; the two obsolete Chinese PR-description revisions were deleted. Table cuisine and subdivision display labels are English; original names, established Japanese Map/Journal labels, user records and multilingual matching data are preserved. Additional interface languages are deferred.
 - [x] Independent self-hosting is documented: each deployment has one Owner, its own Cloudflare database/media, password and model credentials, with public read-only visitors. README covers a minimal no-Google setup, optional services, credentials, configuration and first-use recovery. Generic page metadata and configurable public lookup identity remove inherited personal-site defaults; fresh migrations do not import Owner records or credentials, and deployment/session regressions protect this setup.
 - [x] On 2026-10-03, the Owner accepted the current release scope and authorized merging the release PR and preparing the first release. This approval does not claim that every manual checklist row was newly exercised; implementation, automated checks and recorded deployed verification remain the release evidence.
-- [x] [PR #33](https://github.com/AndyZhou952/jp-food-event-map/pull/33) was merged as `e8cc09c`, and the annotated `0.1.0` tag points to that tested commit. [Release 0.1.0](https://github.com/AndyZhou952/jp-food-event-map/releases/tag/0.1.0) was published on 2026-10-03 with English feature notes, self-hosting guidance, current limits and the four next-version directions below. Final PR and merged-main validation passed 978 tests with zero failures. The deployed website has generic branding and retains the 58-record public catalog; anonymous private-reference and Google-rating reads still reject access.
+- [x] [PR #33](https://github.com/AndyZhou952/place-atlas/pull/33) was merged as `e8cc09c`, and the annotated `0.1.0` tag points to that tested commit. [Release 0.1.0](https://github.com/AndyZhou952/place-atlas/releases/tag/0.1.0) was published on 2026-10-03 with English feature notes, self-hosting guidance, current limits and the five next-version directions below. Final PR and merged-main validation passed 978 tests with zero failures. The deployed website has generic branding and retains the 58-record public catalog; anonymous private-reference and Google-rating reads still reject access.
 
-## Next version
+## Planned work after 0.1.0
 
 1. **iOS front end**
    - [ ] Build an iOS interface equivalent to the current web front end, including Map, Table, Journal, Owner authentication, Add, Recommend and visit media, using the existing application boundaries.
@@ -88,8 +94,8 @@ Updated: 2026-10-04. This is the development progress tracker. System boundaries
    - [ ] Add an Owner-only action beside Load Google ratings to save all eligible loaded references, with an explicit replacement option for existing references.
    - [ ] Operate on valid identity-bound loaded responses without another Google lookup. Keep refresh separate from saving, retain dates/provenance, report each row's outcome and make partial-failure retries duplicate-safe. Add API, persistence and interface regressions.
 5. **Agent frameworks and messaging channels**
-   - [ ] Prepare integration interfaces for agent frameworks such as Pi, Hermes and OpenClaw, so users can operate their own deployment through conversational tools.
-   - [ ] Explore messaging adapters for Telegram, WhatsApp, WeChat, LINE and other channels, allowing users to add restaurants and record visits, notes, photos and videos through chat.
+   - [ ] Prepare portable integration interfaces for agent frameworks such as Pi, Hermes and OpenClaw, with the same validated application operations. The existing external Add API is a foundation; packaged adapters and live framework compatibility are not implemented.
+   - [ ] Implement and verify messaging adapters for Telegram, WhatsApp, WeChat, LINE and other channels, allowing users to add restaurants and record visits, notes, photos and videos through chat. No channel adapter or paired-identity workflow is shipped.
    - [ ] Carry clarification, preview and confirmation through the conversation; authenticate the deployment Owner, preserve write validation and retry safeguards, and keep provider credentials on the server. Validate each framework and channel before claiming support.
 
 ### Additional follow-up quality work

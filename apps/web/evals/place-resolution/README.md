@@ -1,5 +1,7 @@
 # Place-resolution benchmark v1
 
+This is a restaurant identity benchmark for Place Atlas, with a finite set of regional examples. It does not validate architecture/event intake or framework/chat integrations. See [project scope](../../../../docs/project-scope.md).
+
 This package evaluates the first, deterministic part of Add: given the text a person supplied, should the system resolve one real restaurant branch, ask for clarification, or return no match?
 
 It does not evaluate ratings, reservation rules, signature dishes, or long-form web research. Those fields change independently and need separate enrichment benchmarks. Keeping identity resolution separate makes failures actionable and prevents a correct restaurant match from hiding invented enrichment.

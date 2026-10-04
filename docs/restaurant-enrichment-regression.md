@@ -1,15 +1,15 @@
-# Restaurant links and schedules
+# Place Atlas restaurant links and schedules
 
-Updated 2026-10-04. The current collection rule is deliberately simple: Japanese restaurant schedules come only from the exact Tabelog listing; schedules elsewhere come from the selected Google Maps place. If a field is absent, it remains unavailable. The application reads these fields directly, so a model cannot replace them with remembered hours, snippets or another website.
+Updated 2026-10-04. This report covers post-0.1.0 restaurant work, not all Place Atlas record types or worldwide reliability. Architecture/event research and agent/chat integrations have separate planned scope in [project scope](project-scope.md). The current collection rule is deliberately simple: Japanese restaurant schedules come only from the exact Tabelog listing; schedules elsewhere come from the selected Google Maps place. If a field is absent, it remains unavailable. The application reads these fields directly, so a model cannot replace them with remembered hours, snippets or another website.
 
 ## Current benchmark and database
 
 Separate GPT-6 Luna research agents collected the 56 existing Japanese restaurants. The active `catalog-hours.v1.json` has benchmark ID `catalog-hours-tabelog-only-2026-10-04-v2` and covers every saved restaurant identity with its exact Tabelog URL, observation date and evidence.
 
-| Field | Known | Unavailable |
-| --- | ---: | ---: |
-| Opening hours | 56 | 0 |
-| Regular closing policy | 30 | 26 |
+| Field                  | Known | Unavailable |
+| ---------------------- | ----: | ----------: |
+| Opening hours          |    56 |           0 |
+| Regular closing policy |    30 |          26 |
 
 Nine listings also provide separate calendar closure notes. An all-days hours row alone does not establish a no-rest-days policy. Tabelog supplies Recoco's hours through its verified RECOCO listing; the listing's name and street address support the alias without inventing a quotation containing the saved English name.
 
@@ -19,10 +19,10 @@ D1 remains `japan-atlas-owner-poc` (`8accfff1-c41a-4e90-9a20-c215eea6b891`); med
 
 ## Links and the original harness failure
 
-| Restaurant | Tabelog | Official website | Alternative booking |
-| --- | --- | --- | --- |
-| RODEO, Nakameguro | [Listing](https://tabelog.com/tokyo/A1317/A131701/13213575/) | [Branch page](https://gf-restaurant.jp/rodeo/nakameguro) | [Toreta](https://yoyaku.toreta.in/rodeo-nakameguro/#/) |
-| らぁ麺や 嶋 | [Listing](https://tabelog.com/tokyo/A1304/A130401/13247487/) | Standalone website unavailable | [TableCheck](https://www.tablecheck.com/ja/shops/ramenya-shima/reserve) |
+| Restaurant        | Tabelog                                                      | Official website                                         | Alternative booking                                                     |
+| ----------------- | ------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| RODEO, Nakameguro | [Listing](https://tabelog.com/tokyo/A1317/A131701/13213575/) | [Branch page](https://gf-restaurant.jp/rodeo/nakameguro) | [Toreta](https://yoyaku.toreta.in/rodeo-nakameguro/#/)                  |
+| らぁ麺や 嶋       | [Listing](https://tabelog.com/tokyo/A1304/A130401/13247487/) | Standalone website unavailable                           | [TableCheck](https://www.tablecheck.com/ja/shops/ramenya-shima/reserve) |
 
 The old harness conflated the Tabelog reservation-policy citation with a booking destination. Its lookup favored TableCheck and omitted Toreta, and optional booking-window details could cause a valid booking form to be discarded. Japan's linked official pages were also missed. The live evaluator checked reservation mode rather than the destination URL, so these defects escaped its gate.
 

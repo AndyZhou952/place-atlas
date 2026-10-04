@@ -513,6 +513,28 @@ export function CatalogTable({
                             </>
                           ) : null}
                         </dd>
+                        {item.kind === 'food' ? (
+                          <>
+                            <dt>営業時間 / Opening hours</dt>
+                            <dd>{item.openingHours?.value ?? 'Unavailable'}</dd>
+                            <dt>定休日 / Closing days</dt>
+                            <dd>
+                              {item.regularClosingDays?.value ?? 'Unavailable'}
+                            </dd>
+                            {item.closingNotes ? (
+                              <>
+                                <dt>Closure notes</dt>
+                                <dd>{item.closingNotes.value}</dd>
+                              </>
+                            ) : null}
+                            <dt>Schedule checked</dt>
+                            <dd>
+                              {item.scheduleCheck?.checkedAt ??
+                                item.openingHours?.observedAt ??
+                                'Unavailable'}
+                            </dd>
+                          </>
+                        ) : null}
                         <dt>Location</dt>
                         <dd>
                           {item.verificationStatus === 'verified'

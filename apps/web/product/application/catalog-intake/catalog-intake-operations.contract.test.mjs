@@ -161,7 +161,20 @@ test('complete sourced research yields map-ready preview without owner retyping;
     ),
     undefined,
   );
-  for (const ownerFields of [{}, { title: 'My title' }]) {
+  for (const ownerFields of [
+    {},
+    {
+      title: 'My title',
+      openingHours: {
+        value: '昼 11:00 - 14:00\n夜 17:00 - 22:00',
+        sourceUrl: 'https://restaurant.example/hours',
+      },
+      regularClosingDays: {
+        value: '水曜日',
+        sourceUrl: 'https://restaurant.example/hours',
+      },
+    },
+  ]) {
     const app = createFixtureApplication({
       discoveryPort: discoveryFixture(),
       enrichmentPolicy: 'enrich_if_available',
@@ -199,6 +212,14 @@ test('complete sourced research yields map-ready preview without owner retyping;
       result.value.preview.ownerFields.title ??
         result.value.preview.titleProposal.value,
       ownerFields.title ?? profile.name.value,
+    );
+    assert.deepEqual(
+      result.value.preview.ownerFields.openingHours,
+      ownerFields.openingHours,
+    );
+    assert.deepEqual(
+      result.value.preview.ownerFields.regularClosingDays,
+      ownerFields.regularClosingDays,
     );
     assert.deepEqual(result.value.preview.profile, profile);
     assert.equal(

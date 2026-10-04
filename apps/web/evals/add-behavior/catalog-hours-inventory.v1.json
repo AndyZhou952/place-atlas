@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 1,
+  "inventoryId": "catalog-hours-inventory-2026-10-04-v1",
+  "observedDate": "2026-10-04",
+  "cases": [
+    {
+      "itemId": "5e7e408c-eb8f-4d3d-9abf-711891234593",
+      "name": "うなぎ 京家",
+      "listingUrl": "https://tabelog.com/kanagawa/A1409/A140901/14081631/",
+      "address": "神奈川県小田原市栄町1-1-15 ミナカ小田原 2F"
+    },
+    {
+      "itemId": "37656270-4179-412c-b87a-93fb5dbad9f0",
+      "name": "ステーキライスとカレーの店 センタービーフ 新宿三丁目店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13295399/",
+      "address": "東京都新宿区新宿3-14-22 小川ビル B1F"
+    },
+    {
+      "itemId": "6077996c-ea50-4e51-835a-f7be1eb1fd4b",
+      "name": "牛たん 荒 新宿西口店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+      "address": "東京都新宿区西新宿1-16-4 井門西新宿ビル B2F"
+    },
+    {
+      "itemId": "b22acf18-9ff5-415a-959f-651fc2477a1b",
+      "name": "マクドナルド 池袋LABI前店",
+      "listingUrl": "https://tabelog.com/tokyo/A1305/A130501/13102211/",
+      "address": "東京都豊島区東池袋1-9-10 1F"
+    },
+    {
+      "itemId": "40efd7c0-49ed-4526-8b91-53f3a296bfb5",
+      "name": "海坊厨",
+      "listingUrl": "https://tabelog.com/aomori/A0201/A020101/2000433/",
+      "address": "青森県青森市古川1-13-12"
+    },
+    {
+      "itemId": "5bcf484b-8c31-4d37-abc3-3df6fe1e1661",
+      "name": "メンドコロ 天鳳",
+      "listingUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+      "address": "東京都中野区中央2-30-5 ハイムタカラ 1F"
+    },
+    {
+      "itemId": "3fe5a38e-2062-4153-96e1-b06964287935",
+      "name": "スシロー 新宿三丁目店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13256173/",
+      "address": "東京都新宿区新宿3-13-3 新宿文化ビル B1F"
+    },
+    {
+      "itemId": "50b57d6c-40fe-4c34-a647-72c04340a79d",
+      "name": "ヴァーヴ コーヒー ロースターズ 六本木",
+      "listingUrl": "https://tabelog.com/tokyo/A1307/A130701/13244766/",
+      "address": "東京都港区六本木5-16-7"
+    },
+    {
+      "itemId": "e8094f2f-ef92-4aef-8e89-547f76313986",
+      "name": "シェイク シャック 新宿サザンテラス",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+      "address": "東京都渋谷区代々木2-2-1 小田急サザンタワー2階"
+    },
+    {
+      "itemId": "dbe93aa1-da77-44aa-9508-8fc717e19ffa",
+      "name": "東京肉しゃぶ家",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13196268/",
+      "address": "東京都新宿区大久保1-12-3 カーサ第二新宿 1F"
+    },
+    {
+      "itemId": "41ff3290-e413-49f0-8668-df186906bee2",
+      "name": "特選髙坂鶏 克つ鳥",
+      "listingUrl": "https://tabelog.com/tokyo/A1303/A130301/13310446/",
+      "address": "東京都渋谷区道玄坂2-26-15 Shibuya D-second 1F"
+    },
+    {
+      "itemId": "2bcf3204-eeb2-4c5b-a13d-bb7f5e278cb8",
+      "name": "一蘭 新宿歌舞伎町店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+      "address": "東京都新宿区歌舞伎町1-17-10 歌舞伎町CR.B&Vビル B1F"
+    },
+    {
+      "itemId": "faad7004-4cf5-44b9-810c-0de16d16b082",
+      "name": "上等カレー 新大久保店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130404/13206139/",
+      "address": "東京都新宿区百人町1-7-13"
+    },
+    {
+      "itemId": "0983c8ab-9bd6-4d7d-acae-4a0285247c3e",
+      "name": "つけ麺 五ノ神製作所",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13120708/",
+      "address": "東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F"
+    },
+    {
+      "itemId": "9fe10c0b-438d-4302-995a-02157c2c23c8",
+      "name": "焼肉ホルモン金樹",
+      "listingUrl": "https://tabelog.com/tokyo/A1308/A130801/13273456/",
+      "address": "東京都港区赤坂2-13-17 赤坂グリーンランドビル 1F"
+    },
+    {
+      "itemId": "14834c9c-b06a-4108-902c-a8cddaad7df5",
+      "name": "TONKATSU KEITA",
+      "listingUrl": "https://tabelog.com/tokyo/A1319/A131907/13304076/",
+      "address": "東京都杉並区松庵3-41-1 西荻高架下"
+    },
+    {
+      "itemId": "01ee9b01-2ac9-4802-b16c-6adcec6e3f33",
+      "name": "讃岐うどん大使 東京麺通団",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13004352/",
+      "address": "東京都新宿区西新宿7-9-15 ダイカンプラザ　ビジネス清田ビル１Ｆ"
+    },
+    {
+      "itemId": "f3cf91bd-e076-4047-8a42-ef1972446f29",
+      "name": "たんや 善治郎 牛たん通り店",
+      "listingUrl": "https://tabelog.com/miyagi/A0401/A040101/4010191/",
+      "address": "宮城県仙台市青葉区中央１丁目１−１ ＪＲ仙台駅 ３階"
+    },
+    {
+      "itemId": "ce56fedb-f428-4ac6-a9e0-d58bfa9d7765",
+      "name": "遷sen",
+      "listingUrl": "https://tabelog.com/tokyo/A1305/A130501/13313917/",
+      "address": "東京都豊島区西池袋１丁目２４−８ 江戸半ビル 1階"
+    },
+    {
+      "itemId": "1ec55065-7059-4f3b-9136-5f5b67bfff7d",
+      "name": "すし酒場 さしす",
+      "listingUrl": "https://tabelog.com/osaka/A2701/A270101/27115113/",
+      "address": "大阪府大阪市北区梅田１丁目１−３ 大阪駅前第3ビル B100 B1F-68"
+    },
+    {
+      "itemId": "bd65a808-850a-4bf2-a89a-d02f2a69f0b5",
+      "name": "喫茶 月森",
+      "listingUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+      "address": "大阪府大阪市中央区瓦屋町１丁目６−１０"
+    },
+    {
+      "itemId": "d42e025a-71a1-482f-b651-32adbc5b2843",
+      "name": "浅草 生田庵",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131102/13255913/",
+      "address": "東京都台東区花川戸１丁目６−４"
+    },
+    {
+      "itemId": "296f1617-74f9-4f3f-bb65-08a0c2502b7d",
+      "name": "らーめん改",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131103/13191776/",
+      "address": "東京都台東区蔵前４丁目２０−１０"
+    },
+    {
+      "itemId": "ccc1945c-2c56-4478-ba8b-d0c781ae5b49",
+      "name": "銀座のみこ寿司",
+      "listingUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/",
+      "address": "東京都中央区銀座６丁目１２−１２ サクラマークス銀座 11階"
+    },
+    {
+      "itemId": "8e0a073f-8c60-4a62-8a33-15bef2c123e2",
+      "name": "博多ラーメン長浜や 上野店",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131101/13144260/",
+      "address": "東京都台東区上野７丁目２−１ 昭栄ビル １階"
+    },
+    {
+      "itemId": "3308615a-8c71-4c85-b638-5c59ed852223",
+      "name": "焼鳥 にしき",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131101/13297763/",
+      "address": "東京都文京区湯島３丁目３６−１２ TSK 上野ビル 1階"
+    },
+    {
+      "itemId": "31d6070a-4777-4531-a228-6046a9b84083",
+      "name": "れんこん",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+      "address": "東京都台東区上野４丁目９−１"
+    },
+    {
+      "itemId": "fc866802-b88f-408b-9e42-001948594584",
+      "name": "インドレストランDIWALI 梅田店",
+      "listingUrl": "https://tabelog.com/osaka/A2701/A270101/27146374/",
+      "address": "大阪府大阪市北区梅田２丁目４−９ ブリーゼブリーゼ ５階"
+    },
+    {
+      "itemId": "3558098e-d4f9-4597-aa7e-8c4f89de8d48",
+      "name": "炭火焼ホルモンたつや",
+      "listingUrl": "https://tabelog.com/aomori/A0201/A020101/2006050/",
+      "address": "青森県青森市新町１丁目９−１９"
+    },
+    {
+      "itemId": "fd7752b2-0ae7-4781-8749-711e1dc000a7",
+      "name": "シュトラウス",
+      "listingUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+      "address": "青森県青森市新町１丁目１３−２１"
+    },
+    {
+      "itemId": "7cde3b6c-b853-4102-a4ad-8ab1a4c53170",
+      "name": "らぁ麺や 嶋",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+      "address": "東京都渋谷区本町３丁目４１−１１"
+    },
+    {
+      "itemId": "57928933-6c40-4f3a-a2aa-c6f8f91fe6fc",
+      "name": "レア天丼 銀座 三よし 銀座本店",
+      "listingUrl": "https://tabelog.com/tokyo/A1301/A130101/13285959/",
+      "address": "東京都中央区銀座６丁目３−１５ 昭和イーティングビル １階"
+    },
+    {
+      "itemId": "d3935949-78cb-47f2-92d1-86fa5730dae2",
+      "name": "香氣 四川麺条 学芸大学店",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131702/13024183/",
+      "address": "東京都目黒区中央町１丁目１７−１２"
+    },
+    {
+      "itemId": "3ab364f6-4e25-46b2-a5b9-9dae16e3c80b",
+      "name": "SPICY CURRY 魯珈",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130404/13286023/",
+      "address": "東京都新宿区百人町１丁目２４−８ 新宿タウンプラザBF-J 地下1階"
+    },
+    {
+      "itemId": "38b22351-0af8-4a54-80bd-52668316f0d7",
+      "name": "とんかつ ここまでやるか。",
+      "listingUrl": "https://tabelog.com/tokyo/A1306/A130603/13294363/",
+      "address": "東京都港区南青山３丁目２−４ セントラル青山ＮＯ６ BA"
+    },
+    {
+      "itemId": "48af708e-fe3b-48ee-a23d-723bc641acb2",
+      "name": "たん焼 忍",
+      "listingUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+      "address": "東京都新宿区四谷三栄町１４−４ 松啓ビル 1Ｆ"
+    },
+    {
+      "itemId": "4d483e6a-3270-4fe7-8acc-3fd9537749d8",
+      "name": "かぶと",
+      "listingUrl": "https://tabelog.com/tokyo/A1305/A130501/13016660/",
+      "address": "東京都豊島区池袋２丁目５３−２"
+    },
+    {
+      "itemId": "269653b1-c7b1-4b13-9e5f-0ee0dc790344",
+      "name": "松戸富田麺絆",
+      "listingUrl": "https://tabelog.com/tokyo/A1302/A130201/13232095/",
+      "address": "東京都千代田区丸の内２丁目７−２ KITTE丸の内 KITTE GRANCHE"
+    },
+    {
+      "itemId": "c1473c29-4281-4ef4-92fc-46e599d58d37",
+      "name": "海老丸らーめん",
+      "listingUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+      "address": "東京都千代田区西神田２丁目１−１３ 十勝ビル 1F"
+    },
+    {
+      "itemId": "e7baf8ea-4cb8-4d74-b7f8-d29b1eb3e787",
+      "name": "かつれつ四谷たけだ",
+      "listingUrl": "https://tabelog.com/tokyo/A1309/A130902/13131643/",
+      "address": "東京都新宿区四谷１丁目４−２ 峯村ビル １Ｆ"
+    },
+    {
+      "itemId": "068d6fce-a8b6-4247-aa70-8dcf1cde0219",
+      "name": "焼肉 ジャンボ はなれ",
+      "listingUrl": "https://tabelog.com/tokyo/A1310/A131004/13160962/",
+      "address": "東京都文京区本郷３丁目２７−９"
+    },
+    {
+      "itemId": "3428e5e7-f2d4-41c3-915c-341f7dcd1a85",
+      "name": "麺散",
+      "listingUrl": "https://tabelog.com/tokyo/A1306/A130601/13225567/",
+      "address": "東京都渋谷区神宮前６丁目１３−７ 1F"
+    },
+    {
+      "itemId": "8cab882f-8320-429a-8039-fd8708b8dda3",
+      "name": "Recoco Record Cafe",
+      "listingUrl": null,
+      "address": "東京都渋谷区渋谷３丁目１−１０ PLAZA1階"
+    },
+    {
+      "itemId": "bc3f9635-35f7-4ed3-8072-4d268f3f583c",
+      "name": "セントル ザ・ベーカリー",
+      "listingUrl": "https://tabelog.com/tokyo/A1301/A130101/13157424/",
+      "address": "東京都中央区銀座１丁目２−１ 紺屋ビル 1F 東京高速道路"
+    },
+    {
+      "itemId": "13c189a3-6d2b-4fe2-855e-19c58d496a06",
+      "name": "AKHA AMA COFFEE KAGURAZAKA",
+      "listingUrl": "https://tabelog.com/tokyo/A1309/A130905/13248105/",
+      "address": "東京都新宿区赤城元町１−２５"
+    },
+    {
+      "itemId": "e71b39ec-cc5c-4943-9a3e-caf4dd19f1b2",
+      "name": "青森 帆立家",
+      "listingUrl": "https://tabelog.com/aomori/A0201/A020101/2013517/",
+      "address": "青森県青森市新町１丁目１１−１７ 丸倉新町ビル 1階"
+    },
+    {
+      "itemId": "9fe5a165-0776-4a57-af42-a9a607fcca62",
+      "name": "RODEO",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
+      "address": "東京都目黒区中目黒３丁目５−１"
+    },
+    {
+      "itemId": "01ec10d4-80eb-484d-b38d-ef22c56e97ba",
+      "name": "cois espresso club 本店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/",
+      "address": "東京都新宿区新宿1-6-11"
+    },
+    {
+      "itemId": "91e19c26-a0ce-434a-afe2-4aa388e3f344",
+      "name": "SHOGUN BURGER 新宿店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13227776/",
+      "address": "東京都新宿区歌舞伎町１丁目１５−１２ ピアットビル 1階"
+    },
+    {
+      "itemId": "496d673d-02b3-48f8-928d-bfcf570d0228",
+      "name": "GANCON NOODLE",
+      "listingUrl": "https://tabelog.com/tokyo/A1323/A132301/13147756/",
+      "address": "東京都北区中里１丁目３−３ 板橋ビル(青山ビル 1階"
+    },
+    {
+      "itemId": "cff5d716-243b-4ae2-a58b-1daa2ad397e3",
+      "name": "AFURI 六本木交差点",
+      "listingUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+      "address": "東京都港区六本木４丁目９−４ ＵＦビル ４ 1F"
+    },
+    {
+      "itemId": "7eb9720f-69c6-4187-b0a7-7ecbff0a069e",
+      "name": "いーはとーぼ",
+      "listingUrl": "https://tabelog.com/tokyo/A1318/A131802/13012546/",
+      "address": "東京都世田谷区北沢２丁目３４−９ 第１トキワビル 2F"
+    },
+    {
+      "itemId": "876d88b4-7b06-4fc7-82e7-c88b9a1d46f7",
+      "name": "アルデバラン",
+      "listingUrl": "https://tabelog.com/tokyo/A1307/A130702/13278678/",
+      "address": "東京都港区麻布十番3-3-1 三喜ビル 3F"
+    },
+    {
+      "itemId": "koffee-mameya-kakeru",
+      "name": "コーヒー マメヤ カケル",
+      "listingUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+      "address": "東京都江東区平野2-16-14"
+    },
+    {
+      "itemId": "onibus-nakameguro",
+      "name": "オニバスコーヒー 中目黒駅前店",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131701/13191293/",
+      "address": "東京都目黒区上目黒2-14-1"
+    },
+    {
+      "itemId": "tonkatsu-narikura",
+      "name": "とんかつ 成蔵",
+      "listingUrl": "https://tabelog.com/tokyo/A1319/A131905/13236380/",
+      "address": "東京都杉並区成田東4-33-9"
+    }
+  ],
+  "sourceSnapshot": "Public GET /api/items, 2026-10-04: all 56 food records among 58 catalog records."
+}

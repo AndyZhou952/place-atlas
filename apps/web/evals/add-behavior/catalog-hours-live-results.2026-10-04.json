@@ -1,0 +1,1719 @@
+{
+  "benchmarkId": "catalog-hours-2026-10-04-v1",
+  "verifiedOn": "2026-10-04",
+  "scope": "all_56_existing_restaurants",
+  "interpretation": "Strict acceptance requires verified identity, expected schedule semantics and preferred evidence URL. A verified Google fallback failing preferred-source equality is not, by itself, a false fact. These finite runs do not establish general model reliability or historical blame.",
+  "grader": "Both full reports rescored with the same final deterministic scorer and corrected canonical manifest; original runner counts affected by formatting/identity scorer defects are superseded.",
+  "database": {
+    "restaurants": 56,
+    "hours": 56,
+    "closingPolicies": 36,
+    "unavailablePolicies": 20,
+    "calendarNotes": 11,
+    "unrelatedFieldsPreserved": true
+  },
+  "controlledChecks": {
+    "capturedTabelogListings": 55,
+    "allCapturedHoursMatch": true,
+    "sameListingClosingPoliciesAndNotesMatch": true,
+    "storageToBrowserRestaurants": 56
+  },
+  "excludedDiagnostics": [
+    {
+      "reason": "Original discovery matcher required Japanese strings from English Google results; no model research called.",
+      "includedInPassRate": false
+    },
+    {
+      "reason": "Parallel runners shared one credential-scoped conversation and replaced each other’s sessions; invalid evaluation protocol.",
+      "includedInPassRate": false
+    }
+  ],
+  "runs": [
+    {
+      "id": "pre_fallback_identity_fix",
+      "version": "680c526b-132c-407c-82c7-c4bcf5bb84c6",
+      "runStartedAt": "2026-10-04T06:45:26.026Z",
+      "runFinishedAt": "2026-10-04T06:50:46.356Z",
+      "total": 56,
+      "partialReport": false,
+      "inProgress": false,
+      "configuredProvider": "deployed Add Agent configured provider",
+      "responseModelIdentifierObserved": false,
+      "goldAnswersSent": false,
+      "confirmedOrSaved": false,
+      "allTemporarySessionsCancelled": true,
+      "strictPasses": 12,
+      "disjointStages": {
+        "pass": 12,
+        "identity_missing": 32,
+        "schedule_content": 6,
+        "no_preview": 6
+      },
+      "profilesWithHours": 41,
+      "profilesWithClosingPolicies": 19,
+      "preferredSourceClaimFailures": 29,
+      "fieldFailures": {
+        "openingHours:missing": 15,
+        "closingNotes:missing": 8,
+        "regularClosingDays:missing": 17,
+        "openingHours:evidence": 23,
+        "regularClosingDays:evidence": 6,
+        "regularClosingDays:closure_mismatch": 2,
+        "closingNotes:closing_note_mismatch": 2,
+        "closingNotes:unsupported": 1
+      },
+      "cases": [
+        {
+          "id": "cois-espresso-club-main",
+          "itemId": "01ec10d4-80eb-484d-b38d-ef22c56e97ba",
+          "name": "cois espresso club 本店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tokyo-mentsudan-hours",
+          "itemId": "01ee9b01-2ac9-4802-b16c-6adcec6e3f33",
+          "name": "讃岐うどん大使 東京麺通団",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yakiniku-jumbo-hanare-hours",
+          "itemId": "068d6fce-a8b6-4247-aa70-8dcf1cde0219",
+          "name": "焼肉 ジャンボ はなれ",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "gonokami-shinjuku-hours",
+          "itemId": "0983c8ab-9bd6-4d7d-acae-4a0285247c3e",
+          "name": "つけ麺 五ノ神製作所",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "akha-ama-kagurazaka",
+          "itemId": "13c189a3-6d2b-4fe2-855e-19c58d496a06",
+          "name": "AKHA AMA COFFEE KAGURAZAKA",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tonkatsu-keita",
+          "itemId": "14834c9c-b06a-4108-902c-a8cddaad7df5",
+          "name": "TONKATSU KEITA",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "sashisu-osaka-ekimae-3-hours",
+          "itemId": "1ec55065-7059-4f3b-9136-5f5b67bfff7d",
+          "name": "すし酒場 さしす",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "closure_mismatch",
+            "closingNotes": "closing_note_mismatch"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "matsudo-tomita-menban-hours",
+          "itemId": "269653b1-c7b1-4b13-9e5f-0ee0dc790344",
+          "name": "松戸富田麺絆",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ramen-kai-kuramae-hours",
+          "itemId": "296f1617-74f9-4f3f-bb65-08a0c2502b7d",
+          "name": "らーめん改",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "ichiran-shinjuku-kabukicho",
+          "itemId": "2bcf3204-eeb2-4c5b-a13d-bb7f5e278cb8",
+          "name": "一蘭 新宿歌舞伎町店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "renkon-ueno",
+          "itemId": "31d6070a-4777-4531-a228-6046a9b84083",
+          "name": "れんこん",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "yakitori-nishiki-yushima-hours",
+          "itemId": "3308615a-8c71-4c85-b638-5c59ed852223",
+          "name": "焼鳥 にしき",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "menchiri",
+          "itemId": "3428e5e7-f2d4-41c3-915c-341f7dcd1a85",
+          "name": "麺散",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "horumon-tatsuya-aomori-hours",
+          "itemId": "3558098e-d4f9-4597-aa7e-8c4f89de8d48",
+          "name": "炭火焼ホルモンたつや",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "center-beef-shinjuku-sanchome-hours",
+          "itemId": "37656270-4179-412c-b87a-93fb5dbad9f0",
+          "name": "ステーキライスとカレーの店 センタービーフ 新宿三丁目店",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kokomadeyaruka-hours",
+          "itemId": "38b22351-0af8-4a54-80bd-52668316f0d7",
+          "name": "とんかつ ここまでやるか。",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "closingNotes": "unsupported"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "spicy-curry-roka",
+          "itemId": "3ab364f6-4e25-46b2-a5b9-9dae16e3c80b",
+          "name": "SPICY CURRY 魯珈",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "sushiro-shinjuku-sanchome",
+          "itemId": "3fe5a38e-2062-4153-96e1-b06964287935",
+          "name": "スシロー 新宿三丁目店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "umibozu-aomori-hours",
+          "itemId": "40efd7c0-49ed-4526-8b91-53f3a296bfb5",
+          "name": "海坊厨",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "katsutori-shibuya-hours",
+          "itemId": "41ff3290-e413-49f0-8668-df186906bee2",
+          "name": "特選髙坂鶏 克つ鳥",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "tanyaki-shinobu",
+          "itemId": "48af708e-fe3b-48ee-a23d-723bc641acb2",
+          "name": "たん焼 忍",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "closure_mismatch",
+            "closingNotes": "closing_note_mismatch"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "gancon-noodle-komagome-hours",
+          "itemId": "496d673d-02b3-48f8-928d-bfcf570d0228",
+          "name": "GANCON NOODLE",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "kabuto",
+          "itemId": "4d483e6a-3270-4fe7-8acc-3fd9537749d8",
+          "name": "かぶと",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "verve-roppongi-hours",
+          "itemId": "50b57d6c-40fe-4c34-a647-72c04340a79d",
+          "name": "ヴァーヴ コーヒー ロースターズ 六本木",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ginza-miyoshi-hours",
+          "itemId": "57928933-6c40-4f3a-a2aa-c6f8f91fe6fc",
+          "name": "レア天丼 銀座 三よし 銀座本店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "mendokoro-tenho",
+          "itemId": "5bcf484b-8c31-4d37-abc3-3df6fe1e1661",
+          "name": "メンドコロ 天鳳",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "unagi-kyoya",
+          "itemId": "5e7e408c-eb8f-4d3d-9abf-711891234593",
+          "name": "うなぎ 京家",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "gyutan-ara-shinjuku-west",
+          "itemId": "6077996c-ea50-4e51-835a-f7be1eb1fd4b",
+          "name": "牛たん 荒 新宿西口店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ramenya-shima",
+          "itemId": "7cde3b6c-b853-4102-a4ad-8ab1a4c53170",
+          "name": "らぁ麺や 嶋",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "ihatovo",
+          "itemId": "7eb9720f-69c6-4187-b0a7-7ecbff0a069e",
+          "name": "いーはとーぼ",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "aldebaran-azabujuban-hours",
+          "itemId": "876d88b4-7b06-4fc7-82e7-c88b9a1d46f7",
+          "name": "アルデバラン",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "recoco-shibuya",
+          "itemId": "8cab882f-8320-429a-8039-fd8708b8dda3",
+          "name": "Recoco Record Cafe",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "nagahamaya-ueno",
+          "itemId": "8e0a073f-8c60-4a62-8a33-15bef2c123e2",
+          "name": "博多ラーメン長浜や 上野店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "shogun-burger-shinjuku",
+          "itemId": "91e19c26-a0ce-434a-afe2-4aa388e3f344",
+          "name": "SHOGUN BURGER 新宿店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yakiniku-horumon-kinju",
+          "itemId": "9fe10c0b-438d-4302-995a-02157c2c23c8",
+          "name": "焼肉ホルモン金樹",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "rodeo-nakameguro-hours-batch2",
+          "itemId": "9fe5a165-0776-4a57-af42-a9a607fcca62",
+          "name": "RODEO",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "mcdonald-ikebukuro-labi",
+          "itemId": "b22acf18-9ff5-415a-959f-651fc2477a1b",
+          "name": "マクドナルド 池袋LABI前店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "centre-the-bakery-ginza-hours",
+          "itemId": "bc3f9635-35f7-4ed3-8072-4d268f3f583c",
+          "name": "セントル ザ・ベーカリー",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kissa-tsukimori",
+          "itemId": "bd65a808-850a-4bf2-a89a-d02f2a69f0b5",
+          "name": "喫茶 月森",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ebimaru-ramen",
+          "itemId": "c1473c29-4281-4ef4-92fc-46e599d58d37",
+          "name": "海老丸らーめん",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ginza-nomikosushi",
+          "itemId": "ccc1945c-2c56-4478-ba8b-d0c781ae5b49",
+          "name": "銀座のみこ寿司",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "sen-ikebukuro",
+          "itemId": "ce56fedb-f428-4ac6-a9e0-d58bfa9d7765",
+          "name": "遷sen",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "afuri-roppongi-crossing",
+          "itemId": "cff5d716-243b-4ae2-a58b-1daa2ad397e3",
+          "name": "AFURI 六本木交差点",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kouki-gakugei-daigaku",
+          "itemId": "d3935949-78cb-47f2-92d1-86fa5730dae2",
+          "name": "香氣 四川麺条 学芸大学店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "asakusa-ikuta-an",
+          "itemId": "d42e025a-71a1-482f-b651-32adbc5b2843",
+          "name": "浅草 生田庵",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tokyo-nikushabuya",
+          "itemId": "dbe93aa1-da77-44aa-9508-8fc717e19ffa",
+          "name": "東京肉しゃぶ家",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "aomori-hotateya",
+          "itemId": "e71b39ec-cc5c-4943-9a3e-caf4dd19f1b2",
+          "name": "青森 帆立家",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yotsuya-takeda",
+          "itemId": "e7baf8ea-4cb8-4d74-b7f8-d29b1eb3e787",
+          "name": "かつれつ四谷たけだ",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "shake-shack-shinjuku-southern-terrace",
+          "itemId": "e8094f2f-ef92-4aef-8e89-547f76313986",
+          "name": "シェイク シャック 新宿サザンテラス",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tanya-zenjiro-gyutan-street",
+          "itemId": "f3cf91bd-e076-4047-8a42-ef1972446f29",
+          "name": "たんや 善治郎 牛たん通り店",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "joto-curry-shinokubo",
+          "itemId": "faad7004-4cf5-44b9-810c-0de16d16b082",
+          "name": "上等カレー 新大久保店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "diwali-umeda",
+          "itemId": "fc866802-b88f-408b-9e42-001948594584",
+          "name": "インドレストランDIWALI 梅田店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "strauss-aomori",
+          "itemId": "fd7752b2-0ae7-4781-8749-711e1dc000a7",
+          "name": "シュトラウス",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "koffee-mameya-kakeru",
+          "itemId": "koffee-mameya-kakeru",
+          "name": "コーヒー マメヤ カケル",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "onibus-nakameguro",
+          "itemId": "onibus-nakameguro",
+          "name": "オニバスコーヒー 中目黒駅前店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tonkatsu-narikura-hours",
+          "itemId": "tonkatsu-narikura",
+          "name": "とんかつ 成蔵",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        }
+      ]
+    },
+    {
+      "id": "full_repeat_after_fallback_identity_and_official_policy_fix",
+      "version": "b986af8c-1246-41db-931e-6e933d4c7a8a",
+      "runStartedAt": "2026-10-04T07:15:54.682Z",
+      "runFinishedAt": "2026-10-04T07:21:31.681Z",
+      "total": 56,
+      "partialReport": false,
+      "inProgress": false,
+      "configuredProvider": "deployed Add Agent configured provider",
+      "responseModelIdentifierObserved": false,
+      "goldAnswersSent": false,
+      "confirmedOrSaved": false,
+      "allTemporarySessionsCancelled": true,
+      "strictPasses": 17,
+      "disjointStages": {
+        "pass": 17,
+        "identity_missing": 6,
+        "schedule_content": 15,
+        "no_preview": 6,
+        "preferred_source": 7,
+        "identity_unverified": 5
+      },
+      "profilesWithHours": 44,
+      "profilesWithClosingPolicies": 21,
+      "preferredSourceClaimFailures": 27,
+      "fieldFailures": {
+        "openingHours:missing": 12,
+        "closingNotes:missing": 8,
+        "regularClosingDays:closure_mismatch": 2,
+        "closingNotes:closing_note_mismatch": 2,
+        "regularClosingDays:missing": 15,
+        "openingHours:evidence": 22,
+        "regularClosingDays:evidence": 5
+      },
+      "cases": [
+        {
+          "id": "cois-espresso-club-main",
+          "itemId": "01ec10d4-80eb-484d-b38d-ef22c56e97ba",
+          "name": "cois espresso club 本店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tokyo-mentsudan-hours",
+          "itemId": "01ee9b01-2ac9-4802-b16c-6adcec6e3f33",
+          "name": "讃岐うどん大使 東京麺通団",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yakiniku-jumbo-hanare-hours",
+          "itemId": "068d6fce-a8b6-4247-aa70-8dcf1cde0219",
+          "name": "焼肉 ジャンボ はなれ",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "gonokami-shinjuku-hours",
+          "itemId": "0983c8ab-9bd6-4d7d-acae-4a0285247c3e",
+          "name": "つけ麺 五ノ神製作所",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "akha-ama-kagurazaka",
+          "itemId": "13c189a3-6d2b-4fe2-855e-19c58d496a06",
+          "name": "AKHA AMA COFFEE KAGURAZAKA",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tonkatsu-keita",
+          "itemId": "14834c9c-b06a-4108-902c-a8cddaad7df5",
+          "name": "TONKATSU KEITA",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "sashisu-osaka-ekimae-3-hours",
+          "itemId": "1ec55065-7059-4f3b-9136-5f5b67bfff7d",
+          "name": "すし酒場 さしす",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "closure_mismatch",
+            "closingNotes": "closing_note_mismatch"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "matsudo-tomita-menban-hours",
+          "itemId": "269653b1-c7b1-4b13-9e5f-0ee0dc790344",
+          "name": "松戸富田麺絆",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ramen-kai-kuramae-hours",
+          "itemId": "296f1617-74f9-4f3f-bb65-08a0c2502b7d",
+          "name": "らーめん改",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "ichiran-shinjuku-kabukicho",
+          "itemId": "2bcf3204-eeb2-4c5b-a13d-bb7f5e278cb8",
+          "name": "一蘭 新宿歌舞伎町店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "renkon-ueno",
+          "itemId": "31d6070a-4777-4531-a228-6046a9b84083",
+          "name": "れんこん",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "yakitori-nishiki-yushima-hours",
+          "itemId": "3308615a-8c71-4c85-b638-5c59ed852223",
+          "name": "焼鳥 にしき",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "menchiri",
+          "itemId": "3428e5e7-f2d4-41c3-915c-341f7dcd1a85",
+          "name": "麺散",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "horumon-tatsuya-aomori-hours",
+          "itemId": "3558098e-d4f9-4597-aa7e-8c4f89de8d48",
+          "name": "炭火焼ホルモンたつや",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "center-beef-shinjuku-sanchome-hours",
+          "itemId": "37656270-4179-412c-b87a-93fb5dbad9f0",
+          "name": "ステーキライスとカレーの店 センタービーフ 新宿三丁目店",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kokomadeyaruka-hours",
+          "itemId": "38b22351-0af8-4a54-80bd-52668316f0d7",
+          "name": "とんかつ ここまでやるか。",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "spicy-curry-roka",
+          "itemId": "3ab364f6-4e25-46b2-a5b9-9dae16e3c80b",
+          "name": "SPICY CURRY 魯珈",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "sushiro-shinjuku-sanchome",
+          "itemId": "3fe5a38e-2062-4153-96e1-b06964287935",
+          "name": "スシロー 新宿三丁目店",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "umibozu-aomori-hours",
+          "itemId": "40efd7c0-49ed-4526-8b91-53f3a296bfb5",
+          "name": "海坊厨",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "katsutori-shibuya-hours",
+          "itemId": "41ff3290-e413-49f0-8668-df186906bee2",
+          "name": "特選髙坂鶏 克つ鳥",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "tanyaki-shinobu",
+          "itemId": "48af708e-fe3b-48ee-a23d-723bc641acb2",
+          "name": "たん焼 忍",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "closure_mismatch",
+            "closingNotes": "closing_note_mismatch"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "gancon-noodle-komagome-hours",
+          "itemId": "496d673d-02b3-48f8-928d-bfcf570d0228",
+          "name": "GANCON NOODLE",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kabuto",
+          "itemId": "4d483e6a-3270-4fe7-8acc-3fd9537749d8",
+          "name": "かぶと",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "verve-roppongi-hours",
+          "itemId": "50b57d6c-40fe-4c34-a647-72c04340a79d",
+          "name": "ヴァーヴ コーヒー ロースターズ 六本木",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ginza-miyoshi-hours",
+          "itemId": "57928933-6c40-4f3a-a2aa-c6f8f91fe6fc",
+          "name": "レア天丼 銀座 三よし 銀座本店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "mendokoro-tenho",
+          "itemId": "5bcf484b-8c31-4d37-abc3-3df6fe1e1661",
+          "name": "メンドコロ 天鳳",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "unagi-kyoya",
+          "itemId": "5e7e408c-eb8f-4d3d-9abf-711891234593",
+          "name": "うなぎ 京家",
+          "stage": "pass",
+          "identity": "matched",
+          "failures": {},
+          "preferredSourceFields": [],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "gyutan-ara-shinjuku-west",
+          "itemId": "6077996c-ea50-4e51-835a-f7be1eb1fd4b",
+          "name": "牛たん 荒 新宿西口店",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ramenya-shima",
+          "itemId": "7cde3b6c-b853-4102-a4ad-8ab1a4c53170",
+          "name": "らぁ麺や 嶋",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "ihatovo",
+          "itemId": "7eb9720f-69c6-4187-b0a7-7ecbff0a069e",
+          "name": "いーはとーぼ",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "aldebaran-azabujuban-hours",
+          "itemId": "876d88b4-7b06-4fc7-82e7-c88b9a1d46f7",
+          "name": "アルデバラン",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "recoco-shibuya",
+          "itemId": "8cab882f-8320-429a-8039-fd8708b8dda3",
+          "name": "Recoco Record Cafe",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "nagahamaya-ueno",
+          "itemId": "8e0a073f-8c60-4a62-8a33-15bef2c123e2",
+          "name": "博多ラーメン長浜や 上野店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "shogun-burger-shinjuku",
+          "itemId": "91e19c26-a0ce-434a-afe2-4aa388e3f344",
+          "name": "SHOGUN BURGER 新宿店",
+          "stage": "identity_unverified",
+          "identity": "unverified",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yakiniku-horumon-kinju",
+          "itemId": "9fe10c0b-438d-4302-995a-02157c2c23c8",
+          "name": "焼肉ホルモン金樹",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "rodeo-nakameguro-hours-batch2",
+          "itemId": "9fe5a165-0776-4a57-af42-a9a607fcca62",
+          "name": "RODEO",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "mcdonald-ikebukuro-labi",
+          "itemId": "b22acf18-9ff5-415a-959f-651fc2477a1b",
+          "name": "マクドナルド 池袋LABI前店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "centre-the-bakery-ginza-hours",
+          "itemId": "bc3f9635-35f7-4ed3-8072-4d268f3f583c",
+          "name": "セントル ザ・ベーカリー",
+          "stage": "identity_unverified",
+          "identity": "unverified",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kissa-tsukimori",
+          "itemId": "bd65a808-850a-4bf2-a89a-d02f2a69f0b5",
+          "name": "喫茶 月森",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ebimaru-ramen",
+          "itemId": "c1473c29-4281-4ef4-92fc-46e599d58d37",
+          "name": "海老丸らーめん",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "ginza-nomikosushi",
+          "itemId": "ccc1945c-2c56-4478-ba8b-d0c781ae5b49",
+          "name": "銀座のみこ寿司",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "sen-ikebukuro",
+          "itemId": "ce56fedb-f428-4ac6-a9e0-d58bfa9d7765",
+          "name": "遷sen",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "afuri-roppongi-crossing",
+          "itemId": "cff5d716-243b-4ae2-a58b-1daa2ad397e3",
+          "name": "AFURI 六本木交差点",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "kouki-gakugei-daigaku",
+          "itemId": "d3935949-78cb-47f2-92d1-86fa5730dae2",
+          "name": "香氣 四川麺条 学芸大学店",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "asakusa-ikuta-an",
+          "itemId": "d42e025a-71a1-482f-b651-32adbc5b2843",
+          "name": "浅草 生田庵",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tokyo-nikushabuya",
+          "itemId": "dbe93aa1-da77-44aa-9508-8fc717e19ffa",
+          "name": "東京肉しゃぶ家",
+          "stage": "identity_missing",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "aomori-hotateya",
+          "itemId": "e71b39ec-cc5c-4943-9a3e-caf4dd19f1b2",
+          "name": "青森 帆立家",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "yotsuya-takeda",
+          "itemId": "e7baf8ea-4cb8-4d74-b7f8-d29b1eb3e787",
+          "name": "かつれつ四谷たけだ",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "shake-shack-shinjuku-southern-terrace",
+          "itemId": "e8094f2f-ef92-4aef-8e89-547f76313986",
+          "name": "シェイク シャック 新宿サザンテラス",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tanya-zenjiro-gyutan-street",
+          "itemId": "f3cf91bd-e076-4047-8a42-ef1972446f29",
+          "name": "たんや 善治郎 牛たん通り店",
+          "stage": "no_preview",
+          "identity": "missing",
+          "failures": {
+            "openingHours": "missing"
+          },
+          "preferredSourceFields": [],
+          "profileHasHours": false,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "joto-curry-shinokubo",
+          "itemId": "faad7004-4cf5-44b9-810c-0de16d16b082",
+          "name": "上等カレー 新大久保店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing",
+            "closingNotes": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "diwali-umeda",
+          "itemId": "fc866802-b88f-408b-9e42-001948594584",
+          "name": "インドレストランDIWALI 梅田店",
+          "stage": "schedule_content",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "strauss-aomori",
+          "itemId": "fd7752b2-0ae7-4781-8749-711e1dc000a7",
+          "name": "シュトラウス",
+          "stage": "identity_unverified",
+          "identity": "unverified",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        },
+        {
+          "id": "koffee-mameya-kakeru",
+          "itemId": "koffee-mameya-kakeru",
+          "name": "コーヒー マメヤ カケル",
+          "stage": "identity_unverified",
+          "identity": "unverified",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "onibus-nakameguro",
+          "itemId": "onibus-nakameguro",
+          "name": "オニバスコーヒー 中目黒駅前店",
+          "stage": "identity_unverified",
+          "identity": "unverified",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "missing"
+          },
+          "preferredSourceFields": ["openingHours"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": false,
+          "cancelled": true
+        },
+        {
+          "id": "tonkatsu-narikura-hours",
+          "itemId": "tonkatsu-narikura",
+          "name": "とんかつ 成蔵",
+          "stage": "preferred_source",
+          "identity": "matched",
+          "failures": {
+            "openingHours": "evidence",
+            "regularClosingDays": "evidence"
+          },
+          "preferredSourceFields": ["openingHours", "regularClosingDays"],
+          "profileHasHours": true,
+          "profileHasClosingPolicy": true,
+          "cancelled": true
+        }
+      ]
+    }
+  ],
+  "finalClosureRetest": {
+    "version": "8a82d880-17c0-46ec-a510-881d25d31048",
+    "scope": "four_affected_cases_only",
+    "partialReport": true,
+    "passed": 4,
+    "total": 4,
+    "configuredProvider": "deployed Add Agent configured provider",
+    "responseModelIdentifierObserved": false,
+    "goldAnswersSent": false,
+    "confirmedOrSaved": false,
+    "cases": [
+      {
+        "id": "sashisu-osaka-ekimae-3-hours",
+        "name": "すし酒場 さしす",
+        "pass": true,
+        "cancelled": true,
+        "runStartedAt": "2026-10-04T07:29:35.003Z",
+        "runFinishedAt": "2026-10-04T07:29:45.270Z"
+      },
+      {
+        "id": "renkon-ueno",
+        "name": "れんこん",
+        "pass": true,
+        "cancelled": true,
+        "runStartedAt": "2026-10-04T07:29:45.496Z",
+        "runFinishedAt": "2026-10-04T07:29:56.969Z"
+      },
+      {
+        "id": "tanyaki-shinobu",
+        "name": "たん焼 忍",
+        "pass": true,
+        "cancelled": true,
+        "runStartedAt": "2026-10-04T07:29:57.189Z",
+        "runFinishedAt": "2026-10-04T07:30:09.601Z"
+      },
+      {
+        "id": "joto-curry-shinokubo",
+        "name": "上等カレー 新大久保店",
+        "pass": true,
+        "cancelled": true,
+        "runStartedAt": "2026-10-04T07:30:09.821Z",
+        "runFinishedAt": "2026-10-04T07:30:18.314Z"
+      }
+    ]
+  },
+  "finalFullCoverageAcceptance": false
+}

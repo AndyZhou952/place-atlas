@@ -29,7 +29,8 @@
     "db:generate": "drizzle-kit generate",
     "maintenance:assessment-reset": "node --experimental-strip-types scripts/assessment-reset-maintenance.ts",
     "audit:media-integrity": "node scripts/audit-media-integrity.mjs",
-    "eval:restaurant-links": "node evals/add-behavior/run-restaurant-links.mjs"
+    "eval:restaurant-links": "node evals/add-behavior/run-restaurant-links.mjs",
+    "eval:catalog-hours": "node evals/add-behavior/run-catalog-hours.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

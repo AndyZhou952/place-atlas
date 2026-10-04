@@ -659,35 +659,55 @@ function PreviewStep({
             </a>
           </p>
         ) : null}
-        {preview.profile?.openingHours ||
-        preview.profile?.regularClosingDays ? (
-          <div className="catalog-intake-profile-hours">
-            {preview.profile.openingHours ? (
-              <p>
-                営業時間: {preview.profile.openingHours.value}{' '}
-                <a
-                  href={preview.profile.openingHours.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Source
-                </a>
-              </p>
-            ) : null}
-            {preview.profile.regularClosingDays ? (
-              <p>
-                定休日: {preview.profile.regularClosingDays.value}{' '}
-                <a
-                  href={preview.profile.regularClosingDays.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Source
-                </a>
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="catalog-intake-profile-hours">
+          <h5>Operating schedule</h5>
+          <p>
+            Leave unavailable information empty. Keep lunch, dinner, weekday
+            differences and last-order times in the source wording.
+          </p>
+          {(
+            [
+              [
+                'openingHours',
+                'openingHoursSourceUrl',
+                '営業時間 / Opening hours',
+                1200,
+              ],
+              [
+                'regularClosingDays',
+                'regularClosingDaysSourceUrl',
+                '定休日 / Closing days',
+                500,
+              ],
+            ] as const
+          ).map(([field, sourceField, label, limit]) => (
+            <div key={field}>
+              <label htmlFor={`catalog-intake-preview-${field}`}>{label}</label>
+              <textarea
+                id={`catalog-intake-preview-${field}`}
+                value={intake.state[field]}
+                onChange={(event) => intake.setField(field, event.target.value)}
+                maxLength={limit}
+                rows={3}
+                placeholder="Unavailable"
+                disabled={busy}
+              />
+              <label htmlFor={`catalog-intake-preview-${sourceField}`}>
+                {label} source URL
+              </label>
+              <Input
+                id={`catalog-intake-preview-${sourceField}`}
+                type="url"
+                value={intake.state[sourceField]}
+                onChange={(event) =>
+                  intake.setField(sourceField, event.target.value)
+                }
+                placeholder="https://..."
+                disabled={busy}
+              />
+            </div>
+          ))}
+        </div>
       </section>
       {groups.map((group) => (
         <section

@@ -4,11 +4,17 @@ import { readBoundedText } from './web-search.ts';
 export interface OfficialSiteEvidence extends SearchEvidence {
   readonly bookingLinks: readonly { label: string; url: string }[];
   readonly operatingHours?: string;
+  readonly regularClosingDays?: string;
   readonly branchLinks?: readonly {
     url: string;
     name: string;
     address: string;
   }[];
+}
+
+export interface OfficialBranchIdentity {
+  readonly name: string;
+  readonly address: string;
 }
 
 /** Read at most four pages on one public HTTPS origin, without credentials or redirects. */
@@ -17,10 +23,11 @@ export async function readOfficialSite(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   maximumPages = 4,
+  expectedBranch?: OfficialBranchIdentity,
 ): Promise<OfficialSiteEvidence[]> {
   const root = publicPage(websiteUri);
   if (!root) return [];
-  const first = await readPage(root, signal, fetcher);
+  const first = await readPage(root, signal, fetcher, expectedBranch);
   if (!first) return [];
   const links = [...first.html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/giu)]
     .map((match) => {
@@ -49,7 +56,7 @@ export async function readOfficialSite(
     ).values(),
   ].slice(0, Math.max(0, Math.min(4, maximumPages) - 1));
   const followUps = await Promise.all(
-    selected.map(({ page }) => readPage(page, signal, fetcher)),
+    selected.map(({ page }) => readPage(page, signal, fetcher, expectedBranch)),
   );
   return [
     first,
@@ -60,6 +67,9 @@ export async function readOfficialSite(
     content: page.content,
     bookingLinks: page.bookingLinks,
     ...(page.operatingHours ? { operatingHours: page.operatingHours } : {}),
+    ...(page.regularClosingDays
+      ? { regularClosingDays: page.regularClosingDays }
+      : {}),
     ...(page.branchLinks.length ? { branchLinks: page.branchLinks } : {}),
   }));
 }
@@ -70,6 +80,7 @@ interface ReadPage {
   readonly content: string;
   readonly html: string;
   readonly operatingHours?: string;
+  readonly regularClosingDays?: string;
   readonly bookingLinks: readonly { label: string; url: string }[];
   readonly branchLinks: readonly {
     url: string;
@@ -82,6 +93,7 @@ async function readPage(
   page: URL,
   parentSignal: AbortSignal,
   fetcher: typeof fetch,
+  expectedBranch?: OfficialBranchIdentity,
 ): Promise<ReadPage | undefined> {
   const signal = AbortSignal.any([parentSignal, AbortSignal.timeout(8_000)]);
   try {
@@ -113,6 +125,11 @@ async function readPage(
         ),
     ).slice(0, 8_000);
     const structured = officialHours(html, page);
+    const regularClosingDays = officialRegularClosingDays(
+      html,
+      page,
+      expectedBranch,
+    );
     // Group JSON-LD can point to branch pages even on a JavaScript-rendered site.
     // These URLs are discovery hints only; the branch page must be fetched.
     const branchLinks = restaurantRecords(html)
@@ -160,10 +177,11 @@ async function readPage(
       ? {
           url: page.href,
           title,
-          content: `${content} ${structured ? `${structured.name} ${structured.address} Official operating hours: ${structured.hours}` : ''} ${bookingLinks.map((link) => `${link.label}: ${link.url}`).join(' ')} Page URL: ${page.href}`,
+          content: `${content} ${structured ? `${structured.name} ${structured.address} Official operating hours: ${structured.hours}` : ''} ${regularClosingDays ? `Official regular closing days: ${regularClosingDays}` : ''} ${bookingLinks.map((link) => `${link.label}: ${link.url}`).join(' ')} Page URL: ${page.href}`,
           bookingLinks,
           branchLinks,
           ...(structured ? { operatingHours: structured.hours } : {}),
+          ...(regularClosingDays ? { regularClosingDays } : {}),
           html,
         }
       : undefined;
@@ -314,4 +332,176 @@ function officialHours(
   return rows.length
     ? { name: record.name, address: parts.join(''), hours: rows.join('; ') }
     : undefined;
+}
+
+function officialRegularClosingDays(
+  html: string,
+  page: URL,
+  expectedBranch?: OfficialBranchIdentity,
+): string | undefined {
+  // Prefer one address-bearing Restaurant record whose URL is this exact
+  // branch page. Some official microsites omit JSON-LD; callers can instead
+  // provide identity from a previously verified exact-branch listing.
+  const records = restaurantRecords(html);
+  const matches = records.filter((record) => {
+    try {
+      const url = new URL(String(record.url ?? record['@id']));
+      url.hash = '';
+      const address = record.address as Record<string, unknown> | undefined;
+      return (
+        record['@type'] === 'Restaurant' &&
+        url.href.replace(/\/$/u, '') === page.href.replace(/\/$/u, '') &&
+        typeof record.name === 'string' &&
+        ['addressRegion', 'addressLocality', 'streetAddress'].every(
+          (key) => typeof address?.[key] === 'string' && address[key],
+        )
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (matches.length > 1) return undefined;
+  if (matches.length === 1) {
+    if (
+      expectedBranch &&
+      !matchesExpectedBranchRecord(matches[0], expectedBranch)
+    )
+      return undefined;
+  } else if (
+    !expectedBranch ||
+    !matchesExpectedBranchMarkup(html, expectedBranch)
+  ) {
+    return undefined;
+  }
+  const currentUrl = page.href.replace(/\/$/u, '');
+  const hasOtherAddressedBranch = records.some((record) => {
+    try {
+      const url = new URL(String(record.url ?? record['@id']));
+      url.hash = '';
+      const address = record.address as Record<string, unknown> | undefined;
+      return (
+        record['@type'] === 'Restaurant' &&
+        url.href.replace(/\/$/u, '') !== currentUrl &&
+        ['addressRegion', 'addressLocality', 'streetAddress'].every(
+          (key) => typeof address?.[key] === 'string' && address[key],
+        )
+      );
+    } catch {
+      return false;
+    }
+  });
+  // A page containing sibling-branch Restaurant records has global markup;
+  // without a branch-scoped closure container the label could refer to either.
+  if (hasOtherAddressedBranch) return undefined;
+
+  const values = [
+    ...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/giu),
+  ].flatMap((row) => {
+    const cells = [
+      ...row[1].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)\s*>/giu),
+    ].map((cell) => plainText(cell[1]));
+    return cells.length >= 2 &&
+      cells[0].replace(/[：:]/gu, '') === '定休日' &&
+      cells[1] &&
+      cells[1].length <= 250
+      ? [cells[1]]
+      : [];
+  });
+  const unique = [...new Set(values)];
+  if (unique.length !== 1) return undefined;
+  const value = unique[0];
+  // Require an explicit no-closure, irregular, or weekday policy. Annual and
+  // seasonal-only strings such as 年末年始 or 夏季休業 stay out of this field.
+  if (!hasExplicitWeeklyClosurePolicy(value)) return undefined;
+  return value;
+}
+
+function matchesExpectedBranchRecord(
+  record: Record<string, unknown>,
+  expected: OfficialBranchIdentity,
+): boolean {
+  const address = record.address as Record<string, unknown> | undefined;
+  const recordName =
+    typeof record.name === 'string'
+      ? plainText(record.name).replace(/\s+/gu, '')
+      : '';
+  const expectedName = plainText(expected.name).replace(/\s+/gu, '');
+  const recordAddress = [
+    address?.addressRegion,
+    address?.addressLocality,
+    address?.streetAddress,
+  ]
+    .filter((part): part is string => typeof part === 'string')
+    .join('');
+  return (
+    recordName === expectedName &&
+    matchesExpectedAddress(recordAddress, expected.address)
+  );
+}
+
+function matchesExpectedBranchMarkup(
+  html: string,
+  expected: OfficialBranchIdentity,
+): boolean {
+  const headings = [
+    ...html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]\s*>/giu),
+  ].map((heading) => plainText(heading[1]).replace(/\s+/gu, ''));
+  const expectedName = plainText(expected.name).replace(/\s+/gu, '');
+  if (
+    !expectedName ||
+    !headings.some((heading) => heading.includes(expectedName))
+  )
+    return false;
+
+  const addressRows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/giu)]
+    .map((row) =>
+      [
+        ...row[1].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)\s*>/giu),
+      ].map((cell) => plainText(cell[1])),
+    )
+    .filter(
+      (cells) =>
+        cells.length >= 2 && cells[0].replace(/[：:]/gu, '') === '住所',
+    );
+  return (
+    addressRows.length === 1 &&
+    matchesExpectedAddress(addressRows[0][1], expected.address)
+  );
+}
+
+function matchesExpectedAddress(source: string, expected: string): boolean {
+  const normalize = (value: string) =>
+    plainText(value)
+      .replace(/[０-９]/gu, (digit) =>
+        String.fromCharCode(digit.charCodeAt(0) - 0xfee0),
+      )
+      .replace(/\s+/gu, '');
+  const expectedAddress = normalize(expected);
+  const expectedNumber = /\d+-\d+-\d+/u.exec(expectedAddress);
+  if (!expectedNumber || expectedNumber.index === undefined) return false;
+  const expectedCore = expectedAddress.slice(
+    0,
+    expectedNumber.index + expectedNumber[0].length,
+  );
+  const sourceAddress = normalize(source);
+  if (!sourceAddress.startsWith(expectedCore)) return false;
+  const remainder = sourceAddress.slice(expectedCore.length);
+  // Permit the source to omit building details or add a building suffix, but
+  // never accept a longer/different street number such as 5-33-160.
+  return !/^[\d-]/u.test(remainder);
+}
+
+function hasExplicitWeeklyClosurePolicy(value: string): boolean {
+  if (/無休|年中無休|無し|なし|定休日なし|休業日なし|不定休/u.test(value))
+    return true;
+  if (/(?:月|火|水|木|金|土|日)曜日|(?:月|火|水|木|金|土|日)曜/u.test(value))
+    return true;
+  if (
+    /(?:^|[、・,，/（(\s])[月火水木金土日](?=$|[、・,，/（）)\s])/u.test(value)
+  )
+    return true;
+  // Compact explicit weekday lists, e.g. 土日祝 or 月火水木金.
+  return /^[月火水木金土日]+(?:祝日?|祝前日|祝後日)?(?:定休日?|休業|休み)?$/u.test(
+    value,
+  );
 }

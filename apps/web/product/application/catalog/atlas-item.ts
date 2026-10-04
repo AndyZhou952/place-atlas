@@ -71,6 +71,12 @@ export interface AtlasItem {
   readonly description: string;
   readonly openingHours?: CatalogIntakeSourcedValue<string>;
   readonly regularClosingDays?: CatalogIntakeSourcedValue<string>;
+  readonly closingNotes?: CatalogIntakeSourcedValue<string>;
+  readonly scheduleCheck?: {
+    readonly openingHours: 'known' | 'unavailable';
+    readonly regularClosingDays: 'known' | 'unavailable';
+    readonly checkedAt: string;
+  };
   readonly latitude: number;
   readonly longitude: number;
   readonly verificationStatus: VerificationStatus;

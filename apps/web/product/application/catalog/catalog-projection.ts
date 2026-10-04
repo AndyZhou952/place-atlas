@@ -219,6 +219,8 @@ function isReviewOwnerFields(value: unknown): boolean {
         'categories',
         'signatureDishes',
         'summary',
+        'openingHours',
+        'regularClosingDays',
       ],
       [],
     ) &&
@@ -229,7 +231,21 @@ function isReviewOwnerFields(value: unknown): boolean {
     (value.categories === undefined || isReviewOwnerLabels(value.categories)) &&
     (value.signatureDishes === undefined ||
       isReviewOwnerLabels(value.signatureDishes)) &&
-    (value.summary === undefined || typeof value.summary === 'string')
+    (value.summary === undefined || typeof value.summary === 'string') &&
+    (value.openingHours === undefined ||
+      isOwnerSchedule(value.openingHours, 1200)) &&
+    (value.regularClosingDays === undefined ||
+      isOwnerSchedule(value.regularClosingDays, 500))
+  );
+}
+
+function isOwnerSchedule(value: unknown, maxLength: number): boolean {
+  return (
+    hasExactKeys(value, ['value', 'sourceUrl']) &&
+    typeof value.value === 'string' &&
+    value.value.trim().length > 0 &&
+    value.value.length <= maxLength &&
+    isCanonicalHttpsUrl(value.sourceUrl)
   );
 }
 
@@ -574,6 +590,22 @@ export function isAtlasItem(value: unknown): value is AtlasItem {
       isSourcedText(value.openingHours, 1200)) &&
     (value.regularClosingDays === undefined ||
       isSourcedText(value.regularClosingDays, 500)) &&
+    (value.closingNotes === undefined ||
+      isSourcedText(value.closingNotes, 500)) &&
+    (value.scheduleCheck === undefined ||
+      (hasAllowedKeys(
+        value.scheduleCheck,
+        ['openingHours', 'regularClosingDays', 'checkedAt'],
+        ['openingHours', 'regularClosingDays', 'checkedAt'],
+      ) &&
+        ['known', 'unavailable'].includes(
+          String(value.scheduleCheck.openingHours),
+        ) &&
+        ['known', 'unavailable'].includes(
+          String(value.scheduleCheck.regularClosingDays),
+        ) &&
+        typeof value.scheduleCheck.checkedAt === 'string' &&
+        Number.isFinite(Date.parse(value.scheduleCheck.checkedAt)))) &&
     (value.tabelog === undefined || isTabelog(value.tabelog)) &&
     isReservation(value.reservation) &&
     (value.event === undefined || isEventSchedule(value.event)) &&

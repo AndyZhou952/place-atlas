@@ -148,3 +148,170 @@ test('structured official hours belong only to the page restaurant, not a sister
       );
   }
 });
+
+test('explicit closure is extracted only from the matching branch labeled row', async () => {
+  const url = 'https://gonokamiseisakusho.com/shinjyuku.html';
+  const branch = {
+    '@type': 'Restaurant',
+    url,
+    name: 'つけ麺 五ノ神製作所',
+    address: {
+      addressRegion: '東京都',
+      addressLocality: '渋谷区',
+      streetAddress: '千駄ヶ谷5-33-16',
+    },
+    openingHoursSpecification: [
+      {
+        dayOfWeek: [
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday',
+        ],
+        opens: '11:00',
+        closes: '21:30',
+      },
+    ],
+  };
+  const read = async ({
+    record = branch,
+    row = '<tr><th>定休日</th><td>無し</td></tr>',
+    expectedBranch,
+  } = {}) => {
+    const html = `<title>つけ麺 五ノ神製作所</title><p>東京都渋谷区千駄ヶ谷5-33-16</p>${row}<script type="application/ld+json">${JSON.stringify(record)}</script>`;
+    const pages = await readOfficialSite(
+      url,
+      new AbortController().signal,
+      async () =>
+        new Response(html, { headers: { 'content-type': 'text/html' } }),
+      1,
+      expectedBranch,
+    );
+    return pages[0];
+  };
+
+  const source = await read({
+    expectedBranch: {
+      name: branch.name,
+      address: '東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F',
+    },
+  });
+  assert.equal(source.regularClosingDays, '無し');
+  assert.match(source.content, /Official regular closing days: 無し/u);
+
+  const siblingOnly = await read({
+    record: { ...branch, url: 'https://gonokamiseisakusho.com/gotanda.html' },
+  });
+  assert.equal(siblingOnly.regularClosingDays, undefined);
+
+  const ambiguousSibling = await read({
+    record: [
+      branch,
+      {
+        ...branch,
+        url: 'https://gonokamiseisakusho.com/gotanda.html',
+        name: '五ノ神製作所 五反田店',
+        address: {
+          addressRegion: '東京都',
+          addressLocality: '品川区',
+          streetAddress: '西五反田1-25-5',
+        },
+      },
+    ],
+    expectedBranch: {
+      name: branch.name,
+      address: '東京都渋谷区千駄ヶ谷5-33-16',
+    },
+  });
+  assert.equal(ambiguousSibling.regularClosingDays, undefined);
+
+  const mismatchedExactPageRecord = await read({
+    record: {
+      ...branch,
+      name: '別の五ノ神店舗',
+      address: {
+        addressRegion: '東京都',
+        addressLocality: '品川区',
+        streetAddress: '西五反田1-25-5',
+      },
+    },
+    expectedBranch: {
+      name: branch.name,
+      address: '東京都渋谷区千駄ヶ谷5-33-16',
+    },
+  });
+  assert.equal(mismatchedExactPageRecord.regularClosingDays, undefined);
+
+  const unlabeled = await read({ row: '<p>定休日 無し</p>' });
+  assert.equal(unlabeled.regularClosingDays, undefined);
+
+  const seasonalOnly = await read({
+    row: '<tr><th>定休日</th><td>年末年始</td></tr>',
+  });
+  assert.equal(seasonalOnly.regularClosingDays, undefined);
+
+  const summerOnly = await read({
+    row: '<tr><th>定休日</th><td>夏季休業</td></tr>',
+  });
+  assert.equal(summerOnly.regularClosingDays, undefined);
+
+  const calendarOnly = await read({
+    row: '<tr><th>定休日</th><td>夏季休業（8月12日）</td></tr>',
+  });
+  assert.equal(calendarOnly.regularClosingDays, undefined);
+
+  const overlong = await read({
+    row: `<tr><th>定休日</th><td>${'不定休'.repeat(100)}</td></tr>`,
+  });
+  assert.equal(overlong.regularClosingDays, undefined);
+});
+
+test('official branch microsite without JSON-LD uses supplied Tabelog identity', async () => {
+  const url = 'https://gonokamiseisakusho.com/shinjyuku.html';
+  const html = `<title>つけ麺 五ノ神製作所</title><h2>つけ麺 五ノ神製作所</h2><table><tr><td>住所</td><td>東京都渋谷区千駄ヶ谷5-33-16</td></tr><tr><td>営業時間</td><td>11:00～21:30(L.O 21:00)</td></tr><tr><td>定休日</td><td>無し</td></tr></table>`;
+  const fetcher = async () =>
+    new Response(html, { headers: { 'content-type': 'text/html' } });
+  const expectedBranch = {
+    name: 'つけ麺 五ノ神製作所',
+    address: '東京都渋谷区千駄ヶ谷5-33-16 シャトレー新宿御苑第一 1F',
+  };
+  const read = (identity) =>
+    readOfficialSite(url, new AbortController().signal, fetcher, 1, identity);
+
+  const matched = await read(expectedBranch);
+  assert.equal(matched[0].regularClosingDays, '無し');
+
+  const readMarkup = (pageHtml, identity) =>
+    readOfficialSite(
+      url,
+      new AbortController().signal,
+      async () =>
+        new Response(pageHtml, {
+          headers: { 'content-type': 'text/html' },
+        }),
+      1,
+      identity,
+    );
+
+  const wrongCity = await readMarkup(
+    html.replace('東京都渋谷区千駄ヶ谷5-33-16', '東京都品川区千駄ヶ谷5-33-16'),
+    expectedBranch,
+  );
+  assert.equal(wrongCity[0].regularClosingDays, undefined);
+
+  const extendedNumber = await readMarkup(
+    html.replace('千駄ヶ谷5-33-16</td>', '千駄ヶ谷5-33-160</td>'),
+    expectedBranch,
+  );
+  assert.equal(extendedNumber[0].regularClosingDays, undefined);
+
+  const duplicatedBranchAddress = html.replace(
+    '</table>',
+    '<tr><td>住所</td><td>東京都品川区西五反田1-25-5</td></tr></table>',
+  );
+  const ambiguous = await readMarkup(duplicatedBranchAddress, expectedBranch);
+  assert.equal(ambiguous[0].regularClosingDays, undefined);
+});

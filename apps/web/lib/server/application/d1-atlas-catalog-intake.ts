@@ -655,6 +655,15 @@ function toAtlasItem(
   if (!location || !title || !address) {
     throw new Error('Verified publication requires complete durable evidence.');
   }
+  const openingHours = preview.ownerFields.openingHours
+    ? { ...preview.ownerFields.openingHours, observedAt: now.toISOString() }
+    : preview.profile?.openingHours;
+  const regularClosingDays = preview.ownerFields.regularClosingDays
+    ? {
+        ...preview.ownerFields.regularClosingDays,
+        observedAt: now.toISOString(),
+      }
+    : preview.profile?.regularClosingDays;
   return withRestaurantClassification({
     id: itemId,
     kind: 'food',
@@ -663,12 +672,16 @@ function toAtlasItem(
     address,
     description:
       preview.ownerFields.summary ?? preview.profile?.summary?.value ?? '',
-    ...(preview.profile?.openingHours
-      ? { openingHours: preview.profile.openingHours }
+    ...(openingHours ? { openingHours } : {}),
+    ...(regularClosingDays ? { regularClosingDays } : {}),
+    ...(preview.profile?.closingNotes
+      ? { closingNotes: preview.profile.closingNotes }
       : {}),
-    ...(preview.profile?.regularClosingDays
-      ? { regularClosingDays: preview.profile.regularClosingDays }
-      : {}),
+    scheduleCheck: {
+      openingHours: openingHours ? 'known' : 'unavailable',
+      regularClosingDays: regularClosingDays ? 'known' : 'unavailable',
+      checkedAt: now.toISOString(),
+    },
     ...(preview.profile?.officialWebsite
       ? { officialUrl: preview.profile.officialWebsite.value }
       : {}),

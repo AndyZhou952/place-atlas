@@ -44,6 +44,10 @@ export interface CatalogIntakeUiState {
   readonly categories: string;
   readonly signatureDishes: string;
   readonly summary: string;
+  readonly openingHours: string;
+  readonly openingHoursSourceUrl: string;
+  readonly regularClosingDays: string;
+  readonly regularClosingDaysSourceUrl: string;
   readonly latitude: string;
   readonly longitude: string;
   readonly tabelogScore: string;
@@ -90,6 +94,10 @@ export type CatalogIntakeUiAction =
         | 'categories'
         | 'signatureDishes'
         | 'summary'
+        | 'openingHours'
+        | 'openingHoursSourceUrl'
+        | 'regularClosingDays'
+        | 'regularClosingDaysSourceUrl'
         | 'latitude'
         | 'longitude'
         | 'tabelogScore'
@@ -193,6 +201,10 @@ export function catalogIntakeInitialState(): CatalogIntakeUiState {
     categories: '',
     signatureDishes: '',
     summary: '',
+    openingHours: '',
+    openingHoursSourceUrl: '',
+    regularClosingDays: '',
+    regularClosingDaysSourceUrl: '',
     latitude: '',
     longitude: '',
     tabelogScore: '',
@@ -212,6 +224,25 @@ export function catalogIntakeManualCompletionError(
 ): string | undefined {
   if (state.preview && !state.title.trim())
     return 'Enter a restaurant name before updating the preview.';
+  for (const [key, urlKey, limit] of [
+    ['openingHours', 'openingHoursSourceUrl', 1200],
+    ['regularClosingDays', 'regularClosingDaysSourceUrl', 500],
+  ] as const) {
+    if (!state[key].trim() && !state[urlKey].trim()) continue;
+    let validUrl = false;
+    try {
+      const url = new URL(state[urlKey]);
+      validUrl =
+        url.protocol === 'https:' &&
+        !url.username &&
+        !url.password &&
+        !url.hash;
+    } catch {
+      /* A missing or malformed URL is reported below. */
+    }
+    if (!state[key].trim() || state[key].length > limit || !validUrl)
+      return 'Opening hours and closing days need their source URL; leave both fields empty when unavailable.';
+  }
   for (const [label, value] of [
     ['Categories', state.categories],
     ['Signature dishes', state.signatureDishes],
@@ -417,6 +448,10 @@ export function reduceCatalogIntakeUi(
         categories: state.categories,
         signatureDishes: state.signatureDishes,
         summary: state.summary,
+        openingHours: state.openingHours,
+        openingHoursSourceUrl: state.openingHoursSourceUrl,
+        regularClosingDays: state.regularClosingDays,
+        regularClosingDaysSourceUrl: state.regularClosingDaysSourceUrl,
         latitude: state.latitude,
         longitude: state.longitude,
         tabelogScore: state.tabelogScore,

@@ -17,6 +17,7 @@ export interface TabelogEvidence extends SearchEvidence {
     officialAccounts?: string[];
     openingHours?: string;
     regularClosingDays?: string;
+    closingNotes?: string;
     officialWebsite?: string;
     introduction?: string;
   };
@@ -191,24 +192,181 @@ export function parseTabelogListing(
   // Operating hours come only from the exact listing's business-info row,
   // never from review text, booking slot availability, or a last-order time.
   const hoursRow = row('営業時間(?:・定休日)?');
-  const openingHours = hoursRow ? clean(hoursRow).slice(0, 1200) : undefined;
+  const businessOther =
+    /<div\b[^>]*class=["'][^"']*rstinfo-table__business-other[^"']*["'][^>]*>([\s\S]*?)<\/div>/iu.exec(
+      hoursRow ?? '',
+    )?.[0];
+  // Some listings advertise a sister branch in this note. Its address and
+  // schedule must never replace the structured weekly rows for this restaurant.
+  const otherBranch =
+    businessOther &&
+    /[市区][^\s<]{0,30}\d[-－]\d[-－]\d/u.test(clean(businessOther)) &&
+    /(?:店|branch)/iu.test(clean(businessOther));
+  const scheduleRow = otherBranch
+    ? (hoursRow ?? '').replace(businessOther, '')
+    : hoursRow;
+  let openingHours = scheduleRow
+    ? clean(scheduleRow).slice(0, 1200)
+    : undefined;
+  const hasStructuredDayRows = [
+    ...(scheduleRow ?? '').matchAll(
+      /<p\b[^>]*class=["'][^"']*rstinfo-table__business-title[^"']*["'][^>]*>([\s\S]*?)<\/p>/giu,
+    ),
+  ].some((match) => /[月火水木金土日祝]/u.test(clean(match[1])));
+  // A same-listing hours FAQ can make an unqualified clock range explicit by
+  // weekday. It must corroborate the business row, never override its clocks.
+  if (
+    openingHours &&
+    !otherBranch &&
+    !hasStructuredDayRows &&
+    !/(?:[月火水木金土日](?:・|曜)|\[月\])/u.test(
+      openingHours.split(/■\s*定休日/u)[0],
+    )
+  ) {
+    const timeFacts = (value: string) =>
+      [
+        ...new Set(
+          [
+            ...value
+              .normalize('NFKC')
+              .split(/■\s*定休日/u)[0]
+              .matchAll(/\d{1,2}:\d{2}/gu),
+          ].map((match) => match[0]),
+        ),
+      ]
+        .sort((a, b) => a.localeCompare(b))
+        .join('|');
+    for (const faq of records.filter((entry) => entry['@type'] === 'FAQPage')) {
+      if (!Array.isArray(faq.mainEntity)) continue;
+      for (const question of faq.mainEntity) {
+        if (
+          !question ||
+          question.name !== '営業時間・定休日を教えてください' ||
+          typeof question.acceptedAnswer?.text !== 'string'
+        )
+          continue;
+        const answer = question.acceptedAnswer.text;
+        const linked =
+          /href\s*=\s*["']?(https:\/\/tabelog\.com\/[^\s"'>]+)/u.exec(
+            answer,
+          )?.[1];
+        if (
+          !linked ||
+          !isTabelogRestaurantListing(linked) ||
+          identity(linked) !== identity(sourceUrl)
+        )
+          continue;
+        const text = clean(answer.replace(/<a\b[\s\S]*?<\/a>/giu, ''));
+        if (
+          text &&
+          text.length <= 1200 &&
+          /\[(?:月|火|水|木|金|土|日)\]/u.test(text) &&
+          timeFacts(text) === timeFacts(openingHours) &&
+          /24時間営業/u.test(text) === /24時間営業/u.test(openingHours)
+        )
+          openingHours = text;
+      }
+    }
+  }
   const closedItems = [
-    ...(hoursRow ?? '').matchAll(
+    ...(scheduleRow ?? '').matchAll(
       /<p\b[^>]*class=["'][^"']*rstinfo-table__business-title[^"']*["'][^>]*>([\s\S]*?)<\/p>\s*<ul\b[^>]*>([\s\S]*?)<\/ul>/giu,
     ),
   ]
     .filter((match) => clean(match[2]) === '定休日')
     .map((match) => clean(match[1]));
-  const closureNote = /■\s*定休日\s*([^■]{1,300})/u
-    .exec(openingHours ?? '')?.[1]
-    ?.replace(/営業時間・定休日は変更[\s\S]*/u, '')
+  const lines = (
+    otherBranch ? '' : (row('定休日') ?? businessOther ?? scheduleRow ?? '')
+  )
+    .replace(/<br\s*\/?>/giu, '\n')
+    .split('\n')
+    .map(clean)
+    .filter(Boolean);
+  const closureNote =
+    clean(row('定休日') ?? '') ||
+    lines
+      .map(
+        (line, index) =>
+          /^■\s*定休日\s*(.+)$/u.exec(line)?.[1] ??
+          (/^■\s*定休日\s*$/u.test(lines[index - 1] ?? '') &&
+          !line.startsWith('■')
+            ? line
+            : undefined),
+      )
+      .find(Boolean);
+  // A single note may contain both a weekly rule and dated/seasonal closures.
+  // Keep the calendar suffix out of the recurring policy.
+  const weeklyPolicyText = closureNote
+    ?.split(
+      /年末|年始|元旦|元日|お盆|夏季|冬季|\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}/u,
+    )[0]
+    .replace(/[（(、。，,\s]+$/u, '')
     .trim();
+  const explicitPolicy =
+    weeklyPolicyText &&
+    /毎週|[月火水木金土日](?:曜|祝)|祝日|無休|不定休|無し|なし|施設|準ずる|open\s*7\s*days/iu.test(
+      weeklyPolicyText,
+    )
+      ? weeklyPolicyText
+      : undefined;
+  const facilityLabel = lines.find((line) =>
+    /^\d+F(?:カフェ|喫茶|サロン|レストラン|ショップ|売店)[^■]{0,50}$/u.test(
+      line.normalize('NFKC'),
+    ),
+  );
+  const standalonePolicy =
+    !closureNote &&
+    /(?:年中無休|不定休|Open\s*7\s*days\s*a\s*week(?:[^。]{0,80})?|商業施設に準ずる)/iu.exec(
+      openingHours ?? '',
+    )?.[0];
+  const exceptions = closedItems.length
+    ? lines.filter(
+        (line) =>
+          /定休日|定休/u.test(line) &&
+          /祝日|祝祭日/u.test(line) &&
+          !line.startsWith('■'),
+      )
+    : [];
   const regularClosingDays = [
-    ...closedItems,
-    ...(closureNote && /毎週|[月火水木金土日]曜/u.test(closureNote)
-      ? [closureNote]
-      : []),
+    ...new Set([
+      ...closedItems,
+      ...(explicitPolicy || standalonePolicy
+        ? [
+            facilityLabel
+              ? `${facilityLabel}：${explicitPolicy ?? standalonePolicy}`
+              : (explicitPolicy ?? standalonePolicy),
+          ]
+        : []),
+      ...exceptions,
+    ]),
   ].join(' / ');
+  // Calendar-period closures are optional notes, never a guessed weekly policy.
+  const closingNotes =
+    [
+      ...new Set(
+        lines
+          .filter(
+            (line) =>
+              /年末|年始|元旦|元日|お盆|夏季|冬季|\d{1,2}月\d{1,2}日|\d{1,2}\/\d{1,2}/u.test(
+                line,
+              ) &&
+              /休業|休み|休暇|店休日|休みとな|定休日|無休|不定休/u.test(line),
+          )
+          .map((line) =>
+            weeklyPolicyText && line === closureNote
+              ? line
+                  .slice(weeklyPolicyText.length)
+                  .trim()
+                  .replace(/^[（(](.*)[）)]$/u, '$1')
+              : line,
+          ),
+      ),
+    ].join(' / ') ||
+    (closureNote &&
+    !explicitPolicy &&
+    /休|年末|年始|元旦|元日/u.test(closureNote)
+      ? closureNote
+      : undefined);
   const officialRow = row('ホームページ');
   const website =
     officialRow && /href=["'](https:\/\/[^"']+)["']/iu.exec(officialRow)?.[1];
@@ -266,6 +424,7 @@ export function parseTabelogListing(
       : {}),
     ...(openingHours ? { openingHours } : {}),
     ...(regularClosingDays ? { regularClosingDays } : {}),
+    ...(closingNotes ? { closingNotes } : {}),
     ...(introduction ? { introduction } : {}),
     ...(website ? { officialWebsite: clean(website) } : {}),
   };

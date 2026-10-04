@@ -1126,34 +1126,33 @@ function PlaceDetail({
                   <small>Official schedule</small>
                 </div>
               ) : null}
-              {item.openingHours ? (
-                <div className="fact-card">
+              {item.kind === 'food' ? (
+                <div className="fact-card schedule-card">
                   <span>営業時間</span>
-                  <strong>{item.openingHours.value}</strong>
-                  <small>
-                    <a
-                      href={item.openingHours.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Source
-                    </a>
-                  </small>
+                  <strong>{item.openingHours?.value ?? 'Unavailable'}</strong>
+                  {item.openingHours ? (
+                    <small>
+                      {new URL(item.openingHours.sourceUrl).hostname} ·{' '}
+                      {item.openingHours.observedAt.slice(0, 10)}
+                    </small>
+                  ) : null}
                 </div>
               ) : null}
-              {item.regularClosingDays ? (
-                <div className="fact-card">
+              {item.kind === 'food' ? (
+                <div className="fact-card schedule-card">
                   <span>定休日</span>
-                  <strong>{item.regularClosingDays.value}</strong>
-                  <small>
-                    <a
-                      href={item.regularClosingDays.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Source
-                    </a>
-                  </small>
+                  <strong>
+                    {item.regularClosingDays?.value ?? 'Unavailable'}
+                  </strong>
+                  {item.closingNotes ? (
+                    <small>{item.closingNotes.value}</small>
+                  ) : null}
+                  {item.regularClosingDays ? (
+                    <small>
+                      {new URL(item.regularClosingDays.sourceUrl).hostname} ·{' '}
+                      {item.regularClosingDays.observedAt.slice(0, 10)}
+                    </small>
+                  ) : null}
                 </div>
               ) : null}
             </div>

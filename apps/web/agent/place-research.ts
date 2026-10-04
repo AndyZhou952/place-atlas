@@ -31,6 +31,14 @@ import {
   type TableCheckBookingEvidence,
 } from './tablecheck-booking.ts';
 
+type GoogleOperatingSchedule = {
+  name: string;
+  address: string;
+  sourceUrl: string;
+  openingHours: string;
+  regularClosingDays?: string;
+};
+
 export interface AgentConfiguration {
   apiKey: string;
   baseUrl: string;
@@ -41,6 +49,9 @@ export interface AgentConfiguration {
   sourceReader?: RestaurantSourceReader;
   onDiagnostic?: (code: string) => void;
   officialWebsiteForPlaceId?: (placeId: string) => Promise<string | undefined>;
+  operatingScheduleForPlaceId?: (
+    placeId: string,
+  ) => Promise<GoogleOperatingSchedule | undefined>;
 }
 
 type Evidence = SearchEvidence;
@@ -52,6 +63,9 @@ export function createConfiguredPlaceResearchAgent(options: {
   sourceReader?: RestaurantSourceReader;
   onDiagnostic?: (code: string) => void;
   officialWebsiteForPlaceId?: (placeId: string) => Promise<string | undefined>;
+  operatingScheduleForPlaceId?: (
+    placeId: string,
+  ) => Promise<GoogleOperatingSchedule | undefined>;
   fetch?: typeof fetch;
 }): WebResearchPort | undefined {
   if (
@@ -76,6 +90,9 @@ export function createConfiguredPlaceResearchAgent(options: {
       ...(options.fetch ? { fetch: options.fetch } : {}),
       ...(options.sourceReader ? { sourceReader: options.sourceReader } : {}),
       ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {}),
+      ...(options.operatingScheduleForPlaceId
+        ? { operatingScheduleForPlaceId: options.operatingScheduleForPlaceId }
+        : {}),
       ...(options.officialWebsiteForPlaceId
         ? { officialWebsiteForPlaceId: options.officialWebsiteForPlaceId }
         : {}),
@@ -130,7 +147,11 @@ export function createPlaceResearchAgent(
             : 'model_configured_other',
       );
       const evidence: TabelogEvidence[] = [];
+      let googleSchedule: GoogleOperatingSchedule | undefined;
       let officialSchedule: { value: string; sourceUrl: string } | undefined;
+      let officialClosingPolicy:
+        | { value: string; sourceUrl: string }
+        | undefined;
       let officialPageBudget = 4;
       const readOfficialUrls = new Set<string>();
       let officialBookingLink: { value: string; sourceUrl: string } | undefined;
@@ -281,6 +302,7 @@ export function createPlaceResearchAgent(
       const readJapaneseOfficialPage = async (
         website: string,
         maximumPages: number,
+        expectedBranch?: { name: string; address: string },
       ) => {
         if (
           region !== 'japan' ||
@@ -297,6 +319,7 @@ export function createPlaceResearchAgent(
           signal,
           fetcher,
           pageLimit,
+          expectedBranch,
         );
         const subject = input.selectedSubject;
         for (const link of pages.flatMap((page) => page.branchLinks ?? [])) {
@@ -311,7 +334,10 @@ export function createPlaceResearchAgent(
               link.name,
             )
           )
-            await readJapaneseOfficialPage(link.url, 1);
+            await readJapaneseOfficialPage(link.url, 1, {
+              name: link.name,
+              address: link.address,
+            });
         }
         const branchPages = pages.filter((page) =>
           matchesSelectedBranch(
@@ -322,12 +348,18 @@ export function createPlaceResearchAgent(
           ),
         );
         evidence.push(...branchPages);
-        for (const page of branchPages)
+        for (const page of branchPages) {
           if (page.operatingHours)
             officialSchedule = {
               value: page.operatingHours,
               sourceUrl: page.url,
             };
+          if (page.regularClosingDays)
+            officialClosingPolicy = {
+              value: page.regularClosingDays,
+              sourceUrl: page.url,
+            };
+        }
         const declared = branchPages.flatMap((page) =>
           page.bookingLinks.map((link) => ({ ...link, sourceUrl: page.url })),
         );
@@ -371,7 +403,10 @@ export function createPlaceResearchAgent(
         if (!listing?.restaurant?.officialWebsite) return;
         for (const source of sources)
           if (sameOrigin(source.url, listing.restaurant.officialWebsite))
-            await readJapaneseOfficialPage(source.url, 1);
+            await readJapaneseOfficialPage(source.url, 1, {
+              name: listing.restaurant.name,
+              address: listing.restaurant.address,
+            });
       };
       const verifiedListingFallback = () => {
         const selected = input.selectedSubject;
@@ -391,7 +426,52 @@ export function createPlaceResearchAgent(
                   source.restaurant.name,
                 )),
         );
-        if (!listing?.restaurant) return { kind: 'unavailable' as const };
+        if (!listing?.restaurant) {
+          if (!googleSchedule) return { kind: 'unavailable' as const };
+          const observedAt = new Date().toISOString();
+          const closingPolicy =
+            officialClosingPolicy ??
+            (googleSchedule.regularClosingDays
+              ? {
+                  value: googleSchedule.regularClosingDays,
+                  sourceUrl: googleSchedule.sourceUrl,
+                }
+              : undefined);
+          return {
+            kind: 'observed' as const,
+            value: {
+              tabelog: { status: 'unknown' as const },
+              reservation: { status: 'unknown' as const },
+              profile: {
+                name: {
+                  value: googleSchedule.name,
+                  sourceUrl: googleSchedule.sourceUrl,
+                  observedAt,
+                },
+                address: {
+                  value: googleSchedule.address,
+                  sourceUrl: googleSchedule.sourceUrl,
+                  observedAt,
+                },
+                openingHours: {
+                  ...(officialSchedule ?? {
+                    value: googleSchedule.openingHours,
+                    sourceUrl: googleSchedule.sourceUrl,
+                  }),
+                  observedAt,
+                },
+                ...(closingPolicy
+                  ? {
+                      regularClosingDays: {
+                        ...closingPolicy,
+                        observedAt,
+                      },
+                    }
+                  : {}),
+              },
+            },
+          };
+        }
         const details = listing.restaurant;
         const observedAt = new Date().toISOString();
         const profile: Record<string, unknown> = {};
@@ -404,6 +484,7 @@ export function createPlaceResearchAgent(
           'officialWebsite',
           'openingHours',
           'regularClosingDays',
+          'closingNotes',
         ] as const) {
           const value = details[field];
           if (value !== undefined && (!Array.isArray(value) || value.length))
@@ -428,8 +509,23 @@ export function createPlaceResearchAgent(
             sourceUrl: listing.url,
             observedAt,
           };
-        if (officialSchedule)
+        if (googleSchedule && !details.openingHours) {
+          profile.openingHours = {
+            value: googleSchedule.openingHours,
+            sourceUrl: googleSchedule.sourceUrl,
+            observedAt,
+          };
+        }
+        if (googleSchedule?.regularClosingDays && !details.regularClosingDays)
+          profile.regularClosingDays = {
+            value: googleSchedule.regularClosingDays,
+            sourceUrl: googleSchedule.sourceUrl,
+            observedAt,
+          };
+        if (officialSchedule && !details.openingHours)
           profile.openingHours = { ...officialSchedule, observedAt };
+        if (officialClosingPolicy && !details.regularClosingDays)
+          profile.regularClosingDays = { ...officialClosingPolicy, observedAt };
         if (officialBookingLink)
           profile.bookingLink = { ...officialBookingLink, observedAt };
         if (bookingEvidence)
@@ -643,6 +739,39 @@ export function createPlaceResearchAgent(
             }),
           });
         }
+        if (
+          region === 'japan' &&
+          input.selectedSubject.providerNamespace === 'google-places' &&
+          config.operatingScheduleForPlaceId &&
+          config.readSourcePages !== false &&
+          (!evidence.some((source) => source.restaurant?.openingHours) ||
+            !evidence.some((source) => source.restaurant?.regularClosingDays))
+        ) {
+          const proposed = await config.operatingScheduleForPlaceId(
+            input.selectedSubject.placeId,
+          );
+          if (
+            proposed &&
+            proposed.openingHours.length <= 1200 &&
+            matchesSelectedBranch(
+              `${proposed.name} ${proposed.address}`,
+              input.selectedSubject.transientName,
+              input.selectedSubject.transientAddress,
+              input.selectedSubject.ownerQuery,
+              proposed.address,
+              undefined,
+              proposed.name,
+            )
+          ) {
+            googleSchedule = proposed;
+            evidence.push({
+              title: proposed.name,
+              url: proposed.sourceUrl,
+              content: `${proposed.name} ${proposed.address} Operating hours: ${proposed.openingHours}${proposed.regularClosingDays ? ` Regular closing days: ${proposed.regularClosingDays}` : ''}`,
+            });
+            diagnostic('google_operating_schedule_read');
+          }
+        }
         if (region === 'japan' && config.readSourcePages !== false) {
           const subject = input.selectedSubject;
           const listing = evidence.find(
@@ -662,6 +791,10 @@ export function createPlaceResearchAgent(
             await readJapaneseOfficialPage(
               listing.restaurant.officialWebsite,
               2,
+              {
+                name: listing.restaurant.name,
+                address: listing.restaurant.address,
+              },
             );
         }
         // A branch-matched listing can name its booking provider without
@@ -942,6 +1075,7 @@ export function createPlaceResearchAgent(
             'googleRating',
             'openingHours',
             'regularClosingDays',
+            'closingNotes',
           ]) {
             const claim = proposal.profile?.[field];
             const proof =
@@ -1122,21 +1256,12 @@ export function createPlaceResearchAgent(
               'officialWebsite',
               'openingHours',
               'regularClosingDays',
+              'closingNotes',
             ] as const) {
               const value = details[field];
               if (
                 value !== undefined &&
-                (!Array.isArray(value) || value.length) &&
-                !(
-                  (field === 'openingHours' ||
-                    field === 'regularClosingDays') &&
-                  profile[field] &&
-                  details.officialWebsite &&
-                  sameOrigin(
-                    (profile[field] as { sourceUrl: string }).sourceUrl,
-                    details.officialWebsite,
-                  )
-                )
+                (!Array.isArray(value) || value.length)
               )
                 profile[field] = { value, sourceUrl, observedAt };
             }
@@ -1176,8 +1301,36 @@ export function createPlaceResearchAgent(
                 };
             }
           }
-          if (officialSchedule)
+          if (
+            googleSchedule &&
+            !matchedListing?.restaurant?.openingHours &&
+            !profile.openingHours
+          )
+            profile.openingHours = {
+              value: googleSchedule.openingHours,
+              sourceUrl: googleSchedule.sourceUrl,
+              observedAt,
+            };
+          if (
+            googleSchedule?.regularClosingDays &&
+            !matchedListing?.restaurant?.regularClosingDays &&
+            !profile.regularClosingDays
+          )
+            profile.regularClosingDays = {
+              value: googleSchedule.regularClosingDays,
+              sourceUrl: googleSchedule.sourceUrl,
+              observedAt,
+            };
+          if (officialSchedule && !matchedListing?.restaurant?.openingHours)
             profile.openingHours = { ...officialSchedule, observedAt };
+          if (
+            officialClosingPolicy &&
+            !matchedListing?.restaurant?.regularClosingDays
+          )
+            profile.regularClosingDays = {
+              ...officialClosingPolicy,
+              observedAt,
+            };
           if (officialBookingLink)
             profile.bookingLink = { ...officialBookingLink, observedAt };
           if (bookingEvidence) {

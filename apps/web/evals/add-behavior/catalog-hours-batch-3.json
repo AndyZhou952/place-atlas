@@ -1,0 +1,471 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-10-04",
+  "cases": [
+    {
+      "id": "gyutan-ara-shinjuku-west",
+      "itemId": "6077996c-ea50-4e51-835a-f7be1eb1fd4b",
+      "name": "牛たん 荒 新宿西口店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+      "openingHours": {
+        "value": "[月～日・祝日] ランチ 11:30～14:00 ディナー 17:00～23:00 [土・日・祝] ディナー 17:00～22:00 12月31日～1月4日は、休業とさせていただきます。",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+          "quote": "[月～日・祝日] ランチ 11:30～14:00 ディナー 17:00～23:00 [土・日・祝] ディナー 17:00～22:00 12月31日～1月4日は、休業とさせていただきます。",
+          "note": "Overlapping generic and weekend dinner ranges are preserved verbatim. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+          "quote": "12月31日～1月4日は、休業とさせていただきます。",
+          "note": "Explicit year-end/New Year closure recorded separately; it is a calendar-period closure and does not establish a fixed weekly closing day."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "mendokoro-tenho",
+      "itemId": "5bcf484b-8c31-4d37-abc3-3df6fe1e1661",
+      "name": "メンドコロ 天鳳",
+      "listingUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+      "openingHours": {
+        "value": "月・火・水・木・金 11:30 - 15:00 / 18:00 - 22:00; 土 11:00 - 15:00 / 18:00 - 22:00; 日 11:00 - 15:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+          "quote": "月・火・水・木・金 11:30 - 15:00 / 18:00 - 22:00; 土 11:00 - 15:00 / 18:00 - 22:00; 日 11:00 - 15:00",
+          "note": "Tabelog row states hours by day; no separate weekly-closure statement appears. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "shake-shack-shinjuku-southern-terrace",
+      "itemId": "e8094f2f-ef92-4aef-8e89-547f76313986",
+      "name": "シェイク シャック 新宿サザンテラス",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日・祝日 11:00 - 22:30 L.O. 22:00; 定休日 なし",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "なし",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+          "quote": "月・火・水・木・金・土・日・祝日 11:00 - 22:30 L.O. 22:00; 定休日 なし",
+          "note": "Explicit no regular closing day; listing notes year-end, holidays, long weekends and weather can change hours. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+          "quote": "なし",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "ichiran-shinjuku-kabukicho",
+      "itemId": "2bcf3204-eeb2-4c5b-a13d-bb7f5e278cb8",
+      "name": "一蘭 新宿歌舞伎町店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+      "openingHours": {
+        "value": "[月]～[日] 24時間営業; 年中無休",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "年中無休",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+          "quote": "[月]～[日] 24時間営業; 年中無休",
+          "note": "The same listing cautions hours may change and points to the official site. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13194434/",
+          "quote": "年中無休",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "yakiniku-horumon-kinju",
+      "itemId": "9fe10c0b-438d-4302-995a-02157c2c23c8",
+      "name": "焼肉ホルモン金樹",
+      "listingUrl": "https://tabelog.com/tokyo/A1308/A130801/13273456/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土 18:00 - 03:30 L.O. 02:45; 日 17:00 - 23:00 L.O. 22:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1308/A130801/13273456/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1308/A130801/13273456/",
+          "quote": "月・火・水・木・金・土 18:00 - 03:30 L.O. 02:45; 日 17:00 - 23:00 L.O. 22:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "tanya-zenjiro-gyutan-street",
+      "itemId": "f3cf91bd-e076-4047-8a42-ef1972446f29",
+      "name": "たんや 善治郎 牛たん通り店",
+      "listingUrl": "https://tabelog.com/miyagi/A0401/A040101/4010191/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日・祝日 10:00 - 21:30 L.O. 料理21:00",
+        "sourceUrl": "https://tabelog.com/miyagi/A0401/A040101/4010191/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/miyagi/A0401/A040101/4010191/",
+          "quote": "月・火・水・木・金・土・日・祝日 10:00 - 21:30 L.O. 料理21:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "kissa-tsukimori",
+      "itemId": "bd65a808-850a-4bf2-a89a-d02f2a69f0b5",
+      "name": "喫茶 月森",
+      "listingUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日 11:00 - 20:00",
+        "sourceUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+          "quote": "月・火・水・木・金・土・日 11:00 - 20:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "ginza-nomikosushi",
+      "itemId": "ccc1945c-2c56-4478-ba8b-d0c781ae5b49",
+      "name": "銀座のみこ寿司",
+      "listingUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日・祝日・祝前日・祝後日 12:00 - 18:00 / 18:00 - 22:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1301/A130101/13280412/",
+          "quote": "月・火・水・木・金・土・日・祝日・祝前日・祝後日 12:00 - 18:00 / 18:00 - 22:00",
+          "note": "Two service periods are recorded as displayed. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "renkon-ueno",
+      "itemId": "31d6070a-4777-4531-a228-6046a9b84083",
+      "name": "れんこん",
+      "listingUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+      "openingHours": {
+        "value": "月・火・水・木 17:00 - 23:00 L.O. 22:30; 金・祝前日 17:00 - 23:30 L.O. 22:40; 土 16:00 - 23:30 L.O. 22:40; 日・祝日 16:00 - 23:00 L.O. 22:30; 定休日 無し 12/31～1/3迄お休みとなります。",
+        "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "無し。12/31～1/3迄お休みとなります。",
+        "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+          "quote": "月・火・水・木 17:00 - 23:00 L.O. 22:30; 金・祝前日 17:00 - 23:30 L.O. 22:40; 土 16:00 - 23:30 L.O. 22:40; 日・祝日 16:00 - 23:00 L.O. 22:30; 定休日 無し 12/31～1/3迄お休みとなります。",
+          "note": "Regular no-closed-day text and year-end closure kept together. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1311/A131101/13016705/",
+          "quote": "無し。12/31～1/3迄お休みとなります。",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "strauss-aomori",
+      "itemId": "fd7752b2-0ae7-4781-8749-711e1dc000a7",
+      "name": "シュトラウス",
+      "listingUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日・祝日・祝前日・祝後日 10:00 - 18:00; 2Fカフェサロン 営業時間10:30～17:00(L.O.16:45) 定休日 月曜日",
+        "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "2Fカフェサロン：月曜日（菓子販売店の営業時間行は月～日営業と記載）",
+        "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+          "quote": "月・火・水・木・金・土・日・祝日・祝前日・祝後日 10:00 - 18:00; 2Fカフェサロン 営業時間10:30～17:00(L.O.16:45) 定休日 月曜日",
+          "note": "The fixed Monday closure applies explicitly to the 2F cafe salon; the confectionery/shop row lists all days. Kept verbatim to avoid overgeneralizing. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/aomori/A0201/A020101/2000092/",
+          "quote": "2Fカフェサロン：月曜日（菓子販売店の営業時間行は月～日営業と記載）",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "kouki-gakugei-daigaku",
+      "itemId": "d3935949-78cb-47f2-92d1-86fa5730dae2",
+      "name": "香氣 四川麺条 学芸大学店",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131702/13024183/",
+      "openingHours": {
+        "value": "[月]～[日] 11:00 - 04:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1317/A131702/13024183/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1317/A131702/13024183/",
+          "quote": "[月]～[日] 11:00 - 04:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "tanyaki-shinobu",
+      "itemId": "48af708e-fe3b-48ee-a23d-723bc641acb2",
+      "name": "たん焼 忍",
+      "listingUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+      "openingHours": {
+        "value": "[月] 17:00 - 22:00; [火] 17:00 - 22:00; [水] 17:00 - 22:00; [木] 17:00 - 22:00; [金] 17:00 - 22:00; [土] 17:00 - 21:00; [日] 定休日; [祝日] 定休日",
+        "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+        "observedAt": "2026-10-04T06:19:10.000Z"
+      },
+      "regularClosingDays": {
+        "value": "日祝祭日",
+        "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+        "observedAt": "2026-10-04T06:19:10.000Z"
+      },
+      "closingNotes": {
+        "value": "夏季冬季休業あり＊6/15,16は臨時休業です＊8/9～16は夏季休業です",
+        "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+        "observedAt": "2026-10-04T06:19:10.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+          "quote": "Business-info row: 月・火・水・木・金 17:00 - 22:00; FAQ corroborates the daily assignments: [月]～[金] 17:00 - 22:00, [土] 17:00 - 21:00, [日] 定休日, [祝日] 定休日.",
+          "note": "Current business-info hours take precedence over older/conflicting 22:30/21:30 wording; the hours FAQ assigns the matching business-row times to each weekday."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+          "quote": "日祝祭日",
+          "note": "Explicit fixed weekly closure wording from the same Tabelog listing."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1309/A130903/13000943/",
+          "quote": "夏季冬季休業あり＊6/15,16は臨時休業です＊8/9～16は夏季休業です",
+          "note": "Preserved as seasonal/date-specific closure notes, separate from the weekly policy."
+        }
+      ]
+    },
+    {
+      "id": "ebimaru-ramen",
+      "itemId": "c1473c29-4281-4ef4-92fc-46e599d58d37",
+      "name": "海老丸らーめん",
+      "listingUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+      "openingHours": {
+        "value": "月～金 11:30 - 15:00 / 18:00 - 22:30 L.O. 22:00; 土・日・祝日 11:30 - 20:00 L.O. 19:30; 定休日 不定休でお休みを頂く場合があります。",
+        "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "不定休でお休みを頂く場合があります。Googleの営業日を確認頂き、ご来店ください。",
+        "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+          "quote": "月～金 11:30 - 15:00 / 18:00 - 22:30 L.O. 22:00; 土・日・祝日 11:30 - 20:00 L.O. 19:30; 定休日 不定休でお休みを頂く場合があります。",
+          "note": "Listing requests checking Google business hours for irregular closures, retained verbatim. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1310/A131003/13212911/",
+          "quote": "不定休でお休みを頂く場合があります。Googleの営業日を確認頂き、ご来店ください。",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "menchiri",
+      "itemId": "3428e5e7-f2d4-41c3-915c-341f7dcd1a85",
+      "name": "麺散",
+      "listingUrl": "https://tabelog.com/tokyo/A1306/A130601/13225567/",
+      "openingHours": {
+        "value": "月・火・水・木・金・土・日・祝日 11:30 - 22:00 L.O. 21:30",
+        "sourceUrl": "https://tabelog.com/tokyo/A1306/A130601/13225567/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1306/A130601/13225567/",
+          "quote": "月・火・水・木・金・土・日・祝日 11:30 - 22:00 L.O. 21:30",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "akha-ama-kagurazaka",
+      "itemId": "13c189a3-6d2b-4fe2-855e-19c58d496a06",
+      "name": "AKHA AMA COFFEE KAGURAZAKA",
+      "listingUrl": "https://tabelog.com/tokyo/A1309/A130905/13248105/",
+      "openingHours": {
+        "value": "08:00 - 19:00; FAQ lists 月・火・水・木・金・土・日 08:00 - 19:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1309/A130905/13248105/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1309/A130905/13248105/",
+          "quote": "08:00 - 19:00; FAQ lists 月・火・水・木・金・土・日 08:00 - 19:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "cois-espresso-club-main",
+      "itemId": "01ec10d4-80eb-484d-b38d-ef22c56e97ba",
+      "name": "cois espresso club 本店",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/",
+      "openingHours": {
+        "value": "10:00 - 22:00; FAQ lists 月・火・水・木・金・土・日 10:00 - 22:00",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "unavailable",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130402/13319709/",
+          "quote": "10:00 - 22:00; FAQ lists 月・火・水・木・金・土・日 10:00 - 22:00",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Full exact listing HTML checked at 2026-10-04T05:45:41.000Z; no explicit regular weekly closure or no-fixed-rest-day statement found in the business-info/business-other row or hours FAQ."
+        }
+      ],
+      "unavailableReason": "Full exact Tabelog page was fetched and checked: its business-info weekday row, business-other block, and hours/closing-day FAQ contain no explicit weekly rest-day or no-fixed-rest-day statement. A day-specific hours row alone does not establish that the business has no regular closure."
+    },
+    {
+      "id": "afuri-roppongi-crossing",
+      "itemId": "cff5d716-243b-4ae2-a58b-1daa2ad397e3",
+      "name": "AFURI 六本木交差点",
+      "listingUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+      "openingHours": {
+        "value": "月・火・水・木・日・祝日・祝後日 11:00 - 23:00 L.O. 22:30; 金・土・祝前日 11:00 - 05:00 L.O. 04:30; Open 7 days a week（年始を除く）",
+        "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "Open 7 days a week（年始を除く）",
+        "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+          "quote": "月・火・水・木・日・祝日・祝後日 11:00 - 23:00 L.O. 22:30; 金・土・祝前日 11:00 - 05:00 L.O. 04:30; Open 7 days a week（年始を除く）",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1307/A130701/13165303/",
+          "quote": "Open 7 days a week（年始を除く）",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    },
+    {
+      "id": "koffee-mameya-kakeru",
+      "itemId": "koffee-mameya-kakeru",
+      "name": "コーヒー マメヤ カケル",
+      "listingUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+      "openingHours": {
+        "value": "月・火・水・木・土・日 11:00 - 18:00; 金 定休日",
+        "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "regularClosingDays": {
+        "value": "金曜日（営業時間行に「金 定休日」と記載）",
+        "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+        "observedAt": "2026-10-04T05:45:41.000Z"
+      },
+      "hoursStatus": "known",
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+          "quote": "月・火・水・木・土・日 11:00 - 18:00; 金 定休日",
+          "note": "Exact branch listing row; identity corroborated by displayed name and address. Exact full-page HTML refreshed at 2026-10-04T05:45:41.000Z."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1313/A131303/13255632/",
+          "quote": "金曜日（営業時間行に「金 定休日」と記載）",
+          "note": "Explicit closing-day/holiday text from the same Tabelog listing."
+        }
+      ]
+    }
+  ]
+}

@@ -35,6 +35,12 @@ export interface PublicCatalogItemV1 {
   readonly officialUrl?: string;
   readonly openingHours?: PublicSourcedTextV1;
   readonly regularClosingDays?: PublicSourcedTextV1;
+  readonly closingNotes?: PublicSourcedTextV1;
+  readonly scheduleCheck?: {
+    readonly openingHours: 'known' | 'unavailable';
+    readonly regularClosingDays: 'known' | 'unavailable';
+    readonly checkedAt: string;
+  };
   readonly tabelog?: PublicTabelogEvidenceV1;
   readonly googleRating?: PublicTabelogEvidenceV1;
   readonly googlePlaceId?: string;
@@ -350,12 +356,35 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     (reservationEvidenceUrl && reservationEvidenceUrl !== tabelogUrl
       ? reservationEvidenceUrl
       : undefined);
+  const scheduleCheck = projectScheduleCheck(source.scheduleCheck);
   const projectedOpeningHours = projectSourcedText(
-    profile?.openingHours ?? source.openingHours,
+    scheduleCheck?.openingHours === 'unavailable'
+      ? undefined
+      : (source.openingHours ??
+          (reviewFields?.openingHours && source.updatedAt
+            ? {
+                ...asRecord(reviewFields.openingHours),
+                observedAt: source.updatedAt,
+              }
+            : undefined) ??
+          profile?.openingHours),
     1200,
   );
   const projectedRegularClosingDays = projectSourcedText(
-    profile?.regularClosingDays ?? source.regularClosingDays,
+    scheduleCheck?.regularClosingDays === 'unavailable'
+      ? undefined
+      : (source.regularClosingDays ??
+          (reviewFields?.regularClosingDays && source.updatedAt
+            ? {
+                ...asRecord(reviewFields.regularClosingDays),
+                observedAt: source.updatedAt,
+              }
+            : undefined) ??
+          profile?.regularClosingDays),
+    500,
+  );
+  const projectedClosingNotes = projectSourcedText(
+    source.closingNotes ?? profile?.closingNotes,
     500,
   );
   const projected: PublicCatalogItemV1 = {
@@ -394,6 +423,20 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
       ? {}
       : { officialUrl: optionalString(source.officialUrl) }),
     ...(projectedOpeningHours ? { openingHours: projectedOpeningHours } : {}),
+    ...(projectedClosingNotes ? { closingNotes: projectedClosingNotes } : {}),
+    ...(scheduleCheck
+      ? {
+          scheduleCheck: {
+            openingHours: projectedOpeningHours
+              ? ('known' as const)
+              : ('unavailable' as const),
+            regularClosingDays: projectedRegularClosingDays
+              ? ('known' as const)
+              : ('unavailable' as const),
+            checkedAt: scheduleCheck.checkedAt,
+          },
+        }
+      : {}),
     ...(projectedRegularClosingDays
       ? { regularClosingDays: projectedRegularClosingDays }
       : {}),
@@ -464,6 +507,32 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
         ),
   };
   return projected;
+}
+
+function projectScheduleCheck(
+  value: unknown,
+): PublicCatalogItemV1['scheduleCheck'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined;
+  const check = value as Record<string, unknown>;
+  const keys = Object.keys(check).sort();
+  if (
+    keys.length !== 3 ||
+    keys[0] !== 'checkedAt' ||
+    keys[1] !== 'openingHours' ||
+    keys[2] !== 'regularClosingDays' ||
+    !['known', 'unavailable'].includes(String(check.openingHours)) ||
+    !['known', 'unavailable'].includes(String(check.regularClosingDays)) ||
+    typeof check.checkedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(check.checkedAt) ||
+    !Number.isFinite(Date.parse(check.checkedAt))
+  )
+    return undefined;
+  return {
+    openingHours: check.openingHours as 'known' | 'unavailable',
+    regularClosingDays: check.regularClosingDays as 'known' | 'unavailable',
+    checkedAt: check.checkedAt,
+  };
 }
 
 function projectSourcedText(

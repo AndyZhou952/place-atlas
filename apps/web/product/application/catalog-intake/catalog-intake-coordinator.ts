@@ -118,6 +118,7 @@ export interface CatalogIntakeEnrichedProfile {
   readonly summary?: CatalogIntakeSourcedValue<string>;
   readonly openingHours?: CatalogIntakeSourcedValue<string>;
   readonly regularClosingDays?: CatalogIntakeSourcedValue<string>;
+  readonly closingNotes?: CatalogIntakeSourcedValue<string>;
   readonly officialWebsite?: CatalogIntakeSourcedValue<string>;
   readonly bookingLink?: CatalogIntakeSourcedValue<string>;
   readonly googleRating?: CatalogIntakeSourcedValue<{
@@ -241,6 +242,14 @@ export interface CatalogIntakeOwnerFields {
   readonly categories?: readonly string[];
   readonly signatureDishes?: readonly string[];
   readonly summary?: string;
+  readonly openingHours?: {
+    readonly value: string;
+    readonly sourceUrl: string;
+  };
+  readonly regularClosingDays?: {
+    readonly value: string;
+    readonly sourceUrl: string;
+  };
   readonly coordinates?: {
     readonly latitude: number;
     readonly longitude: number;
@@ -2877,6 +2886,8 @@ function validateOwnerFields(
         'categories',
         'signatureDishes',
         'summary',
+        'openingHours',
+        'regularClosingDays',
       ],
       [],
     )
@@ -2911,6 +2922,11 @@ function validateOwnerFields(
     value.coordinates === undefined
       ? undefined
       : validateCoordinates(value.coordinates);
+  const openingHours = validateOwnerSchedule(value.openingHours, 1200);
+  const regularClosingDays = validateOwnerSchedule(
+    value.regularClosingDays,
+    500,
+  );
   if (
     (value.title !== undefined && !title) ||
     (value.address !== undefined && !address) ||
@@ -2918,6 +2934,8 @@ function validateOwnerFields(
     (value.categories !== undefined && !categories) ||
     (value.signatureDishes !== undefined && !signatureDishes) ||
     (value.summary !== undefined && !summary) ||
+    (value.openingHours !== undefined && !openingHours) ||
+    (value.regularClosingDays !== undefined && !regularClosingDays) ||
     (value.coordinates !== undefined && !coordinates)
   ) {
     return undefined;
@@ -2929,8 +2947,35 @@ function validateOwnerFields(
     ...(categories ? { categories } : {}),
     ...(signatureDishes ? { signatureDishes } : {}),
     ...(summary ? { summary } : {}),
+    ...(openingHours ? { openingHours } : {}),
+    ...(regularClosingDays ? { regularClosingDays } : {}),
     ...(coordinates ? { coordinates } : {}),
   };
+}
+
+function validateOwnerSchedule(value: unknown, limit: number) {
+  if (value === undefined) return undefined;
+  if (
+    !isRecordWithAllowedKeys(
+      value,
+      ['value', 'sourceUrl'],
+      ['value', 'sourceUrl'],
+    )
+  )
+    return undefined;
+  if (
+    typeof value.value !== 'string' ||
+    !value.value.trim() ||
+    value.value.length > limit ||
+    /\p{Cc}/u.test(value.value.replace(/[\r\n\t]/gu, ''))
+  )
+    return undefined;
+  const sourceUrl = isCanonicalHttpsUrl(value.sourceUrl)
+    ? value.sourceUrl
+    : undefined;
+  return sourceUrl
+    ? { value: value.value.normalize('NFC').trim(), sourceUrl }
+    : undefined;
 }
 
 function validateOwnerLabels(value: unknown): readonly string[] | undefined {
@@ -3091,6 +3136,7 @@ export function validateEnrichedProfile(
     'summary',
     'openingHours',
     'regularClosingDays',
+    'closingNotes',
     'officialWebsite',
     'bookingLink',
     'googleRating',

@@ -131,11 +131,35 @@ function decodePublicCatalogItem(value: unknown): AtlasItem {
     ...(value.openingHours === undefined
       ? {}
       : { openingHours: decodeSourcedText(value.openingHours, 1200) }),
+    ...(value.closingNotes === undefined
+      ? {}
+      : { closingNotes: decodeSourcedText(value.closingNotes, 500) }),
     ...(value.regularClosingDays === undefined
       ? {}
       : {
           regularClosingDays: decodeSourcedText(value.regularClosingDays, 500),
         }),
+    ...(isRecord(value.scheduleCheck) &&
+    ['known', 'unavailable'].includes(
+      String(value.scheduleCheck.openingHours),
+    ) &&
+    ['known', 'unavailable'].includes(
+      String(value.scheduleCheck.regularClosingDays),
+    ) &&
+    typeof value.scheduleCheck.checkedAt === 'string' &&
+    Number.isFinite(Date.parse(value.scheduleCheck.checkedAt))
+      ? {
+          scheduleCheck: {
+            openingHours: value.scheduleCheck.openingHours as
+              | 'known'
+              | 'unavailable',
+            regularClosingDays: value.scheduleCheck.regularClosingDays as
+              | 'known'
+              | 'unavailable',
+            checkedAt: value.scheduleCheck.checkedAt,
+          },
+        }
+      : {}),
     ...(typeof value.googlePlaceId === 'string' &&
     /^[A-Za-z0-9_-]{10,500}$/u.test(value.googlePlaceId)
       ? { googlePlaceId: value.googlePlaceId }

@@ -56,3 +56,18 @@ test('the same official and booking page is displayed once', () => {
     2,
   );
 });
+
+test('ordinary section anchors do not create duplicate website buttons', () => {
+  const official = 'https://example.com/restaurant/';
+  assert.deepEqual(
+    restaurantLinks({
+      ...item,
+      officialUrl: official,
+      reservation: { ...item.reservation, url: `${official}#reservation` },
+    }),
+    [
+      item.sources[0],
+      { role: 'official', label: 'Official website', url: official },
+    ],
+  );
+});

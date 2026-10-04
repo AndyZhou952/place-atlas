@@ -44,6 +44,34 @@ function fixture() {
   );
   return db;
 }
+test('schedule check retains the newest field observation rather than the final field order', () => {
+  const db = fixture();
+  const sample = {
+    ...benchmark.cases[0],
+    openingHours: { ...claim, observedAt: '2026-10-04T07:00:00.000Z' },
+    regularClosingDays: {
+      ...claim,
+      value: '月曜日',
+      observedAt: '2026-10-04T05:00:00.000Z',
+    },
+    hoursStatus: 'known',
+    weeklyClosureStatus: 'known',
+  };
+  db.exec(
+    planRestaurantHoursBackfill(db.prepare('SELECT * FROM atlas_items').all(), {
+      cases: [sample],
+    }).sql,
+  );
+  const stored = JSON.parse(
+    db.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.equal(stored.scheduleCheck.checkedAt, sample.openingHours.observedAt);
+  assert.equal(
+    stored.regularClosingDays.observedAt,
+    sample.regularClosingDays.observedAt,
+  );
+  db.close();
+});
 test('hours backfill preserves links and profile, is idempotent and can roll back', () => {
   const db = fixture();
   const rows = db.prepare('SELECT * FROM atlas_items').all();
@@ -114,4 +142,61 @@ test('changed restaurant identity and unproven or malformed schedule fail closed
     },
   ])
     assert.throws(() => planRestaurantHoursBackfill(rows, { cases: [sample] }));
+});
+
+test('all-restaurant scope rejects incomplete coverage and duplicate targets', () => {
+  const rows = [
+    { id: item.id, payload_json: JSON.stringify(item), updated_at: 'old' },
+  ];
+  const all = { ...benchmark, scope: 'all_existing_restaurants' };
+  assert.throws(
+    () => planRestaurantHoursBackfill(rows, { ...all, cases: [] }),
+    /every existing restaurant/u,
+  );
+  assert.throws(
+    () =>
+      planRestaurantHoursBackfill(rows, {
+        ...all,
+        cases: [...all.cases, ...all.cases],
+      }),
+    /Duplicate/u,
+  );
+  assert.equal(planRestaurantHoursBackfill(rows, all).entries.length, 1);
+});
+
+test('checked missing policies remain unavailable and a seasonal note never creates a weekly closure', () => {
+  const rows = [
+    { id: item.id, payload_json: JSON.stringify(item), updated_at: 'old' },
+  ];
+  const sample = {
+    ...benchmark.cases[0],
+    hoursStatus: 'known',
+    weeklyClosureStatus: 'unavailable',
+    closingNotes: { ...claim, value: '年末年始' },
+  };
+  const db = fixture();
+  db.exec(
+    planRestaurantHoursBackfill(
+      rows.map((row) => ({ ...row, updated_at: '2026-09-24' })),
+      { cases: [sample] },
+    ).sql,
+  );
+  const next = JSON.parse(
+    db.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.deepEqual(next.scheduleCheck, {
+    openingHours: 'known',
+    regularClosingDays: 'unavailable',
+    checkedAt: claim.observedAt,
+  });
+  assert.equal(next.regularClosingDays, undefined);
+  assert.equal(next.closingNotes.value, '年末年始');
+  assert.throws(
+    () =>
+      planRestaurantHoursBackfill(rows, {
+        cases: [{ ...sample, weeklyClosureStatus: 'known' }],
+      }),
+    /Inconsistent/u,
+  );
+  db.close();
 });

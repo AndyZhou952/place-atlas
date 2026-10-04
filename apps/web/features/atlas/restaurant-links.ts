@@ -50,7 +50,8 @@ function uniqueLinks(links: readonly SourceLink[]): readonly SourceLink[] {
         url.password
       )
         return false;
-      const key = `${url.origin}${url.pathname.replace(/\/$/u, '')}${url.search}${url.hash}`;
+      const fragment = /^#(?:\/|!)/u.test(url.hash) ? url.hash : '';
+      const key = `${url.origin}${url.pathname.replace(/\/$/u, '')}${url.search}${fragment}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

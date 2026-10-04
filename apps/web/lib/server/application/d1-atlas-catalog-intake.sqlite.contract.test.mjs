@@ -110,6 +110,12 @@ test('complete researched profile survives D1 publication and public projection 
     ),
   );
   assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  assert.deepEqual(stored.scheduleCheck, {
+    openingHours: 'known',
+    regularClosingDays: 'known',
+    checkedAt: '2026-09-23T02:00:00.000Z',
+  });
+  assert.deepEqual(projected.scheduleCheck, stored.scheduleCheck);
   const toreta = structuredClone(stored);
   const toretaUrl = 'https://yoyaku.toreta.in/rodeo-nakameguro/#/';
   toreta.intakeEvidence.reservation = {
@@ -145,6 +151,94 @@ test('complete researched profile survives D1 publication and public projection 
   assert.equal(browserItems[0].googleRating.score, 4.2);
   assert.equal(browserItems[0].reservation.mode, 'unavailable');
   assert.deepEqual(browserItems[0].tags, ['洋食', 'Oysters']);
+});
+
+test('Owner schedule corrections survive publication and the browser over earlier model facts', async () => {
+  const sqlite = await migratedDatabase();
+  const preview = withDigest({
+    ...verifiedPreview(),
+    ownerFields: {
+      ...verifiedPreview().ownerFields,
+      openingHours: {
+        value: '月・火 11:00 - 14:00\n17:00 - 21:00',
+        sourceUrl: 'https://example.com/current-hours',
+      },
+      regularClosingDays: {
+        value: '水曜日',
+        sourceUrl: 'https://example.com/current-hours',
+      },
+    },
+    profile: {
+      openingHours: {
+        value: '毎日 08:00 - 22:00',
+        sourceUrl: 'https://example.com/old',
+        observedAt: '2026-09-22T00:00:00.000Z',
+      },
+    },
+  });
+  insertPreviewSession(sqlite, preview, 'b'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'schedule-owner-item',
+  });
+  assert.equal(
+    (await publisher.publish(preview, 'b'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.equal(isAtlasItem(stored), true);
+  const projected = createPublicReadManifest().project('catalog.get', stored);
+  assert.equal(
+    projected.openingHours.value,
+    preview.ownerFields.openingHours.value,
+  );
+  assert.equal(projected.regularClosingDays.value, '水曜日');
+  const browser = await loadPublicCatalog({
+    request: async (url) =>
+      url === '/api/items'
+        ? Response.json([projected])
+        : Response.json({
+            itemId: stored.id,
+            favorite: false,
+            manualVisited: false,
+            effectiveVisited: false,
+          }),
+  });
+  assert.deepEqual(browser[0].openingHours, stored.openingHours);
+  assert.deepEqual(browser[0].scheduleCheck, stored.scheduleCheck);
+  assert.deepEqual(stored.intakeEvidence.ownerFields, preview.ownerFields);
+  sqlite.close();
+});
+
+test('unavailable schedules are explicitly recorded without fabricated hours', async () => {
+  const sqlite = await migratedDatabase();
+  const preview = verifiedPreview();
+  insertPreviewSession(sqlite, preview, 'b'.repeat(64));
+  const publisher = new D1AtlasCatalogIntakePublisher(toD1(sqlite), {
+    now: () => new Date('2026-09-23T02:00:00.000Z'),
+    nextId: () => 'schedule-unavailable-item',
+  });
+  assert.equal(
+    (await publisher.publish(preview, 'b'.repeat(64), 2, 'catalog-r1')).status,
+    'committed_verified',
+  );
+  const stored = JSON.parse(
+    sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
+  );
+  assert.deepEqual(stored.scheduleCheck, {
+    openingHours: 'unavailable',
+    regularClosingDays: 'unavailable',
+    checkedAt: '2026-09-23T02:00:00.000Z',
+  });
+  assert.equal(stored.openingHours, undefined);
+  assert.equal(stored.regularClosingDays, undefined);
+  assert.deepEqual(
+    createPublicReadManifest().project('catalog.get', stored).scheduleCheck,
+    stored.scheduleCheck,
+  );
+  sqlite.close();
 });
 
 test('owner-completed profile publishes with explicit owner provenance and compact tags', async () => {
@@ -818,11 +912,18 @@ test('D1 Atlas Catalog rebuilds a revision-raced second session before reusing t
     },
   );
 
-  const [committed, raced] = await Promise.all([
+  const outcomes = await Promise.all([
     publisher.publish(first, firstKey, 2, 'catalog-r1'),
     publisher.publish(second, secondKey, 2, 'catalog-r1'),
   ]);
+  // Either concurrent writer may win; assert the resulting serialization.
+  const committed = outcomes.find(
+    ({ status }) => status === 'committed_verified',
+  );
+  const raced = outcomes.find(({ status }) => status === 'conflict');
 
+  assert.ok(committed);
+  assert.ok(raced);
   assert.equal(committed.status, 'committed_verified');
   assert.equal(raced.status, 'conflict');
   assert.equal(raced.newPreview.catalogRevision, 'catalog-r2');

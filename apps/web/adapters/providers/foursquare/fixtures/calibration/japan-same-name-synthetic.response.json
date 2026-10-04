@@ -1,0 +1,18 @@
+{
+  "results": [
+    {
+      "fsq_place_id": "fsq-same-name-ginza",
+      "name": "同名食堂 銀座店",
+      "location": { "formatted_address": "東京都中央区銀座1-1" },
+      "latitude": 35.67,
+      "longitude": 139.76
+    },
+    {
+      "fsq_place_id": "fsq-same-name-tsukiji",
+      "name": "同名食堂 築地店",
+      "location": { "formatted_address": "東京都中央区築地2-2" },
+      "latitude": 35.66,
+      "longitude": 139.77
+    }
+  ]
+}

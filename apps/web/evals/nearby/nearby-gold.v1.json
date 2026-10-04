@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "nearby-policy-v1",
+  "kind": "synthetic-tool-evidence-not-live-geography",
+  "catalog": [
+    {
+      "id": "ramen-a",
+      "visited": false,
+      "tags": ["ramen"]
+    },
+    {
+      "id": "sushi-b",
+      "visited": false,
+      "tags": ["sushi"]
+    },
+    {
+      "id": "visited-c",
+      "visited": true,
+      "tags": ["ramen"]
+    },
+    {
+      "id": "curry-d",
+      "visited": false,
+      "tags": ["curry"]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "walk-zh",
+      "input": {
+        "message": "池袋附近没去过的拉面",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600
+          },
+          {
+            "itemId": "sushi-b",
+            "mode": "walk",
+            "seconds": 480
+          },
+          {
+            "itemId": "visited-c",
+            "mode": "walk",
+            "seconds": 300
+          }
+        ],
+        "cuisine": "ramen"
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-ja",
+      "input": {
+        "message": "池袋 ラーメン",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600
+          }
+        ],
+        "cuisine": "ramen"
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-en",
+      "input": {
+        "message": "ramen near Ikebukuro",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600
+          }
+        ],
+        "cuisine": "ramen"
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-boundary",
+      "input": {
+        "message": "15分钟内",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 900
+          },
+          {
+            "itemId": "sushi-b",
+            "mode": "walk",
+            "seconds": 901
+          }
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "prefer-unvisited",
+      "input": {
+        "message": "附近吃点什么",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 720
+          },
+          {
+            "itemId": "visited-c",
+            "mode": "walk",
+            "seconds": 240
+          }
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "explicit-visited",
+      "input": {
+        "message": "找去过的拉面",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "only",
+        "entryState": "not_requested",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600
+          },
+          {
+            "itemId": "visited-c",
+            "mode": "walk",
+            "seconds": 300
+          }
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["visited-c"],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "distance-fallback",
+      "input": {
+        "message": "附近有没有",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": [],
+        "routeState": "unavailable",
+        "distances": [
+          {
+            "itemId": "ramen-a",
+            "meters": 1500
+          },
+          {
+            "itemId": "sushi-b",
+            "meters": 2001
+          }
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": ["unverified_travel_time"]
+      }
+    },
+    {
+      "caseId": "ambiguous-origin",
+      "input": {
+        "message": "中环附近",
+        "locationState": "ambiguous",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": []
+      },
+      "gold": {
+        "action": "clarify",
+        "itemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "geocoder-down",
+      "input": {
+        "message": "銀座",
+        "locationState": "unavailable",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": []
+      },
+      "gold": {
+        "action": "unavailable",
+        "itemIds": [],
+        "requiredWarnings": ["location_provider_unavailable"]
+      }
+    },
+    {
+      "caseId": "empty-catalog",
+      "input": {
+        "message": "附近餐厅",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": [],
+        "visited": "prefer_unvisited",
+        "entryState": "not_requested",
+        "routes": []
+      },
+      "gold": {
+        "action": "no_results",
+        "itemIds": [],
+        "requiredWarnings": []
+      }
+    },
+    {
+      "caseId": "walk-in-unknown",
+      "input": {
+        "message": "附近可以直接walk in吗",
+        "locationState": "resolved",
+        "originId": "synthetic-ikebukuro",
+        "catalogIds": ["ramen-a", "sushi-b", "visited-c", "curry-d"],
+        "visited": "prefer_unvisited",
+        "entryState": "unknown",
+        "routes": [
+          {
+            "itemId": "ramen-a",
+            "mode": "walk",
+            "seconds": 600
+          }
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "itemIds": ["ramen-a"],
+        "requiredWarnings": ["walk_in_unknown"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "datasetId": "selected-chain-research-regressions.v1",
+  "stage": "Research after branch selection; not chain-name disambiguation",
+  "checkedDate": "2026-09-26",
+  "selectedSubject": {
+    "ownerQuery": "鳥貴族 新宿",
+    "providerNamespace": "google-places",
+    "placeId": "ChIJ5bRxldqMGGARDMIc1GJVsKc",
+    "transientName": "YAKITORI Torikizoku Shinjuku South Exit Store",
+    "transientAddress": "Japan, 〒160-0022 Tokyo, Shinjuku City, Shinjuku, 4-chōme−1−１３ 9F"
+  },
+  "sourceCapture": {
+    "url": "https://tabelog.com/tokyo/A1304/A130401/13138401/",
+    "officialCrossCheck": "https://map.torikizoku.co.jp/detail/288/",
+    "name": "鳥貴族 新宿南口店",
+    "address": "東京都新宿区新宿4-1-13 田園新宿ビル 9F",
+    "score": 3.07,
+    "coordinates": {
+      "latitude": 35.68929329869054,
+      "longitude": 139.70251312451066
+    },
+    "categories": ["焼き鳥", "鳥料理", "居酒屋"],
+    "reservation": "予約可",
+    "policy": "Dated main-page capture, independently checked against the official branch address. Scores are not timeless. Gold is never supplied to the live Agent. Distractor responses below are synthetic controls."
+  },
+  "cases": [
+    {
+      "id": "rank-address-matched-second-result",
+      "rankedSnippet": true,
+      "firstRead": "wrong_branch",
+      "expectedKnown": true
+    },
+    {
+      "id": "recover-after-unreadable-first-listing",
+      "rankedSnippet": false,
+      "firstRead": "unavailable",
+      "expectedKnown": true
+    },
+    {
+      "id": "recover-after-wrong-branch-first-listing",
+      "rankedSnippet": false,
+      "firstRead": "wrong_branch",
+      "expectedKnown": true
+    },
+    {
+      "id": "localized-listing-url",
+      "rankedSnippet": true,
+      "localizedUrl": true,
+      "firstRead": "unavailable",
+      "expectedKnown": true
+    },
+    {
+      "id": "same-chain-wrong-street",
+      "rankedSnippet": false,
+      "sourceAddress": "東京都新宿区新宿3-34-11",
+      "firstRead": "unavailable",
+      "expectedKnown": false
+    },
+    {
+      "id": "same-chain-same-numbers-wrong-city",
+      "rankedSnippet": false,
+      "sourceAddress": "大阪府大阪市北区4-1-13",
+      "firstRead": "unavailable",
+      "expectedKnown": false
+    }
+  ]
+}

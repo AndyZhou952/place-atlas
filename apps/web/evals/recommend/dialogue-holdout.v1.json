@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-dialogue-holdout-v1",
+  "kind": "synthetic-paraphrase-continuation-holdout",
+  "originOptions": [
+    { "id": "area:umeda", "kind": "area", "names": ["梅田", "Umeda"] },
+    { "id": "area:kyoto", "kind": "area", "names": ["京都", "Kyoto"] },
+    {
+      "id": "station:umeda",
+      "kind": "station",
+      "names": ["梅田駅", "Umeda Station"]
+    },
+    {
+      "id": "station:kyoto",
+      "kind": "station",
+      "names": ["京都駅", "Kyoto Station"]
+    },
+    {
+      "id": "place:bistro-ueno",
+      "kind": "place",
+      "names": ["Bistro Aoba Ueno"]
+    },
+    {
+      "id": "place:bistro-shibuya",
+      "kind": "place",
+      "names": ["Bistro Aoba Shibuya"]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "area-to-station",
+      "input": {
+        "messages": [
+          "梅田で徒歩8分以内のラーメン",
+          "Which exact starting point?",
+          "梅田駅"
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:umeda",
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 8,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "branch-answer",
+      "input": { "messages": ["Bistro Aoba", "Which branch?", "Ueno"] },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:bistro-ueno",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "mode-answer",
+      "input": {
+        "messages": [
+          "京都駅から12分以内の咖喱",
+          "Walking or straight-line distance?",
+          "徒歩"
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:kyoto",
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 12,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "correct-origin",
+      "input": {
+        "messages": [
+          "京都から徒歩18分の寿司",
+          "Which exact station?",
+          "やっぱり梅田駅"
+        ]
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:umeda",
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 18,
+        "visited": "prefer_unvisited"
+      }
+    }
+  ]
+}

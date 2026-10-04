@@ -1,0 +1,466 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "recommend-intent-v1",
+  "kind": "synthetic-text-and-origin-options-not-live-geocoding",
+  "originOptions": [
+    { "id": "area:ginza", "kind": "area", "names": ["銀座", "银座", "Ginza"] },
+    { "id": "area:shinjuku", "kind": "area", "names": ["新宿", "Shinjuku"] },
+    { "id": "area:ikebukuro", "kind": "area", "names": ["池袋", "Ikebukuro"] },
+    {
+      "id": "station:ginza",
+      "kind": "station",
+      "names": ["銀座駅", "Ginza Station"]
+    },
+    {
+      "id": "station:shinjuku",
+      "kind": "station",
+      "names": ["新宿駅", "Shinjuku Station"]
+    },
+    {
+      "id": "station:shinjuku-sanchome",
+      "kind": "station",
+      "names": ["新宿三丁目駅", "Shinjuku-sanchome Station"]
+    },
+    {
+      "id": "address:shinjuku-west",
+      "kind": "address",
+      "names": ["東京都新宿区西新宿1丁目2-3", "東京都新宿区西新宿1-2-3"]
+    },
+    {
+      "id": "address:ginza-block",
+      "kind": "address",
+      "names": ["東京都中央区銀座2丁目3-4", "東京都中央区銀座2-3-4"]
+    },
+    {
+      "id": "place:cafe-shinjuku",
+      "kind": "place",
+      "names": ["喫茶 みずき 新宿店", "Cafe Mizuki Shinjuku"]
+    },
+    {
+      "id": "place:cafe-roppongi",
+      "kind": "place",
+      "names": ["喫茶 みずき 六本木店", "Cafe Mizuki Roppongi"]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "food-only-ja",
+      "input": { "message": "ラーメン食べたい" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "food-only-zh",
+      "input": { "message": "想吃烧鸟" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": ["yakitori"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "food-only-en",
+      "input": { "message": "Sushi tonight?" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "dish-only-mixed",
+      "input": { "message": "牛タン somewhere good" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": ["beef_tongue"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "open-food-choice",
+      "input": { "message": "今天吃什么？" },
+      "gold": {
+        "action": "recommend",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "near-me-no-gps",
+      "input": { "message": "附近有啥吃的" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 15,
+        "visited": "prefer_unvisited",
+        "clarification": "origin"
+      }
+    },
+    {
+      "caseId": "near-me-en",
+      "input": { "message": "Good curry near me" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 15,
+        "visited": "prefer_unvisited",
+        "clarification": "origin"
+      }
+    },
+    {
+      "caseId": "area-only-ja",
+      "input": { "message": "銀座" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:ginza",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "area-food-zh",
+      "input": { "message": "新宿附近的拉面" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:shinjuku",
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "area-food-en",
+      "input": { "message": "Coffee in Ginza" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:ginza",
+        "foodTerms": ["coffee"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "area-walk-needs-start",
+      "input": { "message": "新宿步行十分钟内的烧鸟" },
+      "gold": {
+        "action": "clarify",
+        "originId": "area:shinjuku",
+        "foodTerms": ["yakitori"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 10,
+        "visited": "prefer_unvisited",
+        "clarification": "exact_origin"
+      }
+    },
+    {
+      "caseId": "station-walk-ja",
+      "input": { "message": "新宿駅から徒歩10分のラーメン" },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:shinjuku",
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 10,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "station-branch-distinction",
+      "input": { "message": "新宿三丁目駅附近吃咖喱" },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:shinjuku-sanchome",
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "two-origins",
+      "input": { "message": "新宿站还是银座站附近？" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "origin_choice"
+      }
+    },
+    {
+      "caseId": "address-paste-ja",
+      "input": { "message": "東京都新宿区西新宿1丁目2-3" },
+      "gold": {
+        "action": "recommend",
+        "originId": "address:shinjuku-west",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "address-building-paste",
+      "input": { "message": "東京都中央区銀座2-3-4 3F" },
+      "gold": {
+        "action": "recommend",
+        "originId": "address:ginza-block",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "maps-url-address",
+      "input": {
+        "message": "https://www.google.com/maps/search/?api=1&query=%E6%9D%B1%E4%BA%AC%E9%83%BD%E6%96%B0%E5%AE%BF%E5%8C%BA%E8%A5%BF%E6%96%B0%E5%AE%BF1-2-3"
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "address:shinjuku-west",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "maps-url-place",
+      "input": {
+        "message": "https://www.google.com/maps/search/?api=1&query=Cafe+Mizuki+Shinjuku"
+      },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:cafe-shinjuku",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "place-name-exact",
+      "input": { "message": "喫茶 みずき 新宿店" },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:cafe-shinjuku",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "place-name-with-food",
+      "input": { "message": "Cafe Mizuki Roppongi 附近想吃拉面" },
+      "gold": {
+        "action": "recommend",
+        "originId": "place:cafe-roppongi",
+        "foodTerms": ["ramen"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "ambiguous-chain-name",
+      "input": { "message": "喫茶 みずき" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "branch"
+      }
+    },
+    {
+      "caseId": "unknown-place-name",
+      "input": { "message": "カフェ ひかり 駅前店" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "unresolved_origin"
+      }
+    },
+    {
+      "caseId": "maps-short-link-needs-resolution",
+      "input": { "message": "https://maps.app.goo.gl/ExampleShortLink" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "clarification": "full_address_or_link"
+      }
+    },
+    {
+      "caseId": "untrusted-url",
+      "input": {
+        "message": "https://google-maps.example.invalid/place/Cafe-Mizuki-Shinjuku"
+      },
+      "gold": {
+        "action": "unsupported",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited",
+        "reason": "untrusted_url"
+      }
+    },
+    {
+      "caseId": "walk-no-origin",
+      "input": { "message": "走路十分钟内有什么好吃的" },
+      "gold": {
+        "action": "clarify",
+        "originId": null,
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 10,
+        "visited": "prefer_unvisited",
+        "clarification": "origin"
+      }
+    },
+    {
+      "caseId": "only-visited",
+      "input": { "message": "新宿駅から歩いて15分、去过的店" },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:shinjuku",
+        "foodTerms": [],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 15,
+        "visited": "only_visited"
+      }
+    },
+    {
+      "caseId": "explicit-no-visited",
+      "input": { "message": "Ginza まだ行ってない寿司" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:ginza",
+        "foodTerms": ["sushi"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "only_unvisited"
+      }
+    },
+    {
+      "caseId": "mixed-language",
+      "input": { "message": "Shinjuku stationから徒歩12分, 烧鸟" },
+      "gold": {
+        "action": "recommend",
+        "originId": "station:shinjuku",
+        "foodTerms": ["yakitori"],
+        "excludedFoodTerms": [],
+        "travelMode": "walk",
+        "maxMinutes": 12,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "food-alternative",
+      "input": { "message": "银座吃寿司或者烧鸟都可以" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:ginza",
+        "foodTerms": ["sushi", "yakitori"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "food-exclusion",
+      "input": { "message": "新宿什么都行，不要拉面" },
+      "gold": {
+        "action": "recommend",
+        "originId": "area:shinjuku",
+        "foodTerms": [],
+        "excludedFoodTerms": ["ramen"],
+        "travelMode": "none",
+        "maxMinutes": null,
+        "visited": "prefer_unvisited"
+      }
+    },
+    {
+      "caseId": "ambiguous-travel-mode",
+      "input": { "message": "銀座駅から15分以内のカレー" },
+      "gold": {
+        "action": "clarify",
+        "originId": "station:ginza",
+        "foodTerms": ["curry"],
+        "excludedFoodTerms": [],
+        "travelMode": "none",
+        "maxMinutes": 15,
+        "visited": "prefer_unvisited",
+        "clarification": "travel_mode"
+      }
+    }
+  ]
+}

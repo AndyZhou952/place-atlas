@@ -1,0 +1,84 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { readOfficialSite } from './official-site-reader.ts';
+
+test('bounded official reader finds branch contact and reservation pages on one origin', async () => {
+  const urls = [];
+  const pages = new Map([
+    [
+      'https://burntends.com.sg/',
+      '<title>Burnt Ends</title><nav><a href="https://evil.example/booking">bad</a></nav><a href="/contact/">Contact</a><a href="/reservations/">Reservations</a><a href="/restaurant/">Restaurant</a><p>Burnt Ends restaurant in Singapore.</p>',
+    ],
+    [
+      'https://burntends.com.sg/restaurant/',
+      '<title>Burnt Ends Restaurant</title><p>Burnt Ends Restaurant serves modern Australian barbecue.</p><a href="/reservations/">Reserve Now</a>',
+    ],
+    [
+      'https://burntends.com.sg/contact/',
+      '<title>Contact</title><p>Burnt Ends Restaurant 7 Dempsey Road #01-02 Singapore 249671.</p><p>Burnt Ends Bar #01-04 is a separate venue.</p>',
+    ],
+    [
+      'https://burntends.com.sg/reservations/',
+      '<title>Reservations</title><p>Burnt Ends Restaurant 7 Dempsey Road #01-02 Singapore 249671. Reserve a table online.</p>',
+    ],
+  ]);
+  const result = await readOfficialSite(
+    'https://burntends.com.sg/',
+    new AbortController().signal,
+    async (url, init) => {
+      urls.push({ url, init });
+      return new Response(pages.get(url) ?? '', {
+        status: pages.has(url) ? 200 : 404,
+        headers: { 'content-type': 'text/html' },
+      });
+    },
+  );
+  assert.deepEqual(
+    result.map((source) => source.url),
+    [
+      'https://burntends.com.sg/',
+      'https://burntends.com.sg/restaurant/',
+      'https://burntends.com.sg/contact/',
+      'https://burntends.com.sg/reservations/',
+    ],
+  );
+  assert.match(result[2].content, /#01-02 Singapore 249671/u);
+  assert.match(
+    result[1].content,
+    /Reserve Now: https:\/\/burntends\.com\.sg\/reservations\//u,
+  );
+  assert.equal(
+    urls.every(({ init }) => init.redirect === 'manual'),
+    true,
+  );
+});
+
+test('official reader rejects private and redirected destinations', async () => {
+  let calls = 0;
+  const fetcher = async () => {
+    calls++;
+    return new Response(null, {
+      status: 302,
+      headers: { location: 'https://evil.example/' },
+    });
+  };
+  assert.deepEqual(
+    await readOfficialSite(
+      'https://127.0.0.1/',
+      new AbortController().signal,
+      fetcher,
+    ),
+    [],
+  );
+  assert.equal(calls, 0);
+  assert.deepEqual(
+    await readOfficialSite(
+      'https://burntends.com.sg/',
+      new AbortController().signal,
+      fetcher,
+    ),
+    [],
+  );
+  assert.equal(calls, 1);
+});

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://japan-atlas.example/schemas/place-enrichment-gold.v1.json",
+  "title": "Place enrichment gold dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "datasetId",
+    "checkedAt",
+    "stalenessDays",
+    "cases"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "checkedAt": { "type": "string", "format": "date" },
+    "stalenessDays": { "type": "integer", "minimum": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "summaryClaim": {
+      "allOf": [
+        { "$ref": "#/$defs/claim" },
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "object",
+                "required": ["text", "supportedFactRefs"],
+                "properties": {
+                  "text": { "type": "string", "minLength": 1 },
+                  "supportedFactRefs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string" }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identityId",
+        "canonicalName",
+        "branchId",
+        "countryCode",
+        "address"
+      ],
+      "properties": {
+        "identityId": { "type": "string", "minLength": 1 },
+        "canonicalName": { "type": "string", "minLength": 1 },
+        "branchId": { "type": "string", "minLength": 1 },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "address": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceId",
+        "provider",
+        "kind",
+        "trust",
+        "captureClass",
+        "capturedAt",
+        "sourceUrl",
+        "branch",
+        "payload"
+      ],
+      "properties": {
+        "evidenceId": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": [
+            "restaurant_page",
+            "provider_snapshot",
+            "owner_note",
+            "search_result",
+            "provider_error"
+          ]
+        },
+        "trust": {
+          "enum": ["authoritative", "directory", "owner", "untrusted"]
+        },
+        "captureClass": {
+          "enum": ["synthetic_controlled", "independently_verified_web_capture"]
+        },
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "branch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identityId", "branchId"],
+          "properties": {
+            "identityId": { "type": "string", "minLength": 1 },
+            "branchId": { "type": "string", "minLength": 1 }
+          }
+        },
+        "containsPromptInjection": { "type": "boolean" },
+        "payload": { "type": "object" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "acceptedEvidenceIds"],
+      "properties": {
+        "state": {
+          "enum": ["known", "unknown", "not_applicable", "not_required"]
+        },
+        "value": {},
+        "acceptedEvidenceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": {
+            "required": ["value"],
+            "properties": { "acceptedEvidenceIds": { "minItems": 1 } }
+          },
+          "else": {
+            "properties": { "acceptedEvidenceIds": { "maxItems": 0 } },
+            "not": { "required": ["value"] }
+          }
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "categoryLabels",
+        "summary",
+        "signatureDishes",
+        "ratings",
+        "officialWebsite",
+        "bookingLink",
+        "reservation"
+      ],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "branch", "area", "address", "coordinates"],
+          "properties": {
+            "name": { "$ref": "#/$defs/claim" },
+            "branch": { "$ref": "#/$defs/claim" },
+            "area": { "$ref": "#/$defs/claim" },
+            "address": { "$ref": "#/$defs/claim" },
+            "coordinates": { "$ref": "#/$defs/claim" }
+          }
+        },
+        "categoryLabels": { "$ref": "#/$defs/claim" },
+        "summary": { "$ref": "#/$defs/summaryClaim" },
+        "signatureDishes": { "$ref": "#/$defs/claim" },
+        "ratings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tabelog", "google"],
+          "properties": {
+            "tabelog": { "$ref": "#/$defs/claim" },
+            "google": { "$ref": "#/$defs/claim" }
+          }
+        },
+        "officialWebsite": { "$ref": "#/$defs/claim" },
+        "bookingLink": { "$ref": "#/$defs/claim" },
+        "reservation": { "$ref": "#/$defs/claim" }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "tags", "place", "evidence", "gold"],
+      "properties": {
+        "caseId": { "type": "string", "minLength": 1 },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "place": { "$ref": "#/$defs/place" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "gold": { "$ref": "#/$defs/result" }
+      }
+    }
+  }
+}

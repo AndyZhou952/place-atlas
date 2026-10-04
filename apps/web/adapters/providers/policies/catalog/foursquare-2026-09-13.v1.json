@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "foursquare-2026-09-13-v1",
+  "providerId": "foursquare-places-api-new",
+  "status": "pending_review",
+  "credentialScopes": ["places.search"],
+  "credential": {
+    "kind": "service_api_key",
+    "secretLocation": "cloudflare_secret",
+    "restrictionEvidence": null
+  },
+  "origins": ["https://places-api.foursquare.com"],
+  "fields": {
+    "fsqPlaceId": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "pending",
+      "leaflet": "pending"
+    },
+    "name": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "pending",
+      "leaflet": "pending"
+    },
+    "formattedAddress": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "pending",
+      "leaflet": "pending"
+    },
+    "coordinates": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "pending",
+      "leaflet": "pending"
+    },
+    "reservations": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "deny",
+      "leaflet": "deny"
+    },
+    "rating": {
+      "read": "pending",
+      "request": "pending",
+      "chat": "pending",
+      "prompt": "deny",
+      "durable": "deny",
+      "leaflet": "deny"
+    }
+  },
+  "attribution": {
+    "chat": {
+      "label": "Foursquare",
+      "url": "https://foursquare.com/products/places"
+    }
+  },
+  "cache": {
+    "crossRequest": "deny",
+    "maximumTtlSeconds": 0
+  },
+  "limits": {
+    "requests": 500,
+    "costUsd": 15
+  },
+  "termsEvidence": [
+    {
+      "url": "https://docs.foursquare.com/fsq-developers-places/reference/places-api-overview",
+      "reviewStatus": "documentation_located"
+    },
+    {
+      "url": "https://docs.foursquare.com/fsq-developers-places/reference/response-fields",
+      "reviewStatus": "field_inventory_only_not_permission"
+    },
+    {
+      "url": "https://docs.foursquare.com/developer/reference/upcoming-changes",
+      "reviewStatus": "pricing_located"
+    }
+  ],
+  "agreementEvidence": null,
+  "activation": {
+    "reviewer": null,
+    "reviewedAt": null,
+    "requiredEvidence": [
+      "actual API agreement or account terms",
+      "per-field read chat durable and Leaflet conclusion",
+      "service-key restriction evidence",
+      "quota and billing alert export",
+      "attribution fixture"
+    ]
+  }
+}

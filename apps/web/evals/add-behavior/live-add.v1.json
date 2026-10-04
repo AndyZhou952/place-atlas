@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "captureClass": "live_production_acceptance",
+  "purpose": "Run the deployed Add discover/select/cancel harness with the configured real model and source providers. Scores are separate from controlled fixtures and may fail when a live dependency is unavailable.",
+  "cases": [
+    {
+      "id": "shake-shack-shinjuku",
+      "query": "Shake Shack Shinjuku Southern Terrace",
+      "candidateNameIncludes": "SHAKE SHACK",
+      "expectedTitleIncludes": "シェイクシャック",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13210432/",
+      "expectedReservationMode": "not_reservable"
+    },
+    {
+      "id": "cafe-tsukimori-osaka",
+      "query": "喫茶 月森 大阪 松屋町",
+      "candidateNameIncludes": "Tsukimori",
+      "expectedTitleIncludes": "喫茶 月森",
+      "expectedTabelogUrl": "https://tabelog.com/osaka/A2701/A270204/27121949/",
+      "expectedReservationMode": "reservable"
+    },
+    {
+      "id": "aomori-haibochu",
+      "query": "海坊厨 青森",
+      "candidateNameIncludes": "Umibozu",
+      "expectedTitleIncludes": "海坊厨",
+      "expectedTabelogUrl": "https://tabelog.com/aomori/A0201/A020101/2000433/",
+      "expectedReservationMode": "reservable",
+      "expectedSummaryPrefix": "主营海鲜、西式料理"
+    },
+    {
+      "id": "mendokoro-tenpo",
+      "query": "メンドコロ天鳳",
+      "candidateNameIncludes": "メンドコロ天鳳",
+      "expectedTitleIncludes": "メンドコロ",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131903/13277105/",
+      "expectedReservationMode": "not_reservable",
+      "expectedSummaryPrefix": "主营拉面、无汤担担面"
+    },
+    {
+      "id": "fuglen-tokyo-new-preview",
+      "query": "FUGLEN TOKYO 富ヶ谷",
+      "candidateNameIncludes": "FUGLEN TOKYO",
+      "expectedTitleIncludes": "FUGLEN TOKYO",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1318/A131810/13141002/",
+      "expectedReservationMode": "not_reservable",
+      "expectedSummaryPrefix": "主营咖啡馆、酒吧"
+    },
+    {
+      "id": "ogasawaratei-release-clock",
+      "query": "小笠原伯爵邸 若松河田",
+      "candidateNameIncludes": "Ogasawara",
+      "expectedTitleIncludes": "小笠原伯爵邸",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1305/A130504/13000998/",
+      "expectedReservationMode": "reservation_required",
+      "expectedSummaryPrefix": "主营西班牙料理",
+      "expectedReleaseNoteIncludes": "毎月1日"
+    },
+    {
+      "id": "burnt-ends-dempsey-profile",
+      "query": "Burnt Ends Singapore Dempsey",
+      "candidateNameExact": "Burnt Ends",
+      "expectedTitleIncludes": "Burnt Ends",
+      "expectedLocationProvenance": "durable_geocoder_observed",
+      "expectedReservationMode": "reservable",
+      "expectedCategoryIncludes": "Australian barbecue",
+      "expectedSummaryPrefix": "主营澳式烧烤",
+      "expectedBookingLink": "https://burntends.com.sg/reservations/"
+    },
+    {
+      "id": "tonkatsu-keita-grounded-dishes",
+      "query": "TONKATSU KEITA 松庵",
+      "candidateNameExact": "TONKATSU KEITA",
+      "expectedTitleIncludes": "TONKATSU KEITA",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1319/A131907/13304076/",
+      "expectedReservationMode": "reservation_required",
+      "expectedCategoryIncludes": "とんかつ",
+      "expectedSummaryPrefix": "主营炸猪排",
+      "expectedSummaryIncludes": "招牌菜包括",
+      "expectedDishesMin": 2
+    },
+    {
+      "id": "gyutan-ara-shinjuku-variant",
+      "query": "牛タン 荒 新宿",
+      "candidateNameIncludes": "Gyutan Ara",
+      "expectedTitleIncludes": "牛たん 荒",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13118210/",
+      "expectedReservationMode": "reservable",
+      "expectedCategoryIncludes": "牛タン"
+    },
+    {
+      "id": "center-beef-shinjuku-sanchome",
+      "query": "ステーキライスとカレーの店 センタービーフ 新宿三丁目店",
+      "candidateNameIncludes": "センタービーフ",
+      "expectedTitleIncludes": "センタービーフ 新宿三丁目店",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13295399/",
+      "expectedReservationMode": "not_reservable",
+      "expectedCategoryIncludes": "カレー"
+    }
+  ]
+}

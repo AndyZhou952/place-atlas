@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "snapshotOnly": {
+    "activeMigrations": [
+      "0000_shallow_doctor_faustus.sql",
+      "0001_dapper_stranger.sql",
+      "0002_funny_wrecker.sql",
+      "0003_maintenance_controls.sql"
+    ],
+    "activeMigrationSha256": {
+      "0000_shallow_doctor_faustus.sql": "f7757db8b1fb79ea73b6b2ee1144b6baff707bf7fcfa21b0e3115df1b31dafbb",
+      "0001_dapper_stranger.sql": "f16be57732d74e227429d299f7a320bd8388d1ab9cde23c0012742d24f1d9f04",
+      "0002_funny_wrecker.sql": "a907ceb37f8e2e1d4060d34f714bffbd01b061d6c659532c731196120d3ad410",
+      "0003_maintenance_controls.sql": "0329e3f6a5daef99614b04c368a815593d683c82c14c3feba68eccaef84bd79a"
+    }
+  },
+  "pendingReset": {
+    "path": "drizzle/pending/0004_reset_test_place_assessments.sql",
+    "sha256": "c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16"
+  },
+  "resetStage": {
+    "activeMigration": "0004_reset_test_place_assessments.sql",
+    "activeMigrations": [
+      "0000_shallow_doctor_faustus.sql",
+      "0001_dapper_stranger.sql",
+      "0002_funny_wrecker.sql",
+      "0003_maintenance_controls.sql",
+      "0004_reset_test_place_assessments.sql"
+    ],
+    "activeMigrationSha256": {
+      "0000_shallow_doctor_faustus.sql": "f7757db8b1fb79ea73b6b2ee1144b6baff707bf7fcfa21b0e3115df1b31dafbb",
+      "0001_dapper_stranger.sql": "f16be57732d74e227429d299f7a320bd8388d1ab9cde23c0012742d24f1d9f04",
+      "0002_funny_wrecker.sql": "a907ceb37f8e2e1d4060d34f714bffbd01b061d6c659532c731196120d3ad410",
+      "0003_maintenance_controls.sql": "0329e3f6a5daef99614b04c368a815593d683c82c14c3feba68eccaef84bd79a",
+      "0004_reset_test_place_assessments.sql": "c79819304252399ae9d4e5c74c46bca33f3c0b259655173749b812e4e4ad8e16"
+    }
+  },
+  "retiredSiteVersions": [16]
+}

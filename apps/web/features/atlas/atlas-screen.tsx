@@ -53,6 +53,7 @@ import type {
   VisitMediaRecord,
 } from './model';
 import { maxMediaFilesPerSelection } from './media-constraints';
+import { restaurantLinks } from './restaurant-links';
 import { AtlasMap } from './atlas-map';
 import {
   filterJournalVisits,
@@ -1198,7 +1199,7 @@ function PlaceDetail({
             </section>
 
             <div className="source-links">
-              {item.sources.map((source) => (
+              {restaurantLinks(item).map((source) => (
                 <a
                   key={`${source.role}-${source.url}`}
                   href={source.url}

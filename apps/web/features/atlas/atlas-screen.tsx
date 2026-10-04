@@ -1125,6 +1125,36 @@ function PlaceDetail({
                   <small>Official schedule</small>
                 </div>
               ) : null}
+              {item.openingHours ? (
+                <div className="fact-card">
+                  <span>営業時間</span>
+                  <strong>{item.openingHours.value}</strong>
+                  <small>
+                    <a
+                      href={item.openingHours.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Source
+                    </a>
+                  </small>
+                </div>
+              ) : null}
+              {item.regularClosingDays ? (
+                <div className="fact-card">
+                  <span>定休日</span>
+                  <strong>{item.regularClosingDays.value}</strong>
+                  <small>
+                    <a
+                      href={item.regularClosingDays.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Source
+                    </a>
+                  </small>
+                </div>
+              ) : null}
             </div>
 
             {item.reservation.releaseNote ? (

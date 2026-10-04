@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "restaurant-links-2026-10-v1",
+  "observedDate": "2026-10-04",
+  "purpose": "Score deployed Add discover/select/cancel enrichment for exact-branch Tabelog, official website, profile booking destination, and fresh reservation policy citation. The policy citation may remain the exact Tabelog listing only with a separately correct booking profile. Gold is local-only and must never be sent to the model.",
+  "cases": [
+    {
+      "id": "rodeo-nakameguro-links",
+      "query": "RODEO Nakameguro",
+      "identity": {
+        "nameVariants": [["RODEO"]],
+        "addressVariants": [
+          ["中目黒", "中目黒3-5-1"],
+          ["Nakameguro", "3-chōme-5-1"]
+        ]
+      },
+      "expected": {
+        "tabelogUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
+        "officialWebsite": {
+          "status": "known",
+          "url": "https://gf-restaurant.jp/rodeo/nakameguro",
+          "allowedUrls": [
+            "https://gf-restaurant.jp/rodeo/nakameguro",
+            "https://gf-restaurant.jp/rodeo"
+          ]
+        },
+        "bookingUrl": "https://yoyaku.toreta.in/rodeo-nakameguro/#/"
+      }
+    },
+    {
+      "id": "ramenya-shima-tokyo-links",
+      "query": "らぁ麺や 嶋 西新宿五丁目 東京",
+      "identity": {
+        "nameVariants": [
+          ["らぁ麺や", "嶋"],
+          ["Ramenya", "Shima"]
+        ],
+        "addressVariants": [
+          ["渋谷区", "本町3-41-12"],
+          ["Shibuya", "Honmachi", "3-chōme-41-12"]
+        ]
+      },
+      "expected": {
+        "tabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+        "officialWebsite": {
+          "status": "unknown",
+          "allowedUrls": []
+        },
+        "bookingUrl": "https://www.tablecheck.com/ja/shops/ramenya-shima/reserve"
+      },
+      "notes": "Tabelog and the TableCheck merchant guide showed 3-41-12 in this check; deployed Google discovery previously returned 3-chōme-41-11. The benchmark treats these as an identity/address mismatch and does not relax it. A standalone official website is unknown; official social profiles are not websites."
+    }
+  ]
+}

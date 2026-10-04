@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "restaurant-hours-2026-10-v1",
+  "observedDate": "2026-10-04",
+  "purpose": "Score Add restaurant-hours enrichment against independently collected hours and regular closure evidence. Preserve source wording and conflicts; do not infer missing hours or merge incompatible schedules.",
+  "cases": [
+    {
+      "id": "rodeo-nakameguro-hours",
+      "itemId": "9fe5a165-0776-4a57-af42-a9a607fcca62",
+      "name": "RODEO",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
+      "openingHours": {
+        "value": "月〜金：17:00 - 23:00\n土・日・祝：12:00〜14:00 ※L.O. 13:00\n　　　　　　17:00 - 23:00\n※全日最終入店 21:30",
+        "sourceUrl": "https://gf-restaurant.jp/rodeo/nakameguro",
+        "observedAt": "2026-10-04T00:00:00.000Z"
+      },
+      "weeklyClosureStatus": "unknown",
+      "evidence": [
+        {
+          "sourceUrl": "https://gf-restaurant.jp/rodeo/nakameguro",
+          "quote": "月〜金：17:00 - 23:00／土・日・祝：12:00〜14:00 ※L.O. 13:00、17:00 - 23:00／※全日最終入店 21:30",
+          "note": "Official page states schedule for weekdays, weekends, and holidays. Structured opening-hours data likewise lists all seven weekdays; no fixed weekly closure is listed. Last entry is kept separate from closing time and lunch last order. The absence of a stated weekly closure is not an assertion of no rest days."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
+          "quote": "[土] 12:00 - 14:00（L.O. 13:00） 17:00 - 23:00; [日] 12:00 - 14:00（L.O. 13:00） 17:00 - 22:00; [祝日] 12:00 - 14:00（L.O. 13:00） 17:00 - 22:00; 【月〜金】最終入店21:30 【土 日 祝】ディナー 最終入店21:00; ■ 定休日 年末年始",
+          "note": "Tabelog conflicts with the official page for Sunday/holiday dinner close (22:00 vs 23:00) and weekend/holiday last entry (21:00 vs official all-day 21:30). Its listed closure is 年末年始, a seasonal closure rather than a weekly closed day; retained as a source statement, not converted into regularClosingDays."
+        }
+      ]
+    },
+    {
+      "id": "ramenya-shima-hours",
+      "itemId": "7cde3b6c-b853-4102-a4ad-8ab1a4c53170",
+      "name": "らぁ麺や 嶋",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+      "openingHours": {
+        "value": "月・火・水・木・金 08:15 - 14:30; 土・日・祝日 定休日\n■入店時間 8:15〜、8:45～、9:30～、10:00～、10:30～、11:00～、11:45～、12:15～、12:45～、13:30～、14:00～",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+        "observedAt": "2026-10-04T00:00:00.000Z"
+      },
+      "regularClosingDays": {
+        "value": "土曜日、日曜日、祝日",
+        "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+        "observedAt": "2026-10-04T00:00:00.000Z"
+      },
+      "weeklyClosureStatus": "known",
+      "evidence": [
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
+          "quote": "[月] 08:15 - 14:30; [火] 08:15 - 14:30; [水] 08:15 - 14:30; [木] 08:15 - 14:30; [金] 08:15 - 14:30; [土] 定休日; [日] 定休日; [祝日] 定休日; ■入店時間 8:15〜、8:45～、9:30～、10:00～、10:30～、11:00～、11:45～、12:15～、12:45～、13:30～、14:00～",
+          "note": "Current Tabelog entry reports weekday hours and weekend/holiday closures. It distinguishes the listed opening interval from its entry-time slots; no last-order time is stated."
+        },
+        {
+          "sourceUrl": "https://www.tablecheck.com/ja/shops/ramenya-shima/reserve",
+          "quote": "来店日の前日午前8時より翌日分の予約を受付開始、各枠の1分前迄予約受付可能です。",
+          "note": "Official booking page confirms reservation-window rules, but the accessible page does not state a regular opening-hours or weekly-closure schedule. Tabelog's note gives bookable entry times as 8:45～14:00, while its current hours/entry-time fields also include 8:15; preserve both as source differences rather than treating reservation slots as opening hours."
+        },
+        {
+          "sourceUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/dtlrvwlst/B493502199/",
+          "quote": "〖営業時間〗月〜金 08:45-14:30 土日祝 定休日",
+          "note": "A Tabelog review dated 2024/10 states a different weekday start (08:45) from the current store-hours listing (08:15). This is an older review statement and is retained as a discrepancy, not merged into the current listing schedule."
+        }
+      ]
+    }
+  ]
+}

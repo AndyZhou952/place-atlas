@@ -37,3 +37,20 @@ These 79 controlled dataset cases gate deterministic safety and presentation beh
 4. The selected preview checks saved restaurants by provider identity, Tabelog listing and corroborated address/coordinates. Strong matches stop a second save; location-only matches warn without merging two businesses in one building. `catalog.intake.confirm` rechecks strong duplicates, then refetches identity, location and canonical sources. A changed fact returns a new preview for another confirmation; missing durable location prevents publication. The catalog port writes a verified item and an idempotent receipt. UI readback after refresh is a separate acceptance signal.
 
 The prompt is guidance; the quote/identity checks, geocoder policy, preview version, publication gate, deterministic copy and tag compaction are code hooks. Known weaknesses outside this benchmark include live provider availability, unrecognized cuisine translations, and the currently limited production Add journey sample. Extend the manifest when a new production failure is independently observed, then add a negative control to prevent an overbroad fix.
+
+## Restaurant link and hours regression
+
+`restaurant-links.v1.json` and `restaurant-hours.v1.json` are independent, dated RODEO/Nakameguro and らぁ麺や 嶋 gold sets. Separate GPT-6 Luna research established merchant identity, listing, official website status, actionable booking destination and operating schedule. Keep these manifests outside model requests. A missing standalone site or fixed weekly closure remains unknown; social profiles and seasonal closures do not fill those fields. Preserve contradictory sources in the evidence notes.
+
+CI runs `booking-destinations.test.mjs`, `operating-hours.test.mjs`, both scorers, and the real coordinator/D1/public projection tests through `npm test`. Controlled merchant HTML exercises Toreta, current TableCheck, optional timing, provider/model outage, wrong branches, spoof official anchors and rejection of a general Tabelog listing as a booking link. The hours scorer compares time ranges assigned to every weekday and holidays, accepts the captured grouped/range day spellings, and rejects missing midweek days or swapped schedules. It is scoped to these Japanese captures, not a universal international timetable parser. Tabelog may remain the reservation-policy citation only when the separately checked profile contains the correct actionable booking destination.
+
+For an opt-in live run from `apps/web`, set `ATLAS_ADD_AGENT_URL` to the authorized HTTPS `/api/agent/catalog-intake` endpoint and run:
+
+```sh
+npm run eval:restaurant-links -- evals/runs/restaurant-links-local.json
+npm run eval:restaurant-links -- evals/runs/restaurant-links-hours-local.json --hours
+```
+
+The runner reads `ATLAS_ADD_AGENT_TOKEN` or ignored `.wrangler/add-agent-token`, performs discover/select/cancel, and never confirms or publishes. Reports remain in ignored `evals/runs/`; each case must cancel successfully. The output separates wrong/missing URLs, source evidence, identity/provider failures and hours/rest-day checks. A live address conflict cannot be bypassed by replacing the expected answer with the model response. Google discovery and Tabelog discovery are different configurations and must be reported separately. Configured provider/model diagnostic codes contain no secrets; do not infer the deployed model identifier from this runner's name.
+
+See [the regression report](../../../../docs/restaurant-enrichment-regression.md) for the verified URLs, production repair, old harness failure mechanisms and live results. The repair scripts in `scripts/restaurant-link-repair.mjs` and `scripts/restaurant-hours-backfill.mjs` generate exact-row compare-and-swap SQL, backups, readback and guarded rollback from an export. They do not execute remote writes themselves. The link script preserves original policy evidence and timestamps. The hours script writes root sourced fields compatible with the previous deployed profile validator; normal revised publication writes both profile and public fields.

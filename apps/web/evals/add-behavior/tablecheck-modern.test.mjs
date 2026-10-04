@@ -13,12 +13,12 @@ const capture = JSON.parse(
   readFileSync(new URL('./tablecheck-modern.v1.json', import.meta.url), 'utf8'),
 );
 
-function merchantHtml(name, officialHost) {
+function merchantHtml(name, officialHost, officialLabel = '公式サイト') {
   return `<title>${name} - TableCheck (テーブルチェック)</title>
     <h3 class="panel-title">${name}を予約する</h3>
     <div class="reserveform-bookingpolicy-text">
       ★こちらはレストランのご予約ページです。<br>
-      <a href="https://${officialHost}/rest/private/">個室のご案内</a><br>
+      <a href="https://${officialHost}/rest/private/">${officialLabel}</a><br>
       ◆ご予約◆<br>${capture.bookingWindowLabel}。<br>
       【ご予約受付開始時間】<br>公式HP：${capture.releaseNote} お電話：毎月1日の午前10時00分より<br>
     </div>`;
@@ -55,6 +55,16 @@ test('modern TableCheck page keeps the exact merchant policy and host', () => {
         `${capture.name}を予約する`,
         'Oga Barを予約する',
       ),
+      capture.bookingUrl,
+    ),
+    undefined,
+  );
+});
+
+test('modern TableCheck does not treat an unrelated directory link as official-site proof', () => {
+  assert.equal(
+    parseTableCheckBookingPage(
+      merchantHtml(capture.name, 'ogasawaratei.com', '個室のご案内'),
       capture.bookingUrl,
     ),
     undefined,

@@ -33,6 +33,8 @@ export interface PublicCatalogItemV1 {
   readonly verifiedAt?: string;
   readonly updatedAt?: string;
   readonly officialUrl?: string;
+  readonly openingHours?: PublicSourcedTextV1;
+  readonly regularClosingDays?: PublicSourcedTextV1;
   readonly tabelog?: PublicTabelogEvidenceV1;
   readonly googleRating?: PublicTabelogEvidenceV1;
   readonly googlePlaceId?: string;
@@ -45,6 +47,12 @@ export interface PublicCatalogItemV1 {
   readonly tags: readonly string[];
   readonly classification?: RestaurantClassification;
   readonly sources: readonly PublicSourceEvidenceV1[];
+}
+
+interface PublicSourcedTextV1 {
+  readonly value: string;
+  readonly sourceUrl: string;
+  readonly observedAt: string;
 }
 
 type PublicTabelogEvidenceV1 =
@@ -74,7 +82,7 @@ type PublicTabelogEvidenceV1 =
     };
 
 type PublicReservationEvidenceV1 =
-  | { readonly status: 'unknown' }
+  | { readonly status: 'unknown'; readonly url?: string }
   | {
       readonly mode:
         | 'walk-in'
@@ -99,7 +107,7 @@ type PublicReservationEvidenceV1 =
       readonly bookingWindowLabel?: string;
       readonly releaseNote?: string;
       readonly channel?: string;
-      readonly url: string;
+      readonly url?: string;
       readonly provenance: 'owner_asserted';
       readonly assertedAt: string;
       readonly freshness: 'fresh' | 'stale';
@@ -112,7 +120,7 @@ type PublicReservationEvidenceV1 =
       readonly bookingWindowLabel?: string;
       readonly releaseNote?: string;
       readonly channel?: string;
-      readonly url: string;
+      readonly url?: string;
       readonly provenance: 'agent_observed';
       readonly observedAt: string;
       readonly freshness: 'fresh' | 'stale';
@@ -308,7 +316,7 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
       ? asRecord(intakeEvidence.candidateIdentity)
       : undefined;
   const intakeTabelog = intakeEvidence
-    ? asRecord(intakeEvidence.tabelog)
+    ? asRecord(intakeEvidence.tabelog ?? {})
     : undefined;
   const reviewFields =
     reviewCandidate && intakeEvidence
@@ -322,6 +330,34 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     source.reservation === undefined && reviewCandidate
       ? { status: 'unknown' }
       : asRecord(source.reservation);
+  const profile = intakeEvidence
+    ? asRecord(intakeEvidence.profile ?? {})
+    : undefined;
+  const explicitBookingUrl = profile
+    ? optionalString(asRecord(profile.bookingLink ?? {}).value)
+    : undefined;
+  const tabelogUrl = optionalString(
+    intakeEvidence
+      ? asRecord(intakeEvidence.tabelog ?? {}).url
+      : asRecord(source.tabelog ?? {}).url,
+  );
+  const policyReservation = intakeEvidence
+    ? asRecord(intakeEvidence.reservation)
+    : reservation;
+  const reservationEvidenceUrl = optionalString(policyReservation.url);
+  const actionableReservationUrl =
+    explicitBookingUrl ??
+    (reservationEvidenceUrl && reservationEvidenceUrl !== tabelogUrl
+      ? reservationEvidenceUrl
+      : undefined);
+  const projectedOpeningHours = projectSourcedText(
+    profile?.openingHours ?? source.openingHours,
+    1200,
+  );
+  const projectedRegularClosingDays = projectSourcedText(
+    profile?.regularClosingDays ?? source.regularClosingDays,
+    500,
+  );
   const projected: PublicCatalogItemV1 = {
     id: asString(source.id),
     kind: asCatalogKind(source.kind),
@@ -357,6 +393,10 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
     ...(optionalString(source.officialUrl) === undefined
       ? {}
       : { officialUrl: optionalString(source.officialUrl) }),
+    ...(projectedOpeningHours ? { openingHours: projectedOpeningHours } : {}),
+    ...(projectedRegularClosingDays
+      ? { regularClosingDays: projectedRegularClosingDays }
+      : {}),
     ...(intakeEvidence
       ? intakeTabelog?.status === 'known'
         ? { tabelog: projectTabelog(intakeTabelog) }
@@ -365,7 +405,9 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
         ? {}
         : { tabelog: projectTabelog(asRecord(source.tabelog)) }),
     reservation: projectReservation(
-      intakeEvidence ? asRecord(intakeEvidence.reservation) : reservation,
+      policyReservation,
+      actionableReservationUrl,
+      tabelogUrl,
     ),
     ...(source.googleRating === undefined
       ? {}
@@ -408,14 +450,63 @@ function projectCatalogItem(source: Readonly<Record<string, unknown>>) {
         }
       : {}),
     sources: intakeEvidence
-      ? projectIntakeSources(intakeEvidence)
-      : asArray(source.sources).map((entry) => projectSource(asRecord(entry))),
+      ? projectIntakeSources(
+          intakeEvidence,
+          optionalString(source.officialUrl),
+          tabelogUrl,
+        )
+      : projectSourcesForPublication(
+          asArray(source.sources).map((entry) =>
+            projectSource(asRecord(entry)),
+          ),
+          optionalString(source.officialUrl),
+          tabelogUrl,
+        ),
   };
   return projected;
 }
 
+function projectSourcedText(
+  value: unknown,
+  maxLength: number,
+): PublicSourcedTextV1 | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return undefined;
+  const record = value as Readonly<Record<string, unknown>>;
+  if (
+    Object.keys(record).length !== 3 ||
+    !['value', 'sourceUrl', 'observedAt'].every((key) => key in record)
+  )
+    return undefined;
+  const { value: text, sourceUrl, observedAt } = record;
+  if (
+    typeof text !== 'string' ||
+    text.trim().length === 0 ||
+    text.length > maxLength ||
+    typeof sourceUrl !== 'string' ||
+    sourceUrl.length > 2048 ||
+    typeof observedAt !== 'string' ||
+    !Number.isFinite(Date.parse(observedAt))
+  )
+    return undefined;
+  try {
+    const url = new URL(sourceUrl);
+    if (
+      !['https:', 'http:'].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      return undefined;
+  } catch {
+    return undefined;
+  }
+  return { value: text, sourceUrl, observedAt };
+}
+
 function projectIntakeSources(
   evidence: Readonly<Record<string, unknown>>,
+  officialUrl?: string,
+  tabelogUrl?: string,
 ): readonly PublicSourceEvidenceV1[] {
   const candidates: Record<string, unknown>[] = [];
   if (evidence.profile !== undefined) {
@@ -432,7 +523,20 @@ function projectIntakeSources(
         });
     }
   }
-  const location = asRecord(evidence.locationEvidence);
+  if (
+    officialUrl &&
+    !candidates.some(
+      (candidate) =>
+        candidate.role === 'official' && candidate.url === officialUrl,
+    )
+  ) {
+    candidates.push({
+      role: 'official',
+      label: 'Official website',
+      url: officialUrl,
+    });
+  }
+  const location = asRecord(evidence.locationEvidence ?? {});
   if (location.status === 'known' && location.provenance === 'agent_observed') {
     candidates.push({
       role: 'location',
@@ -482,12 +586,20 @@ function projectIntakeSources(
     });
   }
 
-  const reservation = asRecord(evidence.reservation);
-  if (reservation.status === 'known') {
+  const reservation = asRecord(evidence.reservation ?? {});
+  const profileBookingUrl = optionalString(
+    asRecord(asRecord(evidence.profile ?? {}).bookingLink ?? {}).value,
+  );
+  const reservationUrl = optionalString(reservation.url);
+  if (
+    !profileBookingUrl &&
+    reservation.status === 'known' &&
+    reservationUrl !== tabelogUrl
+  ) {
     candidates.push({
       role: 'reservation',
-      label: asString(reservation.label),
-      url: asString(reservation.url),
+      label: 'Reservation policy',
+      url: asString(reservationUrl),
       provenance: reservation.provenance,
       ...(reservation.provenance === 'owner_asserted'
         ? { assertedAt: asString(reservation.assertedAt) }
@@ -495,6 +607,29 @@ function projectIntakeSources(
     });
   }
   return candidates.map((candidate) => projectSource(candidate));
+}
+
+function projectSourcesForPublication(
+  sources: readonly PublicSourceEvidenceV1[],
+  officialUrl?: string,
+  tabelogUrl?: string,
+): readonly PublicSourceEvidenceV1[] {
+  const filtered = sources.filter(
+    (source) => !(source.role === 'reservation' && source.url === tabelogUrl),
+  );
+  return officialUrl &&
+    !filtered.some(
+      (source) => source.role === 'official' && source.url === officialUrl,
+    )
+    ? [
+        ...filtered,
+        projectSource({
+          role: 'official',
+          label: 'Official website',
+          url: officialUrl,
+        }),
+      ]
+    : filtered;
 }
 
 function projectAssessment(
@@ -593,9 +728,22 @@ function projectTabelog(source: Readonly<Record<string, unknown>>) {
 
 function projectReservation(
   source: Readonly<Record<string, unknown>>,
+  actionableUrl?: string,
+  tabelogUrl?: string,
 ): PublicReservationEvidenceV1 {
-  if (source.status === 'unknown') return { status: 'unknown' as const };
+  if (source.status === 'unknown')
+    return {
+      status: 'unknown' as const,
+      ...((actionableUrl ?? optionalString(source.url))
+        ? { url: actionableUrl ?? optionalString(source.url) }
+        : {}),
+    };
   if (source.status === 'known') {
+    const url =
+      actionableUrl ??
+      (optionalString(source.url) === tabelogUrl
+        ? undefined
+        : optionalString(source.url));
     const shared = {
       status: 'known' as const,
       mode: asIntakeReservationMode(source.mode),
@@ -612,7 +760,7 @@ function projectReservation(
       ...(optionalString(source.channel) === undefined
         ? {}
         : { channel: optionalString(source.channel) }),
-      url: asString(source.url),
+      ...(url ? { url } : {}),
       freshness: asFreshness(source.freshness),
     };
     if (source.provenance === 'owner_asserted') {
@@ -638,9 +786,18 @@ function projectReservation(
     ...(optionalString(source.channel) === undefined
       ? {}
       : { channel: optionalString(source.channel) }),
-    ...(optionalString(source.url) === undefined
-      ? {}
-      : { url: optionalString(source.url) }),
+    ...((actionableUrl ??
+    (optionalString(source.url) === tabelogUrl
+      ? undefined
+      : optionalString(source.url)))
+      ? {
+          url:
+            actionableUrl ??
+            (optionalString(source.url) === tabelogUrl
+              ? undefined
+              : optionalString(source.url)),
+        }
+      : {}),
     ...(source.advanceDays === undefined
       ? {}
       : { advanceDays: asNumber(source.advanceDays) }),

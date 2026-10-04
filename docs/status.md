@@ -1,10 +1,12 @@
 # PoC delivery checklist
 
-Updated: 2026-10-03. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
+Updated: 2026-10-04. This is the development progress tracker. System boundaries live in `docs/architecture.md`; executable evaluation protocols and data live in `apps/web/evals/`.
 
 `[x]` records completed implementation or verification. `[ ]` records work still open. Local tests and model-only benchmarks do not replace deployed website acceptance.
 
 ## Add — research, review and save a restaurant
+
+- [x] Independently benchmarked and repaired RODEO and らぁ麺や 嶋 booking/official links and sourced Japanese operating hours. The candidate separates policy evidence from booking buttons, reads Toreta/TableCheck and exact-branch official schedules, preserves profile facts at refresh/confirmation, and adds wrong-destination, weekday-assignment and publication regressions. Live results and remaining address conflict are recorded in [the regression report](restaurant-enrichment-regression.md). Candidate UI release is pending this PR; the production code version was not switched.
 
 - [x] Discover → choose a branch → research → preview → owner-confirmed publication is implemented. Session versions, duplicate-safe replay, location validation, source evidence and public catalog readback are covered by tests and live Add journeys. A failed lookup cannot silently publish an unlocated restaurant.
 - [x] If research leaves fields unknown, the owner can correct details and refresh the preview; an address or coordinates are still required for publication. The separate Review tab and candidate publication path have been retired; historical schema and receipts remain readable.

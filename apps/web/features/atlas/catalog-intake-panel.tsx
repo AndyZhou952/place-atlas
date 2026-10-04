@@ -659,6 +659,35 @@ function PreviewStep({
             </a>
           </p>
         ) : null}
+        {preview.profile?.openingHours ||
+        preview.profile?.regularClosingDays ? (
+          <div className="catalog-intake-profile-hours">
+            {preview.profile.openingHours ? (
+              <p>
+                営業時間: {preview.profile.openingHours.value}{' '}
+                <a
+                  href={preview.profile.openingHours.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Source
+                </a>
+              </p>
+            ) : null}
+            {preview.profile.regularClosingDays ? (
+              <p>
+                定休日: {preview.profile.regularClosingDays.value}{' '}
+                <a
+                  href={preview.profile.regularClosingDays.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Source
+                </a>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
       {groups.map((group) => (
         <section

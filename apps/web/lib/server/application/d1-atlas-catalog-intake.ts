@@ -663,6 +663,12 @@ function toAtlasItem(
     address,
     description:
       preview.ownerFields.summary ?? preview.profile?.summary?.value ?? '',
+    ...(preview.profile?.openingHours
+      ? { openingHours: preview.profile.openingHours }
+      : {}),
+    ...(preview.profile?.regularClosingDays
+      ? { regularClosingDays: preview.profile.regularClosingDays }
+      : {}),
     ...(preview.profile?.officialWebsite
       ? { officialUrl: preview.profile.officialWebsite.value }
       : {}),
@@ -759,10 +765,12 @@ function intakeEvidence(preview: CatalogIntakePreview) {
 function reservationSnapshot(
   preview: CatalogIntakePreview,
 ): ReservationSnapshot {
+  const bookingUrl = preview.profile?.bookingLink?.value;
   if (preview.reservation.status === 'unknown') {
     return {
       mode: 'unknown',
       label: 'Reservation status is unknown.',
+      ...(bookingUrl ? { url: bookingUrl } : {}),
     };
   }
   return {
@@ -776,7 +784,9 @@ function reservationSnapshot(
     ...(preview.reservation.channel
       ? { channel: preview.reservation.channel }
       : {}),
-    url: preview.reservation.url,
+    // Keep the researched reservation policy in intakeEvidence, while the
+    // public reservation snapshot points at the verified booking destination.
+    url: bookingUrl ?? preview.reservation.url,
     ...(preview.reservation.advanceDays === undefined
       ? {}
       : { advanceDays: preview.reservation.advanceDays }),

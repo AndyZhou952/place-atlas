@@ -543,7 +543,9 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
           calls.push('search');
           assert.match(
             JSON.parse(init.body).query,
-            /^TONKATSU KEITA .*3-41-1 site:tabelog\.com$/u,
+            calls.filter((call) => call === 'search').length === 1
+              ? /^TONKATSU KEITA .*3-41-1 site:tabelog\.com$/u
+              : /^TONKATSU KEITA .*reservation 公式 予約$/u,
           );
           return Response.json({
             results: [{ url: listingUrl, content: 'Restaurant listing' }],
@@ -591,7 +593,12 @@ test('selected-name lookup precedes the model and keeps relocated branches separ
         ownerQuery: entry.ownerQuery,
       },
     });
-    assert.deepEqual(calls, ['search', 'listing', 'model']);
+    assert.deepEqual(
+      calls,
+      wrongBranch
+        ? ['search', 'listing', 'model']
+        : ['search', 'listing', 'search', 'model'],
+    );
     assert.equal(result.kind, 'observed');
     assert.equal(
       result.value.tabelog.status,
@@ -1265,7 +1272,7 @@ test('a branch-matched TableCheck hint directs the second search before the mode
   });
   const result = await agent.research({ ...input, selectedSubject });
   assert.equal(queries.length, 2);
-  assert.match(queries[1], /TableCheck reservation/u);
+  assert.match(queries[1], /TableCheck site:tablecheck\.com/u);
   assert.equal(modelCalls, 1);
   assert.equal(result.kind, 'observed');
   assert.equal(result.value.reservation.mode, 'reservation_required');

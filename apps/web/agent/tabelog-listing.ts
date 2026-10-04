@@ -12,7 +12,11 @@ export interface TabelogEvidence extends SearchEvidence {
     coordinates?: { latitude: number; longitude: number };
     categories: string[];
     reservation?: string;
-    bookingProviderHint?: 'tablecheck';
+    bookingProviderHint?: 'tablecheck' | 'toreta';
+    bookingLink?: string;
+    officialAccounts?: string[];
+    openingHours?: string;
+    regularClosingDays?: string;
     officialWebsite?: string;
     introduction?: string;
   };
@@ -184,9 +188,46 @@ export function parseTabelogListing(
     .replace(/続きを読む/gu, '')
     .trim()
     .slice(0, 1200);
+  // Operating hours come only from the exact listing's business-info row,
+  // never from review text, booking slot availability, or a last-order time.
+  const hoursRow = row('営業時間(?:・定休日)?');
+  const openingHours = hoursRow ? clean(hoursRow).slice(0, 1200) : undefined;
+  const closedItems = [
+    ...(hoursRow ?? '').matchAll(
+      /<p\b[^>]*class=["'][^"']*rstinfo-table__business-title[^"']*["'][^>]*>([\s\S]*?)<\/p>\s*<ul\b[^>]*>([\s\S]*?)<\/ul>/giu,
+    ),
+  ]
+    .filter((match) => clean(match[2]) === '定休日')
+    .map((match) => clean(match[1]));
+  const closureNote = /■\s*定休日\s*([^■]{1,300})/u
+    .exec(openingHours ?? '')?.[1]
+    ?.replace(/営業時間・定休日は変更[\s\S]*/u, '')
+    .trim();
+  const regularClosingDays = [
+    ...closedItems,
+    ...(closureNote && /毎週|[月火水木金土日]曜/u.test(closureNote)
+      ? [closureNote]
+      : []),
+  ].join(' / ');
   const officialRow = row('ホームページ');
   const website =
     officialRow && /href=["'](https:\/\/[^"']+)["']/iu.exec(officialRow)?.[1];
+  const officialAccounts = [
+    ...(row('公式アカウント') ?? '').matchAll(
+      /href=["'](https:\/\/[^"']+)["']/giu,
+    ),
+  ].map((match) => clean(match[1]));
+  // Only restaurant-info rows can declare a destination; reviews and ads cannot.
+  const bookingLinks = [
+    ...`${row('予約可否') ?? ''} ${row('備考') ?? ''}`.matchAll(
+      /<a\b[^>]*href=["'](https:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/giu,
+    ),
+  ]
+    .filter((match) =>
+      /予約|reserve|book|tablecheck|toreta/iu.test(clean(match[2])),
+    )
+    .map((match) => clean(match[1]));
+  const bookingLink = bookingLinks.length === 1 ? bookingLinks[0] : undefined;
   const categories = (
     typeof record.servesCuisine === 'string'
       ? record.servesCuisine.split(/[、,]/u)
@@ -218,6 +259,13 @@ export function parseTabelogListing(
     ...(/Table\s*Check/iu.test(remarks)
       ? { bookingProviderHint: 'tablecheck' as const }
       : {}),
+    ...(bookingLink ? { bookingLink } : {}),
+    ...(officialAccounts.length ? { officialAccounts } : {}),
+    ...(/トレタ|toreta/iu.test(remarks + reservation)
+      ? { bookingProviderHint: 'toreta' as const }
+      : {}),
+    ...(openingHours ? { openingHours } : {}),
+    ...(regularClosingDays ? { regularClosingDays } : {}),
     ...(introduction ? { introduction } : {}),
     ...(website ? { officialWebsite: clean(website) } : {}),
   };

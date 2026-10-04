@@ -10,6 +10,7 @@ import {
   createCatalogIntakeOperationGroup,
 } from '../../../product/application/catalog-intake/catalog-intake-coordinator.ts';
 import { createCatalogRead } from '../../../product/application/catalog/catalog-read.ts';
+import { isAtlasItem } from '../../../product/application/catalog/catalog-projection.ts';
 import { createNearbyRecommendationOperationGroup } from '../../../product/application/decision/agent-nearby-operation.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-atlas-catalog-intake.ts';
 import { D1CatalogIntakeState } from './d1-catalog-intake-state.ts';
@@ -49,6 +50,8 @@ test('complete researched profile survives D1 publication and public projection 
       categories: claim(['洋食']),
       signatureDishes: claim(['Oysters']),
       summary: claim('A small restaurant.'),
+      openingHours: claim('Lunch 11:30–14:30; Dinner 17:00–22:00'),
+      regularClosingDays: claim('火曜日・第3水曜日'),
       officialWebsite: claim('https://example.com/'),
       bookingLink: claim('https://example.com/book'),
       googleRating: claim({ score: 4.2, reviewCount: 10 }),
@@ -83,14 +86,53 @@ test('complete researched profile survives D1 publication and public projection 
   assert.deepEqual(projected.classification, stored.classification);
   assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
+  assert.deepEqual(projected.openingHours, preview.profile.openingHours);
+  assert.deepEqual(
+    projected.regularClosingDays,
+    preview.profile.regularClosingDays,
+  );
+  assert.deepEqual(stored.openingHours, preview.profile.openingHours);
+  assert.deepEqual(
+    stored.regularClosingDays,
+    preview.profile.regularClosingDays,
+  );
   assert.equal(projected.googleRating.score, 4.2);
   assert.equal(projected.reservation.mode, 'not_reservable');
+  assert.equal(projected.reservation.url, 'https://example.com/book');
+  assert.equal(stored.reservation.url, 'https://example.com/book');
+  assert.equal(
+    stored.intakeEvidence.reservation.url,
+    'https://example.com/menu',
+  );
   assert.ok(
     projected.sources.some(
       (source) => source.url === 'https://example.com/book',
     ),
   );
   assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  const toreta = structuredClone(stored);
+  const toretaUrl = 'https://yoyaku.toreta.in/rodeo-nakameguro/#/';
+  toreta.intakeEvidence.reservation = {
+    ...toreta.intakeEvidence.reservation,
+    mode: 'reservable',
+    label: 'Reservations available',
+    url: toretaUrl,
+  };
+  toreta.intakeEvidence.profile.bookingLink = claim(toretaUrl);
+  toreta.reservation = {
+    ...toreta.reservation,
+    mode: 'advance',
+    label: 'Reservations available',
+    url: toretaUrl,
+  };
+  assert.equal(isAtlasItem(toreta), true);
+  assert.equal(
+    createPublicReadManifest().project('catalog.get', toreta).reservation.url,
+    toretaUrl,
+  );
+  const invalidToreta = structuredClone(toreta);
+  invalidToreta.intakeEvidence.reservation.url = `${toretaUrl}untrusted`;
+  assert.equal(isAtlasItem(invalidToreta), false);
   const catalog = createCatalogRead(new D1CatalogState(toD1(sqlite)), []);
   assert.equal((await catalog.list('verified_catalog'))[0]?.id, 'profile-item');
   const browserItems = await loadPublicCatalog({

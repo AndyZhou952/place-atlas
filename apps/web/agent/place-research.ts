@@ -19,6 +19,10 @@ import {
   restaurantSearchDescription,
   isTabelogRestaurantListing,
 } from './research-instructions.ts';
+import {
+  canonicalToretaBookingUrl,
+  readToretaBookingPage,
+} from './toreta-booking.ts';
 import { explicitReservationTiming } from './reservation-timing.ts';
 import { readOfficialSite } from './official-site-reader.ts';
 import {
@@ -113,7 +117,23 @@ export function createPlaceResearchAgent(
       if (!('selectedSubject' in input)) return { kind: 'unavailable' };
       const region = researchRegion(input.selectedSubject.transientAddress);
       const signal = AbortSignal.timeout(35_000);
+      diagnostic(
+        base.hostname === 'api.deepseek.com'
+          ? 'model_provider_deepseek'
+          : 'model_provider_other',
+      );
+      diagnostic(
+        config.model === 'deepseek-flash'
+          ? 'model_deepseek_flash'
+          : config.model === 'deepseek-chat'
+            ? 'model_deepseek_chat'
+            : 'model_configured_other',
+      );
       const evidence: TabelogEvidence[] = [];
+      let officialSchedule: { value: string; sourceUrl: string } | undefined;
+      let officialPageBudget = 4;
+      const readOfficialUrls = new Set<string>();
+      let officialBookingLink: { value: string; sourceUrl: string } | undefined;
       let bookingEvidence: TableCheckBookingEvidence | undefined;
       let officialCuisine:
         | { readonly category: string; readonly sourceUrl: string }
@@ -160,6 +180,12 @@ export function createPlaceResearchAgent(
           const page = await readListing(url);
           if (!page) continue;
           sources.unshift(page);
+          if (page.restaurant?.bookingLink)
+            sources.push({
+              url: page.restaurant.bookingLink,
+              title: page.title,
+              content: page.content,
+            });
           if (
             page.restaurant &&
             matchesSelectedBranch(
@@ -179,15 +205,19 @@ export function createPlaceResearchAgent(
         if (bookingEvidence) return;
         let candidates = 0;
         for (const [index, source] of sources.entries()) {
-          const bookingUrl = canonicalTableCheckBookingUrl(source.url);
+          const bookingUrl =
+            canonicalTableCheckBookingUrl(source.url) ??
+            canonicalToretaBookingUrl(source.url);
           if (!bookingUrl) continue;
           candidates++;
-          const result = await readTableCheckBookingPage(
-            bookingUrl,
-            fetcher,
-            signal,
+          const result = await (
+            canonicalToretaBookingUrl(bookingUrl)
+              ? readToretaBookingPage
+              : readTableCheckBookingPage
+          )(bookingUrl, fetcher, signal);
+          diagnostic(
+            `${canonicalToretaBookingUrl(bookingUrl) ? 'toreta' : 'tablecheck'}_read_${result.kind}`,
           );
-          diagnostic(`tablecheck_read_${result.kind}`);
           if (result.kind !== 'read') continue;
           const booking = result.evidence.booking;
           const selected = input.selectedSubject;
@@ -248,6 +278,101 @@ export function createPlaceResearchAgent(
         }
         if (!candidates) diagnostic('tablecheck_no_candidate');
       };
+      const readJapaneseOfficialPage = async (
+        website: string,
+        maximumPages: number,
+      ) => {
+        if (
+          region !== 'japan' ||
+          config.readSourcePages === false ||
+          officialPageBudget <= 0 ||
+          readOfficialUrls.has(website)
+        )
+          return;
+        readOfficialUrls.add(website);
+        const pageLimit = Math.min(maximumPages, officialPageBudget);
+        officialPageBudget -= pageLimit;
+        const pages = await readOfficialSite(
+          website,
+          signal,
+          fetcher,
+          pageLimit,
+        );
+        const subject = input.selectedSubject;
+        for (const link of pages.flatMap((page) => page.branchLinks ?? [])) {
+          if (
+            matchesSelectedBranch(
+              `${link.name} ${link.address}`,
+              subject.transientName,
+              subject.transientAddress,
+              subject.ownerQuery,
+              link.address,
+              undefined,
+              link.name,
+            )
+          )
+            await readJapaneseOfficialPage(link.url, 1);
+        }
+        const branchPages = pages.filter((page) =>
+          matchesSelectedBranch(
+            page.content,
+            subject.transientName,
+            subject.transientAddress,
+            subject.ownerQuery,
+          ),
+        );
+        evidence.push(...branchPages);
+        for (const page of branchPages)
+          if (page.operatingHours)
+            officialSchedule = {
+              value: page.operatingHours,
+              sourceUrl: page.url,
+            };
+        const declared = branchPages.flatMap((page) =>
+          page.bookingLinks.map((link) => ({ ...link, sourceUrl: page.url })),
+        );
+        const uniqueLinks = [
+          ...new Map(declared.map((link) => [link.url, link])).values(),
+        ];
+        if (uniqueLinks.length === 1) {
+          officialBookingLink = {
+            value: uniqueLinks[0].url,
+            sourceUrl: uniqueLinks[0].sourceUrl,
+          };
+          diagnostic('official_booking_link_verified');
+        }
+        await readSelectedBookingPage(
+          declared.map((link) => ({
+            title: 'Official booking link',
+            content: '',
+            url: link.url,
+          })),
+        );
+        if (branchPages.length)
+          messages.push({
+            role: 'user',
+            content: JSON.stringify({ discoveredOfficialSources: branchPages }),
+          });
+      };
+      const readDiscoveredOfficialPages = async (sources: SearchEvidence[]) => {
+        const listing = evidence.find(
+          (source) =>
+            source.restaurant?.officialWebsite &&
+            matchesSelectedBranch(
+              `${source.restaurant.name} ${source.restaurant.address}`,
+              input.selectedSubject.transientName,
+              input.selectedSubject.transientAddress,
+              input.selectedSubject.ownerQuery,
+              source.restaurant.address,
+              source.restaurant.postalCode,
+              source.restaurant.name,
+            ),
+        );
+        if (!listing?.restaurant?.officialWebsite) return;
+        for (const source of sources)
+          if (sameOrigin(source.url, listing.restaurant.officialWebsite))
+            await readJapaneseOfficialPage(source.url, 1);
+      };
       const verifiedListingFallback = () => {
         const selected = input.selectedSubject;
         const listing = evidence.find(
@@ -277,6 +402,8 @@ export function createPlaceResearchAgent(
           'coordinates',
           'categories',
           'officialWebsite',
+          'openingHours',
+          'regularClosingDays',
         ] as const) {
           const value = details[field];
           if (value !== undefined && (!Array.isArray(value) || value.length))
@@ -299,6 +426,16 @@ export function createPlaceResearchAgent(
           profile.summary = {
             value: summary,
             sourceUrl: listing.url,
+            observedAt,
+          };
+        if (officialSchedule)
+          profile.openingHours = { ...officialSchedule, observedAt };
+        if (officialBookingLink)
+          profile.bookingLink = { ...officialBookingLink, observedAt };
+        if (bookingEvidence)
+          profile.bookingLink = {
+            value: bookingEvidence.url,
+            sourceUrl: bookingEvidence.url,
             observedAt,
           };
         const policy = details.reservation;
@@ -451,6 +588,15 @@ export function createPlaceResearchAgent(
           readUrls.add(selectedListing);
           if (page) {
             evidence.push(page);
+            if (page.restaurant?.bookingLink)
+              await readSelectedBookingPage([
+                {
+                  url: page.restaurant.bookingLink,
+                  title: page.title,
+                  content: page.content,
+                },
+                page,
+              ]);
             successfulSearches++;
             messages.push({
               role: 'user',
@@ -483,6 +629,7 @@ export function createPlaceResearchAgent(
             successfulSearches++;
             await readSelectedListing(result.sources);
             await readSelectedBookingPage(result.sources);
+            await readDiscoveredOfficialPages(result.sources);
             evidence.push(...result.sources);
           }
           messages.push({
@@ -496,16 +643,37 @@ export function createPlaceResearchAgent(
             }),
           });
         }
+        if (region === 'japan' && config.readSourcePages !== false) {
+          const subject = input.selectedSubject;
+          const listing = evidence.find(
+            (source) =>
+              source.restaurant?.officialWebsite &&
+              matchesSelectedBranch(
+                `${source.restaurant.name} ${source.restaurant.address}`,
+                subject.transientName,
+                subject.transientAddress,
+                subject.ownerQuery,
+                source.restaurant.address,
+                source.restaurant.postalCode,
+                source.restaurant.name,
+              ),
+          );
+          if (listing?.restaurant?.officialWebsite)
+            await readJapaneseOfficialPage(
+              listing.restaurant.officialWebsite,
+              2,
+            );
+        }
         // A branch-matched listing can name its booking provider without
         // giving the booking URL. Spend the remaining search on that provider
         // so a generic model query cannot miss the primary booking rules.
         const bookingSearchListing = evidence.find(
           (source) =>
-            (source.restaurant?.bookingProviderHint === 'tablecheck' ||
-              (/完全予約制|予約必須|要予約/u.test(
+            source.restaurant &&
+            (source.restaurant.bookingProviderHint ||
+              /予約可|完全予約制|予約必須|要予約/u.test(
                 source.restaurant?.reservation ?? '',
-              ) &&
-                source.restaurant?.officialWebsite)) &&
+              )) &&
             matchesSelectedBranch(
               `${source.restaurant.name} ${source.restaurant.aliases?.join(' ') ?? ''} ${source.restaurant.address}`,
               input.selectedSubject.transientName,
@@ -524,11 +692,19 @@ export function createPlaceResearchAgent(
           searches++;
           // The listing already fixed the branch; adding its long address can
           // crowd the merchant page out of a three-result booking search.
-          const query = `${bookingSearchListing.restaurant.name} TableCheck reservation 予約`;
+          const providerHint =
+            bookingSearchListing.restaurant.bookingProviderHint;
+          const query =
+            providerHint === 'tablecheck'
+              ? `${bookingSearchListing.restaurant.name} TableCheck site:tablecheck.com 予約`
+              : providerHint === 'toreta'
+                ? `${bookingSearchListing.restaurant.name} Toreta site:yoyaku.toreta.in 予約`
+                : `${bookingSearchListing.restaurant.name} ${bookingSearchListing.restaurant.area} reservation 公式 予約`;
           const result = await searchProvider.search(query, signal);
           if (result.kind === 'results') {
             successfulSearches++;
             await readSelectedBookingPage(result.sources);
+            await readDiscoveredOfficialPages(result.sources);
             evidence.push(...result.sources);
           }
           messages.push({
@@ -625,6 +801,7 @@ export function createPlaceResearchAgent(
                 if (config.readSourcePages !== false) {
                   await readSelectedListing(result.sources);
                   await readSelectedBookingPage(result.sources);
+                  await readDiscoveredOfficialPages(result.sources);
                 }
                 evidence.push(...result.sources);
               }
@@ -763,6 +940,8 @@ export function createPlaceResearchAgent(
             'officialWebsite',
             'bookingLink',
             'googleRating',
+            'openingHours',
+            'regularClosingDays',
           ]) {
             const claim = proposal.profile?.[field];
             const proof =
@@ -774,6 +953,13 @@ export function createPlaceResearchAgent(
             // identity quote; this exemption never applies to another source.
             const verifiedListingProof =
               matchedListing && proof?.url === matchedListing.url;
+            // Business-row facts come from the structured reader. A model quote
+            // elsewhere in the listing cannot turn seasonal notes into a rest day.
+            if (
+              verifiedListingProof &&
+              (field === 'openingHours' || field === 'regularClosingDays')
+            )
+              continue;
             if (field === 'categories' && claim !== undefined) {
               diagnostic(
                 !supported(proof, evidence)
@@ -811,6 +997,45 @@ export function createPlaceResearchAgent(
                   evidence,
                   input.selectedSubject,
                 ))
+            )
+              continue;
+            if (field === 'bookingLink') {
+              // A policy row's source is not a booking destination. Reader-verified
+              // providers or an explicit booking anchor from a verified official
+              // origin are the only actionable links.
+              const officialOrigin =
+                matchedListing?.restaurant?.officialWebsite;
+              const officialSource =
+                (officialOrigin && sameOrigin(proof.url, officialOrigin)) ||
+                (region === 'overseas' &&
+                  evidence.some(
+                    (source) =>
+                      source.url === proof.url &&
+                      source.content.includes(`Page URL: ${proof.url}`),
+                  ));
+              const explicitAnchor =
+                typeof claim === 'string' &&
+                new RegExp(
+                  `(?:reservations?|reserve now|book a table|book now|booking|予約)[^\\n]{0,100}: ${escapePattern(claim)}`,
+                  'iu',
+                ).test(proof.quote);
+              if (
+                !(
+                  bookingEvidence?.url === claim ||
+                  (officialSource && explicitAnchor)
+                )
+              ) {
+                diagnostic('booking_link_rejected_destination');
+                continue;
+              }
+            }
+            if (
+              field === 'officialWebsite' &&
+              typeof claim === 'string' &&
+              claim !== matchedListing?.restaurant?.officialWebsite &&
+              !/official(?: website)?|ホームページ|公式サイト/iu.test(
+                proof.quote,
+              )
             )
               continue;
             // Exact factual values must occur in evidence; only a description may paraphrase.
@@ -895,11 +1120,23 @@ export function createPlaceResearchAgent(
               'coordinates',
               'categories',
               'officialWebsite',
+              'openingHours',
+              'regularClosingDays',
             ] as const) {
               const value = details[field];
               if (
                 value !== undefined &&
-                (!Array.isArray(value) || value.length)
+                (!Array.isArray(value) || value.length) &&
+                !(
+                  (field === 'openingHours' ||
+                    field === 'regularClosingDays') &&
+                  profile[field] &&
+                  details.officialWebsite &&
+                  sameOrigin(
+                    (profile[field] as { sourceUrl: string }).sourceUrl,
+                    details.officialWebsite,
+                  )
+                )
               )
                 profile[field] = { value, sourceUrl, observedAt };
             }
@@ -939,7 +1176,16 @@ export function createPlaceResearchAgent(
                 };
             }
           }
+          if (officialSchedule)
+            profile.openingHours = { ...officialSchedule, observedAt };
+          if (officialBookingLink)
+            profile.bookingLink = { ...officialBookingLink, observedAt };
           if (bookingEvidence) {
+            profile.bookingLink = {
+              value: bookingEvidence.url,
+              sourceUrl: bookingEvidence.url,
+              observedAt,
+            };
             const corroboratedPolicy =
               reservation.status === 'known' &&
               reservation.mode !== 'not_reservable'
@@ -1453,7 +1699,13 @@ function matchesSelectedBranch(
     address.normalize('NFKC').match(/[\p{Script=Han}ぁ-んァ-ヶ]+[区市郡]/gu) ??
     [];
   if (locality.length)
-    return locality.some((part) => addressText.includes(normalize(part)));
+    return locality.some((part) =>
+      addressText.includes(
+        normalize(
+          part.replace(/^(?:東京都|北海道|京都府|大阪府|.{2,3}県)/u, ''),
+        ),
+      ),
+    );
   return Object.entries(aliasesByLocality).some(
     ([latin, japanese]) =>
       latinAddress.includes(latin) &&
@@ -1506,4 +1758,15 @@ async function readJson(
     offset += chunk.byteLength;
   }
   return JSON.parse(new TextDecoder().decode(body));
+}
+
+function sameOrigin(left: string, right: string): boolean {
+  try {
+    return new URL(left).origin === new URL(right).origin;
+  } catch {
+    return false;
+  }
+}
+function escapePattern(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }

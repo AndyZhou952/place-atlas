@@ -13,7 +13,7 @@ npm run benchmark:place-resolution
 npm run benchmark:place-enrichment
 ```
 
-`benchmark` runs every offline suite. The two scorer commands use example predictions to verify the scoring contract, not a model's quality. Enrichment generates its scorer example from gold rather than storing another full duplicate dataset. `npm test --prefix apps/web` runs application tests followed by all benchmarks; CI uses the same command.
+`benchmark` runs every offline suite. The two scorer commands use example predictions to verify the scoring contract, not a model's quality. Resolution and enrichment generate scorer examples from gold rather than storing duplicate answer files. `npm test --prefix apps/web` runs application tests followed by all benchmarks; CI uses the same command.
 
 | Suite               | What it measures                                                                                     | Evidence and gate                                                                                   |
 | ------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -41,6 +41,7 @@ Live runs are opt-in and can incur provider usage. Use an authorized test deploy
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `place-resolution/run-live-discovery.mjs` | `ALLOW_ADD_LIVE_EVAL=yes`, `ATLAS_BASE_URL`, `OWNER_TEST_PASSWORD`                                             | Discover, independently score identity, cancel transient sessions; no publication         |
 | `place-enrichment/run-live-rating.mjs`    | Same deployment configuration                                                                                  | Discover/select/research and cancel; rating evidence only, no publication                 |
+| `add-behavior/run-browser-add.mjs`        | Local `ATLAS_BASE_URL`, installed Playwright or `PLAYWRIGHT_MODULE`                                            | Controlled current UI across desktop/mobile; every API request is intercepted             |
 | `add-behavior/run-live-add.mjs`           | `ATLAS_ADD_AGENT_URL` for `/api/agent/catalog-intake`, `ATLAS_ADD_AGENT_TOKEN` or `ATLAS_ADD_AGENT_TOKEN_FILE` | Discover/select and check independently specified facts, then cancel; never confirm       |
 | `run-add-enrichment.mjs`                  | `AGENT_API_KEY`, `AGENT_BASE_URL`, `AGENT_MODEL`                                                               | Experimental frozen-evidence extraction prompt; distinct from production Add              |
 | `recommend/run-live-intent-harness.mjs`   | Model configuration above                                                                                      | Production intent interpreter against fixed cases                                         |

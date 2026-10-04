@@ -1,3 +1,4 @@
+import { toD1 } from '../../../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
@@ -709,41 +710,4 @@ function insertConflictingTerminal(sqlite, session) {
       Date.parse(terminal.retainUntil),
       JSON.stringify(terminal),
     );
-}
-
-function toD1(database) {
-  function prepare(sql) {
-    let values = [];
-    return {
-      bind(...next) {
-        values = next;
-        return this;
-      },
-      async run() {
-        const result = database.prepare(sql).run(...values);
-        return { success: true, meta: { changes: result.changes } };
-      },
-      async first() {
-        return database.prepare(sql).get(...values) ?? null;
-      },
-      async all() {
-        return { results: database.prepare(sql).all(...values) };
-      },
-    };
-  }
-  return {
-    prepare,
-    async batch(statements) {
-      database.exec('BEGIN IMMEDIATE');
-      try {
-        const results = [];
-        for (const statement of statements) results.push(await statement.run());
-        database.exec('COMMIT');
-        return results;
-      } catch (error) {
-        database.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
 }

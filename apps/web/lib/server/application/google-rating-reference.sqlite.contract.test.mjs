@@ -1,3 +1,4 @@
+import { toD1 } from '../../../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -245,43 +246,3 @@ test('reference and receipt roll back together when the receipt commit fails', a
   );
   sqlite.close();
 });
-
-function toD1(database) {
-  function prepare(sql) {
-    return bindable(sql, []);
-  }
-  function bindable(sql, values) {
-    return {
-      _run() {
-        const result = database.prepare(sql).run(...values);
-        return { meta: { changes: result.changes }, results: [] };
-      },
-      bind(...nextValues) {
-        return bindable(sql, nextValues);
-      },
-      async run() {
-        return this._run();
-      },
-      async first() {
-        return database.prepare(sql).get(...values) ?? null;
-      },
-      async all() {
-        return { results: database.prepare(sql).all(...values) };
-      },
-    };
-  }
-  return {
-    prepare,
-    async batch(statements) {
-      database.exec('BEGIN IMMEDIATE');
-      try {
-        const results = statements.map((statement) => statement._run());
-        database.exec('COMMIT');
-        return results;
-      } catch (error) {
-        database.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
-}

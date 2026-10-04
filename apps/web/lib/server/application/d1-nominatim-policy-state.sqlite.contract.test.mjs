@@ -1,3 +1,4 @@
+import { toD1 } from '../../../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
@@ -113,24 +114,3 @@ test('D1 Nominatim cache expires stale values and scheduled cleanup removes reta
     0,
   );
 });
-
-function toD1(database) {
-  return {
-    prepare(sql) {
-      let values = [];
-      return {
-        bind(...next) {
-          values = next;
-          return this;
-        },
-        async run() {
-          const result = database.prepare(sql).run(...values);
-          return { success: true, meta: { changes: result.changes } };
-        },
-        async first() {
-          return database.prepare(sql).get(...values) ?? null;
-        },
-      };
-    },
-  };
-}

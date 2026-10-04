@@ -1,7 +1,6 @@
 {
   "datasetId": "selected-place-research-regressions.v1",
   "stage": "Research after the user has selected a provider candidate; not name-resolution accuracy",
-  "incident": "2026-09-26 frontend tonkatsu keita returned an all-unknown preview",
   "selectedSubject": {
     "ownerQuery": "tonkatsu keita",
     "providerNamespace": "google-places",

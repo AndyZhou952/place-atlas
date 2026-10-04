@@ -1,3 +1,4 @@
+import { toD1 } from '../../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
@@ -228,27 +229,4 @@ function insertVisit(database, id, itemId, visitedAt) {
       ) VALUES (?, ?, ?, ?, NULL, ?, ?)`,
     )
     .run(id, itemId, itemId, visitedAt, visitedAt, visitedAt);
-}
-
-function toD1(database) {
-  return {
-    prepare(sql) {
-      const statement = database.prepare(sql);
-      return {
-        async all() {
-          return { results: statement.all() };
-        },
-        bind(...values) {
-          return {
-            async all() {
-              return { results: statement.all(...values) };
-            },
-            async first() {
-              return statement.get(...values) ?? null;
-            },
-          };
-        },
-      };
-    },
-  };
 }

@@ -1,3 +1,4 @@
+import { toD1 } from '../../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
@@ -142,24 +143,4 @@ function reserve(usage, sku, units, hardUnitLimit) {
     hardUnitLimit,
     hardCostLimitUsd: 1000,
   });
-}
-
-function toD1(database) {
-  return {
-    prepare(sql) {
-      const statement = database.prepare(sql);
-      return {
-        bind(...values) {
-          return {
-            async run() {
-              return { meta: { changes: statement.run(...values).changes } };
-            },
-            async first() {
-              return statement.get(...values) ?? null;
-            },
-          };
-        },
-      };
-    },
-  };
 }

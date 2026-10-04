@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { runScorerCli } from '../scorer-cli.mjs';
 
 function supportedReasonFact(fact, item, input, routeClaim) {
   if (!fact || typeof fact !== 'object' || Array.isArray(fact)) return false;
@@ -271,18 +270,8 @@ export function scoreRecommendDecision(dataset, predictionFile) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-  try {
-    const [goldPath, predictionsPath] = process.argv.slice(2);
-    if (!goldPath || !predictionsPath)
-      throw new Error('Usage: node score-decision.mjs GOLD PREDICTIONS');
-    const report = scoreRecommendDecision(
-      JSON.parse(await readFile(goldPath, 'utf8')),
-      JSON.parse(await readFile(predictionsPath, 'utf8')),
-    );
-    console.log(JSON.stringify(report, null, 2));
-    process.exitCode = report.passes ? 0 : 1;
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 2;
-  }
+await runScorerCli(
+  import.meta.url,
+  scoreRecommendDecision,
+  'Usage: node score-decision.mjs GOLD PREDICTIONS',
+);

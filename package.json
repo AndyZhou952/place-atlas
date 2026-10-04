@@ -9,7 +9,7 @@
     "benchmark": "node --experimental-strip-types --test benchmarks/*.test.mjs benchmarks/*/*.test.mjs",
     "benchmark:add": "node --experimental-strip-types --test benchmarks/add-behavior/*.test.mjs apps/web/product/application/catalog-intake/catalog-intake-operations.contract.test.mjs",
     "benchmark:add-live": "node benchmarks/add-behavior/run-live-add.mjs",
-    "benchmark:place-resolution": "node benchmarks/place-resolution/score-place-resolution.mjs benchmarks/place-resolution/place-resolution-gold.v1.json benchmarks/place-resolution/place-resolution-predictions.example.v1.json",
+    "benchmark:place-resolution": "node benchmarks/place-resolution/score-place-resolution.mjs benchmarks/place-resolution/place-resolution-gold.v1.json --example",
     "benchmark:place-enrichment": "node benchmarks/place-enrichment/score-place-enrichment.mjs benchmarks/place-enrichment/place-enrichment-gold.v1.json --example"
   }
 }

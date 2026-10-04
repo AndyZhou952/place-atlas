@@ -1,3 +1,4 @@
+import { toD1 } from '../test-support/d1.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
@@ -182,23 +183,3 @@ void test('D1 transit cap blocks the 251st paid request before provider egress',
     { request_count: 250, billable_units: 250, cost_micro_usd: 5000000 },
   );
 });
-
-function toD1(database) {
-  return {
-    prepare(sql) {
-      const statement = database.prepare(sql);
-      return {
-        bind(...values) {
-          return {
-            async run() {
-              return { meta: { changes: statement.run(...values).changes } };
-            },
-            async first() {
-              return statement.get(...values) ?? null;
-            },
-          };
-        },
-      };
-    },
-  };
-}

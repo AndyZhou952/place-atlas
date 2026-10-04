@@ -1,3 +1,4 @@
+import { exampleResolutionPredictions } from './example-predictions.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -17,9 +18,7 @@ async function readFixture(name) {
 
 test('the curated offline fixture passes every threshold', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const report = scorePlaceResolution(gold, predictions);
 
   assert.equal(report.counts.total, 40);
@@ -56,9 +55,7 @@ test('the curated offline fixture passes every threshold', async () => {
 
 test('an arbitrary chain branch selection is unsafe and fails the gate', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const unsafe = structuredClone(predictions);
   const prediction = unsafe.predictions.find(
     (entry) => entry.caseId === 'ambiguous-brand-torikizoku',
@@ -88,9 +85,7 @@ test('gold validation rejects unresolved cases that omit an explanation', async 
 
 test('a vague or mismatched follow-up fails the clarification UX gate', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const vague = structuredClone(predictions);
   const prediction = vague.predictions.find(
     (entry) => entry.caseId === 'ambiguous-starbucks-shibuya',
@@ -106,9 +101,7 @@ test('a vague or mismatched follow-up fails the clarification UX gate', async ()
 
 test('an empty candidate offer is rejected before it can score', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const emptyOffer = structuredClone(predictions);
   const prediction = emptyOffer.predictions.find(
     (entry) => entry.caseId === 'ambiguous-afuri-roppongi',
@@ -123,9 +116,7 @@ test('an empty candidate offer is rejected before it can score', async () => {
 
 test('invented candidate options fail clarification UX even when the count is valid', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const invented = structuredClone(predictions);
   const prediction = invented.predictions.find(
     (entry) => entry.caseId === 'ambiguous-afuri-roppongi',
@@ -143,9 +134,7 @@ test('invented candidate options fail clarification UX even when the count is va
 
 test('a verified candidate ID with a misleading label fails clarification UX', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const misleading = structuredClone(predictions);
   const prediction = misleading.predictions.find(
     (entry) => entry.caseId === 'ambiguous-afuri-roppongi',
@@ -161,9 +150,7 @@ test('a verified candidate ID with a misleading label fails clarification UX', a
 
 test('top-three recall counts the third provider candidate independently of selection', async () => {
   const gold = await readFixture('place-resolution-gold.v1.json');
-  const predictions = await readFixture(
-    'place-resolution-predictions.example.v1.json',
-  );
+  const predictions = exampleResolutionPredictions(gold);
   const changed = structuredClone(predictions);
   const testCase = gold.cases.find(
     (entry) => entry.gold.expectedAction === 'resolve',

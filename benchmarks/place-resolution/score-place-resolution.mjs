@@ -1,3 +1,4 @@
+import { exampleResolutionPredictions } from './example-predictions.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -556,10 +557,17 @@ async function main() {
       'Usage: node score-place-resolution.mjs <gold.json> <predictions.json>',
     );
   }
+  const gold = await readJson(goldPath);
   const report = scorePlaceResolution(
-    await readJson(goldPath),
-    await readJson(predictionPath),
+    gold,
+    predictionPath === '--example'
+      ? exampleResolutionPredictions(gold)
+      : await readJson(predictionPath),
   );
+  if (predictionPath === '--example') {
+    report.exampleOnly = true;
+    report.productAcceptance = false;
+  }
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (!report.passes) process.exitCode = 1;
 }

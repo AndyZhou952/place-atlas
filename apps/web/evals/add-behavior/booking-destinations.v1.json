@@ -1,27 +1,26 @@
 {
   "schemaVersion": 1,
-  "captureClass": "controlled_projection_of_independently_verified_pages",
-  "observedAt": "2026-10-04",
+  "captureClass": "synthetic_merchant_reader_cases",
   "cases": [
     {
-      "id": "rodeo",
-      "name": "RODEO",
-      "address": "東京都目黒区中目黒3-5-1",
-      "listingUrl": "https://tabelog.com/tokyo/A1317/A131701/13213575/",
-      "bookingUrl": "https://yoyaku.toreta.in/rodeo-nakameguro/#/",
-      "officialWebsite": "https://gf-restaurant.jp/rodeo",
-      "bookingHtml": "<title>RODEO | かんたんネット予約【公式】</title><h3 class=\"name\">RODEO</h3><p class=\"address\">目黒区中目黒3-5-1 中目黒プレアタワー1階</p><p>ご予約にあたってのお願い</p>",
+      "id": "toreta",
+      "name": "Fixture Kitchen",
+      "address": "東京都目黒区中目黒1-1-1",
+      "listingUrl": "https://tabelog.com/tokyo/A1317/A131701/13000001/",
+      "bookingUrl": "https://yoyaku.toreta.in/fixture-kitchen/#/",
+      "officialWebsite": "https://kitchen.example/",
+      "bookingHtml": "<title>Fixture Kitchen | かんたんネット予約【公式】</title><h3 class=\"name\">Fixture Kitchen</h3><p class=\"address\">東京都目黒区中目黒1-1-1</p><p>ご予約にあたってのお願い</p>",
       "policy": "予約可",
       "providerHint": null
     },
     {
-      "id": "shima",
-      "name": "らぁ麺や 嶋",
-      "address": "東京都渋谷区本町3-41-12",
-      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13247487/",
-      "bookingUrl": "https://www.tablecheck.com/ja/shops/ramenya-shima/reserve",
+      "id": "tablecheck",
+      "name": "Fixture Noodles",
+      "address": "東京都渋谷区本町2-2-2",
+      "listingUrl": "https://tabelog.com/tokyo/A1304/A130401/13000002/",
+      "bookingUrl": "https://www.tablecheck.com/ja/shops/fixture-noodles/reserve",
       "officialWebsite": null,
-      "bookingHtml": "<title>らぁ麺や 嶋 - TableCheck (テーブルチェック)</title><h3 class=\"panel-title\">らぁ麺や 嶋を予約する</h3><div class=\"reserveform-bookingpolicy-text\"><span class='markup-red'><span class='markup-underline'>来店日の前日午前8時より翌日分の予約を受付開始、各枠の1分前迄予約受付可能</span></span>です。\n<br/>例）10月1日来店分は、9月30日の午前8時よりご予約を受け付けます。\n<br/>\n<br/><span class='markup-bold'><span class='markup-underline'>＊予約ルール＊</span></span>\n<br/>1回のご予約で6名様迄同時にご予約可能です。\n<br/>\n<br/>※店頭に並んでのご案内は行っておりません。予めご予約の上ご来店ください。\n<br/>※キャンセル枠が発生した場合、再度予約が可能になります。\n<br/>\n<br/><span class='markup-red'>ご予約確定後のキャンセルはいかなる理由であっても、おひとり様2,000円(税込)のキャンセル料を予約手数料とは別に申し受けます。</span>\n<br/><span class='markup-underline'>日時/人数変更は、一度キャンセルをいただき新たにご予約いただきます</span>のでご予約確定前に内容を今一度ご確認ください。\n<br/>\n<br/><span class='markup-red'>スープの出汁に海老を使用しております。甲殻類（特に海老等）が苦手な方、アレルギーのある方は対応が難しいため、ご予約をお控えいただきますようお願いいたします。</span>\n<br/>\n<br/><span class='markup-bold'><span class='markup-underline'>＊ご来店当日＊</span></span>\n<br/>・ご予約時間が近くなりましたら全員揃ってお越しいただき、広がらず道路沿いに一列で並んでお待ちください。\n<br/>・ご予約時間に遅れた場合、キャンセル扱いとさせていただきます。\n<br/>・ご案内時間は、ご予約いただいたお時間から多少前後する場合がございますこと、予めご了承ください（お食事されるペースにより遅れる場合があります）\n<br/>・おひとり様につき必ずラーメン1杯の注文をお願いいたします（お子様も同様にお願いいたします）\n<br/>・連食をご希望の場合は、杯数分の予約確保をお願いします。\n<br/>・香水、オーデコロン等強い香りをまとってのご来店はご遠慮いただけますようお願い申し上げます。ご同伴者様にも必ずお伝えください。\n<br/>・一部、トッピングで海老ワンタンを使用しているメニューがございます。苦手な方はご注文時にお申し出ください。\n<br/>\n<br/><span class='markup-bold'><span class='markup-underline'>＊お支払いについて＊</span></span>\n<br/><span class='markup-red'>当日のお支払いは現金のみの対応となります。</span>\n<br/>\n<br/>ご不明な点がございましたらInstagramのダイレクトメッセージより受け付けます。\n<br/>→<span class='markup-bold'><a href='https://www.instagram.com/ramenya_shima/' class='markup-a' target='_blank'>Instagram</a></span>\n<br/>※Instagramでの新規ご予約やキャンセルはできません。また営業時間中は確認ができません。</div><div class=\"col-xs-10 resreview-sidebar-content\">〒151-0071 東京都渋谷区本町3-41-12</div>",
+      "bookingHtml": "<title>Fixture Noodles - TableCheck</title><h3 class=\"panel-title\">Fixture Noodlesを予約する</h3><div class=\"reserveform-bookingpolicy-text\">来店日の前日午前8時より翌日分の予約を受付開始。※店頭に並んでのご案内は行っておりません。予めご予約の上ご来店ください。</div><div class=\"col-xs-10 resreview-sidebar-content\">〒000-0000 東京都渋谷区本町2-2-2</div>",
       "policy": "完全予約制",
       "providerHint": "tablecheck"
     }

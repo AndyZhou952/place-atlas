@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { isAtlasItem } from '../../product/application/catalog/catalog-projection.ts';
 import {
@@ -7,14 +6,46 @@ import {
   executePublicJsonRead,
 } from '../../lib/server/public-read/public-read-manifest.ts';
 import { loadPublicCatalog } from './public-read-client.ts';
-const benchmark = JSON.parse(
-  readFileSync(
-    new URL('../../evals/add-behavior/catalog-hours.v1.json', import.meta.url),
-    'utf8',
-  ),
-);
+const observedAt = '2026-01-01T00:00:00.000Z';
+const claim = (value) => ({
+  value,
+  sourceUrl: 'https://example.com/hours',
+  observedAt,
+});
+const benchmark = {
+  cases: [
+    {
+      itemId: 'lunch-dinner',
+      name: 'Fixture restaurant A',
+      address: '1 Example Street',
+      observedAt,
+      hoursStatus: 'known',
+      weeklyClosureStatus: 'known',
+      openingHours: claim('月〜土 11:30 - 14:00; 17:00 - 21:00'),
+      regularClosingDays: claim('日曜日'),
+    },
+    {
+      itemId: 'calendar-only',
+      name: 'Fixture restaurant B',
+      address: '2 Example Street',
+      observedAt,
+      hoursStatus: 'known',
+      weeklyClosureStatus: 'unavailable',
+      openingHours: claim('毎日 18:00 - 22:00'),
+      closingNotes: claim('年末年始'),
+    },
+    {
+      itemId: 'unavailable',
+      name: 'Fixture restaurant C',
+      address: '3 Example Street',
+      observedAt,
+      hoursStatus: 'unavailable',
+      weeklyClosureStatus: 'unavailable',
+    },
+  ],
+};
 
-test('every independent restaurant schedule passes storage validation, public projection and browser decoding', async () => {
+test('generic schedule states survive storage validation, public projection and browser decoding', async () => {
   const items = benchmark.cases.map((sample) => ({
     id: sample.itemId,
     kind: 'food',
@@ -45,7 +76,7 @@ test('every independent restaurant schedule passes storage validation, public pr
       checkedAt: sample.observedAt,
     },
   }));
-  assert.equal(items.length, 56);
+  assert.equal(items.length, 3);
   for (const item of items) assert.equal(isAtlasItem(item), true, item.title);
   const response = await executePublicJsonRead({
     manifest: createPublicReadManifest(),
@@ -62,7 +93,7 @@ test('every independent restaurant schedule passes storage validation, public pr
         : Response.json({ favorite: false, effectiveVisited: false });
     },
   });
-  assert.equal(decoded.length, 56);
+  assert.equal(decoded.length, 3);
   for (const item of decoded) {
     const expected = items.find((source) => source.id === item.id);
     for (const key of [

@@ -14,7 +14,6 @@ export interface TabelogEvidence extends SearchEvidence {
     reservation?: string;
     bookingProviderHint?: 'tablecheck' | 'toreta';
     bookingLink?: string;
-    officialAccounts?: string[];
     openingHours?: string;
     regularClosingDays?: string;
     closingNotes?: string;
@@ -324,6 +323,8 @@ export function parseTabelogListing(
         (line) =>
           /定休日|定休/u.test(line) &&
           /祝日|祝祭日/u.test(line) &&
+          /場合|振替|翌|除く|除外|営業/u.test(line) &&
+          !/\d{1,2}:\d{2}/u.test(line) &&
           !line.startsWith('■'),
       )
     : [];
@@ -370,11 +371,6 @@ export function parseTabelogListing(
   const officialRow = row('ホームページ');
   const website =
     officialRow && /href=["'](https:\/\/[^"']+)["']/iu.exec(officialRow)?.[1];
-  const officialAccounts = [
-    ...(row('公式アカウント') ?? '').matchAll(
-      /href=["'](https:\/\/[^"']+)["']/giu,
-    ),
-  ].map((match) => clean(match[1]));
   // Only restaurant-info rows can declare a destination; reviews and ads cannot.
   const bookingLinks = [
     ...`${row('予約可否') ?? ''} ${row('備考') ?? ''}`.matchAll(
@@ -418,7 +414,6 @@ export function parseTabelogListing(
       ? { bookingProviderHint: 'tablecheck' as const }
       : {}),
     ...(bookingLink ? { bookingLink } : {}),
-    ...(officialAccounts.length ? { officialAccounts } : {}),
     ...(/トレタ|toreta/iu.test(remarks + reservation)
       ? { bookingProviderHint: 'toreta' as const }
       : {}),

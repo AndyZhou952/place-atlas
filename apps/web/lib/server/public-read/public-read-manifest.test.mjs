@@ -262,7 +262,7 @@ void test('verified booking destination replaces the Tabelog policy URL in publi
     reservation: {
       mode: 'advance',
       label: '完全予約制',
-      url: 'https://yoyaku.toreta.in/rodeo-nakameguro/#/',
+      url: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
       checkedAt: '2026-10-04T00:00:00.000Z',
     },
     tabelog: {
@@ -275,7 +275,7 @@ void test('verified booking destination replaces the Tabelog policy URL in publi
     intakeEvidence: {
       profile: {
         bookingLink: {
-          value: 'https://yoyaku.toreta.in/rodeo-nakameguro/#/',
+          value: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
           sourceUrl: 'https://official.example/reserve',
           observedAt: '2026-10-04T00:00:00.000Z',
         },
@@ -302,7 +302,7 @@ void test('verified booking destination replaces the Tabelog policy URL in publi
 
   assert.equal(
     projected.reservation.url,
-    'https://yoyaku.toreta.in/rodeo-nakameguro/#/',
+    'https://yoyaku.toreta.in/fixture-kitchen/#/',
   );
   assert.deepEqual(
     projected.sources.filter((source) => source.role === 'reservation'),
@@ -310,7 +310,7 @@ void test('verified booking destination replaces the Tabelog policy URL in publi
       {
         role: 'reservation',
         label: 'Booking',
-        url: 'https://yoyaku.toreta.in/rodeo-nakameguro/#/',
+        url: 'https://yoyaku.toreta.in/fixture-kitchen/#/',
       },
     ],
   );

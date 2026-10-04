@@ -4,25 +4,25 @@ import test from 'node:test';
 import { createPlaceResearchAgent } from './place-research.ts';
 
 const japanSubject = {
-  ownerQuery: '焼鳥 にしき 湯島',
+  ownerQuery: '検証用焼鳥 湯島',
   providerNamespace: 'google-places',
   placeId: 'google-yushima-branch',
-  transientName: '焼鳥 にしき',
+  transientName: '検証用焼鳥',
   transientAddress: '東京都文京区湯島3-36-12',
 };
 const selectedBranch = {
-  name: '焼鳥 にしき',
+  name: '検証用焼鳥',
   address: '東京都文京区湯島3-36-12 TSKビル 1F',
   area: '東京都文京区湯島',
   categories: ['焼き鳥'],
 };
-const listingUrl = 'https://tabelog.com/tokyo/A1311/A131101/13297763/';
+const listingUrl = 'https://tabelog.com/tokyo/A1311/A131101/13000003/';
 const modelTool = {
   id: 'search-listing',
   type: 'function',
   function: {
     name: 'search_web',
-    arguments: JSON.stringify({ query: '焼鳥 にしき 湯島 食べログ' }),
+    arguments: JSON.stringify({ query: '検証用焼鳥 湯島 食べログ' }),
   },
 };
 
@@ -58,8 +58,8 @@ test('Japan schedule fields come from the verified Tabelog row and skip Google',
 });
 
 test('Japan keeps schedules unknown when Tabelog omits them despite official and model claims', async () => {
-  const officialUrl = 'https://gonokamiseisakusho.com/shinjyuku.html';
-  const name = 'つけ麺 五ノ神製作所';
+  const officialUrl = 'https://noodles.example/selected';
+  const name = '検証用麺処';
   const address = '東京都渋谷区千駄ヶ谷5-33-16';
   const hours = '11:00～21:30(L.O 21:00)';
   const identityQuote = `${name} ${address}`;
@@ -118,16 +118,16 @@ test('Japan keeps schedules unknown when Tabelog omits them despite official and
 
 test('non-Japanese schedule fields come from the selected Google Maps place', async () => {
   const overseasSubject = {
-    ownerQuery: 'Burnt Ends Singapore',
+    ownerQuery: 'Fixture Grill Singapore',
     providerNamespace: 'google-places',
-    placeId: 'google-burnt-ends',
-    transientName: 'Burnt Ends',
-    transientAddress: '7 Dempsey Road, Singapore 249679',
+    placeId: 'google-fixture-grill',
+    transientName: 'Fixture Grill',
+    transientAddress: '1 Example Road, Singapore',
   };
   const schedule = {
-    name: 'Burnt Ends',
-    address: '7 Dempsey Road, Singapore 249679',
-    sourceUrl: 'https://maps.google.com/?cid=burnt-ends',
+    name: 'Fixture Grill',
+    address: '1 Example Road, Singapore',
+    sourceUrl: 'https://maps.google.com/?cid=fixture-grill',
     openingHours: 'Monday: 12:00–14:00, 18:00–22:00',
     regularClosingDays: 'Tuesday',
   };
@@ -157,16 +157,16 @@ test('non-Japanese schedule fields come from the selected Google Maps place', as
 
 test('Google schedule provider failure does not discard other verified overseas research', async () => {
   const overseasSubject = {
-    ownerQuery: 'Burnt Ends Singapore',
+    ownerQuery: 'Fixture Grill Singapore',
     providerNamespace: 'google-places',
-    placeId: 'google-burnt-ends',
-    transientName: 'Burnt Ends',
-    transientAddress: '7 Dempsey Road, Singapore 249679',
+    placeId: 'google-fixture-grill',
+    transientName: 'Fixture Grill',
+    transientAddress: '1 Example Road, Singapore',
   };
   const result = await research({
     selectedSubject: overseasSubject,
     listing: {
-      name: 'Burnt Ends',
+      name: 'Fixture Grill',
       address: overseasSubject.transientAddress,
       area: 'Singapore',
     },
@@ -177,7 +177,7 @@ test('Google schedule provider failure does not discard other verified overseas 
   });
 
   assert.equal(result.kind, 'observed');
-  assert.equal(result.value.profile.name.value, 'Burnt Ends');
+  assert.equal(result.value.profile.name.value, 'Fixture Grill');
   assert.equal(result.value.profile.openingHours, undefined);
 });
 

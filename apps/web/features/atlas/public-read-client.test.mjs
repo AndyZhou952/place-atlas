@@ -223,7 +223,7 @@ function intakeCatalogItem(id, evidence) {
 }
 
 void test('the browser loads a mixed catalog with policy-only reservations and sourced schedules', async () => {
-  const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13213575/';
+  const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13000001/';
   const observedAt = '2026-10-04T00:00:00.000Z';
   const facts = {
     tabelog: {

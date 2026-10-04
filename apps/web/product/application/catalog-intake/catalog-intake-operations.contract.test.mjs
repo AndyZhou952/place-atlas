@@ -1906,7 +1906,7 @@ test('catalog.intake.confirm rejects illegal Web research URL, time, range, prov
 });
 
 test('Toreta reservation URLs retain their canonical fragment while credentials remain forbidden', () => {
-  const bookingUrl = 'https://yoyaku.toreta.in/rodeo-nakameguro/#/';
+  const bookingUrl = 'https://yoyaku.toreta.in/fixture-kitchen/#/';
   const value = {
     tabelog: { status: 'unknown' },
     reservation: {
@@ -1933,7 +1933,7 @@ test('Toreta reservation URLs retain their canonical fragment while credentials 
         ...value,
         reservation: {
           ...value.reservation,
-          url: 'https://user:password@yoyaku.toreta.in/rodeo-nakameguro/#/',
+          url: 'https://user:password@yoyaku.toreta.in/fixture-kitchen/#/',
         },
       },
       preview,

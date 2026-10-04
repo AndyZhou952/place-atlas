@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { restaurantLinks } from './restaurant-links.ts';
 
-const tabelog = 'https://tabelog.com/tokyo/A1317/A131701/13213575/';
+const tabelog = 'https://tabelog.com/tokyo/A1317/A131701/13000001/';
 const item = {
   kind: 'food',
   tabelog: { url: tabelog },
@@ -26,8 +26,8 @@ test('policy-only restaurants keep one Tabelog destination without invented link
 });
 
 test('independent official and booking destinations retain the Toreta route', () => {
-  const official = 'https://gf-restaurant.jp/rodeo/nakameguro';
-  const booking = 'https://yoyaku.toreta.in/rodeo-nakameguro/#/';
+  const official = 'https://kitchen.example/selected';
+  const booking = 'https://yoyaku.toreta.in/fixture-kitchen/#/';
   assert.deepEqual(
     restaurantLinks({
       ...item,
@@ -74,7 +74,7 @@ test('ordinary section anchors do not create duplicate website buttons', () => {
 
 test('known Tabelog schedule provenance supplies the listing link when rating and source links are absent', () => {
   const scheduleListing = 'https://tabelog.com/tokyo/A1303/A130301/13292348/';
-  const official = 'https://recoco.cafe/';
+  const official = 'https://restaurant.example/';
   assert.deepEqual(
     restaurantLinks({
       kind: 'food',
@@ -100,7 +100,7 @@ test('known Tabelog schedule provenance supplies the listing link when rating an
 });
 
 test('schedule-link fallback rejects non-listing Tabelog URLs and unavailable claims', () => {
-  const official = 'https://recoco.cafe/';
+  const official = 'https://restaurant.example/';
   const base = {
     kind: 'food',
     officialUrl: official,

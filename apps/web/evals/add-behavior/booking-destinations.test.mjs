@@ -18,12 +18,12 @@ const { cases } = JSON.parse(
   ),
 );
 test('TableCheck follows only one language redirect for the same merchant', async () => {
-  const shima = cases.find((sample) => sample.id === 'shima');
-  const original = shima.bookingUrl.replace('/ja/shops/', '/shops/');
+  const merchant = cases.find((sample) => sample.id === 'tablecheck');
+  const original = merchant.bookingUrl.replace('/ja/shops/', '/shops/');
   for (const destination of [
-    shima.bookingUrl,
-    shima.bookingUrl.replace('ramenya-shima', 'another-shop'),
-    'https://other.example/shops/ramenya-shima/reserve',
+    merchant.bookingUrl,
+    merchant.bookingUrl.replace('fixture-noodles', 'another-shop'),
+    'https://other.example/shops/fixture-noodles/reserve',
   ]) {
     const calls = [];
     const result = await readTableCheckBookingPage(
@@ -36,7 +36,7 @@ test('TableCheck follows only one language redirect for the same merchant', asyn
               status: 302,
               headers: { location: destination },
             })
-          : new Response(shima.bookingHtml, {
+          : new Response(merchant.bookingHtml, {
               headers: { 'content-type': 'text/html' },
             });
       },
@@ -44,11 +44,11 @@ test('TableCheck follows only one language redirect for the same merchant', asyn
     );
     assert.equal(
       result.kind,
-      destination === shima.bookingUrl ? 'read' : 'invalid_source',
+      destination === merchant.bookingUrl ? 'read' : 'invalid_source',
     );
-    assert.equal(calls.length, destination === shima.bookingUrl ? 2 : 1);
+    assert.equal(calls.length, destination === merchant.bookingUrl ? 2 : 1);
     if (result.kind === 'read')
-      assert.equal(result.evidence.url, shima.bookingUrl);
+      assert.equal(result.evidence.url, merchant.bookingUrl);
   }
   let calls = 0;
   const loop = await readTableCheckBookingPage(
@@ -57,7 +57,7 @@ test('TableCheck follows only one language redirect for the same merchant', asyn
       calls++;
       return new Response(null, {
         status: 302,
-        headers: { location: shima.bookingUrl },
+        headers: { location: merchant.bookingUrl },
       });
     },
     new AbortController().signal,
@@ -115,7 +115,7 @@ for (const sample of cases) {
               ? new Response('', { status: 403 })
               : new Response(
                   model === 'wrong_branch'
-                    ? sample.bookingHtml.replace(/3-5-1|3-41-12/gu, '3-99-99')
+                    ? sample.bookingHtml.replace(/1-1-1|2-2-2/gu, '3-99-99')
                     : sample.bookingHtml,
                   { headers: { 'content-type': 'text/html' } },
                 );
@@ -166,7 +166,7 @@ for (const sample of cases) {
         result.value.profile.bookingLink.value,
         sample.listingUrl,
       );
-      if (sample.id === 'rodeo')
+      if (sample.id === 'toreta')
         assert.equal(result.value.reservation.bookingWindowLabel, undefined);
       if (model === 'listing_as_booking')
         assert.ok(codes.includes('booking_link_rejected_destination'));
@@ -174,7 +174,7 @@ for (const sample of cases) {
   }
   test(`${sample.id}: merchant reader extracts the branch address independently of timing`, () => {
     const parse =
-      sample.id === 'rodeo'
+      sample.id === 'toreta'
         ? parseToretaBookingPage
         : parseTableCheckBookingPage;
     const result = parse(sample.bookingHtml, sample.bookingUrl);
@@ -185,14 +185,14 @@ for (const sample of cases) {
 
 test('Toreta routes preserve fragments and reject credentials, other hosts and query URLs', () => {
   assert.equal(
-    canonicalToretaBookingUrl('https://yoyaku.toreta.in/rodeo-nakameguro'),
+    canonicalToretaBookingUrl('https://yoyaku.toreta.in/fixture-kitchen'),
     cases[0].bookingUrl,
   );
   for (const url of [
-    'http://yoyaku.toreta.in/rodeo-nakameguro/',
-    'https://yoyaku.toreta.in.evil.test/rodeo-nakameguro/',
-    'https://owner@yoyaku.toreta.in/rodeo-nakameguro/',
-    'https://yoyaku.toreta.in/rodeo-nakameguro/?token=x',
+    'http://yoyaku.toreta.in/fixture-kitchen/',
+    'https://yoyaku.toreta.in.evil.test/fixture-kitchen/',
+    'https://owner@yoyaku.toreta.in/fixture-kitchen/',
+    'https://yoyaku.toreta.in/fixture-kitchen/?token=x',
   ])
     assert.equal(canonicalToretaBookingUrl(url), undefined);
 });

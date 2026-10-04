@@ -1,6 +1,6 @@
 # Nearby benchmarks: policy and location seeds
 
-These retained restaurant recommendation seeds support Place Atlas evaluation; they are not a separate shipped Nearby interface or a framework/chat integration. Current application journeys are tracked in [Recommend](../recommend/README.md); broader boundaries are in [project scope](../../../../docs/project-scope.md).
+These retained restaurant recommendation seeds support Place Atlas evaluation; they are not a separate shipped Nearby interface or a framework/chat integration. Current application journeys are tracked in [Recommend](../recommend/README.md); broader boundaries are in [architecture](../../../../docs/architecture.md).
 
 `nearby-location-gold.v1.json` is a separate ten-case station-identity seed.
 Tokyo Metro's [Ikebukuro](https://www.tokyometro.jp/station/ikebukuro/index.html)

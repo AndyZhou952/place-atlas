@@ -6,7 +6,7 @@ import { createGooglePlaceRatingClient } from './google-places-new-client.ts';
 const placeId = 'ChIJ1234567890';
 const scheduleResponse = (overrides = {}) => ({
   id: placeId,
-  displayName: { text: '焼鳥 にしき' },
+  displayName: { text: '検証用焼鳥' },
   formattedAddress: '東京都文京区湯島3-36-12',
   googleMapsUri: 'https://maps.google.com/?cid=123456789',
   regularOpeningHours: {
@@ -42,7 +42,7 @@ test('Google operating schedule returns the exact place schedule and explicit cl
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.value, {
-    name: '焼鳥 にしき',
+    name: '検証用焼鳥',
     address: '東京都文京区湯島3-36-12',
     sourceUrl: 'https://maps.google.com/?cid=123456789',
     openingHours:

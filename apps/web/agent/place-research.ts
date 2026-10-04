@@ -420,6 +420,50 @@ export function createPlaceResearchAgent(
           diagnostic('google_operating_schedule_read');
         }
       }
+      const copyListingFacts = (
+        profile: Record<string, unknown>,
+        listing: TabelogEvidence,
+        observedAt: string,
+      ) => {
+        if (!listing.restaurant) return;
+        for (const field of [
+          'name',
+          'address',
+          'area',
+          'coordinates',
+          'categories',
+          'officialWebsite',
+          'openingHours',
+          'regularClosingDays',
+          'closingNotes',
+        ] as const) {
+          if (
+            region !== 'japan' &&
+            ['openingHours', 'regularClosingDays', 'closingNotes'].includes(
+              field,
+            )
+          )
+            continue;
+          const value = listing.restaurant[field];
+          if (value !== undefined && (!Array.isArray(value) || value.length))
+            profile[field] = { value, sourceUrl: listing.url, observedAt };
+        }
+      };
+      const copyGoogleSchedule = (
+        profile: Record<string, unknown>,
+        observedAt: string,
+      ) => {
+        if (region === 'japan' || !googleSchedule) return;
+        for (const field of ['openingHours', 'regularClosingDays'] as const) {
+          const value = googleSchedule[field];
+          if (value)
+            profile[field] = {
+              value,
+              sourceUrl: googleSchedule.sourceUrl,
+              observedAt,
+            };
+        }
+      };
       const verifiedListingFallback = () => {
         const selected = input.selectedSubject;
         const listing = evidence.find(
@@ -483,32 +527,7 @@ export function createPlaceResearchAgent(
         const details = listing.restaurant;
         const observedAt = new Date().toISOString();
         const profile: Record<string, unknown> = {};
-        for (const field of [
-          'name',
-          'address',
-          'area',
-          'coordinates',
-          'categories',
-          'officialWebsite',
-          'openingHours',
-          'regularClosingDays',
-          'closingNotes',
-        ] as const) {
-          if (
-            region !== 'japan' &&
-            ['openingHours', 'regularClosingDays', 'closingNotes'].includes(
-              field,
-            )
-          )
-            continue;
-          const value = details[field];
-          if (value !== undefined && (!Array.isArray(value) || value.length))
-            profile[field] = {
-              value,
-              sourceUrl: listing.url,
-              observedAt,
-            };
-        }
+        copyListingFacts(profile, listing, observedAt);
         for (const key of Object.keys(profile)) {
           if (!validateEnrichedProfile({ [key]: profile[key] }))
             delete profile[key];
@@ -524,19 +543,7 @@ export function createPlaceResearchAgent(
             sourceUrl: listing.url,
             observedAt,
           };
-        if (region !== 'japan' && googleSchedule) {
-          profile.openingHours = {
-            value: googleSchedule.openingHours,
-            sourceUrl: googleSchedule.sourceUrl,
-            observedAt,
-          };
-        }
-        if (region !== 'japan' && googleSchedule?.regularClosingDays)
-          profile.regularClosingDays = {
-            value: googleSchedule.regularClosingDays,
-            sourceUrl: googleSchedule.sourceUrl,
-            observedAt,
-          };
+        copyGoogleSchedule(profile, observedAt);
         if (officialBookingLink)
           profile.bookingLink = { ...officialBookingLink, observedAt };
         if (bookingEvidence)
@@ -1070,13 +1077,6 @@ export function createPlaceResearchAgent(
             // identity quote; this exemption never applies to another source.
             const verifiedListingProof =
               matchedListing && proof?.url === matchedListing.url;
-            // Business-row facts come from the structured reader. A model quote
-            // elsewhere in the listing cannot turn seasonal notes into a rest day.
-            if (
-              verifiedListingProof &&
-              (field === 'openingHours' || field === 'regularClosingDays')
-            )
-              continue;
             if (field === 'categories' && claim !== undefined) {
               diagnostic(
                 !supported(proof, evidence)
@@ -1230,31 +1230,7 @@ export function createPlaceResearchAgent(
           if (matchedListing?.restaurant) {
             const details = matchedListing.restaurant;
             const sourceUrl = matchedListing.url;
-            for (const field of [
-              'name',
-              'address',
-              'area',
-              'coordinates',
-              'categories',
-              'officialWebsite',
-              'openingHours',
-              'regularClosingDays',
-              'closingNotes',
-            ] as const) {
-              if (
-                region !== 'japan' &&
-                ['openingHours', 'regularClosingDays', 'closingNotes'].includes(
-                  field,
-                )
-              )
-                continue;
-              const value = details[field];
-              if (
-                value !== undefined &&
-                (!Array.isArray(value) || value.length)
-              )
-                profile[field] = { value, sourceUrl, observedAt };
-            }
+            copyListingFacts(profile, matchedListing, observedAt);
             if (region === 'japan' && details.score !== undefined) {
               tabelog = {
                 status: 'known',
@@ -1291,18 +1267,7 @@ export function createPlaceResearchAgent(
                 };
             }
           }
-          if (region !== 'japan' && googleSchedule)
-            profile.openingHours = {
-              value: googleSchedule.openingHours,
-              sourceUrl: googleSchedule.sourceUrl,
-              observedAt,
-            };
-          if (region !== 'japan' && googleSchedule?.regularClosingDays)
-            profile.regularClosingDays = {
-              value: googleSchedule.regularClosingDays,
-              sourceUrl: googleSchedule.sourceUrl,
-              observedAt,
-            };
+          copyGoogleSchedule(profile, observedAt);
           if (officialBookingLink)
             profile.bookingLink = { ...officialBookingLink, observedAt };
           if (bookingEvidence) {

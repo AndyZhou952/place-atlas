@@ -1,18 +1,37 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parseTabelogListing } from '../../agent/tabelog-listing.ts';
 import { createPlaceResearchAgent } from '../../agent/place-research.ts';
-import { scoreRestaurantHours } from './restaurant-hours-score.mjs';
 
-const captures = JSON.parse(
-  readFileSync(
-    new URL('./operating-hours-captures.v1.json', import.meta.url),
-    'utf8',
-  ),
-);
+const captures = {
+  cases: [
+    {
+      id: 'dinner-with-weekend-lunch',
+      name: 'Fixture Kitchen',
+      listingUrl: 'https://tabelog.com/tokyo/A1317/A131701/13000001/',
+      hoursRowHtml:
+        '<p class="rstinfo-table__business-title">月・火・水・木・金</p><ul><li>17:00 - 23:00</li></ul><p class="rstinfo-table__business-title">土・日・祝日</p><ul><li>12:00 - 14:00 L.O. 13:00</li><li>17:00 - 22:00</li></ul><div>■ 定休日<br>年末年始</div>',
+      expectedHoursIncludes: [
+        '17:00 - 23:00',
+        '12:00 - 14:00',
+        'L.O. 13:00',
+        '17:00 - 22:00',
+      ],
+      expectedClosingDays: null,
+    },
+    {
+      id: 'weekday-lunch',
+      name: 'Fixture Noodles',
+      listingUrl: 'https://tabelog.com/tokyo/A1317/A131701/13000002/',
+      hoursRowHtml:
+        '<p class="rstinfo-table__business-title">月・火・水・木・金</p><ul><li>08:15 - 14:30</li></ul><p class="rstinfo-table__business-title">土・日・祝日</p><ul><li>定休日</li></ul>',
+      expectedHoursIncludes: ['08:15 - 14:30'],
+      expectedClosingDays: '土・日・祝日',
+    },
+  ],
+};
 function page(sample, row = sample.hoursRowHtml) {
-  return `<script type="application/ld+json">${JSON.stringify({ '@type': 'Restaurant', '@id': sample.listingUrl, name: sample.name, address: { addressRegion: '東京都', addressLocality: '目黒区', streetAddress: '中目黒3-5-1' }, servesCuisine: 'イタリアン' })}</script><table><tr><th>営業時間</th><td>${row}</td></tr></table>`;
+  return `<script type="application/ld+json">${JSON.stringify({ '@type': 'Restaurant', '@id': sample.listingUrl, name: sample.name, address: { addressRegion: '東京都', addressLocality: '目黒区', streetAddress: '中目黒1-1-1' }, servesCuisine: 'イタリアン' })}</script><table><tr><th>営業時間</th><td>${row}</td></tr></table>`;
 }
 for (const sample of captures.cases) {
   test(`${sample.id}: hours preserve day differences, last order and explicit closures`, () => {
@@ -26,7 +45,8 @@ for (const sample of captures.cases) {
       parsed.regularClosingDays,
       sample.expectedClosingDays ?? undefined,
     );
-    if (sample.id === 'rodeo') assert.notEqual(parsed.regularClosingDays, '月');
+    if (sample.id === 'dinner-with-weekend-lunch')
+      assert.notEqual(parsed.regularClosingDays, '月');
   });
   test(`${sample.id}: verified business hours survive a model outage`, async () => {
     const listing = parseTabelogListing(page(sample), sample.listingUrl);
@@ -72,8 +92,10 @@ test('review claims and missing rows cannot invent operating hours or a weekly c
   assert.equal(parsed.regularClosingDays, undefined);
 });
 
-test('model cannot turn RODEO seasonal New Year closure into regularClosingDays', async () => {
-  const sample = captures.cases.find((entry) => entry.id === 'rodeo');
+test('model cannot turn a seasonal New Year closure into regularClosingDays', async () => {
+  const sample = captures.cases.find(
+    (entry) => entry.id === 'dinner-with-weekend-lunch',
+  );
   const listing = parseTabelogListing(page(sample), sample.listingUrl);
   const quote = listing.content.includes('年末年始') ? '年末年始' : '';
   assert.ok(quote, 'fixture listing includes the seasonal closure note');
@@ -126,10 +148,10 @@ test('model cannot turn RODEO seasonal New Year closure into regularClosingDays'
 });
 
 test('official group JSON-LD can guide branch navigation but never supplies Japanese schedule fields', async () => {
-  const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13213575/';
-  const groupUrl = 'https://gf-restaurant.example/';
-  const branchUrl = 'https://gf-restaurant.example/rodeo/nakameguro';
-  const branchAddress = '東京都目黒区中目黒3-5-1';
+  const listingUrl = 'https://tabelog.com/tokyo/A1317/A131701/13000001/';
+  const groupUrl = 'https://kitchen.example/';
+  const branchUrl = 'https://kitchen.example/selected';
+  const branchAddress = '東京都目黒区中目黒1-1-1';
   const schedule = [
     {
       dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -146,11 +168,11 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
     {
       '@type': 'Restaurant',
       url: branchUrl,
-      name: 'RODEO',
+      name: 'Fixture Kitchen',
       address: {
         addressRegion: '東京都',
         addressLocality: '目黒区',
-        streetAddress: '中目黒3-5-1',
+        streetAddress: '中目黒1-1-1',
       },
       // Directory records may contain fields, but those fields are not facts
       // until the referenced branch page has itself been fetched and matched.
@@ -158,8 +180,8 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
     },
     {
       '@type': 'Restaurant',
-      url: 'https://gf-restaurant.example/rodeo/shibuya',
-      name: 'RODEO',
+      url: 'https://kitchen.example/other',
+      name: 'Fixture Kitchen',
       address: {
         addressRegion: '東京都',
         addressLocality: '渋谷区',
@@ -170,13 +192,13 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
       ],
     },
   ];
-  const branchHtml = `<title>RODEO Nakameguro</title><p>Restaurant branch information.</p><script type="application/ld+json">${JSON.stringify({ '@type': 'Restaurant', url: branchUrl, name: 'RODEO', address: { addressRegion: '東京都', addressLocality: '目黒区', streetAddress: '中目黒3-5-1' }, openingHoursSpecification: schedule })}</script>`;
+  const branchHtml = `<title>Fixture Kitchen Nakameguro</title><p>Restaurant branch information.</p><script type="application/ld+json">${JSON.stringify({ '@type': 'Restaurant', url: branchUrl, name: 'Fixture Kitchen', address: { addressRegion: '東京都', addressLocality: '目黒区', streetAddress: '中目黒1-1-1' }, openingHoursSpecification: schedule })}</script>`;
   const listing = {
     url: listingUrl,
-    title: 'RODEO',
-    content: `RODEO ${branchAddress}`,
+    title: 'Fixture Kitchen',
+    content: `Fixture Kitchen ${branchAddress}`,
     restaurant: {
-      name: 'RODEO',
+      name: 'Fixture Kitchen',
       address: branchAddress,
       area: '目黒区',
       categories: ['イタリアン'],
@@ -210,7 +232,7 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
                 headers: { 'content-type': 'text/html' },
               });
         }
-        if (url === 'https://gf-restaurant.example/rodeo/shibuya') {
+        if (url === 'https://kitchen.example/other') {
           fetched.push(url);
           return new Response(branchHtml, {
             headers: { 'content-type': 'text/html' },
@@ -223,9 +245,9 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
       selectedSubject: {
         providerNamespace: 'tabelog',
         placeId: listingUrl,
-        transientName: 'RODEO',
+        transientName: 'Fixture Kitchen',
         transientAddress: branchAddress,
-        ownerQuery: 'RODEO Nakameguro',
+        ownerQuery: 'Fixture Kitchen Nakameguro',
       },
     });
     assert.equal(result.kind, 'observed', variant);
@@ -242,28 +264,55 @@ test('official group JSON-LD can guide branch navigation but never supplies Japa
   }
 });
 
-test('hours scorer accepts equivalent Tabelog flat text and gold day labels', () => {
-  const sample = JSON.parse(
-    readFileSync(
-      new URL('./restaurant-hours.v1.json', import.meta.url),
-      'utf8',
-    ),
-  ).cases.find((entry) => entry.id === 'ramenya-shima-hours');
-  const listing = parseTabelogListing(
-    page(captures.cases.find((entry) => entry.id === 'shima')),
-    sample.listingUrl,
+const first = captures.cases[0];
+const facts = (row, extra = '') =>
+  parseTabelogListing(page(first, row) + extra, first.listingUrl).restaurant;
+const faq = (text, url = first.listingUrl) =>
+  `<script type="application/ld+json">${JSON.stringify({ '@type': 'FAQPage', mainEntity: [{ name: '営業時間・定休日を教えてください', acceptedAnswer: { text: `${text} <a href="${url}">店舗情報</a>` } }] })}</script>`;
+
+test('sister-branch advertising cannot replace selected weekly rows or closure notes', () => {
+  const row =
+    '<p class="rstinfo-table__business-title">月〜土</p><ul><li>17:00 - 22:30</li></ul><p class="rstinfo-table__business-title">日</p><ul><li>定休日</li></ul><div class="rstinfo-table__business-other">別支店 東京都渋谷区神南1-1-1 12:00 - 14:30 ■ 定休日 火曜日 年末年始休業</div>';
+  const checked = facts(row);
+  assert.match(checked.openingHours, /17:00 - 22:30/u);
+  assert.doesNotMatch(checked.openingHours, /12:00|別支店/u);
+  assert.equal(checked.regularClosingDays, '日');
+  assert.equal(checked.closingNotes, undefined);
+});
+
+test('closure of a secondary facility keeps its scope', () => {
+  const checked = facts(
+    '月・火・水・木・金・土・日 10:00 - 18:00<br>2Fカフェサロン<br>■ 定休日<br>月曜日',
   );
-  const observed = {
-    openingHours: {
-      value: listing.restaurant.openingHours,
-      sourceUrl: sample.listingUrl,
-      observedAt: sample.openingHours.observedAt,
-    },
-    regularClosingDays: {
-      value: listing.restaurant.regularClosingDays,
-      sourceUrl: sample.listingUrl,
-      observedAt: sample.regularClosingDays.observedAt,
-    },
-  };
-  assert.equal(scoreRestaurantHours(sample, observed).pass, true);
+  assert.equal(checked.regularClosingDays, '2Fカフェサロン：月曜日');
+});
+
+test('same-listing FAQ can qualify bare hours but cannot change clocks or branch identity', () => {
+  const row = '11:00 - 20:00';
+  assert.match(facts(row, faq('[月]11:00 - 20:00')).openingHours, /\[月\]/u);
+  assert.equal(facts(row, faq('[月]11:00 - 21:00')).openingHours, row);
+  assert.equal(
+    facts(row, faq('[月]11:00 - 20:00', captures.cases[1].listingUrl))
+      .openingHours,
+    row,
+  );
+  assert.equal(facts(row).regularClosingDays, undefined);
+});
+
+test('structured days cannot be reassigned by a same-clock FAQ', () => {
+  const row =
+    '<p class="rstinfo-table__business-title">月</p><ul><li>11:00 - 20:00</li></ul><p class="rstinfo-table__business-title">火</p><ul><li>12:00 - 21:00</li></ul>';
+  const checked = facts(row, faq('[月]12:00 - 21:00 [火]11:00 - 20:00'));
+  assert.match(checked.openingHours, /月 11:00 - 20:00/u);
+  assert.match(checked.openingHours, /火 12:00 - 21:00/u);
+});
+
+test('an explicit holiday exception remains separate from weekly closed rows', () => {
+  const checked = facts(
+    captures.cases[1].hoursRowHtml + '<br>祝日の場合は翌日が定休日となります',
+  );
+  assert.equal(
+    checked.regularClosingDays,
+    '土・日・祝日 / 祝日の場合は翌日が定休日となります',
+  );
 });

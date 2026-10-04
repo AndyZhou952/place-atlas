@@ -20,9 +20,9 @@ The [0.1.0 release](https://github.com/AndyZhou952/place-atlas/releases/tag/0.1.
 | Agent and chat access | Scoped discover/select/confirm/cancel Add API and browser tools                                                         | Framework packages, chat adapters, pairing, conversational Visit/media workflows and live compatibility checks |
 | Other roadmap items   | Per-restaurant Google reference save/replacement                                                                        | Bulk reference replacement and an iOS client                                                                   |
 
-Post-release restaurant work on the current development branch adds verified official/alternative booking links, sourced hours and rest days, and a loading state for the real catalog. Japanese schedules use only the exact Tabelog listing; schedules elsewhere use the selected Google Maps place. These improvements are documented separately from the immutable 0.1.0 source tag in the [development status](docs/status.md) and [restaurant regression report](docs/restaurant-enrichment-regression.md).
+Post-release restaurant work on the current development branch adds verified official/alternative booking links, sourced hours and rest days, and a loading state for the real catalog. Japanese schedules use only the exact Tabelog listing; schedules elsewhere use the selected Google Maps place. These improvements are documented separately from the immutable 0.1.0 source tag in [development status](docs/status.md).
 
-See [project scope](docs/project-scope.md) for released, current and planned capabilities, and [architecture](docs/architecture.md) for application responsibilities and the planned integration boundary.
+See [architecture](docs/architecture.md) for released, current and planned capabilities, application responsibilities and the planned integration boundary.
 
 ## Who can use it?
 

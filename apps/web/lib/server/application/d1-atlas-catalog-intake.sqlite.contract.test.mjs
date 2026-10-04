@@ -117,7 +117,7 @@ test('complete researched profile survives D1 publication and public projection 
   });
   assert.deepEqual(projected.scheduleCheck, stored.scheduleCheck);
   const toreta = structuredClone(stored);
-  const toretaUrl = 'https://yoyaku.toreta.in/rodeo-nakameguro/#/';
+  const toretaUrl = 'https://yoyaku.toreta.in/fixture-kitchen/#/';
   toreta.intakeEvidence.reservation = {
     ...toreta.intakeEvidence.reservation,
     mode: 'reservable',

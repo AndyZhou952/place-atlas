@@ -1,6 +1,6 @@
 # Place-resolution benchmark v1
 
-This is a restaurant identity benchmark for Place Atlas, with a finite set of regional examples. It does not validate architecture/event intake or framework/chat integrations. See [project scope](../../../../docs/project-scope.md).
+This is a restaurant identity benchmark for Place Atlas, with a finite set of regional examples. It does not validate architecture/event intake or framework/chat integrations. See [architecture](../../../../docs/architecture.md).
 
 This package evaluates the first, deterministic part of Add: given the text a person supplied, should the system resolve one real restaurant branch, ask for clarification, or return no match?
 
@@ -25,7 +25,7 @@ The metadata, documentation, and runner output are English. Queries intentionall
 - `clarify`: the query is real but cannot safely identify one branch. The product should ask a focused follow-up or show two to three relevant candidates.
 - `no_match`: no supported identity was found. The product must not invent a place, address, rating, or provider identifier.
 
-Brand-only input such as `鳥貴族` is deliberately `clarify`. A resolver that silently chooses one store fails even if the selected store exists. A `clarify` result is only complete when it either asks a focused question for the required hint or offers two to three ranked candidates with readable labels.
+Ambiguous brand-only input is deliberately `clarify`. A resolver that silently chooses one store fails even if the selected store exists. A `clarify` result is only complete when it either asks a focused question for the required hint or offers two to three ranked candidates with readable labels.
 
 ## Run locally or in CI
 
@@ -64,8 +64,8 @@ The report also includes accuracy slices by input tag, such as `chinese`, `roman
 - Real identities were checked on 2026-09-25 against the source URL stored on each entity and case.
 - Nine cases specifically cover one- or two-name short messages. Five distinctive exact names resolve; four generic names or chain brands require a focused location follow-up. Each short resolve case carries a curation note explaining why the bare name is sufficient at the checked date.
 - Tabelog pages are used as identity evidence for several Japanese restaurants because they expose the canonical name, area, and address. The benchmark does not copy a rating or assume it is stable.
-- Official store locators are used to prove branch ambiguity for Torikizoku, AFURI, Starbucks Japan, and Ichiran.
-- Overseas cases use restaurant-owned pages where available. The Ho Lee Fook case uses the Michelin Guide because its current address is directly exposed there.
+- Official store locators establish branch ambiguity where multiple locations exist.
+- Overseas identities use restaurant-owned pages or a directory exposing the branch address.
 - Synthetic negative cases test hallucination resistance. Their Google Maps URLs are reproducible search links, not a claim that absence from one search proves universal nonexistence.
 - A source changing or a restaurant moving is a reason to review the gold case, not to silently update expected output at runtime.
 

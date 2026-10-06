@@ -17,6 +17,7 @@ import {
   findSavedPlaceDuplicates,
   type SavedPlace,
 } from './saved-place-duplicates.ts';
+import { formatOpeningHours } from '../catalog/operating-hours.ts';
 
 export type AddErrorCode =
   | 'invalid_input'
@@ -2947,7 +2948,14 @@ function validateOwnerFields(
     ...(categories ? { categories } : {}),
     ...(signatureDishes ? { signatureDishes } : {}),
     ...(summary ? { summary } : {}),
-    ...(openingHours ? { openingHours } : {}),
+    ...(openingHours
+      ? {
+          openingHours: {
+            ...openingHours,
+            value: formatOpeningHours(openingHours.value),
+          },
+        }
+      : {}),
     ...(regularClosingDays ? { regularClosingDays } : {}),
     ...(coordinates ? { coordinates } : {}),
   };

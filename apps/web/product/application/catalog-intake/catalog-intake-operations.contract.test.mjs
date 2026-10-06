@@ -215,7 +215,12 @@ test('complete sourced research yields map-ready preview without owner retyping;
     );
     assert.deepEqual(
       result.value.preview.ownerFields.openingHours,
-      ownerFields.openingHours,
+      ownerFields.openingHours
+        ? {
+            ...ownerFields.openingHours,
+            value: '昼 11:00–14:00 / 夜 17:00–22:00',
+          }
+        : undefined,
     );
     assert.deepEqual(
       result.value.preview.ownerFields.regularClosingDays,

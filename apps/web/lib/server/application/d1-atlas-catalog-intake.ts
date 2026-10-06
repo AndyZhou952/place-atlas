@@ -10,6 +10,7 @@ import type {
 } from '../../../product/application/catalog/atlas-item.ts';
 import { compactRestaurantTags } from '../../../product/application/catalog-intake/restaurant-profile-presentation.ts';
 import { withRestaurantClassification } from '../../../product/application/catalog/restaurant-classification.ts';
+import { formatOpeningHours } from '../../../product/application/catalog/operating-hours.ts';
 
 interface ReceiptRow {
   readonly outcome_json: string;
@@ -655,9 +656,15 @@ function toAtlasItem(
   if (!location || !title || !address) {
     throw new Error('Verified publication requires complete durable evidence.');
   }
-  const openingHours = preview.ownerFields.openingHours
+  const suppliedOpeningHours = preview.ownerFields.openingHours
     ? { ...preview.ownerFields.openingHours, observedAt: now.toISOString() }
     : preview.profile?.openingHours;
+  const openingHours = suppliedOpeningHours
+    ? {
+        ...suppliedOpeningHours,
+        value: formatOpeningHours(suppliedOpeningHours.value),
+      }
+    : undefined;
   const regularClosingDays = preview.ownerFields.regularClosingDays
     ? {
         ...preview.ownerFields.regularClosingDays,
@@ -760,9 +767,35 @@ function toReviewCandidate(
 
 function intakeEvidence(preview: CatalogIntakePreview) {
   return {
-    ...(preview.profile ? { profile: preview.profile } : {}),
+    ...(preview.profile
+      ? {
+          profile: {
+            ...preview.profile,
+            ...(preview.profile.openingHours
+              ? {
+                  openingHours: {
+                    ...preview.profile.openingHours,
+                    value: formatOpeningHours(
+                      preview.profile.openingHours.value,
+                    ),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
     candidateIdentity: preview.candidateIdentity,
-    ownerFields: preview.ownerFields,
+    ownerFields: {
+      ...preview.ownerFields,
+      ...(preview.ownerFields.openingHours
+        ? {
+            openingHours: {
+              ...preview.ownerFields.openingHours,
+              value: formatOpeningHours(preview.ownerFields.openingHours.value),
+            },
+          }
+        : {}),
+    },
     ...(preview.titleProposal ? { titleProposal: preview.titleProposal } : {}),
     ...(preview.addressProposal
       ? { addressProposal: preview.addressProposal }

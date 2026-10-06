@@ -8,6 +8,7 @@ import {
   composeRestaurantSummary,
 } from '../product/application/catalog-intake/restaurant-profile-presentation.ts';
 import { researchRegion } from '../product/application/catalog/research-region.ts';
+import { formatOpeningHours } from '../product/application/catalog/operating-hours.ts';
 import { createWebSearch, type SearchEvidence } from './web-search.ts';
 import type { RestaurantSourceReader } from './browser-source-reader.ts';
 import {
@@ -450,7 +451,14 @@ export function createPlaceResearchAgent(
             continue;
           const value = listing.restaurant[field];
           if (value !== undefined && (!Array.isArray(value) || value.length))
-            profile[field] = { value, sourceUrl: listing.url, observedAt };
+            profile[field] = {
+              value:
+                field === 'openingHours' && typeof value === 'string'
+                  ? formatOpeningHours(value)
+                  : value,
+              sourceUrl: listing.url,
+              observedAt,
+            };
         }
       };
       const copyGoogleSchedule = (
@@ -462,7 +470,8 @@ export function createPlaceResearchAgent(
           const value = googleSchedule[field];
           if (value)
             profile[field] = {
-              value,
+              value:
+                field === 'openingHours' ? formatOpeningHours(value) : value,
               sourceUrl: googleSchedule.sourceUrl,
               observedAt,
             };
@@ -512,7 +521,7 @@ export function createPlaceResearchAgent(
                   observedAt,
                 },
                 openingHours: {
-                  value: googleSchedule.openingHours,
+                  value: formatOpeningHours(googleSchedule.openingHours),
                   sourceUrl: googleSchedule.sourceUrl,
                   observedAt,
                 },

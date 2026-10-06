@@ -138,6 +138,13 @@
   gap: 0.35rem;
 }
 
+.catalog-intake-hours-preview {
+  margin-block: 0.4rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
 .catalog-intake-preview-group > h5 {
   margin: 0.4rem 0 0;
   color: var(--ink);

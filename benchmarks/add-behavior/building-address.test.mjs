@@ -128,7 +128,7 @@ for (const sample of cases) {
       assert.equal(result.value.profile.openingHours.sourceUrl, url);
       assert.equal(
         result.value.profile.openingHours.value,
-        '11:00 - 22:00 L.O. 21:30',
+        '11:00–22:00 L.O. 21:30',
       );
       assert.equal(result.value.profile.regularClosingDays, undefined);
     }

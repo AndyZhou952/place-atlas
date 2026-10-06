@@ -55,6 +55,7 @@ import type {
 import { maxMediaFilesPerSelection } from './media-constraints';
 import { restaurantLinks } from './restaurant-links';
 import { AtlasMap } from './atlas-map';
+import { OpeningHours } from './opening-hours';
 import {
   filterJournalVisits,
   sortJournalVisits,
@@ -1151,11 +1152,17 @@ function PlaceDetail({
               {item.kind === 'food' ? (
                 <div className="fact-card schedule-card">
                   <span>営業時間</span>
-                  <strong>{item.openingHours?.value ?? 'Unavailable'}</strong>
+                  <OpeningHours value={item.openingHours?.value} />
                   {item.openingHours ? (
                     <small>
-                      {new URL(item.openingHours.sourceUrl).hostname} ·{' '}
-                      {item.openingHours.observedAt.slice(0, 10)}
+                      <a
+                        href={item.openingHours.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {new URL(item.openingHours.sourceUrl).hostname}
+                      </a>{' '}
+                      · {item.openingHours.observedAt.slice(0, 10)}
                     </small>
                   ) : null}
                 </div>

@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "identical-seven-weekdays",
+      "input": "月 11:00 - 22:00\n火 11:00 - 22:00\n水 11:00 - 22:00\n木 11:00 - 22:00\n金 11:00 - 22:00\n土 11:00 - 22:00\n日 11:00 - 22:00",
+      "expected": "月〜日 11:00–22:00"
+    },
+    {
+      "id": "explicit-equal-holiday-hours",
+      "input": "月・火・水・木・金・土・日・祝日 11:00 - 22:00",
+      "expected": "毎日 11:00–22:00"
+    },
+    {
+      "id": "all-days-explicit",
+      "input": "毎日 11:00 - 22:00",
+      "expected": "毎日 11:00–22:00"
+    },
+    {
+      "id": "contiguous-weekdays-weekend-split",
+      "input": "月・火・水・木・金 17:00 - 23:00\n土・日・祝日 12:00 - 14:00 L.O. 13:00 / 17:00 - 22:00",
+      "expected": "月〜金 17:00–23:00\n土・日・祝日 12:00–14:00 L.O. 13:00 / 17:00–22:00"
+    },
+    {
+      "id": "noncontiguous-identical-days",
+      "input": "月 11:00 - 20:00\n水 11:00 - 20:00\n金 11:00 - 20:00",
+      "expected": "月・水・金 11:00–20:00"
+    },
+    {
+      "id": "two-days-keep-explicit-list",
+      "input": "土 11:00 - 20:00\n日 11:00 - 20:00",
+      "expected": "土・日 11:00–20:00"
+    },
+    {
+      "id": "overnight-and-single-digit-clock",
+      "input": "金 18:00 - 2:00",
+      "expected": "金 18:00–翌02:00"
+    },
+    {
+      "id": "extended-hour-clock-is-not-converted",
+      "input": "金 18:00 - 26:00",
+      "expected": "金 18:00–26:00"
+    },
+    {
+      "id": "explicit-overnight-clock",
+      "input": "金 18:00–翌02:00",
+      "expected": "金 18:00–翌02:00"
+    },
+    {
+      "id": "unqualified-hours-do-not-invent-days",
+      "input": "11:00 - 20:00",
+      "expected": "11:00–20:00"
+    },
+    {
+      "id": "fullwidth-clock-typography",
+      "input": "月・火・水・木・金 １１：００～２０：００",
+      "expected": "月〜金 11:00–20:00"
+    },
+    {
+      "id": "bracketed-weekday-list",
+      "input": "[月・火・水・木・金] 11:00 - 20:00",
+      "expected": "月〜金 11:00–20:00",
+      "presentation": { "lines": ["月〜金 11:00–20:00"], "notes": [] }
+    },
+    {
+      "id": "split-period-labels-and-last-orders",
+      "input": "月〜金 ランチ 11:30 - 14:30 L.O. 14:00 / ディナー 17:00 - 22:00 L.O. 21:00",
+      "expected": "月〜金 ランチ 11:30–14:30 L.O. 14:00 / ディナー 17:00–22:00 L.O. 21:00"
+    },
+    {
+      "id": "different-last-orders-cannot-merge",
+      "input": "月 11:00–22:00 L.O. 21:00\n火 11:00–22:00 L.O. 21:30",
+      "expected": "月 11:00–22:00 L.O. 21:00\n火 11:00–22:00 L.O. 21:30"
+    },
+    {
+      "id": "different-service-labels-cannot-merge",
+      "input": "月 ランチ 11:00–20:00\n火 ディナー 11:00–20:00",
+      "expected": "月 ランチ 11:00–20:00\n火 ディナー 11:00–20:00"
+    },
+    {
+      "id": "parenthesized-day-service-scope-keeps-attachment",
+      "input": "月 11:00–22:00（ランチのみ）\n火 11:00–22:00（ディナーのみ）",
+      "expected": "月 11:00–22:00（ランチのみ）\n火 11:00–22:00（ディナーのみ）",
+      "presentation": {
+        "lines": [
+          "月 11:00–22:00（ランチのみ）",
+          "火 11:00–22:00（ディナーのみ）"
+        ],
+        "notes": []
+      }
+    },
+    {
+      "id": "semicolon-separates-meal-periods",
+      "input": "月・火・水・木・金 11:00 - 14:00; 17:00 - 22:00",
+      "expected": "月〜金 11:00–14:00 / 17:00–22:00",
+      "presentation": {
+        "lines": ["月〜金 11:00–14:00 / 17:00–22:00"],
+        "notes": []
+      }
+    },
+    {
+      "id": "ambiguous-per-day-suffix-keeps-attachment",
+      "input": "月 11:00–22:00; テイクアウトのみ\n火 11:00–22:00; 店内飲食のみ",
+      "expected": "月 11:00–22:00；テイクアウトのみ\n火 11:00–22:00；店内飲食のみ",
+      "presentation": {
+        "lines": [
+          "月 11:00–22:00；テイクアウトのみ",
+          "火 11:00–22:00；店内飲食のみ"
+        ],
+        "notes": []
+      }
+    },
+    {
+      "id": "secondary-facility-hours-and-closure-stay-visible",
+      "input": "毎日 10:00 - 18:00; 2Fカフェ 10:30～17:00(L.O.16:45) 定休日 月曜日",
+      "expected": "毎日 10:00–18:00\n2Fカフェ 10:30–17:00(L.O.16:45) 定休日 月曜日",
+      "presentation": {
+        "lines": [
+          "毎日 10:00–18:00",
+          "2Fカフェ 10:30–17:00(L.O.16:45) 定休日 月曜日"
+        ],
+        "notes": []
+      }
+    },
+    {
+      "id": "food-drink-last-orders-retain-scope",
+      "input": "毎日 11:00–22:00 料理L.O. 21:00 ドリンクL.O. 21:30",
+      "expected": "毎日 11:00–22:00 料理L.O. 21:00 ドリンクL.O. 21:30"
+    },
+    {
+      "id": "last-admission-is-not-last-order",
+      "input": "毎日 11:00–22:00 最終入店 20:30",
+      "expected": "毎日 11:00–22:00 最終入店 20:30"
+    },
+    {
+      "id": "explicit-closed-days-retained",
+      "input": "月・火・水・木・金 08:15 - 14:30\n土・日・祝日 定休日",
+      "expected": "月〜金 08:15–14:30\n土・日・祝日 定休日"
+    },
+    {
+      "id": "explicit-24-hour-business",
+      "input": "毎日 24時間営業",
+      "expected": "毎日 24時間営業"
+    },
+    {
+      "id": "equal-opening-and-closing-is-not-inferred-24-hours",
+      "input": "毎日 00:00–00:00",
+      "expected": "毎日 00:00–00:00"
+    },
+    {
+      "id": "holiday-eve-and-following-day-exceptions",
+      "input": "月〜日 11:00–22:00\n祝日 12:00–20:00\n祝前日 11:00–翌02:00\n祝翌日 13:00–20:00",
+      "expected": "月〜日 11:00–22:00\n祝日 12:00–20:00\n祝前日 11:00–翌02:00\n祝翌日 13:00–20:00"
+    },
+    {
+      "id": "seasonal-and-service-notes-preserved",
+      "input": "毎日 11:00–22:00\n\n注意事項\n年末年始休業\nスープがなくなり次第終了。営業時間は変更になる場合があります。",
+      "expected": "毎日 11:00–22:00\n\n注意事項\n年末年始休業\nスープがなくなり次第終了。営業時間は変更になる場合があります。",
+      "presentation": {
+        "lines": ["毎日 11:00–22:00"],
+        "notes": [
+          "年末年始休業",
+          "スープがなくなり次第終了。営業時間は変更になる場合があります。"
+        ]
+      }
+    },
+    {
+      "id": "unsupported-prose-keeps-complete-source-wording",
+      "input": "平日は仕込み完了後に開店。水曜日のみ予約客の状況によって営業。",
+      "expected": "平日は仕込み完了後に開店。水曜日のみ予約客の状況によって営業。"
+    },
+    {
+      "id": "conflicting-overlapping-days-not-reconciled",
+      "input": "月〜金 11:00–20:00\n金 12:00–21:00",
+      "expected": "月〜金 11:00–20:00\n金 12:00–21:00"
+    },
+    {
+      "id": "different-facility-scope-kept",
+      "input": "1Fレストラン 月〜日 11:00–22:00\n2Fカフェ 月〜日 11:00–22:00",
+      "expected": "1Fレストラン 月〜日 11:00–22:00\n2Fカフェ 月〜日 11:00–22:00"
+    }
+  ]
+}

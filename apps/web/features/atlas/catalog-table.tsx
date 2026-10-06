@@ -18,6 +18,7 @@ import {
 import { ratingPlaceId } from '../../agent/google-rating-policy';
 import { googleRatingIdentity } from './google-rating-display';
 import { restaurantLinks } from './restaurant-links';
+import { OpeningHours } from './opening-hours';
 import type { useGoogleRatingDisplay } from './use-google-rating-display';
 import './catalog-table.css';
 
@@ -516,7 +517,24 @@ export function CatalogTable({
                         {item.kind === 'food' ? (
                           <>
                             <dt>営業時間 / Opening hours</dt>
-                            <dd>{item.openingHours?.value ?? 'Unavailable'}</dd>
+                            <dd>
+                              <OpeningHours value={item.openingHours?.value} />
+                              {item.openingHours ? (
+                                <small>
+                                  <a
+                                    href={item.openingHours.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {
+                                      new URL(item.openingHours.sourceUrl)
+                                        .hostname
+                                    }
+                                  </a>{' '}
+                                  · {item.openingHours.observedAt.slice(0, 10)}
+                                </small>
+                              ) : null}
+                            </dd>
                             <dt>定休日 / Closing days</dt>
                             <dd>
                               {item.regularClosingDays?.value ?? 'Unavailable'}

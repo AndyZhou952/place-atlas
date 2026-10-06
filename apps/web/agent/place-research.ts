@@ -168,6 +168,7 @@ export function createPlaceResearchAgent(
         const result = config.sourceReader
           ? await config.sourceReader(url, signal)
           : await readTabelogListingResult(url, fetcher, signal);
+        diagnostic(`listing_read_${result.kind}`);
         if (result.kind === 'read') return result.evidence;
         if (result.kind === 'blocked') sourceAccessIssue = 'blocked';
         else sourceAccessIssue ??= 'unavailable';
@@ -203,7 +204,7 @@ export function createPlaceResearchAgent(
               title: page.title,
               content: page.content,
             });
-          if (
+          const branchMatches = Boolean(
             page.restaurant &&
             matchesSelectedBranch(
               `${page.restaurant.name} ${page.restaurant.aliases?.join(' ') ?? ''} ${page.restaurant.address}`,
@@ -213,9 +214,12 @@ export function createPlaceResearchAgent(
               page.restaurant.address,
               page.restaurant.postalCode,
               page.restaurant.name,
-            )
-          )
-            break;
+            ),
+          );
+          diagnostic(
+            branchMatches ? 'listing_branch_match' : 'listing_branch_mismatch',
+          );
+          if (branchMatches) break;
         }
       };
       const readSelectedBookingPage = async (sources: SearchEvidence[]) => {
@@ -1607,6 +1611,124 @@ function verifiedOfficialCuisine(
   return undefined;
 }
 
+const japaneseLocalities: Record<string, string> = {
+  // Google commonly renders Tokyo wards as English "City" while Japanese
+  // listings use the Japanese ward suffix. These aliases only corroborate identity.
+  adachi: '足立区',
+  arakawa: '荒川区',
+  bunkyo: '文京区',
+  chiyoda: '千代田区',
+  chuo: '中央区',
+  edogawa: '江戸川区',
+  itabashi: '板橋区',
+  katsushika: '葛飾区',
+  kita: '北区',
+  koto: '江東区',
+  meguro: '目黒区',
+  minato: '港区',
+  nakano: '中野区',
+  nerima: '練馬区',
+  ota: '大田区',
+  setagaya: '世田谷区',
+  shibuya: '渋谷区',
+  shinagawa: '品川区',
+  shinjuku: '新宿区',
+  suginami: '杉並区',
+  sumida: '墨田区',
+  taito: '台東区',
+  toshima: '豊島区',
+  nishishinjuku: '西新宿',
+  ikebukuro: '池袋',
+  ginza: '銀座',
+  azabujuban: '麻布十番',
+};
+
+/** A missing lot is not a conflicting lot. Require independent building anchors. */
+function matchesOmittedBuildingLot(
+  selectedAddress: string,
+  sourceAddress: string,
+  sourcePostalCode: string | undefined,
+  selectedNumbers: string[],
+  sourceNumbers: string[],
+): boolean {
+  if (
+    researchRegion(selectedAddress) !== 'japan' ||
+    selectedNumbers.length !== 1 ||
+    sourceNumbers.length !== 1 ||
+    selectedNumbers[0].split('-').length !== 3 ||
+    sourceNumbers[0].split('-').length !== 2 ||
+    selectedNumbers[0].split('-').slice(0, 2).join('-') !== sourceNumbers[0]
+  )
+    return false;
+  const postalCode = selectedAddress
+    .normalize('NFKC')
+    .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
+    ?.replace(/\D/gu, '');
+  if (!postalCode || postalCode !== sourcePostalCode) return false;
+  const city = selectedAddress
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .match(/\b([a-z]+) city\b/u)?.[1];
+  const ward = city ? japaneseLocalities[city] : undefined;
+  // Restrict the exception to a corroborated Tokyo ward, not numbers alone.
+  if (
+    !ward?.endsWith('区') ||
+    !/\bTokyo\b/iu.test(selectedAddress) ||
+    !sourceAddress.includes(`東京都${ward}`)
+  )
+    return false;
+  const building = (value: string) => {
+    const address = value
+      .normalize('NFKC')
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ');
+    const suffix = address.match(
+      /\d{1,4}(?:[-‐‑‒–—−ー]|ch[ōo]me|丁目)+\d{1,4}(?:[-‐‑‒–—−ー]+\d{1,4})?(?:[-‐‑‒–—−ー]*先)?\s+(.+)$/iu,
+    )?.[1];
+    if (!suffix) return undefined;
+    const floor = suffix.match(
+      /(?:地下\s*(\d+)\s*(?:F|階)|B\s*(\d+)\s*F?|(\d+)\s*(?:F|階))$/iu,
+    );
+    if (!floor) return undefined;
+    let label = suffix.slice(0, floor.index).trim().toLowerCase();
+    if (label.replace(/\s/gu, '').length < 5) return undefined;
+    // Normalize written number suffixes, not arbitrary brand transliteration.
+    const writtenDigits: Record<string, string> = {
+      ワン: '1',
+      ツー: '2',
+      スリー: '3',
+      フォー: '4',
+      ファイブ: '5',
+      シックス: '6',
+      セブン: '7',
+      エイト: '8',
+      ナイン: '9',
+      テン: '10',
+    };
+    label = label.replace(
+      /(?:ワン|ツー|スリー|フォー|ファイブ|シックス|セブン|エイト|ナイン|テン)$/u,
+      (word) => writtenDigits[word],
+    );
+    for (const [latin, japanese] of Object.entries(japaneseLocalities))
+      if (label.startsWith(latin)) {
+        label = japanese + label.slice(latin.length);
+        break;
+      }
+    return {
+      label: label.replace(/[\p{P}\p{Z}\s]/gu, ''),
+      floor: floor[1] || floor[2] ? `b${floor[1] ?? floor[2]}` : floor[3],
+    };
+  };
+  const selected = building(selectedAddress);
+  const source = building(sourceAddress);
+  return Boolean(
+    selected &&
+    source &&
+    selected.label === source.label &&
+    selected.floor === source.floor,
+  );
+}
+
 function matchesSelectedBranch(
   quote: string,
   name: string,
@@ -1695,7 +1817,19 @@ function matchesSelectedBranch(
   const matchingNumbers = selectedNumbers.filter((numbers) =>
     sourceNumbers.includes(numbers),
   );
-  if (!matchingNumbers.length) return false;
+  if (!matchingNumbers.length)
+    return Boolean(
+      sourceAddress &&
+      listedName.length >= 5 &&
+      (selectedName === listedName || selectedOwnerName === listedName) &&
+      matchesOmittedBuildingLot(
+        address,
+        sourceAddress,
+        sourcePostalCode,
+        selectedNumbers,
+        sourceNumbers,
+      ),
+    );
   const selectedPostalCode = address
     .normalize('NFKC')
     .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
@@ -1725,37 +1859,6 @@ function matchesSelectedBranch(
   }
   // Common bilingual ward/neighborhood aliases are corroboration, never identity
   // by themselves. Unmapped addresses stay unknown rather than matching numbers alone.
-  const aliasesByLocality: Record<string, string> = {
-    // Google commonly renders Tokyo wards as English "City" while Japanese
-    // listings use the Japanese ward suffix. Street number and selected name are also required above.
-    adachi: '足立区',
-    arakawa: '荒川区',
-    bunkyo: '文京区',
-    chiyoda: '千代田区',
-    chuo: '中央区',
-    edogawa: '江戸川区',
-    itabashi: '板橋区',
-    katsushika: '葛飾区',
-    kita: '北区',
-    koto: '江東区',
-    meguro: '目黒区',
-    minato: '港区',
-    nakano: '中野区',
-    nerima: '練馬区',
-    ota: '大田区',
-    setagaya: '世田谷区',
-    shibuya: '渋谷区',
-    shinagawa: '品川区',
-    shinjuku: '新宿区',
-    suginami: '杉並区',
-    sumida: '墨田区',
-    taito: '台東区',
-    toshima: '豊島区',
-    nishishinjuku: '西新宿',
-    ikebukuro: '池袋',
-    ginza: '銀座',
-    azabujuban: '麻布十番',
-  };
   const latinAddress = address
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
@@ -1768,8 +1871,8 @@ function matchesSelectedBranch(
     .match(/\b([a-z]+) city\b/u)?.[1];
   if (
     selectedCity &&
-    aliasesByLocality[selectedCity] &&
-    !addressText.includes(normalize(aliasesByLocality[selectedCity])) &&
+    japaneseLocalities[selectedCity] &&
+    !addressText.includes(normalize(japaneseLocalities[selectedCity])) &&
     !addressText.includes(`${selectedCity}ku`) &&
     !addressText.includes(`${selectedCity}city`)
   )
@@ -1796,7 +1899,7 @@ function matchesSelectedBranch(
         ),
       ),
     );
-  return Object.entries(aliasesByLocality).some(
+  return Object.entries(japaneseLocalities).some(
     ([latin, japanese]) =>
       latinAddress.includes(latin) &&
       (addressText.includes(normalize(japanese)) ||

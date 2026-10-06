@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { presentCatalogIntakePreview } from '@/product/application/catalog-intake/catalog-intake-preview-presenter';
 
 import { useCatalogIntake } from './use-catalog-intake';
+import { OpeningHours } from './opening-hours';
 import {
   catalogIntakeLiveMessage,
   catalogIntakeManualCompletionError,
@@ -662,8 +663,9 @@ function PreviewStep({
         <div className="catalog-intake-profile-hours">
           <h5>Operating schedule</h5>
           <p>
-            Leave unavailable information empty. Keep lunch, dinner, weekday
-            differences and last-order times in the source wording.
+            Combine days with the same hours. Keep separate lunch and dinner
+            periods, weekday differences and last-order times. Leave unavailable
+            information empty; keep source notes under 注意事項.
           </p>
           {(
             [
@@ -683,6 +685,14 @@ function PreviewStep({
           ).map(([field, sourceField, label, limit]) => (
             <div key={field}>
               <label htmlFor={`catalog-intake-preview-${field}`}>{label}</label>
+              {field === 'openingHours' && intake.state.openingHours.trim() ? (
+                <div
+                  className="catalog-intake-hours-preview"
+                  aria-label="Opening hours preview"
+                >
+                  <OpeningHours value={intake.state.openingHours} />
+                </div>
+              ) : null}
               <textarea
                 id={`catalog-intake-preview-${field}`}
                 value={intake.state[field]}

@@ -50,7 +50,7 @@ test('complete researched profile survives D1 publication and public projection 
       categories: claim(['洋食']),
       signatureDishes: claim(['Oysters']),
       summary: claim('A small restaurant.'),
-      openingHours: claim('Lunch 11:30–14:30; Dinner 17:00–22:00'),
+      openingHours: claim('月・火・水・木・金 17:00 - 05:00 L.O. 04:30'),
       regularClosingDays: claim('火曜日・第3水曜日'),
       officialWebsite: claim('https://example.com/'),
       bookingLink: claim('https://example.com/book'),
@@ -79,6 +79,13 @@ test('complete researched profile survives D1 publication and public projection 
     sqlite.prepare('SELECT payload_json FROM atlas_items').get().payload_json,
   );
   const projected = createPublicReadManifest().project('catalog.get', stored);
+  const normalizedProfile = {
+    ...preview.profile,
+    openingHours: {
+      ...preview.profile.openingHours,
+      value: '月〜金 17:00–翌05:00 L.O. 04:30',
+    },
+  };
   assert.deepEqual(projected.tags, ['洋食', 'Oysters']);
   assert.deepEqual(stored.classification.cuisines, [
     { familyId: 'japanese', categoryId: 'japanese.yoshoku' },
@@ -86,12 +93,12 @@ test('complete researched profile survives D1 publication and public projection 
   assert.deepEqual(projected.classification, stored.classification);
   assert.equal(projected.description, 'A small restaurant.');
   assert.equal(projected.officialUrl, 'https://example.com/');
-  assert.deepEqual(projected.openingHours, preview.profile.openingHours);
+  assert.deepEqual(projected.openingHours, normalizedProfile.openingHours);
   assert.deepEqual(
     projected.regularClosingDays,
     preview.profile.regularClosingDays,
   );
-  assert.deepEqual(stored.openingHours, preview.profile.openingHours);
+  assert.deepEqual(stored.openingHours, normalizedProfile.openingHours);
   assert.deepEqual(
     stored.regularClosingDays,
     preview.profile.regularClosingDays,
@@ -109,7 +116,11 @@ test('complete researched profile survives D1 publication and public projection 
       (source) => source.url === 'https://example.com/book',
     ),
   );
-  assert.deepEqual(stored.intakeEvidence.profile, preview.profile);
+  assert.deepEqual(stored.intakeEvidence.profile, normalizedProfile);
+  assert.equal(
+    preview.profile.openingHours.value,
+    '月・火・水・木・金 17:00 - 05:00 L.O. 04:30',
+  );
   assert.deepEqual(stored.scheduleCheck, {
     openingHours: 'known',
     regularClosingDays: 'known',
@@ -192,7 +203,7 @@ test('Owner schedule corrections survive publication and the browser over earlie
   const projected = createPublicReadManifest().project('catalog.get', stored);
   assert.equal(
     projected.openingHours.value,
-    preview.ownerFields.openingHours.value,
+    '月・火 11:00–14:00 / 17:00–21:00',
   );
   assert.equal(projected.regularClosingDays.value, '水曜日');
   const browser = await loadPublicCatalog({
@@ -208,7 +219,17 @@ test('Owner schedule corrections survive publication and the browser over earlie
   });
   assert.deepEqual(browser[0].openingHours, stored.openingHours);
   assert.deepEqual(browser[0].scheduleCheck, stored.scheduleCheck);
-  assert.deepEqual(stored.intakeEvidence.ownerFields, preview.ownerFields);
+  assert.deepEqual(stored.intakeEvidence.ownerFields, {
+    ...preview.ownerFields,
+    openingHours: {
+      ...preview.ownerFields.openingHours,
+      value: '月・火 11:00–14:00 / 17:00–21:00',
+    },
+  });
+  assert.deepEqual(stored.intakeEvidence.profile.openingHours, {
+    ...preview.profile.openingHours,
+    value: '毎日 08:00–22:00',
+  });
   sqlite.close();
 });
 

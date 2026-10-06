@@ -1,7 +1,84 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { parseTabelogListing } from '../../apps/web/agent/tabelog-listing.ts';
 import { createPlaceResearchAgent } from '../../apps/web/agent/place-research.ts';
+import {
+  formatOpeningHours,
+  openingHoursPresentation,
+} from '../../apps/web/product/application/catalog/operating-hours.ts';
+import { validateEnrichedProfile } from '../../apps/web/product/application/catalog-intake/catalog-intake-coordinator.ts';
+
+// Expectations are a literal oracle, independent of the formatter implementation.
+const formatting = JSON.parse(
+  await readFile(new URL('./operating-hours.v1.json', import.meta.url), 'utf8'),
+);
+assert.equal(formatting.schemaVersion, 1);
+for (const sample of formatting.cases) {
+  test(`opening-hours format: ${sample.id}`, () => {
+    assert.equal(formatOpeningHours(sample.input), sample.expected);
+    assert.equal(
+      formatOpeningHours(sample.expected),
+      sample.expected,
+      'idempotence',
+    );
+    if (sample.presentation)
+      assert.deepEqual(
+        openingHoursPresentation(sample.input),
+        sample.presentation,
+      );
+  });
+}
+
+test('formatting expansion at the 1200-character claim boundary preserves all facts', () => {
+  const prefix = '金 18:00-2:00\n';
+  const notePrefix = '臨時休業の際は事前告知します。';
+  const note =
+    notePrefix + '注'.repeat(1200 - prefix.length - notePrefix.length);
+  const source = prefix + note;
+  assert.equal(source.length, 1200);
+  assert.equal(
+    formatOpeningHours(source),
+    source,
+    'retain the full accepted source',
+  );
+  assert.equal(
+    formatOpeningHours(formatOpeningHours(source)),
+    source,
+    'idempotence',
+  );
+  assert.deepEqual(openingHoursPresentation(source), {
+    lines: ['金 18:00–翌02:00'],
+    notes: [note],
+  });
+  assert.ok(
+    validateEnrichedProfile({
+      openingHours: {
+        value: formatOpeningHours(source),
+        sourceUrl: 'https://fixture.example/selected/hours',
+        observedAt: '2026-09-22T10:00:00.000Z',
+      },
+    }),
+    'formatted facts remain valid at the existing claim boundary',
+  );
+});
+
+test('profile validation retains exact source wording until evidence grounding', () => {
+  const sourceUrl = 'https://fixture.example/selected/hours';
+  const observedAt = '2026-09-22T10:00:00.000Z';
+  const checked = validateEnrichedProfile({
+    openingHours: {
+      value: '月・火・水・木・金 11:00 - 20:00',
+      sourceUrl,
+      observedAt,
+    },
+  });
+  assert.deepEqual(checked.openingHours, {
+    value: '月・火・水・木・金 11:00 - 20:00',
+    sourceUrl,
+    observedAt,
+  });
+});
 
 const captures = {
   cases: [
@@ -18,6 +95,8 @@ const captures = {
         '17:00 - 22:00',
       ],
       expectedClosingDays: null,
+      expectedFormattedHours:
+        '月〜金 17:00–23:00\n土・日・祝日 12:00–14:00 L.O. 13:00 / 17:00–22:00\n\n注意事項\n■ 定休日 年末年始',
     },
     {
       id: 'weekday-lunch',
@@ -27,6 +106,17 @@ const captures = {
         '<p class="rstinfo-table__business-title">月・火・水・木・金</p><ul><li>08:15 - 14:30</li></ul><p class="rstinfo-table__business-title">土・日・祝日</p><ul><li>定休日</li></ul>',
       expectedHoursIncludes: ['08:15 - 14:30'],
       expectedClosingDays: '土・日・祝日',
+      expectedFormattedHours: '月〜金 08:15–14:30\n土・日・祝日 定休日',
+    },
+    {
+      id: 'daily-repeated-schedule',
+      name: 'Fixture Daily Kitchen',
+      listingUrl: 'https://tabelog.com/tokyo/A1317/A131701/13000003/',
+      hoursRowHtml:
+        '<p class="rstinfo-table__business-title">月</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">火</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">水</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">木</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">金</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">土</p><ul><li>11:00 - 22:00</li></ul><p class="rstinfo-table__business-title">日・祝日</p><ul><li>11:00 - 22:00</li></ul>',
+      expectedHoursIncludes: ['11:00 - 22:00'],
+      expectedClosingDays: null,
+      expectedFormattedHours: '毎日 11:00–22:00',
     },
   ],
 };
@@ -48,7 +138,9 @@ for (const sample of captures.cases) {
     if (sample.id === 'dinner-with-weekend-lunch')
       assert.notEqual(parsed.regularClosingDays, '月');
   });
-  test(`${sample.id}: verified business hours survive a model outage`, async () => {
+  test(`${sample.id}: verified business hours survive a model outage`, async (t) => {
+    const observedAt = '2026-09-22T10:00:00.000Z';
+    t.mock.timers.enable({ apis: ['Date'], now: new Date(observedAt) });
     const listing = parseTabelogListing(page(sample), sample.listingUrl);
     const agent = createPlaceResearchAgent({
       apiKey: 'fixture',
@@ -69,7 +161,7 @@ for (const sample of captures.cases) {
     assert.equal(result.kind, 'observed');
     assert.equal(
       result.value.profile.openingHours.value,
-      listing.restaurant.openingHours,
+      sample.expectedFormattedHours,
     );
     assert.equal(
       result.value.profile.regularClosingDays?.value,
@@ -79,6 +171,7 @@ for (const sample of captures.cases) {
       result.value.profile.openingHours.sourceUrl,
       sample.listingUrl,
     );
+    assert.equal(result.value.profile.openingHours.observedAt, observedAt);
   });
 }
 test('review claims and missing rows cannot invent operating hours or a weekly closure', () => {
@@ -142,7 +235,7 @@ test('model cannot turn a seasonal New Year closure into regularClosingDays', as
   assert.equal(result.kind, 'observed');
   assert.equal(
     result.value.profile.openingHours.value,
-    listing.restaurant.openingHours,
+    sample.expectedFormattedHours,
   );
   assert.equal(result.value.profile.regularClosingDays, undefined);
 });

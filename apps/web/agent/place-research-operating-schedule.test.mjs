@@ -49,7 +49,7 @@ test('Japan schedule fields come from the verified Tabelog row and skip Google',
   assert.equal(result.kind, 'observed');
   assert.equal(
     result.value.profile.openingHours.value,
-    '月〜土 18:00 - 22:30; 日・祝 定休日',
+    '月〜土 18:00–22:30\n日・祝日 定休日',
   );
   assert.equal(result.value.profile.openingHours.sourceUrl, listingUrl);
   assert.equal(result.value.profile.regularClosingDays.value, '日曜日、祝日');

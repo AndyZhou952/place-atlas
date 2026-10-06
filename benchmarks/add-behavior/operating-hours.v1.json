@@ -60,7 +60,10 @@
       "id": "bracketed-weekday-list",
       "input": "[月・火・水・木・金] 11:00 - 20:00",
       "expected": "月〜金 11:00–20:00",
-      "presentation": { "lines": ["月〜金 11:00–20:00"], "notes": [] }
+      "presentation": {
+        "lines": ["月〜金 11:00–20:00"],
+        "notes": []
+      }
     },
     {
       "id": "split-period-labels-and-last-orders",
@@ -178,6 +181,24 @@
       "id": "different-facility-scope-kept",
       "input": "1Fレストラン 月〜日 11:00–22:00\n2Fカフェ 月〜日 11:00–22:00",
       "expected": "1Fレストラン 月〜日 11:00–22:00\n2Fカフェ 月〜日 11:00–22:00"
+    },
+    {
+      "id": "secondary-takeaway-schedule-visible",
+      "input": "月〜日 10:00–18:00; テイクアウト 09:00–20:00",
+      "expected": "月〜日 10:00–18:00；テイクアウト 09:00–20:00",
+      "presentation": {
+        "lines": ["月〜日 10:00–18:00；テイクアウト 09:00–20:00"],
+        "notes": []
+      }
+    },
+    {
+      "id": "secondary-bar-schedule-visible",
+      "input": "月〜日 10:00–18:00; 2Fバー 営業時間17:00～23:00",
+      "expected": "月〜日 10:00–18:00；2Fバー 営業時間17:00–23:00",
+      "presentation": {
+        "lines": ["月〜日 10:00–18:00；2Fバー 営業時間17:00–23:00"],
+        "notes": []
+      }
     }
   ]
 }

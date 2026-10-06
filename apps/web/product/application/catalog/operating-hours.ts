@@ -91,12 +91,22 @@ function schedule(value: string): { hours: string; note: string } | undefined {
     const separator = remaining.match(/^[\s/、,;；]+/);
     if (separator) remaining = remaining.slice(separator[0].length);
   }
-  return segments.length
+  const parsed = segments.length
     ? {
         hours: segments.join(' / '),
         note: remaining.replace(/^[;；\s]+/, '').trim(),
       }
     : undefined;
+  // A second service's schedule is a fact to display, not a general advisory.
+  if (
+    parsed?.note &&
+    new RegExp(range).test(parsed.note) &&
+    !/^(?:■|※|【|\d{1,2}月\d{1,2}日)/.test(parsed.note)
+  ) {
+    parsed.hours += `；${typography(parsed.note)}`;
+    parsed.note = '';
+  }
+  return parsed;
 }
 
 /** Format verified facts only. Unknown wording and conflicting rules stay explicit. */

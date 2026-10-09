@@ -234,6 +234,169 @@ test('complete sourced research yields map-ready preview without owner retyping;
   }
 });
 
+for (const scenario of [
+  { name: 'identical research without a geocoder', sameTime: true },
+  { name: 'timestamp-only full refresh', partial: false },
+  { name: 'timestamp-only partial refresh', partial: true },
+  { name: 'timestamp-only refresh with a geocoder', geocoder: true },
+  { name: 'changed value', change: { value: 'Updated branch summary' } },
+  {
+    name: 'changed source',
+    change: { sourceUrl: 'https://official.example/new' },
+  },
+  { name: 'new field', newField: true },
+]) {
+  test(`catalog.intake.confirm distinguishes profile facts from observation times: ${scenario.name}`, async () => {
+    const initialObservedAt = '2026-09-22T10:00:00.000Z';
+    const refreshedObservedAt = scenario.sameTime
+      ? initialObservedAt
+      : '2026-09-22T10:01:00.000Z';
+    const claim = (value) => ({
+      value,
+      sourceUrl: 'https://official.example/branch',
+      observedAt: initialObservedAt,
+    });
+    const profile = {
+      name: claim('Selected branch'),
+      area: claim('Nakameguro'),
+      address: claim('Tokyo address 1-2-3'),
+      coordinates: claim({ latitude: 35.6, longitude: 139.7 }),
+      categories: claim(['カフェ']),
+      signatureDishes: claim(['Roast beef']),
+      summary: claim('Branch summary'),
+      openingHours: claim('11:00–22:00'),
+      regularClosingDays: claim('Tuesday'),
+      closingNotes: claim('Closed on public holidays'),
+      officialWebsite: claim('https://official.example/'),
+      bookingLink: claim('https://official.example/reserve'),
+      googleRating: claim({ score: 4.2, reviewCount: 100 }),
+    };
+    const refreshedProfile = Object.fromEntries(
+      Object.entries(
+        scenario.partial ? { summary: profile.summary } : profile,
+      ).map(([field, value]) => [
+        field,
+        { ...value, observedAt: refreshedObservedAt },
+      ]),
+    );
+    if (scenario.change)
+      Object.assign(refreshedProfile.summary, scenario.change);
+    if (scenario.newField) {
+      delete profile.closingNotes;
+    }
+    const publications = [];
+    let confirmResearchCalls = 0;
+    const application = createFixtureApplication({
+      discoveryPort: discoveryFixture(),
+      enrichmentPolicy: 'enrich_if_available',
+      ...(scenario.geocoder
+        ? {
+            durableGeocoderPort: {
+              async propose() {
+                return { ok: true, value: { status: 'no_match' } };
+              },
+            },
+          }
+        : {}),
+      webResearchPort: {
+        async research(input) {
+          const confirming = input.phase === 'confirm';
+          if (confirming) confirmResearchCalls++;
+          const observedAt = confirming
+            ? refreshedObservedAt
+            : initialObservedAt;
+          return {
+            kind: 'observed',
+            value: {
+              tabelog: {
+                ...agentTabelog(
+                  4.2,
+                  'https://tabelog.com/tokyo/A1307/A130701/13000001/',
+                ),
+                observedAt,
+              },
+              reservation: {
+                status: 'known',
+                mode: 'reservable',
+                label: '予約可',
+                url: 'https://official.example/reserve',
+                provenance: 'agent_observed',
+                freshness: 'fresh',
+                observedAt,
+              },
+              profile: confirming ? refreshedProfile : profile,
+            },
+          };
+        },
+      },
+      atlasCatalogIntakePort: {
+        async publish(preview) {
+          publications.push(preview);
+          return {
+            status: 'committed_verified',
+            itemId: 'profile-item',
+            receiptRef: 'profile-receipt',
+            replayed: false,
+          };
+        },
+      },
+    });
+    await application.execute({
+      key: 'catalog.intake.discover',
+      input: { query: 'restaurant', requestToken: 'profile-observation-times' },
+    });
+    const selected = await application.execute({
+      key: 'catalog.intake.select',
+      input: {
+        sessionId: 'session-1',
+        expectedSessionVersion: 1,
+        ordinal: 1,
+        ownerFields: {},
+        requestResearch: true,
+      },
+    });
+    assert.equal(selected.ok, true);
+    assert.equal(
+      selected.value.preview.warnings.some(
+        ({ code }) => code === 'provider_unavailable',
+      ),
+      false,
+    );
+    const confirmed = await application.execute({
+      key: 'catalog.intake.confirm',
+      input: { sessionId: 'session-1', expectedPreviewVersion: 1 },
+    });
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmResearchCalls, 1);
+    if (!scenario.change && !scenario.newField) {
+      assert.equal(confirmed.value.status, 'committed_verified');
+      assert.equal(publications.length, 1);
+      assert.deepEqual(publications[0], selected.value.preview);
+    } else {
+      assert.equal(confirmed.value.status, 'conflict');
+      assert.equal(publications.length, 0);
+      const refreshed = confirmed.value.newPreview;
+      assert.equal(refreshed.previewVersion, 2);
+      assert.notEqual(
+        refreshed.evidenceDigest,
+        selected.value.preview.evidenceDigest,
+      );
+      assert.deepEqual(refreshed.profile.area, profile.area);
+      assert.deepEqual(
+        refreshed.profile[scenario.newField ? 'closingNotes' : 'summary'],
+        refreshedProfile[scenario.newField ? 'closingNotes' : 'summary'],
+      );
+      const retried = await application.execute({
+        key: 'catalog.intake.confirm',
+        input: { sessionId: 'session-1', expectedPreviewVersion: 2 },
+      });
+      assert.equal(retried.value.status, 'committed_verified');
+      assert.equal(confirmResearchCalls, 1);
+      assert.deepEqual(publications[0], refreshed);
+    }
+  });
+}
+
 test('same-branch partial refresh preserves sourced profile fields and presents changed booking links before publication', async () => {
   const tabelogUrl = 'https://tabelog.com/tokyo/A1307/A130701/13000001/';
   const oldBookingUrl =

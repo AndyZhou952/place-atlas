@@ -1217,6 +1217,13 @@ export function createCatalogIntakeModule(options: {
             observedAt: profile.coordinates.observedAt,
           };
         }
+        // Sourced location evidence resolves the missing-geocoder fallback.
+        if (
+          locationEvidence.status === 'known' &&
+          locationEvidence.provenance === 'agent_observed'
+        ) {
+          geocoderUnavailable = false;
+        }
         const tabelog =
           ownerTabelog.status === 'known'
             ? ownerTabelog
@@ -3621,7 +3628,23 @@ function mergeEnrichedProfile(
   prior: CatalogIntakeEnrichedProfile | undefined,
 ): CatalogIntakeEnrichedProfile | undefined {
   if (!refreshed && !prior) return undefined;
-  return { ...prior, ...refreshed };
+  const merged = { ...prior, ...refreshed };
+  for (const field of Object.keys(
+    refreshed ?? {},
+  ) as (keyof CatalogIntakeEnrichedProfile)[]) {
+    const next = refreshed?.[field];
+    const previous = prior?.[field];
+    // Reobserving the same sourced fact must not invalidate owner confirmation.
+    if (
+      next &&
+      previous &&
+      next.sourceUrl === previous.sourceUrl &&
+      canonicalJson(next.value) === canonicalJson(previous.value)
+    ) {
+      Object.assign(merged, { [field]: previous });
+    }
+  }
+  return merged;
 }
 
 async function digestCanonical(value: unknown): Promise<string> {

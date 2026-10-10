@@ -58,7 +58,7 @@ const ownerPocBusinessWriteSurface = [
     'application_operation',
   ),
   ownerPocRoute('items/[id]/personal/route.ts', ['PATCH'], 'coordinator'),
-  ownerPocRoute('items/[id]/route.ts', ['DELETE', 'PATCH'], 'fail_closed'),
+  ownerPocRoute('items/[id]/route.ts', ['DELETE', 'PATCH'], 'coordinator'),
   ownerPocRoute('items/route.ts', ['POST'], 'fail_closed'),
   ownerPocRoute('journal/[id]/route.ts', ['DELETE', 'PATCH'], 'coordinator'),
   ownerPocRoute('journal/route.ts', ['POST'], 'coordinator'),
@@ -146,13 +146,6 @@ void test('every owner business write is coordinated or fails closed before lega
         continue;
       }
       const handler = method.handlerStatements.join('\n');
-      if (
-        expected.filename === 'items/[id]/route.ts' &&
-        methodName === 'PATCH'
-      ) {
-        assert.match(handler, /getServerInvocationCoordinator\(\)/u);
-        continue;
-      }
       if (expected.ownerPocPolicy === 'coordinator') {
         assert.match(
           handler,

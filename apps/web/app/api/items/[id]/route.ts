@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 import { deleteAtlasItemResponse } from '@/app/api/destructive-responses';
-import { rejectUncoordinatedOwnerPocWrite } from '@/lib/server/application/owner-poc-write-policy';
 import { getServerAtlasApplication } from '@/lib/server/application/server-atlas-application';
 import { getServerInvocationCoordinator } from '@/lib/server/application/server-invocation-coordinator';
 import { withOwnerWriteAuth } from '@/lib/server/auth/owner-auth';
@@ -55,11 +54,8 @@ export const DELETE = withOwnerWriteAuth(async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const unavailable = rejectUncoordinatedOwnerPocWrite();
-  if (unavailable) return unavailable;
-  void request;
   const { id } = await context.params;
-  return deleteAtlasItemResponse(getServerAtlasApplication(), id);
+  return deleteAtlasItemResponse(getServerInvocationCoordinator(), request, id);
 });
 
 function parseAtlasItemEdit(input: unknown): AtlasItemEdit | undefined {

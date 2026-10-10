@@ -137,6 +137,56 @@ test('an unauthorized Atlas write requests Owner login and rejects without repor
   assert.equal(loginRequests, 1);
 });
 
+test('restaurant deletion sends a stable mutation ID and unwraps its receipt', async () => {
+  const calls = [];
+  const application = createBrowserAtlasApplication({
+    async request(url, init) {
+      calls.push({ url, init });
+      return mutationResponse(init, { id: 'place / 1', deleted: true });
+    },
+  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await application.execute({
+      key: 'catalog.delete_item',
+      input: { id: 'place / 1' },
+      mutationId: 'delete-place-one',
+    });
+    assert.deepEqual(result, { id: 'place / 1', deleted: true });
+  }
+  for (const { url, init } of calls) {
+    assert.equal(url, '/api/items/place%20%2F%201');
+    assert.equal(init.method, 'DELETE');
+    assert.equal(
+      new Headers(init.headers).get('x-atlas-mutation-id'),
+      'delete-place-one',
+    );
+  }
+});
+
+test('unauthorized restaurant deletion requests owner login', async () => {
+  let signals = 0;
+  const unsubscribe = subscribeOwnerLoginRequired(() => {
+    signals += 1;
+  });
+  try {
+    const application = createBrowserAtlasApplication({
+      async request() {
+        return new Response('Owner login is required.', { status: 401 });
+      },
+    });
+    await assert.rejects(
+      application.execute({
+        key: 'catalog.delete_item',
+        input: { id: 'place-1' },
+      }),
+      /Owner login is required/u,
+    );
+    assert.equal(signals, 1);
+  } finally {
+    unsubscribe();
+  }
+});
+
 test('catalog intake stores the server conversation, returns it on the next operation, and never sends owner identity', async () => {
   const calls = [];
   let storedConversation;
@@ -262,7 +312,8 @@ test('Browser AtlasApplication preserves every existing JSON route shape', async
       const isCoordinatedWrite =
         url.startsWith('/api/journal') ||
         url.startsWith('/api/media/') ||
-        (url.startsWith('/api/items/') && init?.method === 'PATCH');
+        (url.startsWith('/api/items/') &&
+          ['PATCH', 'DELETE'].includes(init?.method));
       return isCoordinatedWrite && init?.method !== undefined
         ? mutationResponse(init, { ok: true })
         : Response.json(isList ? [] : { ok: true });

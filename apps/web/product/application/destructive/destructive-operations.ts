@@ -85,16 +85,21 @@ export function createDestructiveOperationGroup(
       effect: 'destructive',
       validate: validateId,
     },
-    async handle({ id }) {
+    async handle({ id }, execution) {
       try {
         const context = await state.readItemDeletion(id);
         if (!itemProjection.project(context)) {
           return failure('not_found', 'Atlas item not found.');
         }
 
-        await state.commitItemDeletion(id, dependencies.clock.now());
+        const output: DeleteAtlasItemResult = { id, deleted: true };
+        await state.commitItemDeletion(
+          id,
+          dependencies.clock.now(),
+          execution?.atomicMutation?.receiptFor(output),
+        );
         await deleteObjectsBestEffort(objects, context.mediaObjectKeys);
-        return success({ id, deleted: true });
+        return success(output);
       } catch {
         return failure(
           'dependency_failure',

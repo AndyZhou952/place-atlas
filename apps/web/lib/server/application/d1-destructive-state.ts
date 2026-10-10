@@ -72,54 +72,66 @@ export class D1DestructiveState implements DestructiveRecordState {
     return toContext(row ?? { item_id: id });
   }
 
-  async commitItemDeletion(id: string, deletedAt: string): Promise<void> {
-    await this.#database.batch([
-      this.#database
-        .prepare('DELETE FROM visit_media WHERE item_id = ?')
-        .bind(id),
-      this.#database.prepare('DELETE FROM visits WHERE item_id = ?').bind(id),
-      this.#database
-        .prepare('DELETE FROM journal_entries WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM place_assessments WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_item_overrides WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_item_location_snapshots WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_item_tabelog_snapshots WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare(
-          'DELETE FROM atlas_item_reservation_snapshots WHERE item_id = ?',
-        )
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_place_identities WHERE item_id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_review_candidates WHERE id = ?')
-        .bind(id),
-      this.#database
-        .prepare('DELETE FROM atlas_google_rating_references WHERE item_id = ?')
-        .bind(id),
-      this.#database.prepare('DELETE FROM atlas_items WHERE id = ?').bind(id),
-      this.#database
-        .prepare(
-          `INSERT INTO atlas_item_tombstones (item_id, deleted_at)
+  async commitItemDeletion(
+    id: string,
+    deletedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void> {
+    await commitD1MutationAtomically(
+      this.#database,
+      [
+        this.#database
+          .prepare('DELETE FROM visit_media WHERE item_id = ?')
+          .bind(id),
+        this.#database.prepare('DELETE FROM visits WHERE item_id = ?').bind(id),
+        this.#database
+          .prepare('DELETE FROM journal_entries WHERE item_id = ?')
+          .bind(id),
+        this.#database
+          .prepare('DELETE FROM place_assessments WHERE item_id = ?')
+          .bind(id),
+        this.#database
+          .prepare('DELETE FROM atlas_item_overrides WHERE item_id = ?')
+          .bind(id),
+        this.#database
+          .prepare(
+            'DELETE FROM atlas_item_location_snapshots WHERE item_id = ?',
+          )
+          .bind(id),
+        this.#database
+          .prepare('DELETE FROM atlas_item_tabelog_snapshots WHERE item_id = ?')
+          .bind(id),
+        this.#database
+          .prepare(
+            'DELETE FROM atlas_item_reservation_snapshots WHERE item_id = ?',
+          )
+          .bind(id),
+        this.#database
+          .prepare('DELETE FROM atlas_place_identities WHERE item_id = ?')
+          .bind(id),
+        this.#database
+          .prepare('DELETE FROM atlas_review_candidates WHERE id = ?')
+          .bind(id),
+        this.#database
+          .prepare(
+            'DELETE FROM atlas_google_rating_references WHERE item_id = ?',
+          )
+          .bind(id),
+        this.#database.prepare('DELETE FROM atlas_items WHERE id = ?').bind(id),
+        this.#database
+          .prepare(
+            `INSERT INTO atlas_item_tombstones (item_id, deleted_at)
            VALUES (?, ?)
            ON CONFLICT(item_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
-        )
-        .bind(id, deletedAt),
-      this.#database.prepare(
-        'UPDATE atlas_catalog_revision ' +
-          'SET revision_number = revision_number + 1 WHERE singleton = 1',
-      ),
-    ]);
+          )
+          .bind(id, deletedAt),
+        this.#database.prepare(
+          'UPDATE atlas_catalog_revision ' +
+            'SET revision_number = revision_number + 1 WHERE singleton = 1',
+        ),
+      ],
+      atomicCommit,
+    );
   }
 }
 

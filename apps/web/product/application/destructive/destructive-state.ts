@@ -26,7 +26,11 @@ export interface DestructiveRecordState {
   ): Promise<void>;
   readItemDeletion(id: string): Promise<DestructiveItemContext>;
   /** Atomically removes all structured item records and writes its tombstone. */
-  commitItemDeletion(id: string, deletedAt: string): Promise<void>;
+  commitItemDeletion(
+    id: string,
+    deletedAt: string,
+    atomicCommit?: AtomicMutationCommit,
+  ): Promise<void>;
 }
 
 export interface DestructiveMediaObjects {

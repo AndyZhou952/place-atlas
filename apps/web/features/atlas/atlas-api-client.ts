@@ -247,10 +247,11 @@ export function createBrowserAtlasApplication(
           body: JSON.stringify(edit),
         },
       ),
-    'catalog.delete_item': ({ id }) =>
-      requestJson(
+    'catalog.delete_item': ({ id }, mutationId) =>
+      requestMutationJson(
         transport,
         browserOperationPath('catalog.delete_item', { id }),
+        mutationId,
         {
           method: browserOperationHttpCatalog['catalog.delete_item'].method,
         },

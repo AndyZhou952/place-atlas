@@ -96,6 +96,15 @@
       "expectedTabelogUrl": "https://tabelog.com/tokyo/A1304/A130401/13295399/",
       "expectedReservationMode": "not_reservable",
       "expectedCategoryIncludes": "カレー"
+    },
+    {
+      "id": "maison-landemaine-atre-ebisu-voice",
+      "query": "メゾン　ランドｳメンヌ　アトレ",
+      "candidateNameIncludes": "Maison Landemaine",
+      "expectedTitleIncludes": "メゾン ランドゥメンヌ アトレ恵比寿",
+      "expectedTabelogUrl": "https://tabelog.com/tokyo/A1303/A130302/13255915/",
+      "expectedReservationMode": "not_reservable",
+      "expectedCategoryIncludes": "洋菓子"
     }
   ]
 }

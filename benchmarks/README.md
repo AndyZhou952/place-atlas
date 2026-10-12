@@ -23,6 +23,8 @@ npm run benchmark:place-enrichment
 | `nearby/`           | Origin interpretation, cuisine/visit constraints and verified route limits                           | Controlled catalog and provider observations; rejects invented identities and travel times          |
 | `recommend/`        | Intent, dialogue continuation, decision and UI/API contract                                          | Distinct intent, decision and journey fixtures; separate production harness and model-only baseline |
 
+The branch-alias suite retains one active `branch-alias.v1.json` dataset. It checks small-ゥ dictation spelling with width/kana normalization, source-backed location recovery despite model failure, and rejection of wrong branches, blocked sources and review URLs. Separate coordinator checks validate a publishable preview or zero publication calls when location is unverified. The live Add manifest exercises the same spelling through discover/select/cancel.
+
 A passing offline test proves only its controlled behavior. A live model run additionally measures model output and provider availability. A browser/database journey must establish confirmation, persistence and readback separately. Keep these results and case counts separate.
 
 ## Dataset and prediction contracts

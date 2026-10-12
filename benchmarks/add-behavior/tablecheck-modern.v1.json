@@ -54,6 +54,21 @@
       "address": "東京都新宿区河田町10-10",
       "bookingName": "小笠原伯爵邸カフェ",
       "expected": false
+    },
+    {
+      "id": "official-origin-hint-with-short-address",
+      "postcode": "162-0054",
+      "address": "東京都新宿区河田町10-10",
+      "officialDiscovery": true,
+      "expected": true
+    },
+    {
+      "id": "official-origin-other-merchant-hint-rejected",
+      "postcode": "162-0054",
+      "address": "東京都新宿区河田町10-10",
+      "bookingName": "小笠原伯爵邸カフェ",
+      "officialDiscovery": true,
+      "expected": false
     }
   ]
 }

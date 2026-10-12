@@ -123,20 +123,27 @@ for (const scenario of [
                       content: `${capture.name} ${capture.address}`,
                     },
                   ]
-                : [
-                    {
-                      url: capture.pickupUrl,
-                      title: '小笠原伯爵邸（テイクアウト・デリバリー）',
-                      content: 'Pickup only',
-                    },
-                    {
-                      url: `${capture.bookingUrl}?service_category_id=other`,
-                      title: scenario.bookingName,
-                      content: capture.bookingWindowLabel,
-                    },
-                  ],
+                : scenario.officialDiscovery
+                  ? []
+                  : [
+                      {
+                        url: capture.pickupUrl,
+                        title: '小笠原伯爵邸（テイクアウト・デリバリー）',
+                        content: 'Pickup only',
+                      },
+                      {
+                        url: `${capture.bookingUrl}?service_category_id=other`,
+                        title: scenario.bookingName,
+                        content: capture.bookingWindowLabel,
+                      },
+                    ],
           });
         }
+        if (scenario.officialDiscovery && url === capture.officialWebsite)
+          return new Response(
+            `<title>${capture.name}</title><p>${capture.name} 〒162-0054 ${capture.address}</p><a href="${capture.bookingUrl}">ご予約</a>`,
+            { headers: { 'content-type': 'text/html' } },
+          );
         if (url === capture.pickupUrl)
           return new Response(
             merchantHtml(
@@ -176,7 +183,13 @@ for (const scenario of [
           '10-10 Kawadachō, Shinjuku City, Tokyo 162-0054, Japan',
       },
     });
-    assert.equal(searches, scenario.id === 'wrong-selected-street' ? 1 : 2);
+    assert.equal(
+      searches,
+      scenario.id === 'wrong-selected-street' ||
+        (scenario.officialDiscovery && scenario.expected)
+        ? 1
+        : 2,
+    );
     assert.equal(
       result.kind,
       scenario.id === 'wrong-selected-street' ? 'unavailable' : 'observed',

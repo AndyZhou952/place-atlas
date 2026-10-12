@@ -39,6 +39,116 @@
       "listingAlias": "VERVE COFFEE ROASTERS",
       "streetAddress": "六本木5-16-8",
       "expectedKnown": false
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": true,
+      "caseId": "maison-voice-halfwidth-u-sparse-model"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾンランドｳメンヌアトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": true,
+      "caseId": "maison-voice-glued-name-invalid-model",
+      "model": "invalid_json"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン ランドウメンヌ アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": true,
+      "caseId": "maison-fullwidth-u-model-outage",
+      "model": "http_error"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン ランドゥメンヌ アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": true,
+      "caseId": "maison-canonical-small-u-control"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-6 アトレ恵比寿 本館 3F",
+      "expectedKnown": false,
+      "caseId": "maison-voice-wrong-street-rejected"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 別館 3F",
+      "expectedKnown": false,
+      "caseId": "maison-voice-wrong-building-and-postcode-rejected",
+      "postalCode": "1500013"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "OTHER BAKERY",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": false,
+      "caseId": "maison-voice-other-business-same-building-rejected",
+      "listedName": "メゾン ランドメンヌ アトレ恵比寿"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": false,
+      "caseId": "maison-voice-blocked-source-stays-unknown",
+      "source": "blocked"
+    },
+    {
+      "fixture": "maison",
+      "ownerQuery": "メゾン　ランドｳメンヌ　アトレ",
+      "listingAlias": "MAISON LANDEMAINE",
+      "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+      "expectedKnown": false,
+      "caseId": "maison-voice-review-url-cannot-supply-location",
+      "source": "review_url"
     }
-  ]
+  ],
+  "revision": 2,
+  "additionalFixtures": {
+    "maison": {
+      "captureClass": "independently_verified_web_capture",
+      "capturedAt": "2026-10-12T11:51:00.712Z",
+      "evidenceNotes": "Minimal exact-listing JSON-LD and business-row capture. Score is a dated snapshot; negative controls are synthetic mutations. Selected name/address are the bilingual fixture input.",
+      "officialBranchUrl": "https://www.maisonlandemainejapon.com/access",
+      "selectedSubject": {
+        "providerNamespace": "google-places",
+        "placeId": "ChIJCS79bMCLGGARsLOY3SPtUQc",
+        "transientName": "Maison Landemaine atré Ebisu",
+        "transientAddress": "Japan, 〒150-0022 Tokyo, Shibuya, Ebisuminami, 1-chōme−5−５ アトレ恵比寿本館 ３階"
+      },
+      "listing": {
+        "sourceUrl": "https://tabelog.com/tokyo/A1303/A130302/13255915/",
+        "name": "メゾン ランドゥメンヌ アトレ恵比寿",
+        "alias": "MAISON LANDEMAINE",
+        "addressRegion": "東京都",
+        "addressLocality": "渋谷区",
+        "streetAddress": "恵比寿南1-5-5 アトレ恵比寿 本館 3F",
+        "postalCode": "1500022",
+        "aggregateScore": 3.55,
+        "coordinates": {
+          "latitude": 35.64715095871963,
+          "longitude": 139.70978872407989
+        },
+        "categories": "パン、洋菓子、カフェ",
+        "reservation": "予約不可",
+        "officialWebsite": "https://www.maisonlandemainejapon.com/"
+      }
+    }
+  }
 }

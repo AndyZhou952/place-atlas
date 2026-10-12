@@ -170,6 +170,12 @@ export function createPlaceResearchAgent(
           ? await config.sourceReader(url, signal)
           : await readTabelogListingResult(url, fetcher, signal);
         diagnostic(`listing_read_${result.kind}`);
+        if (result.kind === 'read')
+          diagnostic(
+            result.evidence.restaurant?.coordinates
+              ? 'tabelog_listing_read_geo'
+              : 'tabelog_listing_read_no_geo',
+          );
         if (result.kind === 'read') return result.evidence;
         if (result.kind === 'blocked') sourceAccessIssue = 'blocked';
         else sourceAccessIssue ??= 'unavailable';
@@ -973,6 +979,13 @@ export function createPlaceResearchAgent(
                     source.restaurant.name,
                   )),
           );
+          diagnostic(
+            matchedListing
+              ? 'parsed_listing_branch_match'
+              : evidence.some((source) => source.restaurant)
+                ? 'parsed_listing_branch_mismatch'
+                : 'parsed_listing_missing',
+          );
           // The parsed main listing has its own branch check. Do not discard
           // those independently verified facts because the model is uncertain.
           if (
@@ -1756,6 +1769,9 @@ function matchesSelectedBranch(
       .replace(/[ァ-ヶ]/gu, (char) =>
         String.fromCharCode(char.charCodeAt(0) - 0x60),
       )
+      // Dictation can expand small ゥ to ウ (including half-width ｳ).
+      // Fold this spelling while retaining all other letters and branch checks.
+      .replace(/ぅ/gu, 'う')
       .replace(/\brd\b/gu, 'road')
       .replace(/\bst\b/gu, 'street')
       .replace(/\bave\b/gu, 'avenue')

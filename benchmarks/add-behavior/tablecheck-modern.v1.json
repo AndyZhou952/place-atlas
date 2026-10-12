@@ -28,5 +28,32 @@
       "officialHost": "ogasawaratei.com",
       "selectedAddress": "10-11 Kawadachō, Shinjuku City, Tokyo 162-0054, Japan"
     }
+  ],
+  "sidebarCases": [
+    {
+      "id": "sidebar-postcode-exact-branch",
+      "postcode": "162-0054",
+      "address": "東京都新宿区河田町10-10",
+      "expected": true
+    },
+    {
+      "id": "sidebar-conflicting-postcode",
+      "postcode": "162-0055",
+      "address": "東京都新宿区河田町10-10",
+      "expected": false
+    },
+    {
+      "id": "sidebar-other-street",
+      "postcode": "162-0054",
+      "address": "東京都新宿区河田町10-11",
+      "expected": false
+    },
+    {
+      "id": "sidebar-other-business",
+      "postcode": "162-0054",
+      "address": "東京都新宿区河田町10-10",
+      "bookingName": "小笠原伯爵邸カフェ",
+      "expected": false
+    }
   ]
 }

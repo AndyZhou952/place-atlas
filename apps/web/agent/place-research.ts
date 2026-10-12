@@ -363,9 +363,20 @@ export function createPlaceResearchAgent(
           };
           diagnostic('official_booking_link_verified');
         }
+        // A verified official origin can discover merchant links even when its
+        // page lacks a branch-scoped address. These are hints, not claims: the
+        // merchant reader still verifies its own name, street and postcode or
+        // corroborated official host before any booking facts are accepted.
+        const bookingHints = [
+          ...new Map(
+            pages
+              .flatMap((page) => page.bookingLinks)
+              .map((link) => [link.url, link]),
+          ).values(),
+        ];
         await readSelectedBookingPage(
-          declared.map((link) => ({
-            title: 'Official booking link',
+          bookingHints.map((link) => ({
+            title: 'Official-origin booking hint',
             content: '',
             url: link.url,
           })),

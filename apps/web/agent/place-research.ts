@@ -256,7 +256,7 @@ export function createPlaceResearchAgent(
                 selected.transientAddress,
                 selected.ownerQuery,
                 booking.address,
-                undefined,
+                booking.postalCode,
                 booking.name,
               )
             : false;

@@ -5,6 +5,7 @@ export interface TableCheckBookingEvidence extends SearchEvidence {
   readonly booking: {
     readonly name: string;
     readonly address?: string;
+    readonly postalCode?: string;
     readonly officialWebsiteHost?: string;
     readonly bookingWindowLabel?: string;
     readonly advanceDays?: number;
@@ -146,10 +147,14 @@ export function parseTableCheckBookingPage(
     const timing = explicitReservationTiming(policyText);
     // A working booking form need not publish a booking window. Keep the
     // branch address separately from policy so timing never gates the URL.
-    const address =
-      /class=["'][^"']*resreview-sidebar-content[^"']*["'][^>]*>\s*〒\d{3}-\d{4}\s*([^<]{8,220})<\/div>/iu.exec(
+    const addressRow =
+      /class=["'][^"']*resreview-sidebar-content[^"']*["'][^>]*>\s*〒(\d{3}-\d{4})\s*([^<]{8,220})<\/div>/iu.exec(
         html,
-      )?.[1];
+      );
+    const address = addressRow?.[2];
+    // Keep the postcode attached to this branch address, never a footer or
+    // policy mention. Short Japanese street numbers need both for identity.
+    const postalCode = addressRow?.[1].replace('-', '');
     const officialWebsiteHost = [
       ...policy.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/giu),
     ]
@@ -185,6 +190,7 @@ export function parseTableCheckBookingPage(
       booking: {
         name,
         ...(address ? { address: decode(address).trim() } : {}),
+        ...(postalCode ? { postalCode } : {}),
         ...(officialWebsiteHost ? { officialWebsiteHost } : {}),
         ...timing,
       },

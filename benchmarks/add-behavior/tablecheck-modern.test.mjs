@@ -79,6 +79,11 @@ for (const scenario of [
     expected: true,
   },
   ...capture.negativeCases.map((entry) => ({ ...entry, expected: false })),
+  ...capture.sidebarCases.map((entry) => ({
+    ...entry,
+    bookingName: entry.bookingName ?? capture.name,
+    officialHost: 'unused.example',
+  })),
 ]) {
   test(`modern TableCheck research: ${scenario.id}`, async () => {
     let searches = 0;
@@ -142,7 +147,14 @@ for (const scenario of [
           );
         if (url === capture.bookingUrl)
           return new Response(
-            merchantHtml(scenario.bookingName, scenario.officialHost),
+            scenario.postcode
+              ? merchantHtml(
+                  scenario.bookingName,
+                  scenario.officialHost,
+                  '個室のご案内',
+                ) +
+                  `<div class="resreview-sidebar-content">〒${scenario.postcode} ${scenario.address}</div>`
+              : merchantHtml(scenario.bookingName, scenario.officialHost),
             {
               headers: { 'content-type': 'text/html' },
             },
@@ -178,3 +190,18 @@ for (const scenario of [
     }
   });
 }
+
+test('modern sidebar postcode belongs to the same parsed address row', () => {
+  const html =
+    merchantHtml(capture.name, 'unused.example', '個室のご案内') +
+    `<div class="resreview-sidebar-content">〒162-0054 ${capture.address}</div>`;
+  const parsed = parseTableCheckBookingPage(html, capture.bookingUrl);
+  assert.equal(parsed.booking.postalCode, capture.postalCode);
+  assert.equal(parsed.booking.address, capture.address);
+  assert.equal(parsed.booking.officialWebsiteHost, undefined);
+  const unrelated = parseTableCheckBookingPage(
+    html.replace('〒162-0054', '〒bad-code') + '<footer>〒162-0054</footer>',
+    capture.bookingUrl,
+  );
+  assert.equal(unrelated, undefined);
+});

@@ -77,3 +77,29 @@ test('a denied or less complete fallback cannot erase supported primary facts', 
     kind: 'blocked',
   });
 });
+
+test('a complete bilingual identity read does not require coordinates or another transport', async () => {
+  const evidence = {
+    kind: 'read',
+    evidence: {
+      url: listingUrl.replace('tabelog.com/', 'tabelog.com/en/'),
+      title: 'Canariya',
+      content: 'Canariya (カナリヤ) 東京都新宿区新宿6-11-2',
+      nameBridge: {
+        name: 'Canariya',
+        japaneseName: 'カナリヤ',
+        address: '東京都新宿区新宿6-11-2',
+      },
+    },
+  };
+  const reader = withSameListingFallback(
+    async () => evidence,
+    async () => {
+      assert.fail('a complete name bridge must not spend a transport retry');
+    },
+  );
+  assert.deepEqual(
+    await reader(evidence.evidence.url, new AbortController().signal),
+    evidence,
+  );
+});

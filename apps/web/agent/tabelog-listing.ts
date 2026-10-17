@@ -2,6 +2,13 @@ import { isTabelogRestaurantListing } from './research-instructions.ts';
 import { readBoundedText, type SearchEvidence } from './web-search.ts';
 
 export interface TabelogEvidence extends SearchEvidence {
+  englishListingUrl?: string;
+  nameBridge?: {
+    name: string;
+    japaneseName: string;
+    address: string;
+    postalCode?: string;
+  };
   restaurant?: {
     name: string;
     aliases?: string[];
@@ -121,6 +128,54 @@ export function parseTabelogListing(
     /^\d{7}$/u.test(address.postalCode)
       ? address.postalCode
       : undefined;
+  // Localized pages can omit JSON-LD streetAddress. Read only their paired
+  // header names and explicit address row as an identity bridge, never as a
+  // substitute source of Japanese listing facts.
+  if (new URL(sourceUrl).pathname.startsWith('/en/')) {
+    const clean = (value: string) =>
+      value
+        .replace(/<[^>]*>/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .trim();
+    const header =
+      /<h2\b[^>]*class=["']display-name["'][^>]*>([\s\S]*?)<\/h2>\s*<span\b[^>]*class=["']alias["'][^>]*>[（(]([^<>]+)[）)]<\/span>/iu.exec(
+        html,
+      );
+    const addressRow =
+      /<th[^>]*>\s*Address\s*<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/iu.exec(
+        html,
+      )?.[1];
+    const street =
+      addressRow &&
+      /<p\b[^>]*class=["']rstinfo-table__address["'][^>]*>([\s\S]*?)<\/p>/iu.exec(
+        addressRow,
+      )?.[1];
+    const name = typeof record.name === 'string' ? record.name.trim() : '';
+    const japaneseName = header?.[2]?.trim();
+    const listedAddress = street && clean(street);
+    if (
+      !header ||
+      clean(header[1]) !== name ||
+      !name ||
+      name.length > 300 ||
+      !japaneseName ||
+      japaneseName.length > 300 ||
+      !listedAddress ||
+      listedAddress.length > 500
+    )
+      return undefined;
+    return {
+      url: sourceUrl,
+      title: name,
+      content: `${name} (${japaneseName}) ${listedAddress}`,
+      nameBridge: {
+        name,
+        japaneseName,
+        address: listedAddress,
+        ...(postalCode ? { postalCode } : {}),
+      },
+    };
+  }
   const rating = record.aggregateRating as Record<string, unknown> | undefined;
   const name = typeof record.name === 'string' ? record.name.trim() : '';
   const parts = ['addressRegion', 'addressLocality', 'streetAddress'].map(
@@ -423,7 +478,18 @@ export function parseTabelogListing(
     ...(introduction ? { introduction } : {}),
     ...(website ? { officialWebsite: clean(website) } : {}),
   };
+  const englishUrl = new URL(sourceUrl);
+  englishUrl.pathname = '/en' + englishUrl.pathname;
+  englishUrl.search = '';
+  englishUrl.hash = '';
+  const hasEnglishAlternate = [...html.matchAll(/<link\b[^>]*>/giu)].some(
+    ([tag]) =>
+      /\brel=["']alternate["']/iu.test(tag) &&
+      /\bhreflang=["']en["']/iu.test(tag) &&
+      /\bhref=["']([^"']+)["']/iu.exec(tag)?.[1] === englishUrl.href,
+  );
   return {
+    ...(hasEnglishAlternate ? { englishListingUrl: englishUrl.href } : {}),
     url: sourceUrl,
     title: name,
     content: `${[name, ...aliases, parts.join('')].join(' ')}${score === undefined ? '' : `\nTabelog aggregate restaurant rating: ${score.toFixed(2)}`}\nRestaurant facts: ${JSON.stringify(restaurant)}`,

@@ -353,3 +353,149 @@ for (const caseId of [
     }
   });
 }
+
+// Synthetic paired-language listing: the localized JSON-LD intentionally has
+// no streetAddress, while its exact-branch business row retains the address.
+for (const variant of [
+  'verified',
+  'model_outage',
+  'wrong_street',
+  'wrong_postcode',
+  'wrong_japanese_name',
+  'wrong_english_name',
+  'wrong_listing_id',
+  'blocked',
+  'unavailable',
+  'review_only_alias',
+  'missing_alternate',
+  'untrusted_alternate',
+]) {
+  test(`Add paired-language identity: ${variant}`, async () => {
+    const url = 'https://tabelog.com/tokyo/A1304/A130401/19990001/';
+    const englishUrl = url.replace('tabelog.com/', 'tabelog.com/en/');
+    const address = '東京都新宿区新宿6-11-2';
+    const record = {
+      '@type': 'Restaurant',
+      '@id': url,
+      name: 'カナリヤ 新宿店',
+      address: {
+        addressRegion: '東京都',
+        addressLocality: '新宿区',
+        streetAddress: '新宿6-11-2',
+        postalCode: '1600022',
+      },
+      geo: { latitude: 35.69, longitude: 139.7 },
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: '3.45' },
+      servesCuisine: 'ネパール料理',
+    };
+    const script = (data) =>
+      `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+    const primary = parseTabelogListing(
+      script(record) +
+        (variant === 'missing_alternate'
+          ? ''
+          : `<link href="${variant === 'untrusted_alternate' ? englishUrl.replace('19990001', '19990002') : englishUrl}" hreflang="en" rel="alternate"/>`) +
+        '<table><tr><th>予約可否</th><td>予約可</td></tr></table>',
+      url,
+    );
+    const englishName =
+      variant === 'wrong_english_name'
+        ? 'Other Restaurant'
+        : 'Canariya Shinjuku ten';
+    const japaneseName =
+      variant === 'wrong_japanese_name' ? '別店舗 新宿店' : record.name;
+    const translated = parseTabelogListing(
+      script({
+        ...record,
+        '@id':
+          variant === 'wrong_listing_id'
+            ? englishUrl.replace('19990001', '19990002')
+            : englishUrl,
+        name: englishName,
+        address: {
+          ...record.address,
+          streetAddress: '',
+          postalCode: variant === 'wrong_postcode' ? '1600000' : '1600022',
+        },
+      }) +
+        (variant === 'review_only_alias'
+          ? `<article>${englishName} (${japaneseName})</article>`
+          : `<h2 class="display-name"><span>${englishName}</span></h2><span class="alias">(${japaneseName})</span>`) +
+        `<table><tr><th>Address</th><td><p class="rstinfo-table__address">${variant === 'wrong_street' ? address.replace('6-11-2', '6-11-3') : address}</p></td></tr></table>`,
+      englishUrl,
+    );
+    const reads = [];
+    const diagnostics = [];
+    const agent = createPlaceResearchAgent({
+      apiKey: 'test',
+      model: 'test',
+      baseUrl: 'https://model.example/v1',
+      searchApiKey: 'test',
+      onDiagnostic: (code) => diagnostics.push(code),
+      sourceReader: async (target) => {
+        reads.push(target);
+        if (target === url) return { kind: 'read', evidence: primary };
+        assert.equal(target, englishUrl);
+        if (variant === 'blocked' || variant === 'unavailable')
+          return { kind: variant };
+        return translated
+          ? { kind: 'read', evidence: translated }
+          : { kind: 'invalid_source' };
+      },
+      fetch: async (target, init) => {
+        assert.doesNotMatch(
+          init.body,
+          /wrong_street|expectedKnown|wrong_postcode/u,
+        );
+        if (target === 'https://api.tavily.com/search')
+          return Response.json({
+            results: [{ url, title: record.name, content: address }],
+          });
+        assert.equal(target, 'https://model.example/v1/chat/completions');
+        return variant === 'model_outage'
+          ? Response.json({}, { status: 503 })
+          : Response.json({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({ subjectMatch: 'uncertain' }),
+                  },
+                },
+              ],
+            });
+      },
+    });
+    const result = await agent.research({
+      phase: 'initial',
+      selectedSubject: {
+        providerNamespace: 'google-places',
+        placeId: 'synthetic-place',
+        transientName: 'Canariya Shinjuku',
+        transientAddress:
+          '6-chōme-11-2 Shinjuku, Shinjuku City, Tokyo 160-0022, Japan',
+        ownerQuery: 'Canariya Shinjuku',
+      },
+      scope: { ownerId: 'benchmark', channel: 'web', conversationId: 'test' },
+      sessionId: 'test',
+      expectedSessionVersion: 1,
+      queryOrUrlsDigest: 'test',
+    });
+    const expectedKnown = ['verified', 'model_outage'].includes(variant);
+    assert.equal(
+      result.value?.profile?.coordinates?.sourceUrl === url,
+      expectedKnown,
+    );
+    assert.equal(result.value?.tabelog?.status === 'known', expectedKnown);
+    if (expectedKnown) {
+      assert.deepEqual(result.value.profile.coordinates.value, record.geo);
+      assert.equal(result.value.profile.name.value, record.name);
+      assert.equal(result.value.reservation.mode, 'reservable');
+      assert.ok(diagnostics.includes('listing_name_bridge_verified'));
+    }
+    assert.ok(reads.length <= 2);
+    assert.ok(reads.every((target) => target === url || target === englishUrl));
+    if (expectedKnown) assert.deepEqual(reads, [url, englishUrl]);
+    if (variant === 'missing_alternate' || variant === 'untrusted_alternate')
+      assert.deepEqual(reads, [url]);
+  });
+}

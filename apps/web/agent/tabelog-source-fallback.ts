@@ -17,7 +17,8 @@ export function withSameListingFallback(
     );
     if (
       signal.aborted ||
-      (first.kind === 'read' && first.evidence.restaurant?.coordinates)
+      (first.kind === 'read' &&
+        (first.evidence.restaurant?.coordinates || first.evidence.nameBridge))
     )
       return first;
     const second = await fallback(url, signal);

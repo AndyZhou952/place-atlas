@@ -165,6 +165,7 @@ export function createPlaceResearchAgent(
       const readUrls = new Set<string>();
       const usedCallIds = new Set<string>();
       let sourceAccessIssue: 'blocked' | 'unavailable' | undefined;
+      let nameBridgeRead = false;
       const readListing = async (url: string) => {
         const result = config.sourceReader
           ? await config.sourceReader(url, signal)
@@ -176,7 +177,83 @@ export function createPlaceResearchAgent(
               ? 'tabelog_listing_read_geo'
               : 'tabelog_listing_read_no_geo',
           );
-        if (result.kind === 'read') return result.evidence;
+        if (result.kind === 'read') {
+          const page = result.evidence;
+          const details = page.restaurant;
+          const subject = input.selectedSubject;
+          if (
+            details &&
+            page.englishListingUrl &&
+            !nameBridgeRead &&
+            readUrls.size < 3 &&
+            /[a-z]/iu.test(subject.transientName) &&
+            !matchesSelectedBranch(
+              `${details.name} ${details.aliases?.join(' ') ?? ''} ${details.address}`,
+              subject.transientName,
+              subject.transientAddress,
+              subject.ownerQuery,
+              details.address,
+              details.postalCode,
+              details.name,
+            )
+          ) {
+            nameBridgeRead = true;
+            const englishUrl = new URL(url);
+            englishUrl.pathname = '/en' + englishUrl.pathname;
+            englishUrl.search = '';
+            englishUrl.hash = '';
+            if (page.englishListingUrl === englishUrl.href) {
+              readUrls.add(englishUrl.href);
+              try {
+                const translated = config.sourceReader
+                  ? await config.sourceReader(englishUrl.href, signal)
+                  : await readTabelogListingResult(
+                      englishUrl.href,
+                      fetcher,
+                      signal,
+                    );
+                diagnostic(`listing_name_bridge_${translated.kind}`);
+                const bridge =
+                  translated.kind === 'read' &&
+                  translated.evidence.url === englishUrl.href
+                    ? translated.evidence.nameBridge
+                    : undefined;
+                const key = (text: string) =>
+                  text.normalize('NFKC').replace(/[\p{P}\p{Z}\s]/gu, '');
+                if (
+                  bridge &&
+                  key(bridge.japaneseName) === key(details.name) &&
+                  key(bridge.address) === key(details.address) &&
+                  (!details.postalCode ||
+                    bridge.postalCode === details.postalCode) &&
+                  matchesSelectedBranch(
+                    `${bridge.name} ${details.name} ${details.address}`,
+                    subject.transientName,
+                    subject.transientAddress,
+                    subject.ownerQuery,
+                    details.address,
+                    details.postalCode,
+                    details.name,
+                  )
+                ) {
+                  diagnostic('listing_name_bridge_verified');
+                  return {
+                    ...page,
+                    content: `${page.content}\nSame-listing bilingual identity (${englishUrl.href}): ${translated.kind === 'read' ? translated.evidence.content : ''}`,
+                    restaurant: {
+                      ...details,
+                      aliases: [...(details.aliases ?? []), bridge.name],
+                    },
+                  };
+                }
+                diagnostic('listing_name_bridge_rejected');
+              } catch {
+                diagnostic('listing_name_bridge_unavailable');
+              }
+            }
+          }
+          return page;
+        }
         if (result.kind === 'blocked') sourceAccessIssue = 'blocked';
         else sourceAccessIssue ??= 'unavailable';
         return undefined;

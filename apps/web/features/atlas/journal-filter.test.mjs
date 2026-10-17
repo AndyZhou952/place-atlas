@@ -93,3 +93,67 @@ test('same-day visits keep their input order as a deterministic tie-breaker', ()
     ['later', 'earlier'],
   );
 });
+
+test('sorts by the displayed overall place score, with repeat visits newest first', () => {
+  const itemsById = new Map([
+    ['a', { personalRating: 4 }],
+    ['b', { personalRating: 3.5 }],
+  ]);
+  const input = visits.map((visit) => ({ ...visit, privateVisitScore: 5 }));
+  assert.deepEqual(
+    sortJournalVisits(input, 'score-desc', itemsById).map((visit) => visit.id),
+    ['2', '1', '3'],
+  );
+  assert.deepEqual(
+    sortJournalVisits(input, 'score-asc', itemsById).map((visit) => visit.id),
+    ['3', '2', '1'],
+  );
+  assert.deepEqual(
+    input.map((visit) => visit.id),
+    ['1', '2', '3'],
+  );
+});
+
+test('score sorting puts unscored and missing places last in both directions, preserving zero', () => {
+  const input = [
+    ...visits,
+    { id: '4', itemId: 'c', visitedAt: '2026-10-02', createdAt: '2026-10-02' },
+    {
+      id: '5',
+      itemId: 'missing',
+      visitedAt: '2026-10-03',
+      createdAt: '2026-10-03',
+    },
+  ];
+  const itemsById = new Map([
+    ['a', { personalRating: 4 }],
+    ['b', { personalRating: 0 }],
+    ['c', {}],
+  ]);
+  assert.deepEqual(
+    sortJournalVisits(input, 'score-desc', itemsById).map((visit) => visit.id),
+    ['2', '1', '3', '5', '4'],
+  );
+  assert.deepEqual(
+    sortJournalVisits(input, 'score-asc', itemsById).map((visit) => visit.id),
+    ['3', '2', '1', '5', '4'],
+  );
+});
+
+test('equal scores across places use visit date, input time, then ID', () => {
+  const input = [
+    { id: 'c', itemId: 'a', visitedAt: '2026-10-01', createdAt: '2026-10-03' },
+    { id: 'b', itemId: 'b', visitedAt: '2026-10-01', createdAt: '2026-10-04' },
+    { id: 'a', itemId: 'a', visitedAt: '2026-10-01', createdAt: '2026-10-04' },
+  ];
+  const itemsById = new Map([
+    ['a', { personalRating: 4 }],
+    ['b', { personalRating: 4 }],
+  ]);
+  for (const sort of ['score-desc', 'score-asc']) {
+    assert.deepEqual(
+      sortJournalVisits(input, sort, itemsById).map((visit) => visit.id),
+      ['a', 'b', 'c'],
+    );
+  }
+});

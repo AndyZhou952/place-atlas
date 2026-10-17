@@ -5,10 +5,6 @@ import type {
 import { failure, type Result } from '../../product/application/result.ts';
 
 const providerNamespace = 'google-places';
-const attribution = {
-  label: 'Google Maps',
-  url: 'https://maps.google.com/',
-} as const;
 
 export interface GooglePlacesTransientPlace {
   readonly placeId: string;
@@ -173,16 +169,30 @@ function toCandidate(
   place: GooglePlacesTransientPlace,
   ordinal: number,
 ): GooglePlaceDiscoveryCandidate {
+  const placeId = place.placeId.normalize('NFC').trim();
+  const name = place.name.normalize('NFC').trim();
+  const address = place.address.normalize('NFC').trim();
+  // Maps URLs require both api=1 and a query, even when targeting a place ID.
+  // The name and address also identify the branch if Maps cannot resolve the ID.
+  const mapsUrl = new URL('https://www.google.com/maps/search/');
+  mapsUrl.search = new URLSearchParams({
+    api: '1',
+    query: `${name} ${address}`,
+    query_place_id: placeId,
+  }).toString();
   return {
     durableIdentity: {
       providerNamespace,
-      placeId: place.placeId.normalize('NFC').trim(),
+      placeId,
       ordinal,
     },
     transientPresentation: {
-      name: place.name.normalize('NFC').trim(),
-      address: place.address.normalize('NFC').trim(),
-      attribution,
+      name,
+      address,
+      attribution: {
+        label: 'Google Maps',
+        url: mapsUrl.href,
+      },
     },
   };
 }

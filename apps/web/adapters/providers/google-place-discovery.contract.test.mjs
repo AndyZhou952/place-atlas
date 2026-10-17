@@ -81,10 +81,74 @@ test('Google transient refetch returns one attributed request-scoped presentatio
       address: 'Address place-a',
       attribution: {
         label: 'Google Maps',
-        url: 'https://maps.google.com/',
+        url: 'https://www.google.com/maps/search/?api=1&query=Name+place-a+Address+place-a&query_place_id=place-a',
       },
     },
   });
+});
+
+test('each restaurant branch links to its own Maps place in discovery and refetch', async () => {
+  const places = [
+    {
+      placeId: 'ChIJ-shinjuku-now',
+      relevance: 1,
+      name: 'スシロー',
+      address: '東京都新宿区新宿3-37-12 新宿NOWA 3F',
+    },
+    {
+      placeId: 'ChIJ-shinjuku-3chome',
+      relevance: 0.9,
+      name: 'スシロー',
+      address: '東京都新宿区新宿3-13-3 B1F',
+    },
+    {
+      placeId: 'ChIJ+west&branch=3#entry',
+      relevance: 0.8,
+      name: 'Sushiro & Sushi / 新宿西口',
+      address: '東京都新宿区西新宿1-1-1, 2F #3',
+    },
+  ];
+  const adapter = createGooglePlaceDiscoveryAdapter({
+    async searchText() {
+      return { ok: true, value: { places, hasMore: false } };
+    },
+    async getPlace({ placeId }) {
+      return {
+        ok: true,
+        value: places.find((place) => place.placeId === placeId),
+      };
+    },
+  });
+
+  const discovered = await adapter.discover({ query: 'sushiro shinjuku' });
+  assert.equal(discovered.ok, true);
+  assert.equal(discovered.value.candidates.length, 3);
+  const links = new Set();
+  for (const [index, place] of places.entries()) {
+    const candidate = discovered.value.candidates[index];
+    const attribution = candidate.transientPresentation.attribution;
+    assert.equal(attribution.label, 'Google Maps');
+    const url = new URL(attribution.url);
+    assert.equal(url.origin, 'https://www.google.com');
+    assert.equal(url.pathname, '/maps/search/');
+    assert.equal(url.searchParams.get('api'), '1');
+    assert.equal(url.searchParams.get('query_place_id'), place.placeId);
+    assert.equal(
+      url.searchParams.get('query'),
+      `${place.name} ${place.address}`,
+    );
+    assert.equal(url.hash, '');
+    assert.equal([...url.searchParams].length, 3);
+    links.add(attribution.url);
+
+    const refetched = await adapter.refetch(candidate.durableIdentity);
+    assert.equal(refetched.ok, true);
+    assert.deepEqual(
+      refetched.value.transientPresentation.attribution,
+      attribution,
+    );
+  }
+  assert.equal(links.size, 3);
 });
 
 test('fuzzy provider hits cannot discard an explicit street number or most of a long name', async () => {

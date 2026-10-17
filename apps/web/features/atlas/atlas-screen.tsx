@@ -1284,10 +1284,12 @@ function JournalWorkspace({
     toDate,
   });
   const itemsById = new Map(vm.items.map((item) => [item.id, item]));
-  const records = sortJournalVisits(filteredVisits, sort).flatMap((visit) => {
-    const item = itemsById.get(visit.itemId);
-    return item ? [{ item, visit }] : [];
-  });
+  const records = sortJournalVisits(filteredVisits, sort, itemsById).flatMap(
+    (visit) => {
+      const item = itemsById.get(visit.itemId);
+      return item ? [{ item, visit }] : [];
+    },
+  );
   const visitNumbers = new Map<string, number>();
   const visitCounts = new Map<string, number>();
   for (const visit of sortJournalVisits(vm.visits, 'visited-asc')) {
@@ -1334,6 +1336,8 @@ function JournalWorkspace({
                 <option value="visited-asc">Visit date · oldest first</option>
                 <option value="recorded-desc">Added · newest first</option>
                 <option value="recorded-asc">Added · oldest first</option>
+                <option value="score-desc">My score · highest first</option>
+                <option value="score-asc">My score · lowest first</option>
               </select>
             </label>
             <label htmlFor="journal-place-filter">

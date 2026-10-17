@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
 import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
+import { sortMapItems } from './map-sort';
 import { matchesAtlasNameQuery } from '@/product/application/decision/search-policy';
 import type {
   AtlasItemEdit,
@@ -188,14 +189,7 @@ export function useAtlasViewModel(canEdit: boolean) {
       );
     });
 
-    return [...filtered].sort((left, right) => {
-      const leftDistance = distances[left.id];
-      const rightDistance = distances[right.id];
-      if (leftDistance === undefined && rightDistance === undefined) return 0;
-      if (leftDistance === undefined) return 1;
-      if (rightDistance === undefined) return -1;
-      return leftDistance - rightDistance;
-    });
+    return sortMapItems(filtered, distances);
   }, [distances, favoriteOnly, items, kind, personalFilter, query]);
 
   const selectedItem =

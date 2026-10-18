@@ -714,7 +714,7 @@ function PersonalRatingInline({
         onSubmit={submit}
         noValidate
       >
-        <label htmlFor={`personal-rating-${item.id}`}>マイスコア / 10</label>
+        <label htmlFor={`personal-rating-${item.id}`}>マイスコア</label>
         <Input
           ref={inputRef}
           id={`personal-rating-${item.id}`}
@@ -755,7 +755,7 @@ function PersonalRatingInline({
   if (!canEdit)
     return (
       <span className="rating-strip-item personal-rating-inline">
-        <span>マイスコア / 10</span>
+        <span>マイスコア</span>
         <strong>{item.personalRating ?? '未評価'}</strong>
       </span>
     );
@@ -772,7 +772,7 @@ function PersonalRatingInline({
         if (event.key === 'Enter') beginEditing();
       }}
     >
-      <span>マイスコア / 10</span>
+      <span>マイスコア</span>
       <strong>
         {item.personalRating === undefined
           ? '未評価'

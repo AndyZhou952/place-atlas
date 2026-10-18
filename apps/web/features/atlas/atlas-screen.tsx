@@ -398,6 +398,22 @@ function MapWorkspace({
               <p className="eyebrow">Tokyo · source checked 2026-09-06</p>
               <h2>{vm.visibleItems.length} real records</h2>
             </div>
+            <label className="map-sort" htmlFor="map-sort">
+              Sort
+              <select
+                id="map-sort"
+                value={vm.mapSort}
+                onChange={(event) =>
+                  vm.setMapSort(
+                    event.target.value === 'score' ? 'score' : 'added',
+                  )
+                }
+                tabIndex={listOpen ? 0 : -1}
+              >
+                <option value="added">Added</option>
+                <option value="score">Score</option>
+              </select>
+            </label>
           </div>
 
           <div className="search-field">
@@ -698,13 +714,13 @@ function PersonalRatingInline({
         onSubmit={submit}
         noValidate
       >
-        <label htmlFor={`personal-rating-${item.id}`}>マイスコア</label>
+        <label htmlFor={`personal-rating-${item.id}`}>マイスコア / 10</label>
         <Input
           ref={inputRef}
           id={`personal-rating-${item.id}`}
           type="number"
           min="0"
-          max="5"
+          max="10"
           step="0.5"
           value={draft}
           aria-label="マイスコア"
@@ -739,7 +755,7 @@ function PersonalRatingInline({
   if (!canEdit)
     return (
       <span className="rating-strip-item personal-rating-inline">
-        <span>マイスコア</span>
+        <span>マイスコア / 10</span>
         <strong>{item.personalRating ?? '未評価'}</strong>
       </span>
     );
@@ -756,7 +772,7 @@ function PersonalRatingInline({
         if (event.key === 'Enter') beginEditing();
       }}
     >
-      <span>マイスコア</span>
+      <span>マイスコア / 10</span>
       <strong>
         {item.personalRating === undefined
           ? '未評価'
@@ -1678,7 +1694,7 @@ function VisitComposer({
       normalizedRating = parseOptionalRating(rating);
       setFormError('');
     } catch {
-      setFormError('Enter any number from 0 to 5. It will be saved to 0.1.');
+      setFormError('Enter any number from 0 to 10. It will be saved to 0.1.');
       return;
     }
 
@@ -1779,12 +1795,12 @@ function VisitComposer({
           />
         </label>
         <label htmlFor={`${idPrefix}-visit-rating`}>
-          Overall マイスコア / 5
+          Overall マイスコア / 10
           <Input
             id={`${idPrefix}-visit-rating`}
             type="number"
             min="0"
-            max="5"
+            max="10"
             step="0.1"
             value={rating}
             placeholder="Optional"
@@ -1953,7 +1969,7 @@ function JournalVisitRow({
       normalizedRating = parseOptionalRating(rating);
       setError('');
     } catch {
-      setError('Enter any number from 0 to 5.');
+      setError('Enter any number from 0 to 10.');
       return;
     }
 
@@ -2003,12 +2019,12 @@ function JournalVisitRow({
               />
             </label>
             <label htmlFor={`visit-rating-${visit.id}`}>
-              Overall マイスコア
+              Overall マイスコア / 10
               <Input
                 id={`visit-rating-${visit.id}`}
                 type="number"
                 min="0"
-                max="5"
+                max="10"
                 step="0.1"
                 value={rating}
                 disabled={itemId !== visit.itemId || busy}

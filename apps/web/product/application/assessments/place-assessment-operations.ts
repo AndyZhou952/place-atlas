@@ -127,7 +127,7 @@ function validateMutation(input: unknown): Result<PlaceAssessmentMutation> {
       (typeof patch.overallRating !== 'number' ||
         !Number.isFinite(patch.overallRating) ||
         patch.overallRating < 0 ||
-        patch.overallRating > 5)) ||
+        patch.overallRating > 10)) ||
     (patch.isFavorite !== undefined && typeof patch.isFavorite !== 'boolean') ||
     (patch.manualVisited !== undefined &&
       typeof patch.manualVisited !== 'boolean') ||

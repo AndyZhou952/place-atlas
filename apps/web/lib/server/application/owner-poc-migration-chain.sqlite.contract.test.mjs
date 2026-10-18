@@ -17,9 +17,10 @@ const migrations = [
   '0010_owner_agent_settings.sql',
   '0011_visit_media_score.sql',
   '0012_google_rating_references.sql',
+  '0013_personal_rating_ten.sql',
 ];
 
-test('owner-poc append-only 0001-0012 chain replays from two empty databases', async () => {
+test('owner-poc append-only 0001-0013 chain replays from two empty databases', async () => {
   for (let run = 0; run < 2; run += 1) {
     const database = new DatabaseSync(':memory:');
     for (const migration of migrations) {
@@ -139,4 +140,68 @@ test('migration replay preserves previously installed catalog records', async ()
     }),
   );
   database.close();
+});
+
+test('personal score migration converts to ten, preserves unrelated data, and leaves null unrated', async () => {
+  const database = new DatabaseSync(':memory:');
+  for (const migration of migrations.filter(
+    (name) => !name.startsWith('0013_'),
+  )) {
+    database.exec(await readFile(new URL(migration, root), 'utf8'));
+  }
+  const inputs = [0, 1, 2, 3, 3.5, 3.7, 4, 4.2, 4.5, 5, null];
+  const expected = [0, 2, 4, 6, 7, 7.5, 8, 8.5, 9, 10, null];
+  for (const [index, rating] of inputs.entries()) {
+    database
+      .prepare(
+        `INSERT INTO place_assessments (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at) VALUES (?, ?, 1, 1, 'keep note', 'created', 'updated')`,
+      )
+      .run(`synthetic-${index}`, rating);
+  }
+  // Personal score fields are independent of source facts, visits and media.
+  database
+    .prepare(
+      `INSERT INTO atlas_items (id,payload_json,verification_status,created_at,updated_at) VALUES ('source',?, 'verified','created','updated')`,
+    )
+    .run(
+      JSON.stringify({ tabelog: { score: 4.2 }, googleRating: { score: 4.5 } }),
+    );
+  database.exec(
+    `INSERT INTO visits VALUES ('visit','source','Source','2026-10-18','keep visit','created','updated')`,
+  );
+  const before = database
+    .prepare('SELECT * FROM place_assessments ORDER BY item_id')
+    .all();
+  const sourcesBefore = database.prepare('SELECT * FROM atlas_items').all();
+  const visitsBefore = database.prepare('SELECT * FROM visits').all();
+  const sql = await readFile(
+    new URL('0013_personal_rating_ten.sql', root),
+    'utf8',
+  );
+  database.exec(sql);
+  for (const [index, rating] of expected.entries()) {
+    assert.equal(
+      database
+        .prepare(
+          'SELECT overall_rating FROM place_assessments WHERE item_id = ?',
+        )
+        .get(`synthetic-${index}`).overall_rating,
+      rating,
+    );
+  }
+  const converted = database
+    .prepare('SELECT * FROM place_assessments ORDER BY item_id')
+    .all();
+  assert.deepEqual(
+    converted.map(({ overall_rating: _rating, ...rest }) => rest),
+    before.map(({ overall_rating: _rating, ...rest }) => rest),
+  );
+  assert.deepEqual(
+    database.prepare('SELECT * FROM atlas_items').all(),
+    sourcesBefore,
+  );
+  assert.deepEqual(
+    database.prepare('SELECT * FROM visits').all(),
+    visitsBefore,
+  );
 });

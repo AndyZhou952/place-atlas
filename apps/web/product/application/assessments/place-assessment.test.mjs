@@ -51,10 +51,10 @@ async function update(application, patch) {
   });
 }
 
-test('ratings accept 0, 5 and arbitrary decimals normalized to one decimal place', async () => {
+test('ratings accept 0, 10 and arbitrary decimals normalized to one decimal place', async () => {
   for (const [input, expected] of [
     [0, 0],
-    [5, 5],
+    [10, 10],
     [3.76, 3.8],
   ]) {
     const { application } = createFixture();
@@ -235,7 +235,7 @@ test('clearing a rating or summary preserves every other assessment state', asyn
 
 test('invalid inputs and missing items return public failures', async () => {
   const { application } = createFixture();
-  for (const overallRating of [-0.1, 5.1, Number.NaN]) {
+  for (const overallRating of [-0.1, 10.1, Number.NaN]) {
     assert.equal((await update(application, { overallRating })).ok, false);
   }
   assert.deepEqual(

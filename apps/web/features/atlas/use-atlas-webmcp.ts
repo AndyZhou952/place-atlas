@@ -220,11 +220,11 @@ export function createAtlasWebMcpTools({
       name: 'set_personal_rating',
       title: 'Set or clear a personal rating',
       description:
-        'Persist one optional overall rating from 0 to 5 for an Atlas item. This is separate from individual visits and Tabelog.',
+        'Persist one optional overall rating from 0 to 10 for an Atlas item. This is separate from individual visits and Tabelog.',
       inputSchema: objectInputSchema(
         {
           id: { type: 'string' },
-          rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
+          rating: { type: ['number', 'null'], minimum: 0, maximum: 10 },
         },
         ['id', 'rating'],
       ),
@@ -257,7 +257,7 @@ export function createAtlasWebMcpTools({
           mutationId: { type: 'string' },
           itemId: { type: 'string' },
           visitedAt: { type: 'string' },
-          rating: { type: 'number', minimum: 0, maximum: 5 },
+          rating: { type: 'number', minimum: 0, maximum: 10 },
           note: { type: 'string' },
         },
         ['itemId', 'visitedAt'],
@@ -294,7 +294,7 @@ export function createAtlasWebMcpTools({
         {
           id: { type: 'string' },
           visitedAt: { type: 'string' },
-          rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
+          rating: { type: ['number', 'null'], minimum: 0, maximum: 10 },
           note: { type: 'string' },
         },
         ['id', 'visitedAt'],
@@ -510,14 +510,14 @@ function assertRating(value: unknown, nullable: boolean): void {
     (typeof value === 'number' &&
       Number.isFinite(value) &&
       value >= 0 &&
-      value <= 5)
+      value <= 10)
   ) {
     return;
   }
   throw new TypeError(
     nullable
-      ? 'rating must be null or a number from 0 to 5'
-      : 'rating must be a number from 0 to 5',
+      ? 'rating must be null or a number from 0 to 10'
+      : 'rating must be a number from 0 to 10',
   );
 }
 

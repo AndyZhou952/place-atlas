@@ -1,8 +1,11 @@
 import type { AtlasItem } from './model';
 
+export type MapSort = 'added' | 'score';
+
 export function sortMapItems(
   items: readonly AtlasItem[],
   distances: Readonly<Record<string, number>> = {},
+  sort: MapSort = 'added',
 ): AtlasItem[] {
   return [...items].sort((left, right) => {
     const leftDistance = distances[left.id];
@@ -13,6 +16,8 @@ export function sortMapItems(
       if (rightDistance === undefined) return -1;
       if (leftDistance !== rightDistance) return leftDistance - rightDistance;
     }
+
+    if (sort === 'added') return 0;
 
     const leftScore = left.hasVisited ? left.personalRating : undefined;
     const rightScore = right.hasVisited ? right.personalRating : undefined;

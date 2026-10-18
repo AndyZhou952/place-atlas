@@ -276,7 +276,7 @@ function validateVisitUpdate(input: unknown): Result<VisitUpdate> {
 function invalidNewVisit(): Result<never> {
   return failure(
     'invalid_input',
-    'Valid place and date are required; optional ratings must be between 0 and 5.',
+    'Valid place and date are required; optional ratings must be between 0 and 10.',
   );
 }
 
@@ -285,7 +285,7 @@ function isRating(value: unknown): value is number {
     typeof value === 'number' &&
     Number.isFinite(value) &&
     value >= 0 &&
-    value <= 5
+    value <= 10
   );
 }
 

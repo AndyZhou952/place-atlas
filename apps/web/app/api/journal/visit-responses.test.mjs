@@ -24,7 +24,7 @@ test('Journal POST maps normalized input into a 201 mutation receipt', async () 
       id: ' visit-one ',
       itemId: 'place-one',
       visitedAt: '2026-09-12',
-      rating: 3.76,
+      rating: 8.76,
     },
   );
 
@@ -35,7 +35,7 @@ test('Journal POST maps normalized input into a 201 mutation receipt', async () 
     id: 'visit-one',
     itemId: 'place-one',
     visitedAt: '2026-09-12',
-    rating: 3.76,
+    rating: 8.76,
   });
 });
 
@@ -122,7 +122,7 @@ test('Journal writes require mutation IDs and preserve sanitized errors', async 
       throw new Error('must not run');
     }),
     request,
-    { itemId: 'place-one', visitedAt: '2026-09-12', rating: 6 },
+    { itemId: 'place-one', visitedAt: '2026-09-12', rating: 10.1 },
   );
   const missing = await updateVisitResponse(
     coordinator(async () => ({

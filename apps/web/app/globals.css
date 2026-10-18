@@ -794,6 +794,24 @@
   font-weight: 650;
 }
 
+.map-sort {
+  display: grid;
+  flex-shrink: 0;
+  gap: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+}
+
+.map-sort select {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
 .nearby-console {
   margin: 1rem 0;
   padding: 1rem 0;

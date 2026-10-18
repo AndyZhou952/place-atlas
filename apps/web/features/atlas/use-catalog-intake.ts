@@ -32,9 +32,11 @@ export function useCatalogIntake(
   const performDiscover = useCallback(
     async (requestToken: string) => {
       const name = state.query.normalize('NFC').trim();
-      const query = [name, state.searchArea.normalize('NFC').trim()]
-        .filter(Boolean)
-        .join(' ');
+      const query = URL.canParse(name)
+        ? name
+        : [name, state.searchArea.normalize('NFC').trim()]
+            .filter(Boolean)
+            .join(' ');
       if (!name) {
         dispatch({
           type: 'request_failed',
@@ -201,13 +203,14 @@ function toUiError(error: unknown): CatalogIntakeUiError {
     ? {
         code: error.code,
         message: error.message,
+        ...(error.reference ? { reference: error.reference } : {}),
         ...(error.retryable === undefined
           ? {}
           : { retryable: error.retryable }),
       }
     : {
         code: 'unexpected_failure',
-        message: 'The Add request could not be completed.',
+        message: 'The Add response could not be read. Please retry.',
         retryable: true,
       };
 }

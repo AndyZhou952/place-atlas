@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   catalogIntakeInitialState,
+  catalogIntakeErrorRecovery,
   catalogIntakeManualCompletionError,
   catalogIntakeManualLabels,
   reduceCatalogIntakeUi,
@@ -224,3 +225,34 @@ function previewOutput() {
     },
   };
 }
+
+test('Add recovery only suggests signing in for an authentication failure and preserves the selected branch', () => {
+  const base = {
+    ...catalogIntakeInitialState(),
+    query: '青葉亭',
+    searchArea: '盛岡',
+    selectedOrdinal: 2,
+    sessionId: 'synthetic-session',
+    lastOperation: 'select',
+  };
+  for (const code of [
+    'unauthorized',
+    'forbidden',
+    'dependency_failure',
+    'unexpected_failure',
+    'rate_limited',
+    'invalid_input',
+  ]) {
+    const state = reduceCatalogIntakeUi(base, {
+      type: 'request_failed',
+      error: { code, message: 'Synthetic failure', retryable: true },
+    });
+    assert.equal(state.query, base.query);
+    assert.equal(state.searchArea, base.searchArea);
+    assert.equal(state.selectedOrdinal, 2);
+    assert.equal(state.sessionId, base.sessionId);
+    assert.equal(state.lastOperation, 'select');
+    const recovery = catalogIntakeErrorRecovery(state.error);
+    assert.equal(/Sign in as Owner/.test(recovery), code === 'unauthorized');
+  }
+});

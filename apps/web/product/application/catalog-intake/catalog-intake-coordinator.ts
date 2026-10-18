@@ -145,6 +145,7 @@ export type WebResearchOutcome =
         | 'already_spent'
         | 'expired'
         | 'conflict';
+      readonly reason?: 'timed_out';
     };
 
 type WebResearchInputBase = {
@@ -1133,6 +1134,7 @@ export function createCatalogIntakeModule(options: {
           reservation: { status: 'unknown' as const },
         };
         let researchUnavailable = false;
+        let researchTimedOut = false;
         let researchSourceIssue: 'blocked' | 'unavailable' | undefined;
         if (
           (options.enrichmentPolicy === 'enrich_if_available' ||
@@ -1168,6 +1170,7 @@ export function createCatalogIntakeModule(options: {
           }
           if (research.kind !== 'observed') {
             researchUnavailable = true;
+            researchTimedOut = research.reason === 'timed_out';
           } else {
             researchSourceIssue = research.sourceAccessIssue;
             researchUnavailable = researchSourceIssue !== undefined;
@@ -1286,8 +1289,9 @@ export function createCatalogIntakeModule(options: {
               ? ([
                   {
                     code: 'provider_unavailable' as const,
-                    message:
-                      researchSourceIssue === 'blocked'
+                    message: researchTimedOut
+                      ? 'Restaurant research timed out. Your selected branch is retained. Retry the lookup, or paste its full Tabelog listing URL to read that exact branch.'
+                      : researchSourceIssue === 'blocked'
                         ? 'Tabelog refused the server request. Automatic research is incomplete; this does not mean the restaurant has no rating or reservation information. Your selected restaurant is retained.'
                         : researchSourceIssue === 'unavailable'
                           ? 'The restaurant source could not be read. Automatic research is incomplete; missing fields are not evidence that the information does not exist.'

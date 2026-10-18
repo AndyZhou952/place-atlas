@@ -72,29 +72,41 @@ export async function catalogIntakeResponse(options: {
       conversationHeader,
     );
   }
-  const execute = readExecute(
-    options.getApplication ? options.getApplication() : options.application,
-  );
-  if (!execute) {
-    return errorResponse(
+  let result: Result<unknown, AddError>;
+  try {
+    const execute = readExecute(
+      options.getApplication ? options.getApplication() : options.application,
+    );
+    if (!execute) throw new Error('unavailable_application');
+    result = await execute(
+      { key: options.operation, input: input.value },
+      {
+        invocation: {
+          ownerId: 'owner',
+          channel: options.channel ?? 'web',
+          conversationId,
+        },
+      },
+    );
+  } catch {
+    // Never log request input, credentials, or arbitrary exception text.
+    const reference = crypto.randomUUID();
+    console.error(
+      'catalog_intake_request_failed',
+      options.operation,
+      reference,
+    );
+    const response = errorResponse(
       'unexpected_failure',
-      'The catalog intake operation is unavailable.',
+      'The Add service encountered a server error. Please retry.',
       500,
-      false,
+      true,
       conversationId,
       conversationHeader,
     );
+    response.headers.set('x-atlas-request-id', reference);
+    return response;
   }
-  const result = await execute(
-    { key: options.operation, input: input.value },
-    {
-      invocation: {
-        ownerId: 'owner',
-        channel: options.channel ?? 'web',
-        conversationId,
-      },
-    },
-  );
   if (result.ok) {
     return jsonResponse(result.value, 200, conversationId, conversationHeader);
   }

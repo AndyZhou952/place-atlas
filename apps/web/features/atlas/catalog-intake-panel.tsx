@@ -17,6 +17,7 @@ import { useCatalogIntake } from './use-catalog-intake';
 import { OpeningHours } from './opening-hours';
 import {
   catalogIntakeLiveMessage,
+  catalogIntakeErrorRecovery,
   catalogIntakeManualCompletionError,
   catalogIntakePendingMessage,
 } from './catalog-intake-ui-state';
@@ -105,8 +106,8 @@ export function CatalogIntakePanel({
           </Button>
         </div>
         <small id="catalog-intake-query-help">
-          For chains or similar names, add an area below and search again. Keep
-          the restaurant name; a full address is not required.
+          For chains or similar names, add an area below. You can also paste the
+          restaurant’s full Tabelog listing URL to choose an exact branch.
         </small>
         <label htmlFor="catalog-intake-search-area">
           Area, station or branch (optional)
@@ -136,7 +137,7 @@ export function CatalogIntakePanel({
         aria-live="polite"
         aria-atomic="true"
       >
-        <p>{catalogIntakeLiveMessage(state)}</p>
+        <p>{state.stage === 'error' ? '' : catalogIntakeLiveMessage(state)}</p>
       </div>
 
       {busy && state.lastOperation === 'select' ? <ResearchProgress /> : null}
@@ -193,9 +194,10 @@ export function CatalogIntakePanel({
         >
           <CircleAlert aria-hidden="true" />
           <strong>{state.error?.message ?? 'The Add request failed.'}</strong>
-          <p>
-            Your input is still here. Sign in as Owner if prompted, then retry.
-          </p>
+          <p>{catalogIntakeErrorRecovery(state.error)}</p>
+          {state.error?.reference ? (
+            <small>Reference: {state.error.reference}</small>
+          ) : null}
           <Button
             ref={retryRef}
             type="button"

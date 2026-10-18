@@ -182,3 +182,46 @@ test('non-discover intake rejects a forged but well-formed conversation', async 
     message: 'The Web catalog intake conversation is invalid.',
   });
 });
+
+for (const stage of ['construction', 'execution']) {
+  test(`Add HTTP contains ${stage} exceptions with a safe diagnostic reference`, async () => {
+    const logs = [];
+    const original = console.error;
+    console.error = (...values) => logs.push(values);
+    try {
+      const response = await catalogIntakeResponse({
+        getApplication() {
+          if (stage === 'construction') throw new Error('credential=private');
+          return {
+            async execute() {
+              throw new Error('credential=private');
+            },
+          };
+        },
+        request: new Request('https://atlas.test/api/catalog-intake/discover', {
+          method: 'POST',
+          body: JSON.stringify({ input: { query: 'private-query' } }),
+        }),
+        operation: 'catalog.intake.discover',
+        serverConversationId,
+      });
+      assert.equal(response.status, 500);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(
+        response.headers.get('x-atlas-web-conversation-id'),
+        serverConversationId,
+      );
+      const reference = response.headers.get('x-atlas-request-id');
+      assert.match(reference, /^[a-f0-9-]{36}$/);
+      const body = await response.json();
+      assert.equal(body.code, 'unexpected_failure');
+      assert.equal(body.retryable, true);
+      assert.deepEqual(logs, [
+        ['catalog_intake_request_failed', 'catalog.intake.discover', reference],
+      ]);
+      assert.doesNotMatch(JSON.stringify({ logs, body }), /credential|private/);
+    } finally {
+      console.error = original;
+    }
+  });
+}

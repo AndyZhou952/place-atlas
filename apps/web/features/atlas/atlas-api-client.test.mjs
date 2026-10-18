@@ -286,7 +286,7 @@ test('catalog intake exposes a typed closed error and requests login without dro
       assert.ok(error instanceof CatalogIntakeRequestError);
       assert.equal(error.code, 'unauthorized');
       assert.equal(error.retryable, false);
-      assert.deepEqual(Object.keys(error), ['code', 'retryable']);
+      assert.deepEqual(Object.keys(error), ['code', 'retryable', 'reference']);
       return true;
     },
   );
@@ -568,3 +568,69 @@ function mutationResponse(init, result, status = 200) {
     { status },
   );
 }
+
+test('Add failures preserve HTTP cause and only a real 401 asks for Owner login', async () => {
+  let logins = 0;
+  const unsubscribe = subscribeOwnerLoginRequired(() => {
+    logins++;
+  });
+  try {
+    for (const [status, code, retryable] of [
+      [401, 'unauthorized', false],
+      [403, 'forbidden', false],
+      [429, 'rate_limited', true],
+      [500, 'dependency_failure', true],
+      [502, 'dependency_failure', true],
+      [504, 'dependency_failure', true],
+    ]) {
+      const application = createBrowserAtlasApplication(
+        {
+          async request() {
+            return new Response(
+              '<html>Untrusted provider details: secret</html>',
+              { status, headers: { 'cf-ray': '0123456789abcdef-NRT' } },
+            );
+          },
+        },
+        { read: () => undefined, write() {} },
+      );
+      await assert.rejects(
+        application.execute({
+          key: 'catalog.intake.discover',
+          input: { query: 'Synthetic place', requestToken: 'request' },
+        }),
+        (error) => {
+          assert.ok(error instanceof CatalogIntakeRequestError);
+          assert.equal(error.code, code);
+          assert.equal(error.retryable, retryable);
+          assert.equal(error.reference, '0123456789abcdef-NRT');
+          assert.doesNotMatch(error.message, /Untrusted|secret/);
+          if (status !== 401)
+            assert.doesNotMatch(error.message, /[Ss]ign in|[Ll]ogin/);
+          return true;
+        },
+      );
+    }
+    assert.equal(logins, 1);
+    const application = createBrowserAtlasApplication({
+      async request() {
+        throw new TypeError('private network error');
+      },
+    });
+    await assert.rejects(
+      application.execute({
+        key: 'catalog.intake.discover',
+        input: { query: 'Synthetic place', requestToken: 'request' },
+      }),
+      (error) => {
+        assert.equal(error.code, 'dependency_failure');
+        assert.match(error.message, /connection/);
+        assert.doesNotMatch(error.message, /private/);
+        return true;
+      },
+    );
+    assert.equal(logins, 1);
+  } finally {
+    unsubscribe();
+  }
+});

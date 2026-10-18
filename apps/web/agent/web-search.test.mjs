@@ -183,3 +183,41 @@ test('explicit key selects Tavily and never sends that key to DuckDuckGo', async
     1,
   );
 });
+
+test('a stalled primary search is aborted early enough to use the fallback', async () => {
+  const calls = [];
+  const parent = new AbortController();
+  const keepAlive = setTimeout(() => {}, 6000);
+  try {
+    const search = createWebSearch({
+      fetch: async (endpoint, init) => {
+        calls.push(new URL(endpoint).origin);
+        if (new URL(endpoint).hostname === 'search.yahoo.co.jp') {
+          assert.notEqual(init.signal, parent.signal);
+          await new Promise((resolve, reject) =>
+            init.signal.addEventListener(
+              'abort',
+              () => reject(init.signal.reason),
+              { once: true },
+            ),
+          );
+        }
+        init.signal.throwIfAborted();
+        return new Response(fixture);
+      },
+    });
+    const result = await search.search(
+      '架空の店 site:tabelog.com',
+      parent.signal,
+    );
+    assert.equal(result.kind, 'results');
+    assert.equal(result.sources[0].url, url);
+    assert.equal(parent.signal.aborted, false);
+    assert.deepEqual(calls, [
+      'https://search.yahoo.co.jp',
+      'https://html.duckduckgo.com',
+    ]);
+  } finally {
+    clearTimeout(keepAlive);
+  }
+});

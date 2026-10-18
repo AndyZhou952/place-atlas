@@ -14,6 +14,7 @@ export function createTabelogPlaceDiscoveryPort(
     fetch?: typeof fetch;
     searchApiKey?: string;
     sourceReader?: RestaurantSourceReader;
+    textDiscovery?: GooglePlaceDiscoveryPort;
   } = {},
 ): GooglePlaceDiscoveryPort {
   const fetcher = options.fetch ?? fetch;
@@ -62,6 +63,8 @@ export function createTabelogPlaceDiscoveryPort(
       if (direct) {
         urls = [direct];
       } else {
+        if (options.textDiscovery)
+          return options.textDiscovery.discover({ query });
         const result = await search.search(
           `${query.trim()} site:tabelog.com`,
           signal,
@@ -102,6 +105,9 @@ export function createTabelogPlaceDiscoveryPort(
       };
     },
     async refetch({ providerNamespace, placeId }) {
+      if (providerNamespace !== 'tabelog' && options.textDiscovery) {
+        return options.textDiscovery.refetch({ providerNamespace, placeId });
+      }
       if (
         providerNamespace !== 'tabelog' ||
         canonicalListing(placeId) !== placeId

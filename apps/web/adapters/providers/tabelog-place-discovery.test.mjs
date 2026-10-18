@@ -153,3 +153,44 @@ test('blocked search is provider failure, while genuine no-results is an empty r
     value: { candidates: [], hasMore: false },
   });
 });
+
+test('a configured Maps provider handles names but never consumes an exact listing URL', async () => {
+  const calls = [];
+  const canonical = listing('13999999');
+  const sentinel = { ok: true, value: { candidates: [], hasMore: false } };
+  const port = createTabelogPlaceDiscoveryPort({
+    textDiscovery: {
+      async discover(input) {
+        calls.push(['search', input]);
+        return sentinel;
+      },
+      async refetch(input) {
+        calls.push(['refetch', input]);
+        return {
+          ok: false,
+          error: { code: 'dependency_failure', message: 'unavailable' },
+        };
+      },
+    },
+    fetch: async (url) => {
+      calls.push(['listing', requestUrl(url)]);
+      return page(requestUrl(url));
+    },
+  });
+  assert.equal(await port.discover({ query: 'Synthetic branch' }), sentinel);
+  const result = await port.discover({ query: canonical });
+  assert.equal(result.value.candidates[0].durableIdentity.placeId, canonical);
+  assert.equal(
+    (await port.refetch({ providerNamespace: 'tabelog', placeId: canonical }))
+      .ok,
+    true,
+  );
+  await port.refetch({
+    providerNamespace: 'google-places',
+    placeId: 'synthetic-google',
+  });
+  assert.deepEqual(
+    calls.map(([kind]) => kind),
+    ['search', 'listing', 'listing', 'refetch'],
+  );
+});

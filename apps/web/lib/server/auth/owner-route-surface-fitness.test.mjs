@@ -155,7 +155,7 @@ void test('every owner business write is coordinated or fails closed before lega
         continue;
       }
       if (expected.ownerPocPolicy === 'application_operation') {
-        assert.match(handler, /getServerAtlasApplication\(\)/u);
+        assert.match(handler, /getApplication: getServerAtlasApplication/u);
         assert.match(handler, /catalogIntakeResponse/u);
         continue;
       }

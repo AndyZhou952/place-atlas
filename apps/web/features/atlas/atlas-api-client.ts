@@ -185,8 +185,14 @@ export interface WebConversationStore {
 export class CatalogIntakeRequestError extends Error {
   readonly code: AddErrorCode;
   readonly retryable?: boolean;
+  readonly reference?: string;
 
-  constructor(code: AddErrorCode, message: string, retryable?: boolean) {
+  constructor(
+    code: AddErrorCode,
+    message: string,
+    retryable?: boolean,
+    reference?: string,
+  ) {
     super(message);
     Object.defineProperty(this, 'name', {
       configurable: true,
@@ -194,6 +200,7 @@ export class CatalogIntakeRequestError extends Error {
     });
     this.code = code;
     if (retryable !== undefined) this.retryable = retryable;
+    if (reference) this.reference = reference;
   }
 }
 
@@ -452,11 +459,20 @@ async function requestCatalogIntakeJson<
   if (isConversationId(existingConversation)) {
     headers.set(conversationHeader, existingConversation);
   }
-  const response = await transport.request(browserOperationPath(key), {
-    method: browserOperationHttpCatalog[key].method,
-    headers,
-    body: JSON.stringify({ input }),
-  });
+  let response: Response;
+  try {
+    response = await transport.request(browserOperationPath(key), {
+      method: browserOperationHttpCatalog[key].method,
+      headers,
+      body: JSON.stringify({ input }),
+    });
+  } catch {
+    throw new CatalogIntakeRequestError(
+      'dependency_failure',
+      'We could not reach the Add service. Check your connection, then retry.',
+      true,
+    );
+  }
   const responseConversation = response.headers.get(conversationHeader);
   if (response.ok && !isConversationId(responseConversation)) {
     throw new CatalogIntakeRequestError(
@@ -475,9 +491,19 @@ async function requestCatalogIntakeJson<
       error.code,
       error.message,
       error.retryable,
+      readRequestReference(response),
     );
   }
-  return (await response.json()) as BrowserOperationOutput<Key>;
+  try {
+    return (await response.json()) as BrowserOperationOutput<Key>;
+  } catch {
+    throw new CatalogIntakeRequestError(
+      'unexpected_failure',
+      'The Add service returned an unreadable response. Please retry.',
+      true,
+      readRequestReference(response),
+    );
+  }
 }
 
 async function readCatalogIntakeError(response: Response): Promise<{
@@ -503,11 +529,47 @@ async function readCatalogIntakeError(response: Response): Promise<{
       ...(value.retryable === undefined ? {} : { retryable: value.retryable }),
     };
   }
+  const status = response.status;
+  if (status === 401)
+    return {
+      code: 'unauthorized',
+      message: 'Your Owner session has expired. Sign in again, then retry.',
+      retryable: false,
+    };
+  if (status === 403)
+    return {
+      code: 'forbidden',
+      message: 'The Add request was blocked by an access check (HTTP 403).',
+      retryable: false,
+    };
+  if (status === 429)
+    return {
+      code: 'rate_limited',
+      message: 'Too many Add requests. Wait a moment, then retry.',
+      retryable: true,
+    };
   return {
-    code: 'unexpected_failure',
-    message: 'The catalog intake request could not be completed.',
-    retryable: response.status >= 500,
+    code: status >= 500 ? 'dependency_failure' : 'unexpected_failure',
+    message:
+      status === 504
+        ? 'The Add service timed out (HTTP 504). Please retry.'
+        : status >= 500
+          ? `The Add service is temporarily unavailable (HTTP ${status}). Please retry.`
+          : `The Add request was rejected (HTTP ${status}). Check your input and try again.`,
+    retryable: status >= 500,
   };
+}
+
+function readRequestReference(response: Response): string | undefined {
+  const value =
+    response.headers.get('x-atlas-request-id') ??
+    response.headers.get('cf-ray');
+  return value &&
+    /^(?:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}|[a-f0-9]{16}(?:-[a-z]{3})?)$/iu.test(
+      value,
+    )
+    ? value
+    : undefined;
 }
 
 function isConversationId(value: unknown): value is string {

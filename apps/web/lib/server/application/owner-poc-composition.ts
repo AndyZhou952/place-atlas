@@ -162,16 +162,17 @@ export function createOwnerPocComposition(
       ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
     }),
   );
-  const discovery =
-    providerModes.googlePlaces === 'enabled' && intakeOptions.googlePlacesApiKey
-      ? googleDiscovery
-      : createTabelogPlaceDiscoveryPort({
-          ...(sourceReader ? { sourceReader } : {}),
-          ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
-          ...(intakeOptions.searchApiKey
-            ? { searchApiKey: intakeOptions.searchApiKey }
-            : {}),
-        });
+  const discovery = createTabelogPlaceDiscoveryPort({
+    ...(providerModes.googlePlaces === 'enabled' &&
+    intakeOptions.googlePlacesApiKey
+      ? { textDiscovery: googleDiscovery }
+      : {}),
+    ...(sourceReader ? { sourceReader } : {}),
+    ...(intakeOptions.fetch ? { fetch: intakeOptions.fetch } : {}),
+    ...(intakeOptions.searchApiKey
+      ? { searchApiKey: intakeOptions.searchApiKey }
+      : {}),
+  });
   const nominatimState = new D1NominatimPolicyState(database, clock);
   const durableGeocoder =
     providerModes.durableGeocoder === 'enabled'

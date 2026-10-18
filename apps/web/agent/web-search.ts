@@ -21,7 +21,7 @@ export function createWebSearch(options: {
           const response = await fetcher('https://api.tavily.com/search', {
             method: 'POST',
             redirect: 'manual',
-            signal,
+            signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${options.apiKey}`,
@@ -87,7 +87,7 @@ async function searchYahooJapan(
     endpoint.searchParams.set('p', query);
     const response = await fetcher(endpoint.href, {
       redirect: 'manual',
-      signal,
+      signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]),
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
     if ([202, 403, 429].includes(response.status))
@@ -111,7 +111,7 @@ async function searchDuckDuckGo(
     endpoint.searchParams.set('kp', '-1');
     const response = await fetcher(endpoint.href, {
       redirect: 'manual',
-      signal,
+      signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]),
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
     if ([202, 403, 429].includes(response.status))

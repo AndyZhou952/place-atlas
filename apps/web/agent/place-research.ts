@@ -1507,7 +1507,10 @@ export function createPlaceResearchAgent(
         }
       } catch {
         diagnostic(signal.aborted ? 'deadline' : 'exception');
-        return recoverVerifiedListing();
+        const recovered = recoverVerifiedListing();
+        return recovered.kind === 'unavailable' && signal.aborted
+          ? { kind: 'unavailable', reason: 'timed_out' }
+          : recovered;
       }
       return { kind: 'unavailable' };
     },
@@ -1638,13 +1641,7 @@ export function initialResearchQuery(subject: {
     ownerHint &&
     plainName(name) !== plainName(ownerHint) &&
     comparableName(name) === comparableName(ownerHint);
-  const addressHint = subject.transientAddress
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/ch[ōo]me|丁目|番地|番|号/gu, '-')
-    .replace(/[\s‐‑‒–—−ー]/gu, '-')
-    .replace(/-+/gu, '-')
-    .match(/\d{1,4}-\d{1,4}-\d{1,4}/u)?.[0];
+  const addressHint = streetNumbers(subject.transientAddress)[0];
   const parts = [equivalentOwnerName ? ownerHint : name];
   if (
     ownerHint &&
@@ -1653,10 +1650,24 @@ export function initialResearchQuery(subject: {
   ) {
     parts.push(ownerHint);
   }
+  const region = researchRegion(subject.transientAddress);
+  if (
+    region === 'japan' &&
+    !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(name)
+  ) {
+    const buildingSuffix = subject.transientAddress
+      .normalize('NFKC')
+      .match(/\d{1,4}[-‐‑‒–—−ー]\d{1,4}(?:[-‐‑‒–—−ー]\d{1,4})?\s+(.+)$/u)?.[1];
+    const buildingHint = buildingSuffix
+      ?.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{3,}/gu)
+      ?.join(' ')
+      .slice(0, 80);
+    if (buildingHint && !parts.some((part) => part.includes(buildingHint)))
+      parts.push(buildingHint);
+  }
   if (addressHint && !parts.some((part) => part.includes(addressHint))) {
     parts.push(addressHint);
   }
-  const region = researchRegion(subject.transientAddress);
   if (region === 'japan') return `${parts.join(' ')} site:tabelog.com`;
   // The app can read Google rating by selected Place ID. Spend the limited
   // search budget on official branch facts that the Place ID cannot supply.
@@ -1839,6 +1850,35 @@ function matchesOmittedBuildingLot(
   );
 }
 
+function floorNumber(value: string): number | undefined {
+  const floor = value
+    .normalize('NFKC')
+    .toLowerCase()
+    .match(
+      /(?:地下\s*(\d+)\s*(?:f|階)|\bb\s*(\d+)\s*f?\b|(?<!\d)(\d+)\s*(?:f\b|階))/u,
+    );
+  return floor
+    ? floor[1] || floor[2]
+      ? -Number(floor[1] || floor[2])
+      : Number(floor[3])
+    : undefined;
+}
+
+/** Floor numbers are building metadata, never another component of the street lot. */
+function streetNumbers(value: string): string[] {
+  return (
+    value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+      .replace(/(?:地下\s*\d+\s*階|\b(?:b\s*)?\d+\s*f\b|\d+\s*階)/gu, ' ')
+      .replace(/ch[ōo]me|丁目|番地|番|号/gu, '-')
+      .replace(/[\s‐‑‒–—−ー]/gu, '-')
+      .replace(/-+/gu, '-')
+      .match(/\d{1,4}-\d{1,4}(?:-\d{1,4})?/gu) ?? []
+  );
+}
+
 function matchesSelectedBranch(
   quote: string,
   name: string,
@@ -1916,15 +1956,14 @@ function matchesSelectedBranch(
     return true;
   // Street/block numbers survive Japanese/English address formatting, unlike city names.
   // A name match alone is insufficient for chains; ambiguous address evidence stays unknown.
-  const streetNumbers = (value: string): string[] =>
-    value
-      .normalize('NFKC')
-      .toLowerCase()
-      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
-      .replace(/ch[ōo]me|丁目|番地|番|号/gu, '-')
-      .replace(/[\s‐‑‒–—−ー]/gu, '-')
-      .replace(/-+/gu, '-')
-      .match(/\d{1,4}-\d{1,4}(?:-\d{1,4})?/gu) ?? [];
+  const selectedFloor = floorNumber(address);
+  const sourceFloor = sourceAddress ? floorNumber(sourceAddress) : undefined;
+  if (
+    selectedFloor !== undefined &&
+    sourceFloor !== undefined &&
+    selectedFloor !== sourceFloor
+  )
+    return false;
   const selectedNumbers = streetNumbers(address);
   const sourceNumbers = streetNumbers(sourceAddress ?? quote);
   const matchingNumbers = selectedNumbers.filter((numbers) =>

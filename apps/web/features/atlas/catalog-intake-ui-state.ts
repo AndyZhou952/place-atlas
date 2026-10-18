@@ -30,6 +30,7 @@ export interface CatalogIntakeUiError {
   readonly code: AddErrorCode;
   readonly message: string;
   readonly retryable?: boolean;
+  readonly reference?: string;
 }
 
 export interface CatalogIntakeUiState {
@@ -187,6 +188,25 @@ export function catalogIntakeLiveMessage(state: CatalogIntakeUiState): string {
         return 'This restaurant is already saved. Nothing new was added.';
       }
       return 'Existing place reused; no duplicate was created.';
+  }
+}
+
+export function catalogIntakeErrorRecovery(
+  error?: CatalogIntakeUiError,
+): string {
+  switch (error?.code) {
+    case 'unauthorized':
+      return 'Your input is still here. Sign in as Owner, then retry.';
+    case 'forbidden':
+      return 'Your input is still here. The site blocked this request. If it continues after reloading, contact the deployment owner.';
+    case 'rate_limited':
+      return 'Your input is still here. Wait a moment before retrying.';
+    case 'invalid_input':
+      return 'Your input is still here. Check the details above and try again.';
+    default:
+      return error?.retryable === false
+        ? 'Your input is still here. Check the details or start a new search.'
+        : 'Your input is still here. Retry this step. If it keeps failing, try the restaurant’s full Tabelog listing URL.';
   }
 }
 

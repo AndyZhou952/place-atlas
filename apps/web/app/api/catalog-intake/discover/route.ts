@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const POST = withOwnerWriteAuth(async function POST(request: Request) {
   const serverConversationId = await getOwnerWebConversationId(request);
   return catalogIntakeResponse({
-    application: getServerAtlasApplication(),
+    getApplication: getServerAtlasApplication,
     request,
     operation: 'catalog.intake.discover',
     serverConversationId,

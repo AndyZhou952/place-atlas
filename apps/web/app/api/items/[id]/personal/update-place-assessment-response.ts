@@ -71,7 +71,7 @@ function isPersonalItemPatch(value: unknown): value is PersonalItemPatch {
       (typeof value.overallRating === 'number' &&
         Number.isFinite(value.overallRating) &&
         value.overallRating >= 0 &&
-        value.overallRating <= 5)) &&
+        value.overallRating <= 10)) &&
     (value.summary === undefined ||
       value.summary === null ||
       typeof value.summary === 'string')

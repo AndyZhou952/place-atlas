@@ -45,10 +45,10 @@ test('Visit list is newest visit first with creation time as the stable tie-brea
   );
 });
 
-test('create accepts a rating by itself and normalizes 0, 5, and arbitrary decimals', async () => {
+test('create accepts a rating by itself and normalizes 0, 10, and arbitrary decimals', async () => {
   for (const [rating, expected] of [
     [0, 0],
-    [5, 5],
+    [10, 10],
     [3.76, 3.8],
   ]) {
     const { application } = fixture();
@@ -279,7 +279,7 @@ test('update preserves rating when omitted and accepts normalized values at both
   for (const [rating, expected] of [
     [undefined, 3.3],
     [0, 0],
-    [5, 5],
+    [10, 10],
     [3.76, 3.8],
   ]) {
     const { application } = fixture({

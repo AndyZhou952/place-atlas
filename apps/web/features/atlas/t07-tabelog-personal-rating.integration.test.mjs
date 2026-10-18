@@ -62,7 +62,7 @@ const storedAddItem = {
   updatedAt: '2026-09-24T08:00:00.000Z',
 };
 
-test('T-07 keeps Tabelog 3.87 beside personal score 3.5 across the Web mutation and reload', async () => {
+test('T-07 keeps Tabelog 3.87 beside personal score 7.5 across the Web mutation and reload', async () => {
   const recordState = new InMemoryPlaceAssessmentState({
     dynamicPayloads: [JSON.stringify(storedAddItem)],
   });
@@ -81,9 +81,9 @@ test('T-07 keeps Tabelog 3.87 beside personal score 3.5 across the Web mutation 
     type: 'item.mutation.started',
     itemId: storedAddItem.id,
     mutationId: 't07-personal-rating',
-    patch: { personalRating: 3.5 },
+    patch: { personalRating: 7.5 },
   });
-  assert.equal(viewModel.items[0].personalRating, 3.5);
+  assert.equal(viewModel.items[0].personalRating, 7.5);
   assert.deepEqual(viewModel.items[0].tabelog, expectedTabelog());
 
   const response = await updatePlaceAssessmentResponse(
@@ -96,11 +96,11 @@ test('T-07 keeps Tabelog 3.87 beside personal score 3.5 across the Web mutation 
       },
     ),
     storedAddItem.id,
-    { overallRating: 3.5 },
+    { overallRating: 7.5 },
   );
   assert.equal(response.status, 200);
   const receipt = await response.json();
-  assert.equal(receipt.result.item.personalRating, 3.5);
+  assert.equal(receipt.result.item.personalRating, 7.5);
   assert.deepEqual(receipt.result.item.tabelog, expectedTabelog());
 
   viewModel = reduceAtlasViewModelState(viewModel, {
@@ -109,12 +109,12 @@ test('T-07 keeps Tabelog 3.87 beside personal score 3.5 across the Web mutation 
     mutationId: 't07-personal-rating',
     item: receipt.result.item,
   });
-  assert.equal(viewModel.items[0].personalRating, 3.5);
+  assert.equal(viewModel.items[0].personalRating, 7.5);
   assert.deepEqual(viewModel.items[0].tabelog, expectedTabelog());
 
   const reloaded = await catalog.get(storedAddItem.id);
   assert.ok(reloaded && 'address' in reloaded);
-  assert.equal(reloaded.personalRating, 3.5);
+  assert.equal(reloaded.personalRating, 7.5);
   assert.deepEqual(reloaded.tabelog, expectedTabelog());
   assert.deepEqual(reloaded.intakeEvidence?.tabelog, tabelog);
 });

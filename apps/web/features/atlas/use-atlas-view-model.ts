@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
 import { browserAtlasApplication } from './atlas-api-client';
 import { matchesPersonalStatus } from './personal-filter';
-import { sortMapItems } from './map-sort';
+import { sortMapItems, type MapSort } from './map-sort';
 import { matchesAtlasNameQuery } from '@/product/application/decision/search-policy';
 import type {
   AtlasItemEdit,
@@ -41,6 +41,7 @@ export function useAtlasViewModel(canEdit: boolean) {
     useState<AtlasPersonalFilter>('all');
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [query, setQuery] = useState('');
+  const [mapSort, setMapSort] = useState<MapSort>('added');
   const [selectedId, setSelectedId] = useState(DEFAULT_ITEM_ID);
   const [distances, setDistances] = useState<Record<string, number>>({});
   const [nearbyLocationHint, setNearbyLocationHint] = useState('');
@@ -189,8 +190,8 @@ export function useAtlasViewModel(canEdit: boolean) {
       );
     });
 
-    return sortMapItems(filtered, distances);
-  }, [distances, favoriteOnly, items, kind, personalFilter, query]);
+    return sortMapItems(filtered, distances, mapSort);
+  }, [distances, favoriteOnly, items, kind, personalFilter, query, mapSort]);
 
   const selectedItem =
     visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0];
@@ -733,6 +734,8 @@ export function useAtlasViewModel(canEdit: boolean) {
     nearbyResult,
     notice,
     personalFilter,
+    mapSort,
+    setMapSort,
     query,
     reloadCatalogViews,
     removeItem,

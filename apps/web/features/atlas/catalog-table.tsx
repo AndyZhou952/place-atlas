@@ -25,7 +25,7 @@ import './catalog-table.css';
 const unknown = 'Unknown';
 const sortLabels: Record<TableSort, string> = {
   lastVisit: 'Last visit',
-  personalRating: 'My rating',
+  personalRating: 'My rating / 10',
   tabelog: 'Tabelog rating',
   google: 'Google rating',
   name: 'Name',

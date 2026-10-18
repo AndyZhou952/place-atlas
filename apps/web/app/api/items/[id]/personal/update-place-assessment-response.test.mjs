@@ -15,7 +15,7 @@ test('the personal HTTP adapter maps legacy hasVisited into one mutation envelop
   let envelope;
   const item = {
     id: 'place-one',
-    personalRating: 3.8,
+    personalRating: 8.8,
     isFavorite: true,
     hasVisited: true,
     overallComment: 'Good',
@@ -28,7 +28,7 @@ test('the personal HTTP adapter maps legacy hasVisited into one mutation envelop
     request,
     item.id,
     {
-      overallRating: 3.76,
+      overallRating: 8.76,
       isFavorite: true,
       hasVisited: false,
       summary: '  Good  ',
@@ -43,7 +43,7 @@ test('the personal HTTP adapter maps legacy hasVisited into one mutation envelop
   assert.deepEqual(envelope.input, {
     itemId: 'place-one',
     patch: {
-      overallRating: 3.76,
+      overallRating: 8.76,
       isFavorite: true,
       manualVisited: false,
       summary: '  Good  ',
@@ -100,7 +100,7 @@ test('the personal adapter requires a mutation ID and preserves stable error sta
     }),
     request,
     'place-one',
-    { overallRating: 6 },
+    { overallRating: 10.1 },
   );
   const missing = await updatePlaceAssessmentResponse(
     coordinator(async () => ({

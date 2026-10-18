@@ -123,7 +123,7 @@ function isRating(value: unknown): value is number {
     typeof value === 'number' &&
     Number.isFinite(value) &&
     value >= 0 &&
-    value <= 5
+    value <= 10
   );
 }
 
@@ -132,4 +132,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const invalidCreateMessage =
-  'Valid place and date are required; optional ratings must be between 0 and 5';
+  'Valid place and date are required; optional ratings must be between 0 and 10';

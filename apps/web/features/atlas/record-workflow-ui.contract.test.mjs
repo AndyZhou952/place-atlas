@@ -22,7 +22,7 @@ test('place detail and Journal share one Visit composer', () => {
     /<VisitComposer vm=\{vm\} idPrefix="journal" \/>/u,
   );
   assert.match(screenSource, /type="date"/u);
-  assert.match(screenSource, /マイスコア \/ 5/u);
+  assert.match(screenSource, /マイスコア \/ 10/u);
   assert.match(screenSource, /Note \(optional\)/u);
   assert.match(
     screenSource,

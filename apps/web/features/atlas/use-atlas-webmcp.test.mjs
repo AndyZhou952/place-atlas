@@ -135,7 +135,7 @@ test('WebMCP keeps the existing tool names, input schemas, and annotations', () 
         {
           properties: {
             id: { type: 'string' },
-            rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
+            rating: { type: ['number', 'null'], minimum: 0, maximum: 10 },
           },
           required: ['id', 'rating'],
         },
@@ -148,7 +148,7 @@ test('WebMCP keeps the existing tool names, input schemas, and annotations', () 
             mutationId: { type: 'string' },
             itemId: { type: 'string' },
             visitedAt: { type: 'string' },
-            rating: { type: 'number', minimum: 0, maximum: 5 },
+            rating: { type: 'number', minimum: 0, maximum: 10 },
             note: { type: 'string' },
           },
           required: ['itemId', 'visitedAt'],
@@ -161,7 +161,7 @@ test('WebMCP keeps the existing tool names, input schemas, and annotations', () 
           properties: {
             id: { type: 'string' },
             visitedAt: { type: 'string' },
-            rating: { type: ['number', 'null'], minimum: 0, maximum: 5 },
+            rating: { type: ['number', 'null'], minimum: 0, maximum: 10 },
             note: { type: 'string' },
           },
           required: ['id', 'visitedAt'],

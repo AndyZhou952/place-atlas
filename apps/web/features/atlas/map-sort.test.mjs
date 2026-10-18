@@ -30,7 +30,7 @@ test('visited scores lead descending; unvisited and unscored places follow by Ta
   ];
   const original = structuredClone(items);
   assert.deepEqual(
-    sortMapItems(items).map((item) => item.id),
+    sortMapItems(items, {}, 'score').map((item) => item.id),
     [
       'visited-high',
       'visited-low',
@@ -67,7 +67,7 @@ test('equal personal scores use Tabelog descending and exact ties preserve input
     },
   ];
   assert.deepEqual(
-    sortMapItems(items).map((item) => item.id),
+    sortMapItems(items, {}, 'score').map((item) => item.id),
     ['higher', 'same', 'lower', 'no-tabelog'],
   );
 });
@@ -81,9 +81,42 @@ test('nearby distances take priority, with rating order for ties and places with
     { id: 'unknown-high', hasVisited: true, personalRating: 4 },
   ];
   assert.deepEqual(
-    sortMapItems(items, { far: 2000, near: 0, 'near-rated': 0 }).map(
+    sortMapItems(items, { far: 2000, near: 0, 'near-rated': 0 }, 'score').map(
       (item) => item.id,
     ),
     ['near-rated', 'near', 'far', 'unknown-high', 'unknown-low'],
+  );
+});
+
+test('Added is the default and preserves database insertion order through filtering and edits', () => {
+  const items = [
+    { id: 'new', hasVisited: false },
+    {
+      id: 'older',
+      hasVisited: true,
+      personalRating: 10,
+      tabelog: { score: 4.5 },
+    },
+    { id: 'oldest', tabelog: { score: 4.8 } },
+  ];
+  assert.deepEqual(
+    sortMapItems(items).map(({ id }) => id),
+    ['new', 'older', 'oldest'],
+  );
+  assert.deepEqual(
+    sortMapItems(items.filter(({ id }) => id !== 'older')).map(({ id }) => id),
+    ['new', 'oldest'],
+  );
+  assert.deepEqual(
+    sortMapItems(items, {}, 'score').map(({ id }) => id),
+    ['older', 'oldest', 'new'],
+  );
+  assert.deepEqual(
+    sortMapItems(items, {}, 'added').map(({ id }) => id),
+    ['new', 'older', 'oldest'],
+  );
+  assert.deepEqual(
+    sortMapItems(items, { new: 5, oldest: 1 }).map(({ id }) => id),
+    ['oldest', 'new', 'older'],
   );
 });

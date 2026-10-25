@@ -14,7 +14,7 @@ export default defineConfig({
     cloudflare({
       configPath,
       viteEnvironment: { name: 'server' },
-      // Older local configs point at removed entry files and a cleanup cron.
+      // Older local configs point at the removed Next.js entry file.
       config: (config) => {
         config.main = './src/server/worker.ts';
         config.assets = {
@@ -22,7 +22,6 @@ export default defineConfig({
           not_found_handling: 'single-page-application',
           run_worker_first: ['/api/*'],
         };
-        config.triggers = { crons: [] };
       },
     }),
   ],

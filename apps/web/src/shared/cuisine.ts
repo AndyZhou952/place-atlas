@@ -100,52 +100,40 @@ export function prefectureLabel(code?: string): string | undefined {
   return PREFECTURE_OPTIONS.find((entry) => entry.code === code)?.label;
 }
 
-// Restaurant overview copy: one prose language, sourced names kept intact.
-
-const CHINESE_NAMES = new Map(
-  (
-    '焼鳥:烧鸟 焼き鳥:烧鸟 やきとり:烧鸟 鳥料理:鸡肉料理 鶏料理:鸡肉料理 串焼:串烧 串焼き:串烧 和食:日式料理 ' +
-    'ラーメン:拉面 餃子:饺子 寿司:寿司 洋食:西式料理 海鮮:海鲜 バー:酒吧 パン:面包 スペイン料理:西班牙料理 ' +
-    '居酒屋:居酒屋 とんかつ:炸猪排 カレー:咖喱 ハンバーガー:汉堡 カフェ:咖啡馆 喫茶店:咖啡馆 うどん:乌冬面 ' +
-    'そば:荞麦面 天ぷら:天妇罗 焼肉:烤肉 ケーキ:蛋糕 中華料理:中餐 イタリアン:意式料理 フレンチ:法式料理'
-  )
-    .split(' ')
-    .map((pair) => pair.split(':') as [string, string]),
-);
-
-const YAKITORI = /^(?:焼鳥|焼き鳥|やきとり|yakitori)$/iu;
-const YAKITORI_ADJACENT = /^(?:鳥料理|鶏料理|串焼|串焼き)$/u;
-
-/** Up to `limit` distinct, specific labels; area names and yakitori synonyms are dropped. */
-export function compactCategories(labels: readonly string[], area = '', limit = 2): string[] {
-  const clean = labels.map((label) => label.normalize('NFC').trim()).filter(Boolean);
-  const hasYakitori = clean.some((label) => YAKITORI.test(label));
-  const seen = new Set<string>();
-  return clean
-    .filter((label) => {
-      const key = YAKITORI.test(label) ? 'yakitori' : normalizeText(label);
-      const isArea = key.length >= 2 && normalizeText(area).includes(key);
-      if (isArea || seen.has(key) || (hasYakitori && YAKITORI_ADJACENT.test(label))) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, limit);
-}
-
-export function composeOverview(
-  categories: readonly string[],
-  dishes: readonly string[],
-  area: string,
-) {
-  const cuisines = [
+/** Stored classification snapshot written with new catalog items (read back by record.ts). */
+export function withRestaurantClassification<
+  T extends {
+    readonly tags: readonly string[];
+    readonly address?: string;
+    readonly intakeEvidence?: {
+      readonly ownerFields?: { readonly categories?: readonly string[] };
+      readonly profile?: { readonly categories?: { readonly value: readonly string[] } };
+    };
+  },
+>(item: T) {
+  const evidence = item.intakeEvidence;
+  const cuisineLabels = [
     ...new Set(
-      compactCategories(categories, area).map((label) => CHINESE_NAMES.get(label) ?? label),
+      evidence?.ownerFields?.categories ?? evidence?.profile?.categories?.value ?? item.tags,
     ),
   ];
-  const picked = dishes.filter((dish) => !categories.includes(dish)).slice(0, 3);
-  return [
-    cuisines.length ? `主营${cuisines.join('、')}。` : '',
-    area ? `位于${area}。` : '',
-    picked.length ? `招牌菜包括${picked.join('、')}。` : '',
-  ].join('');
+  const address = item.address ?? '';
+  const subdivision = PREFECTURE_OPTIONS.find((entry) => entry.code === prefectureOf(address));
+  return {
+    ...item,
+    classification: {
+      cuisines: classifyCuisines(cuisineLabels).map((id) => ({
+        familyId: id.split('.')[0],
+        ...(id.includes('.') ? { categoryId: id } : {}),
+      })),
+      geography: subdivision
+        ? {
+            countryCode: 'JP',
+            subdivisionCode: subdivision.code,
+            subdivisionName: subdivision.name,
+          }
+        : {},
+      basis: { cuisineLabels, address },
+    },
+  };
 }

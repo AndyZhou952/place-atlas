@@ -1,101 +1,100 @@
+// The Recommend harness wired through the Worker: the model only interprets the request;
+// candidates come from the saved catalog, so an invented restaurant can never be recommended.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { type RecommendDeps, recommend } from '../src/server/agent/recommend.ts';
-import type { Restaurant } from '../src/shared/types.ts';
-import { chatResponse, stubFetch } from './fixtures.ts';
+import type { Env } from '../src/server/env.ts';
+import { handleApi } from '../src/server/worker.ts';
+import { migratedD1, stubFetch } from './fixtures.ts';
 
-const restaurant = (
-  id: string,
-  title: string,
-  tags: string[],
-  latitude: number,
-  extra: Partial<Restaurant> = {},
-): Restaurant => ({
-  id,
-  title,
-  area: '新宿',
-  address: '東京都新宿区',
-  description: '',
-  latitude,
-  longitude: 139.7,
-  tags,
-  cuisines: [],
-  reservation: { policy: 'unknown', label: '' },
-  addedAt: '2026-10-01',
-  updatedAt: '2026-10-01',
-  favorite: false,
-  visited: false,
-  ...extra,
-});
-const saved = [
-  restaurant('a', 'カレーA', ['カレー'], 35.7, { rating: 9, visited: true }),
-  restaurant('b', 'カレーB', ['カレー'], 35.69),
-  restaurant('c', '鮨C', ['寿司'], 35.6),
-];
-const model = { apiKey: 'k', baseUrl: 'https://model.test/v1', model: 'm' };
-const ask = (
-  answer: unknown,
-  geocode: RecommendDeps['geocode'] = async () => ({
-    label: '新宿駅',
-    latitude: 35.69,
+const ORIGIN = 'https://atlas.test';
+
+function restaurant(id: string, title: string, tags: string[], latitude: number) {
+  return {
+    id,
+    kind: 'food',
+    title,
+    area: '新宿',
+    address: '東京都新宿区西新宿1-1-1',
+    description: '',
+    latitude,
     longitude: 139.7,
-  }),
-) =>
-  recommend('新宿駅の近くでカレー', saved, {
-    model,
-    geocode,
-    fetch: stubFetch({ 'https://model.test/': () => chatResponse(answer) }),
+    verificationStatus: 'verified',
+    verifiedAt: '2026-10-01T00:00:00.000Z',
+    reservation: { mode: 'unknown', label: '' },
+    personalState: 'saved',
+    tags,
+    sources: [],
+  };
+}
+
+async function ask(interpretation: unknown, query: string) {
+  const { db, sqlite } = migratedD1();
+  const insert = sqlite.prepare(
+    `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
+     VALUES (?, ?, 'verified', '2026-10-01', '2026-10-01')`,
+  );
+  insert.run(
+    'ramen-a',
+    JSON.stringify(restaurant('ramen-a', '合成ラーメン A', ['ラーメン'], 35.69)),
+  );
+  insert.run('sushi-b', JSON.stringify(restaurant('sushi-b', '合成鮨 B', ['寿司'], 35.6)));
+  const env: Env = {
+    DB: db,
+    MEDIA: {} as R2Bucket,
+    ATLAS_OWNER_PASSWORD: 'owner-pass',
+    ATLAS_OWNER_SESSION_SECRET: 'x'.repeat(40),
+    AGENT_API_KEY: 'model-key',
+    AGENT_BASE_URL: 'https://api.deepseek.com',
+    AGENT_MODEL: 'deepseek-flash',
+  };
+  globalThis.fetch = stubFetch({
+    'https://api.deepseek.com/chat/completions': () =>
+      Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(interpretation) } }],
+      }),
   });
+  const request = (method: string, path: string, body: unknown, cookie = '') =>
+    handleApi(
+      new Request(`${ORIGIN}${path}`, {
+        method,
+        headers: { origin: ORIGIN, 'content-type': 'application/json', cookie },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  const login = await request('POST', '/api/session', { password: 'owner-pass' });
+  const cookie = login.headers.get('set-cookie')!.split(';')[0];
+  const response = await request('POST', '/api/recommend', { query, replies: [] }, cookie);
+  // oxlint-disable-next-line typescript/no-explicit-any -- assertions inspect the JSON
+  const body: any = await response.json();
+  return { status: response.status, body };
+}
 
-test('model picks are limited to saved ids, deduplicated, and sorted by distance from the origin', async () => {
-  const result = await ask({
-    origin: '新宿駅',
-    picks: [
-      { id: 'a', reason: '高評価' },
-      { id: 'invented', reason: 'x' },
-      { id: 'b', reason: '未訪問' },
-      { id: 'a', reason: 'again' },
-    ],
-  });
-  assert.deepEqual(result.origin, { label: '新宿駅', latitude: 35.69, longitude: 139.7 });
+const interpretation = {
+  action: 'recommend',
+  originId: null,
+  originText: null,
+  foodTerms: ['ramen'],
+  excludedFoodTerms: [],
+  travelMode: 'none',
+  maxMinutes: null,
+  visited: 'any',
+};
+
+test('a food-only request recommends only matching saved restaurants', async () => {
+  const { status, body } = await ask(interpretation, 'ラーメンが食べたい');
+  assert.equal(status, 200);
+  assert.equal(body.status, 'recommend');
   assert.deepEqual(
-    result.picks.map((pick) => [pick.id, pick.distanceKm]),
-    [
-      ['b', 0],
-      ['a', 1.1],
-    ],
+    body.recommendations.map((item: { itemId: string }) => item.itemId),
+    ['ramen-a'],
   );
 });
 
-test('an origin that cannot be geocoded leaves the model order without distances', async () => {
-  const result = await ask(
-    {
-      origin: 'どこか',
-      picks: [
-        { id: 'a', reason: '' },
-        { id: 'b', reason: '' },
-      ],
-    },
-    async () => undefined,
+test('a timed route without a starting point asks for one instead of guessing', async () => {
+  const { body } = await ask(
+    { ...interpretation, travelMode: 'walk', maxMinutes: 10 },
+    '歩いて10分以内のラーメン',
   );
-  assert.equal(result.origin, undefined);
-  assert.deepEqual(
-    result.picks.map((pick) => [pick.id, pick.distanceKm]),
-    [
-      ['a', undefined],
-      ['b', undefined],
-    ],
-  );
-});
-
-test('no picks returns a message', async () => {
-  assert.match((await ask({ picks: [], message: '該当なし' })).message!, /該当なし/u);
-});
-
-test('without a model, keywords match and unvisited, higher-rated places come first', async () => {
-  const result = await recommend('カレー', saved, { geocode: async () => undefined });
-  assert.deepEqual(
-    result.picks.map((pick) => pick.id),
-    ['b', 'a'],
-  );
+  assert.equal(body.status, 'clarify');
 });

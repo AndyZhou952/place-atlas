@@ -3,7 +3,7 @@ import test from 'node:test';
 import { isOwner, login, requireOwner } from '../src/server/auth.ts';
 import type { Env } from '../src/server/env.ts';
 import { HttpError } from '../src/server/http.ts';
-import { modelConfig } from '../src/server/settings.ts';
+import { resolveAgentSettings } from '../src/server/settings.ts';
 
 const secret = '0123456789abcdef0123456789abcdef-secret';
 const encoder = new TextEncoder();
@@ -114,10 +114,10 @@ test('model settings saved by 0.1 still decrypt', async () => {
     iv: encode(iv),
     ciphertext: encode(new Uint8Array(ciphertext)),
   });
-  assert.deepEqual(await modelConfig(envWith(envelope)), {
-    apiKey: 'sk-test-123456',
-    baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-flash',
+  assert.deepEqual(await resolveAgentSettings(envWith(envelope)), {
+    agentApiKey: 'sk-test-123456',
+    agentBaseUrl: 'https://api.deepseek.com',
+    agentModel: 'deepseek-flash',
   });
-  assert.equal(await modelConfig(envWith()), undefined);
+  assert.deepEqual(await resolveAgentSettings(envWith()), {});
 });

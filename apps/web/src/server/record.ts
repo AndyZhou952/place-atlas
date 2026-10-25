@@ -1,13 +1,6 @@
 import { classifyCuisines, prefectureOf } from '../shared/cuisine.ts';
-import { formatOpeningHours } from '../shared/hours.ts';
 import { tabelogListingUrl } from '../shared/text.ts';
-import type {
-  AddDraft,
-  Reservation,
-  ReservationPolicy,
-  Restaurant,
-  SourcedText,
-} from '../shared/types.ts';
+import type { Reservation, ReservationPolicy, Restaurant, SourcedText } from '../shared/types.ts';
 
 // Stored `atlas_items.payload_json` has two shapes:
 //  - flat items (0.1 seeds and every record written by this version), and
@@ -166,75 +159,5 @@ export function toRestaurant(row: StoredRow): Restaurant | undefined {
     favorite: Boolean(row.is_favorite),
     visited: Boolean(row.has_visited) || Number(row.visit_count ?? 0) > 0,
     ...(comment ? { comment } : {}),
-  };
-}
-
-const LEGACY_MODE: Record<ReservationPolicy, string> = {
-  reservable: 'same-day',
-  required: 'advance',
-  not_reservable: 'unavailable',
-  unknown: 'unknown',
-};
-
-/** Payload for a newly added restaurant, in the flat shape that 0.1 can also read. */
-export function toPayload(draft: AddDraft, now: string): Json {
-  const tabelogUrl = draft.tabelog?.url;
-  const scheduleSource = draft.scheduleSourceUrl ?? tabelogUrl;
-  const schedule = (value?: string, format = false) =>
-    value && scheduleSource
-      ? {
-          value: format ? formatOpeningHours(value) : value,
-          sourceUrl: scheduleSource,
-          observedAt: now,
-        }
-      : undefined;
-  const openingHours = schedule(draft.openingHours, true);
-  const regularClosingDays = schedule(draft.regularClosingDays);
-  const closingNotes = schedule(draft.closingNotes);
-  const { policy, label, bookingUrl, note } = draft.reservation;
-  return {
-    id: draft.id,
-    kind: 'food',
-    title: draft.title,
-    ...(draft.alternateTitle ? { alternateTitle: draft.alternateTitle } : {}),
-    area: draft.area,
-    address: draft.address,
-    description: draft.description,
-    latitude: draft.latitude,
-    longitude: draft.longitude,
-    verificationStatus: 'verified',
-    verifiedAt: now,
-    updatedAt: now,
-    personalState: 'saved',
-    tags: [...draft.categories.slice(0, 2), ...draft.dishes.slice(0, 2)],
-    cuisineLabels: draft.categories,
-    ...(tabelogUrl && draft.tabelog?.score !== undefined
-      ? { tabelog: { score: draft.tabelog.score, url: tabelogUrl, checkedAt: now } }
-      : {}),
-    ...(draft.googlePlaceId ? { googlePlaceId: draft.googlePlaceId } : {}),
-    ...(draft.officialUrl ? { officialUrl: draft.officialUrl } : {}),
-    reservation: {
-      mode: LEGACY_MODE[policy],
-      policy,
-      label,
-      checkedAt: now,
-      ...(bookingUrl ? { url: bookingUrl } : {}),
-      ...(note ? { releaseNote: note } : {}),
-    },
-    ...(openingHours ? { openingHours } : {}),
-    ...(regularClosingDays ? { regularClosingDays } : {}),
-    ...(closingNotes ? { closingNotes } : {}),
-    scheduleCheck: {
-      openingHours: openingHours ? 'known' : 'unavailable',
-      regularClosingDays: regularClosingDays ? 'known' : 'unavailable',
-      checkedAt: now,
-    },
-    sources: [
-      ...(tabelogUrl ? [{ role: 'tabelog', label: 'Tabelog', url: tabelogUrl }] : []),
-      ...(draft.officialUrl
-        ? [{ role: 'official', label: 'Official website', url: draft.officialUrl }]
-        : []),
-      ...(bookingUrl ? [{ role: 'reservation', label: 'Booking', url: bookingUrl }] : []),
-    ],
   };
 }

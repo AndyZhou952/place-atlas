@@ -1,52 +1,69 @@
 # Architecture
 
-Japan Atlas is one Cloudflare Worker that serves a React single-page app and a JSON API. D1 stores records, R2 stores photos and videos. Each deployment has one Owner; visitors can read everything that is published.
+Japan Atlas is one Cloudflare Worker that serves a React single-page app and a JSON API. D1 stores records and Add sessions, R2 stores photos and videos. Each deployment has one Owner; visitors can read everything that is published. An optional second Worker, the route sidecar, holds the Google Maps key used for Recommend routes.
 
-## Layout (`apps/web/src`)
+## Layout (`apps/web`)
 
 ```
-shared/        Types and pure domain rules used by both sides
-  types.ts       API data shapes (Restaurant, Visit, Media, AddDraft, …)
-  cuisine.ts     Cuisine taxonomy, prefectures, overview text
-  hours.ts       Tabelog opening-hours formatting
-  text.ts        Search normalization, distance, rating and URL rules
-server/        The Worker
-  worker.ts      Route table: HTTP → handlers (the only place that knows about requests)
-  auth.ts        Owner password login, HMAC session cookie, same-origin writes, Add API token
-  db.ts          D1/R2 repository: restaurants, assessments, visits, media, Google references
-  record.ts      Stored payload ⇄ Restaurant; reads both 0.1 record formats
-  settings.ts    Encrypted model settings
-  sources/       External readers: web search, Tabelog listing, Google Places, geocoder
-  agent/         Model-assisted workflows: llm.ts (one JSON chat call), add.ts, recommend.ts
-client/        The browser app (MVVM)
-  api.ts         Model: typed calls to the API
-  viewmodels/    State and actions as hooks (useAtlas, useAdd, useOwner, …) and pure selectors
-  views/         React components that render view-model state and call its actions
+src/shared/          Types and pure rules used by both sides
+  types.ts             Browse/journal API shapes (Restaurant, Visit, Media, …)
+  catalog-intake.ts    Add API contract (discover/select/confirm/cancel inputs and outputs, preview)
+  catalog-intake-preview.ts, catalog-intake-warnings.ts, restaurant-profile.ts
+                       Preview presentation, warning order, profile/overview rules
+  recommend-conversation.ts
+                       Recommend API contract (query + clarification replies → recommend/clarify)
+  cuisine.ts, hours.ts, text.ts, research-region.ts, result.ts
+src/server/          The Worker
+  worker.ts            Route table: HTTP → handlers, plus the daily cleanup cron
+  auth.ts              Owner login, HMAC session cookie, Add conversation ids, Add Agent token
+  db.ts, record.ts     D1/R2 repository; stored payload ⇄ Restaurant for both 0.1 formats
+  settings.ts          Encrypted model settings and the tool-call connection check
+  agent/               The agent harness (below)
+src/client/          The browser app (MVVM)
+  api.ts               Model: the only module that talks HTTP
+  viewmodels/          State and actions as hooks (useAtlas, useAdd + add-state, useRecommend, …)
+  views/               React components; OwnerWorkspace holds the Add and Recommend panels
+route-sidecar/       Separate Worker: Google geocoding, walking matrix and transit routes
 ```
 
-Dependencies point one way: `views → viewmodels → api → (HTTP) → worker → agent/sources/db → shared`. Views never fetch; the Worker's agent code never touches HTTP requests or D1 directly.
+Dependencies point one way: `views → viewmodels → api → (HTTP) → worker → agent/db → shared`. Shared code imports nothing from the server or the browser.
+
+## Agent harness (`src/server/agent`)
+
+| Area | Files | Role |
+| --- | --- | --- |
+| Add wiring | `add/compose.ts`, `add/http.ts`, `add/google-rating.ts` | Builds the harness from deployment settings; HTTP contract, conversation checks and error codes; Google rating for a preview |
+| Add workflow | `add/coordinator.ts` | Session state machine: discover → select (research) → owner edits → confirm, with versions, expiry, research allowances, validation of every model claim and duplicate detection |
+| Add storage | `add/d1-session-state.ts`, `add/d1-publisher.ts`, `add/stored-item.ts`, `add/saved-place-duplicates.ts` | Add sessions in D1; atomic publication of the confirmed restaurant (with `intakeEvidence`) and receipts |
+| Discovery | `discovery/tabelog-place-discovery.ts`, `discovery/google-place-discovery.ts`, `discovery/google-places-client.ts` | Google Places text search verifies the typed name when enabled; otherwise Tabelog listings found by search; a pasted Tabelog URL is read directly |
+| Location | `discovery/nominatim-geocoder.ts`, `discovery/nominatim-transport.ts`, `discovery/nominatim-policy-state.ts` | Nominatim coordinates with a shared rate gate and 30-day cache in D1 |
+| Quotas | `discovery/provider-usage.ts`, `discovery/bounded-json-http.ts` | Monthly per-SKU request and cost caps in D1; bounded provider responses |
+| Research agent | `research/place-research.ts`, `research/research-instructions.ts` | Tool-calling loop (at most two `search_web` calls, three model turns, 35 s) that returns sourced facts with exact quotes; the coordinator rejects unsupported claims |
+| Research readers | `research/tabelog-listing.ts`, `research/web-search.ts`, `research/firecrawl-source-reader.ts`, `research/tabelog-source-fallback.ts`, `research/browser-source-reader.ts`, `research/official-site-reader.ts`, `research/tablecheck-booking.ts`, `research/toreta-booking.ts`, `research/reservation-timing.ts` | Tabelog listing parsing, search, official site and booking-page readers, booking-window extraction |
+| Recommend | `recommend/compose.ts`, `recommend/conversation-service.ts`, `recommend/interpreter.ts`, `recommend/intent.ts`, `recommend/decision.ts`, `recommend/receipt.ts`, `recommend/search-policy.ts`, `recommend/geo-distance.ts` | The model only interprets the request; deterministic rules normalize it, choose candidates from the saved catalog and write the reasons |
+| Routes | `recommend/route-sidecar-client.ts`, `recommend/route-sidecar-adapter.ts`, `recommend/route-ports.ts`, `route-sidecar/*` | Metered calls to the route sidecar for geocoding, walking and transit evidence |
 
 ## Data
 
-`atlas_items.payload_json` holds each restaurant. New records use a flat shape that the 0.1 code can also read; 0.1 Add records keep their facts under `intakeEvidence`, which `record.ts` projects. Personal data lives beside it: `place_assessments` (rating 0–10, favorite, visited, comment), `visits`, `visit_media` (R2 object key plus an opaque public `pm_…` id). Title/description edits fold any 0.1 override into the payload. Cuisine and prefecture are derived on read from the stored category labels and address.
+`atlas_items.payload_json` holds each restaurant. Records published by Add keep their sourced facts under `intakeEvidence`; older records use a flat shape. `record.ts` projects both. Personal data lives beside it: `place_assessments` (rating 0–10, favorite, visited, comment), `visits`, `visit_media` (R2 object key plus an opaque public `pm_…` id). Add uses `catalog_intake_sessions`, research allowances, receipts and the Nominatim cache; the cron removes expired sessions and stale cache rows daily.
 
-Deleting a restaurant removes its visits, media objects, assessment and references and leaves a tombstone. Migrations in `migrations/owner-poc` are append-only; several 0.1 tables are no longer read but remain for existing databases.
+Deleting a restaurant removes its visits, media objects, assessment and references and leaves a tombstone. Migrations in `migrations/owner-poc` are append-only; tables that are no longer read stay for existing databases.
 
 ## Add
 
-1. **Search**: `"<name> <area> site:tabelog.com"` through Tavily (if configured) or Yahoo! JAPAN, then DuckDuckGo. Up to three main-listing URLs are read; a pasted listing URL skips search. With a Google key and no Tabelog result, Google Places text search supplies candidates.
-2. **Preview**: the chosen listing is read again (Firecrawl first when configured, then directly; the final page must be the same listing). Name, aliases, address, coordinates, aggregate score, cuisine labels, reservation row, booking link, official site and hours come from the listing's Restaurant JSON-LD and its own info rows; reviews are never read. A Google place is attached only if it lies within 150 m. The model receives the listing introduction and reservation text and returns signature dishes and a booking note; each must appear verbatim in that text or it is dropped. The Chinese overview is composed by code.
-3. **Save**: the Owner edits the draft and saves. The server validates every field (location must be in Japan), rejects a second record for the same Tabelog listing or Google place, and inserts with the draft's id so a retry cannot duplicate.
+1. **Discover** (`POST /api/catalog-intake/discover {input:{query, requestToken}}`): with Google Places enabled, the typed name is matched on Google Maps (up to three candidates with Google attribution); otherwise Tabelog listings are found by search. The response starts a session and returns the conversation header to echo on later steps.
+2. **Select** (`select {sessionId, expectedSessionVersion, ordinal, requestResearch}`): the chosen place is geocoded with Nominatim and the research agent gathers the Tabelog score, reservation rule, hours, categories, dishes and official links. Every fact needs a source URL and quote from the same branch, or it stays unknown. The Owner can edit fields and select again to refresh the preview; Owner edits are sent as explicit assertions.
+3. **Confirm** (`confirm {sessionId, expectedPreviewVersion}`): evidence is checked again. A changed preview is returned for review instead of being saved; otherwise the restaurant is published once (a retry returns the same receipt), with the staged Google rating as a dated reference.
 
-External agents use the same three endpoints (`/api/add/search|preview|save`) with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN`; a human should review the draft before saving.
+The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake` with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN` (never with a cookie) and may not assert Owner-only fields.
 
 ## Recommend
 
-One model call receives the request and a one-line summary of each saved restaurant and returns up to five ids with reasons plus an optional starting point. Ids not in the catalog are discarded and names always come from the database. A starting point is geocoded with OpenStreetMap Nominatim and picks are sorted by straight-line distance, shown in km with a Google Maps walking-directions link (never as walking time). Without a model, keyword matching is used.
+`POST /api/recommend {query, replies}`. The model receives the request, earlier answers and the saved areas and place names, and returns a structured interpretation (food terms, origin, travel mode, visited preference). Code normalizes it against the request text, so the model cannot invent origins, restaurants or routes. Candidates come only from saved restaurants. A station or address is geocoded by the route sidecar; distances are straight-line unless the sidecar returned walking or transit evidence, which is shown with its source and time. Unclear starting points and timed routes without a start produce a clarifying question.
 
 ## Security
 
-- Writes require the Owner cookie (HMAC-SHA256, 30 days, `HttpOnly; Secure; SameSite=Strict`) and a same-origin `Origin` header. Recommend and Google ratings are Owner-only because they spend provider quota.
+- Writes require the Owner cookie (HMAC-SHA256, 30 days, `HttpOnly; Secure; SameSite=Strict`) and a same-origin `Origin` header. Add, Recommend and Google ratings are Owner-only (or the Add Agent token) because they spend provider quota.
 - Model keys are encrypted with AES-GCM (key derived by HKDF from a server secret) and never returned to the browser.
-- Outbound requests use fixed endpoints, manual redirects, timeouts and size limits. Source text is passed to the model as data and its output is validated.
+- Outbound requests use fixed endpoints, manual redirects, timeouts, size limits and monthly quotas. Source text is passed to the model as data and every claim is validated against its quote.
 - Uploads are limited to JPEG/PNG/WebP/GIF (8 MB) and MP4/WebM (50 MB) and checked by file signature.

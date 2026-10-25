@@ -1,11 +1,22 @@
 import type {
-  AddCandidate,
-  AddDraft,
-  AddPreview,
+  AddErrorCode,
+  CatalogIntakeCancelInput,
+  CatalogIntakeCancelOutput,
+  CatalogIntakeConfirmInput,
+  CatalogIntakeConfirmOutput,
+  CatalogIntakeDiscoverInput,
+  CatalogIntakeDiscoverOutput,
+  CatalogIntakeSelectInput,
+  CatalogIntakeSelectOutput,
+} from '../shared/catalog-intake.ts';
+import type {
+  RecommendConversationInput,
+  RecommendConversationOutput,
+} from '../shared/recommend-conversation.ts';
+import type {
   GoogleRating,
   Media,
   ModelSettingsStatus,
-  RecommendResult,
   Restaurant,
   RestaurantPatch,
   Visit,
@@ -84,14 +95,114 @@ export const api = {
     request<ModelSettingsStatus>('PUT', '/api/settings/model', input),
   removeModelSettings: () => request<ModelSettingsStatus>('DELETE', '/api/settings/model'),
 
-  addSearch: (query: string, area: string) =>
-    request<AddCandidate[]>('POST', '/api/add/search', { query, area }),
-  addPreview: (candidate: Pick<AddCandidate, 'source' | 'ref'>) =>
-    request<AddPreview>('POST', '/api/add/preview', {
-      source: candidate.source,
-      ref: candidate.ref,
-    }),
-  addSave: (draft: AddDraft) => request<{ id: string }>('POST', '/api/add/save', { draft }),
+  recommend: (input: RecommendConversationInput) =>
+    request<RecommendConversationOutput>('POST', '/api/recommend', input),
 
-  recommend: (query: string) => request<RecommendResult>('POST', '/api/recommend', { query }),
+  /** The live Google rating for an Add preview; undefined when unavailable. */
+  previewGoogleRating: async (sessionId: string, signal: AbortSignal) => {
+    const response = await fetch(
+      `/api/catalog-intake/google-rating?sessionId=${encodeURIComponent(sessionId)}`,
+      { credentials: 'same-origin', cache: 'no-store', signal },
+    );
+    if (!response.ok || response.status === 204) return undefined;
+    const rating = (await response.json()) as Partial<GoogleRating>;
+    return typeof rating.score === 'number' && typeof rating.url === 'string'
+      ? (rating as GoogleRating)
+      : undefined;
+  },
+};
+
+// Add (catalog intake). Each step after discover echoes the conversation the server returned.
+
+export class AddRequestError extends Error {
+  readonly code: AddErrorCode;
+  readonly retryable?: boolean;
+  readonly reference?: string;
+  constructor(code: AddErrorCode, message: string, retryable?: boolean, reference?: string) {
+    super(message);
+    this.code = code;
+    if (retryable !== undefined) this.retryable = retryable;
+    if (reference) this.reference = reference;
+  }
+}
+
+const CONVERSATION_HEADER = 'x-atlas-web-conversation-id';
+const CONVERSATION_KEY = 'atlas.catalog-intake.conversation-v1';
+const STATUS_CODES: Record<number, AddErrorCode> = {
+  400: 'invalid_input',
+  401: 'unauthorized',
+  403: 'forbidden',
+  404: 'not_found',
+  409: 'conflict',
+  410: 'expired',
+  413: 'invalid_input',
+  429: 'rate_limited',
+  503: 'dependency_failure',
+};
+
+function storedConversation(): string | undefined {
+  try {
+    const value = sessionStorage.getItem(CONVERSATION_KEY) ?? undefined;
+    return value && /^[a-f0-9]{32}$/u.test(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function intake<T>(operation: string, input: unknown): Promise<T> {
+  const headers = new Headers({ 'content-type': 'application/json' });
+  const conversation = storedConversation();
+  if (conversation) headers.set(CONVERSATION_HEADER, conversation);
+  let response: Response;
+  try {
+    response = await fetch(`/api/catalog-intake/${operation}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers,
+      body: JSON.stringify({ input }),
+    });
+  } catch {
+    throw new AddRequestError(
+      'dependency_failure',
+      'We could not reach the Add service. Check your connection, then retry.',
+      true,
+    );
+  }
+  const returned = response.headers.get(CONVERSATION_HEADER);
+  if (returned && /^[a-f0-9]{32}$/u.test(returned)) {
+    try {
+      sessionStorage.setItem(CONVERSATION_KEY, returned);
+    } catch {
+      // Blocked storage only means the next step starts a new conversation.
+    }
+  }
+  const payload = (await response.json().catch(() => undefined)) as
+    | { code?: AddErrorCode; message?: string; error?: string; retryable?: boolean }
+    | undefined;
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event('atlas:login-required'));
+    throw new AddRequestError(
+      payload?.code ?? STATUS_CODES[response.status] ?? 'unexpected_failure',
+      payload?.message ?? payload?.error ?? 'The Add request failed. Nothing was saved.',
+      payload?.retryable,
+      response.headers.get('x-atlas-request-id') ?? undefined,
+    );
+  }
+  if (!payload)
+    throw new AddRequestError(
+      'unexpected_failure',
+      'The Add service returned an unreadable response. Please retry.',
+      true,
+    );
+  return payload as T;
+}
+
+export const addApi = {
+  discover: (input: CatalogIntakeDiscoverInput) =>
+    intake<CatalogIntakeDiscoverOutput>('discover', input),
+  select: (input: CatalogIntakeSelectInput) => intake<CatalogIntakeSelectOutput>('select', input),
+  confirm: (input: CatalogIntakeConfirmInput) =>
+    intake<CatalogIntakeConfirmOutput>('confirm', input),
+  cancel: (input: CatalogIntakeCancelInput) => intake<CatalogIntakeCancelOutput>('cancel', input),
 };

@@ -111,7 +111,12 @@ export function PlaceDetail({
           onSave={(rating) => update({ rating })}
         />
         {restaurant.tabelog ? (
-          <a className="rating" href={restaurant.tabelog.url} target="_blank" rel="noreferrer">
+          <a
+            className="rating tabelog-rating"
+            href={restaurant.tabelog.url}
+            target="_blank"
+            rel="noreferrer"
+          >
             <span>食べログ</span>
             <strong>
               <Star aria-hidden="true" /> {restaurant.tabelog.score?.toFixed(2) ?? '—'}
@@ -140,7 +145,7 @@ export function PlaceDetail({
             </button>
           </span>
         ) : null}
-        <span className="muted">
+        <span className="rating-visit-count">
           {visits.length} visits{visits[0] ? ` · Last ${visits[0].visitedOn}` : ''}
         </span>
       </div>
@@ -163,11 +168,11 @@ export function PlaceDetail({
 
       <div className="facts">
         <div className="fact">
-          <span>Reservation</span>
+          <span>Visit / booking</span>
           <strong>
             {restaurant.reservation.label || POLICY_LABEL[restaurant.reservation.policy]}
           </strong>
-          {restaurant.reservation.note ? <small>{restaurant.reservation.note}</small> : null}
+          <small>{restaurant.reservation.note ?? 'Details in source links'}</small>
         </div>
         <div className="fact">
           <span>営業時間</span>
@@ -285,7 +290,10 @@ function CommentEditor({
   return (
     <section className="comment">
       <header>
-        <h3>Overall comment</h3>
+        <div>
+          <p className="eyebrow">Personal note</p>
+          <h3>Overall comment</h3>
+        </div>
         {owner && draft === undefined ? (
           <button
             type="button"

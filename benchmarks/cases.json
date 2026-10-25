@@ -105,20 +105,125 @@
       {
         "name": "Cuisine near a station",
         "request": "新宿駅の近くでラーメン",
-        "expect": { "first": "r1", "excludes": ["r3", "r4", "r6"], "origin": true }
+        "interpretation": {
+          "action": "recommend",
+          "originId": null,
+          "originText": "新宿駅",
+          "originKind": "station",
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "recommend",
+          "first": "r1",
+          "excludes": ["r3", "r4", "r6"]
+        }
       },
       {
         "name": "Not yet visited",
-        "request": "ラーメンでまだ行ってない店",
-        "expect": { "includes": ["r1"], "excludes": ["r2"] }
+        "request": "まだ行ってないラーメン屋",
+        "interpretation": {
+          "action": "recommend",
+          "originId": null,
+          "originText": null,
+          "originKind": null,
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "only_unvisited"
+        },
+        "expect": {
+          "status": "recommend",
+          "includes": ["r1"],
+          "excludes": ["r2"]
+        }
       },
-      { "name": "English request", "request": "sushi in Ginza", "expect": { "first": "r3" } },
-      { "name": "Other region", "request": "京都でコーヒー", "expect": { "first": "r6" } },
+      {
+        "name": "English request",
+        "request": "sushi in Ginza",
+        "interpretation": {
+          "action": "recommend",
+          "originId": "area:銀座",
+          "originText": null,
+          "originKind": null,
+          "foodTerms": ["sushi"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "recommend",
+          "first": "r3"
+        }
+      },
+      {
+        "name": "Other region",
+        "request": "京都でコーヒー",
+        "interpretation": {
+          "action": "recommend",
+          "originId": null,
+          "originText": "京都",
+          "originKind": "area",
+          "foodTerms": ["coffee"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "recommend",
+          "first": "r6"
+        }
+      },
+      {
+        "name": "Timed walk needs a start",
+        "request": "歩いて10分以内のラーメン",
+        "interpretation": {
+          "action": "recommend",
+          "originId": null,
+          "originText": null,
+          "originKind": null,
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "walk",
+          "maxMinutes": 10,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "clarify"
+        }
+      },
       {
         "name": "Nothing fits",
         "request": "フレンチのフルコース",
-        "expect": { "excludes": ["r1", "r2", "r3", "r4", "r5", "r6"] }
+        "interpretation": {
+          "action": "unsupported",
+          "originId": null,
+          "originText": null,
+          "originKind": null,
+          "foodTerms": [],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "prefer_unvisited",
+          "reason": "French is not a saved cuisine."
+        },
+        "expect": {
+          "excludes": ["r1", "r2", "r3", "r4", "r5", "r6"]
+        },
+        "knownGap": "Only ramen, sushi, curry, yakitori, beef tongue and coffee are recognized food terms; other cuisines match everything."
       }
-    ]
+    ],
+    "places": {
+      "新宿駅": [35.6896, 139.7006],
+      "銀座": [35.6717, 139.765],
+      "Ginza": [35.6717, 139.765],
+      "京都": [35.0116, 135.7681]
+    }
   }
 }

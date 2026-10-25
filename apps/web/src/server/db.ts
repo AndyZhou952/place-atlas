@@ -8,6 +8,7 @@ import type {
   VisitInput,
 } from '../shared/types.ts';
 import { HttpError } from './http.ts';
+import type { AtlasItem } from './agent/add/stored-item.ts';
 import { type StoredRow, toRestaurant } from './record.ts';
 
 // Tables come from migrations/owner-poc. Their historical names are kept so existing
@@ -35,6 +36,31 @@ export async function getRestaurant(db: D1Database, id: string): Promise<Restaur
   const restaurant = row && toRestaurant(row);
   if (!restaurant) throw new HttpError(404, 'Restaurant not found.');
   return restaurant;
+}
+
+/**
+ * The stored payloads with Owner overrides and assessments applied, as the Add and Recommend
+ * harnesses read them (the same rows `listRestaurants` accepts).
+ */
+export async function listCatalogItems(db: D1Database): Promise<AtlasItem[]> {
+  const { results } = await db
+    .prepare(`${RESTAURANT_SQL} ORDER BY i.created_at DESC, i.id ASC`)
+    .all<StoredRow>();
+  return results.flatMap((row) => {
+    const restaurant = toRestaurant(row);
+    if (!restaurant) return [];
+    const payload = JSON.parse(row.payload_json) as AtlasItem;
+    return [
+      {
+        ...payload,
+        title: restaurant.title,
+        description: restaurant.description,
+        personalRating: typeof row.overall_rating === 'number' ? row.overall_rating : undefined,
+        isFavorite: row.is_favorite === 1,
+        hasVisited: row.has_visited === 1 || (row.visit_count ?? 0) > 0,
+      },
+    ];
+  });
 }
 
 export async function insertRestaurant(db: D1Database, id: string, payload: unknown, now: string) {
@@ -106,6 +132,10 @@ export async function updateRestaurant(
         )
         .bind(patch.title ?? current.title, patch.description ?? current.description, now, now, id),
       db.prepare('DELETE FROM atlas_item_overrides WHERE item_id = ?').bind(id),
+      // An open Add preview compares this revision before it publishes.
+      db.prepare(
+        'UPDATE atlas_catalog_revision SET revision_number = revision_number + 1 WHERE singleton = 1',
+      ),
     );
   }
   await db.batch(statements);
@@ -132,6 +162,7 @@ export async function deleteRestaurant(db: D1Database, media: R2Bucket, id: stri
     .all<{ object_key: string }>();
   await db.batch([
     ...ITEM_TABLES.map((table) => db.prepare(`DELETE FROM ${table} WHERE item_id = ?`).bind(id)),
+    db.prepare('DELETE FROM atlas_review_candidates WHERE id = ?').bind(id),
     db.prepare('DELETE FROM atlas_items WHERE id = ?').bind(id),
     db
       .prepare(

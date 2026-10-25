@@ -1,147 +1,155 @@
+// The Add harness wired through the Worker: Google Places verifies the typed place, Nominatim
+// confirms coordinates, and confirmation publishes one verified restaurant.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { discover, parseDraft, preview, reservationFromListing } from '../src/server/agent/add.ts';
-import { HttpError } from '../src/server/http.ts';
-import type { Restaurant } from '../src/shared/types.ts';
-import {
-  FULL_ROWS,
-  LISTING_URL,
-  chatResponse,
-  firecrawlResponse,
-  listingHtml,
-  stubFetch,
-  yahooHtml,
-} from './fixtures.ts';
+import type { Env } from '../src/server/env.ts';
+import { handleApi } from '../src/server/worker.ts';
+import { migratedD1, stubFetch } from './fixtures.ts';
 
-const model = { apiKey: 'test-key', baseUrl: 'https://model.test/v1', model: 'test' };
-const OTHER = 'https://tabelog.com/tokyo/A1317/A131701/13000002/';
+const ORIGIN = 'https://atlas.test';
+const PLACE_ID = 'ChIJsyntheticPlace001';
 
-function sources(chat?: (body: { messages: { content: string }[] }) => Response) {
-  return {
-    firecrawl: true,
-    model,
-    fetch: stubFetch({
-      'https://search.yahoo.co.jp/': () =>
-        new Response(
-          yahooHtml([
-            `${LISTING_URL}dtlrvwlst/`,
-            LISTING_URL,
-            `${OTHER}?ref=1`,
-            'https://example.com/',
-          ]),
-        ),
-      'https://api.firecrawl.dev/': async (request) => {
-        const { url } = (await request.json()) as { url: string };
-        return firecrawlResponse(url, listingHtml({ url, rows: FULL_ROWS }));
-      },
-      'https://model.test/': async (request) =>
-        chat
-          ? chat(await request.json())
-          : chatResponse({ dishes: ['穴子寿司'], bookingNote: '1ヶ月前の1日から予約受付' }),
-    }),
+function setup() {
+  const { db } = migratedD1();
+  const env: Env = {
+    DB: db,
+    MEDIA: {} as R2Bucket,
+    ATLAS_OWNER_PASSWORD: 'owner-pass',
+    ATLAS_OWNER_SESSION_SECRET: 'x'.repeat(40),
+    GOOGLE_PLACES_API_KEY: 'google-test-key',
+    CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
+    CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
   };
+  const place = {
+    id: PLACE_ID,
+    displayName: { text: '合成食堂 中目黒' },
+    formattedAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3',
+  };
+  const calls: string[] = [];
+  globalThis.fetch = stubFetch({
+    'https://places.googleapis.com/v1/places:searchText': () => {
+      calls.push('google:search');
+      return Response.json({ places: [place] });
+    },
+    'https://places.googleapis.com/v1/places/': () => {
+      calls.push('google:details');
+      return Response.json(place);
+    },
+    'https://nominatim.openstreetmap.org/': () => {
+      calls.push('nominatim');
+      return Response.json([
+        {
+          lat: '35.6441',
+          lon: '139.6988',
+          display_name: '1-2-3, 中目黒, 目黒区, 東京都, 153-0061, 日本',
+          osm_type: 'node',
+          osm_id: 1000001,
+        },
+      ]);
+    },
+  });
+  let cookie = '';
+  let conversation = '';
+  const call = async (method: string, path: string, payload?: unknown) => {
+    const response = await handleApi(
+      new Request(`${ORIGIN}${path}`, {
+        method,
+        headers: {
+          origin: ORIGIN,
+          'content-type': 'application/json',
+          ...(cookie ? { cookie } : {}),
+          ...(conversation ? { 'x-atlas-web-conversation-id': conversation } : {}),
+        },
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+      }),
+      env,
+    );
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) cookie = setCookie.split(';')[0];
+    conversation = response.headers.get('x-atlas-web-conversation-id') ?? conversation;
+    // oxlint-disable-next-line typescript/no-explicit-any -- assertions inspect the JSON
+    const body: any = response.status === 204 ? null : await response.json();
+    return { status: response.status, body };
+  };
+  return { env, call, calls };
 }
 
-test('discover reads each distinct main listing found by search', async () => {
-  const candidates = await discover('鮨 テスト', '中目黒', sources());
-  assert.deepEqual(
-    candidates.map((candidate) => [candidate.ref, candidate.name, candidate.score]),
-    [
-      [LISTING_URL, '鮨 テスト (Sushi Test)', 3.62],
-      [OTHER, '鮨 テスト (Sushi Test)', 3.62],
-    ],
-  );
-});
+test('Owner Add: Google-verified discover → select → confirm publishes a verified restaurant', async () => {
+  const { call, calls } = setup();
+  assert.equal((await call('POST', '/api/session', { password: 'owner-pass' })).status, 200);
 
-test('a pasted listing URL skips search', async () => {
-  const candidates = await discover(`${LISTING_URL}?tab=top`, undefined, sources());
-  assert.deepEqual(
-    candidates.map((candidate) => candidate.ref),
-    [LISTING_URL],
-  );
-});
-
-test('preview builds a draft from the listing; the model may only quote it', async () => {
-  const { draft, duplicates, notes } = await preview(
-    { source: 'tabelog', ref: LISTING_URL },
-    [],
-    sources(),
-  );
-  assert.equal(draft.title, '鮨 テスト');
-  assert.equal(draft.alternateTitle, 'Sushi Test');
-  assert.deepEqual([draft.latitude, draft.longitude], [35.6441, 139.6988]);
-  assert.deepEqual(draft.tabelog, { url: LISTING_URL, score: 3.62 });
-  assert.deepEqual(draft.reservation, {
-    policy: 'required',
-    label: '完全予約制 1ヶ月前の1日から予約受付 予約はこちら',
-    bookingUrl: 'https://yoyaku.toreta.in/sushi-test/',
-    note: '1ヶ月前の1日から予約受付',
+  const discovered = await call('POST', '/api/catalog-intake/discover', {
+    input: { query: '合成食堂 中目黒', requestToken: 'request-0001' },
   });
-  assert.equal(draft.officialUrl, 'https://sushi-test.example/');
-  assert.deepEqual(draft.dishes, ['穴子寿司']);
-  assert.equal(draft.description, '主营寿司、海鲜。位于目黒区中目黒。招牌菜包括穴子寿司。');
-  assert.equal(draft.regularClosingDays, '日・月');
-  assert.deepEqual(duplicates, []);
-  assert.deepEqual(notes, []);
-});
+  assert.equal(discovered.status, 200, JSON.stringify(discovered.body));
+  assert.equal(discovered.body.candidates[0].transientName, '合成食堂 中目黒');
 
-test('invented dishes and booking notes are dropped; a model outage still yields a draft', async () => {
-  const invented = await preview(
-    { source: 'tabelog', ref: LISTING_URL },
-    [],
-    sources(() => chatResponse({ dishes: ['大トロ', 'ちらし寿司'], bookingNote: '3ヶ月前から' })),
+  const selected = await call('POST', '/api/catalog-intake/select', {
+    input: {
+      sessionId: discovered.body.sessionId,
+      expectedSessionVersion: discovered.body.sessionVersion,
+      ordinal: 1,
+    },
+  });
+  assert.equal(selected.status, 200, JSON.stringify(selected.body));
+  assert.equal(selected.body.preview.candidateIdentity.placeId, PLACE_ID);
+
+  const confirm = (previewVersion: number) =>
+    call('POST', '/api/catalog-intake/confirm', {
+      input: { sessionId: discovered.body.sessionId, expectedPreviewVersion: previewVersion },
+    });
+  let confirmed = await confirm(selected.body.preview.previewVersion);
+  // Confirm re-checks the evidence; a changed preview comes back for review instead of saving.
+  if (confirmed.body.status === 'conflict')
+    confirmed = await confirm(confirmed.body.newPreview.previewVersion);
+  assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+  assert.equal(confirmed.body.status, 'committed_verified');
+  assert.deepEqual([...new Set(calls)], ['google:search', 'google:details', 'nominatim']);
+
+  const saved = (await call('GET', '/api/restaurants')).body.find(
+    (restaurant: { title: string }) => restaurant.title === '合成食堂 中目黒',
   );
-  assert.deepEqual(invented.draft.dishes, ['ちらし寿司']);
-  assert.equal(invented.draft.reservation.note, undefined);
-
-  const outage = await preview(
-    { source: 'tabelog', ref: LISTING_URL },
-    [],
-    sources(() => new Response('', { status: 503 })),
-  );
-  assert.deepEqual(outage.draft.dishes, []);
-  assert.equal(outage.draft.tabelog?.score, 3.62);
-  assert.match(outage.notes.join(' '), /model was unavailable/u);
+  assert.equal(saved.googlePlaceId, PLACE_ID);
+  assert.equal(saved.prefecture, 'JP-13');
 });
 
-test('the same listing is reported as already saved', async () => {
-  const saved = {
-    id: 'saved-1',
-    title: '鮨 テスト',
-    tabelog: { url: LISTING_URL },
-    latitude: 0,
-    longitude: 0,
-  } as Restaurant;
-  const { duplicates } = await preview({ source: 'tabelog', ref: LISTING_URL }, [saved], sources());
-  assert.deepEqual(duplicates, [{ id: 'saved-1', title: '鮨 テスト', match: 'same' }]);
+test('Add steps after discover must echo the conversation, and need the Owner session', async () => {
+  const { call } = setup();
+  const anonymous = await call('POST', '/api/catalog-intake/discover', {
+    input: { query: '合成食堂', requestToken: 'request-0002' },
+  });
+  assert.equal(anonymous.status, 401);
+  await call('POST', '/api/session', { password: 'owner-pass' });
+  const forged = await call('POST', '/api/catalog-intake/cancel', {
+    input: { sessionId: 'session-unknown', expectedSessionVersion: 1 },
+  });
+  assert.equal(forged.status, 400);
 });
 
-test('reservation policy follows the listing wording', () => {
-  assert.equal(reservationFromListing('予約可').policy, 'reservable');
-  assert.equal(reservationFromListing('予約不可 ※当日のみ').policy, 'not_reservable');
-  assert.equal(reservationFromListing('完全予約制').policy, 'required');
-  assert.equal(reservationFromListing(undefined).policy, 'unknown');
-});
-
-test('saving requires a name, address and a location in Japan', () => {
-  const valid = {
-    id: 'draft-0001',
-    title: '鮨 テスト',
-    address: '東京都目黒区中目黒1-1-1',
-    latitude: 35.6,
-    longitude: 139.7,
-    tabelog: { url: `${LISTING_URL}?x=1`, score: 3.6 },
-    reservation: { policy: 'unknown', label: '' },
+test('the external Add Agent uses its Bearer token and cannot assert Owner fields', async () => {
+  const { env } = setup();
+  const token = 'a'.repeat(40);
+  const agentEnv = { ...env, ATLAS_ADD_AGENT_TOKEN: token };
+  const send = (authorization: string, body: unknown) =>
+    handleApi(
+      new Request(`${ORIGIN}/api/agent/catalog-intake`, {
+        method: 'POST',
+        headers: { authorization, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      agentEnv,
+    );
+  const discover = {
+    operation: 'discover',
+    input: { query: '合成食堂', requestToken: 'agent-0001' },
   };
-  assert.equal(parseDraft(valid).tabelog?.url, LISTING_URL);
-  for (const invalid of [
-    { ...valid, title: '' },
-    { ...valid, latitude: 48.8 },
-    { ...valid, latitude: null },
-    { ...valid, tabelog: { url: 'https://tabelog.com/rstLst/' } },
-    { ...valid, reservation: { policy: 'maybe' } },
-    { ...valid, officialUrl: 'javascript:alert(1)' },
-  ]) {
-    assert.throws(() => parseDraft(invalid), HttpError, JSON.stringify(invalid));
-  }
+  assert.equal((await send(`Bearer ${'b'.repeat(40)}`, discover)).status, 401);
+  const accepted = await send(`Bearer ${token}`, discover);
+  assert.equal(accepted.status, 200);
+  assert.match(accepted.headers.get('x-atlas-agent-conversation-id') ?? '', /^[a-f0-9]{32}$/u);
+  const ownerFields = await send(`Bearer ${token}`, {
+    operation: 'select',
+    input: { sessionId: 's', expectedSessionVersion: 1, ordinal: 1, ownerFields: {} },
+  });
+  assert.equal(ownerFields.status, 400);
 });

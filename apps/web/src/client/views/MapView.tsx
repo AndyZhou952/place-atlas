@@ -50,15 +50,18 @@ export function MapView({
           </button>
         </div>
         <div className="summary">
-          <span>
-            <strong>{view.summary.saved}</strong> saved
-          </span>
-          <span>
-            <strong>{view.summary.visited}</strong> visited
-          </span>
-          <span>
-            <strong>{view.summary.favorites}</strong> favorites
-          </span>
+          {(
+            [
+              [view.summary.saved, 'Saved'],
+              [view.summary.visited, 'Visited'],
+              [view.summary.favorites, 'Favorites'],
+            ] as const
+          ).map(([value, label]) => (
+            <div key={label}>
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
         </div>
         <fieldset className="chips">
           <legend className="sr-only">Filter by visit status</legend>

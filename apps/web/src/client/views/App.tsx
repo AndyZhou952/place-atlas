@@ -1,13 +1,12 @@
-import { KeyRound, Plus, Sparkles, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Bot, Database, KeyRound, Plus, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useAtlas } from '../viewmodels/useAtlas.ts';
 import { useOwner } from '../viewmodels/useOwner.ts';
-import { AddPanel } from './AddPanel.tsx';
 import { JournalView } from './JournalView.tsx';
 import { MapView } from './MapView.tsx';
 import { OwnerPanel } from './OwnerPanel.tsx';
+import { OwnerWorkspace } from './OwnerWorkspace.tsx';
 import { PolicyPage } from './PolicyPage.tsx';
-import { RecommendPanel } from './RecommendPanel.tsx';
 import { TableView } from './TableView.tsx';
 
 const VIEWS = [
@@ -55,7 +54,7 @@ export function App() {
             旅
           </span>
           <span>
-            <span className="eyebrow">Restaurant field guide</span>
+            <span className="eyebrow">Private working atlas</span>
             <strong>Japan Atlas</strong>
           </span>
         </button>
@@ -96,16 +95,24 @@ export function App() {
         </div>
       </header>
 
+      <section className="system-strip" aria-label="System status">
+        <span>
+          <Database aria-hidden="true" /> Durable Atlas database
+        </span>
+        <span>
+          <Bot aria-hidden="true" /> Agent Add API ready
+        </span>
+      </section>
+
       {owner.panelOpen ? <OwnerPanel owner={owner} /> : null}
       {owner.owner ? (
-        <Workspace tool={tool} onTool={setTool}>
-          <div hidden={tool !== 'add'}>
-            <AddPanel onSaved={() => void atlas.reload()} onOpen={openRestaurant} />
-          </div>
-          <div hidden={tool !== 'recommend'}>
-            <RecommendPanel restaurants={atlas.restaurants} onOpen={openRestaurant} />
-          </div>
-        </Workspace>
+        <OwnerWorkspace
+          activeTool={tool}
+          onToolChange={setTool}
+          onClose={() => setTool(undefined)}
+          onCommitted={() => void atlas.reload()}
+          onSelect={openRestaurant}
+        />
       ) : null}
 
       {atlas.notice ? (
@@ -162,54 +169,5 @@ export function App() {
         </nav>
       </footer>
     </main>
-  );
-}
-
-/** Owner tools share one modal dialog; each tool keeps its draft while switching or closing. */
-function Workspace({
-  tool,
-  onTool,
-  children,
-}: {
-  readonly tool?: 'add' | 'recommend';
-  readonly onTool: (tool?: 'add' | 'recommend') => void;
-  readonly children: React.ReactNode;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (!tool) dialog.current?.close();
-    else if (!dialog.current?.open) dialog.current?.showModal();
-  }, [tool]);
-  return (
-    <dialog
-      ref={dialog}
-      className="workspace"
-      aria-label="Owner tools"
-      onClose={() => onTool(undefined)}
-    >
-      <header className="workspace-header">
-        <nav className="segmented" aria-label="Owner tools">
-          <button type="button" aria-pressed={tool === 'add'} onClick={() => onTool('add')}>
-            <Plus aria-hidden="true" /> Add restaurant
-          </button>
-          <button
-            type="button"
-            aria-pressed={tool === 'recommend'}
-            onClick={() => onTool('recommend')}
-          >
-            <Sparkles aria-hidden="true" /> Recommend
-          </button>
-        </nav>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close"
-          onClick={() => onTool(undefined)}
-        >
-          <X aria-hidden="true" />
-        </button>
-      </header>
-      {children}
-    </dialog>
   );
 }

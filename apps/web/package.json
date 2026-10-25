@@ -10,9 +10,10 @@
     "dev": "vite dev",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
-    "lint": "cd ../.. && apps/web/node_modules/.bin/oxlint --config apps/web/.oxlintrc.json apps/web/src apps/web/test apps/web/vite.config.ts benchmarks",
-    "format": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json apps/web/src apps/web/test apps/web/vite.config.ts benchmarks",
-    "format:check": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --check apps/web/src apps/web/test apps/web/vite.config.ts benchmarks",
+    "deploy:route-sidecar": "wrangler deploy --config wrangler.route-sidecar.jsonc",
+    "lint": "cd ../.. && apps/web/node_modules/.bin/oxlint --config apps/web/.oxlintrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format:check": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --check apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
     "benchmark": "node --experimental-strip-types --no-warnings ../../benchmarks/run.ts"

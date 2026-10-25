@@ -36,16 +36,6 @@ export function normalizeRating(value: number): number {
   return Math.round((value + Number.EPSILON) * 10) / 10;
 }
 
-export function isHttpsUrl(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-}
-
 /** Main restaurant listing only; review, ranking and map pages are not listings. */
 export function tabelogListingUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;

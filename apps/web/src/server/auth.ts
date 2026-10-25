@@ -90,15 +90,51 @@ export async function requireOwner(request: Request, env: Env): Promise<void> {
   if (!(await isOwner(request, env))) throw new HttpError(401, 'Owner login is required.');
 }
 
-/** Add endpoints also accept the external agent's Bearer token. */
-export async function requireOwnerOrAddAgent(request: Request, env: Env): Promise<void> {
-  const token = env.ATLAS_ADD_AGENT_TOKEN;
-  const bearer = request.headers.get('authorization')?.match(/^Bearer (\S+)$/u)?.[1];
-  if (token && token.length >= 32 && bearer) {
-    if (await timingSafeEqual(bearer, token)) return;
-    throw new HttpError(401, 'Invalid token.');
-  }
+const hex16 = (signature: ArrayBuffer) =>
+  Array.from(new Uint8Array(signature).slice(0, 16), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+
+/**
+ * Add sessions are scoped to a conversation: the Owner's web conversation is derived from the
+ * session cookie, so a new login starts a new conversation.
+ */
+export async function ownerWebConversationId(request: Request, env: Env): Promise<string> {
   await requireOwner(request, env);
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await hmacKey(env.ATLAS_OWNER_SESSION_SECRET!),
+    encoder.encode(`atlas:web-conversation:v1:${readCookie(request)}`),
+  );
+  return hex16(signature);
+}
+
+/** The external Add Agent uses a Bearer token (never with a cookie); returns its conversation. */
+export async function addAgentConversationId(request: Request, env: Env): Promise<string> {
+  const configured = env.ATLAS_ADD_AGENT_TOKEN;
+  const signingSecret = env.ATLAS_OWNER_SESSION_SECRET;
+  if (
+    !configured ||
+    !/^[A-Za-z0-9_-]{32,128}$/u.test(configured) ||
+    !signingSecret ||
+    signingSecret.length < 32
+  )
+    throw new HttpError(503, 'Add Agent authentication is unavailable.');
+  const candidate = /^Bearer ([A-Za-z0-9_-]{32,128})$/u.exec(
+    request.headers.get('authorization') ?? '',
+  )?.[1];
+  if (
+    !candidate ||
+    request.headers.has('cookie') ||
+    !(await timingSafeEqual(candidate, configured))
+  )
+    throw new HttpError(401, 'Add Agent authentication is required.');
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await hmacKey(signingSecret),
+    encoder.encode(`atlas:add-agent-conversation:v1:${candidate}`),
+  );
+  return hex16(signature);
 }
 
 async function timingSafeEqual(left: string, right: string): Promise<boolean> {

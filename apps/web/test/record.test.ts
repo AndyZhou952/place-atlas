@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { toPayload, toRestaurant } from '../src/server/record.ts';
-import type { AddDraft } from '../src/shared/types.ts';
+import { toRestaurant } from '../src/server/record.ts';
 import { LISTING_URL } from './fixtures.ts';
 
 const at = '2026-10-01T00:00:00.000Z';
@@ -125,33 +124,4 @@ test('events, architecture, review candidates and broken payloads are not restau
     assert.equal(toRestaurant(row(payload)), undefined);
   }
   assert.equal(toRestaurant({ ...row({}), payload_json: '{' }), undefined);
-});
-
-test('a new record round-trips through the stored payload', () => {
-  const draft: AddDraft = {
-    id: 'new-1',
-    title: '鮨 テスト',
-    area: '目黒区中目黒',
-    address: '東京都目黒区中目黒1-1-1',
-    latitude: 35.64,
-    longitude: 139.7,
-    description: '主营寿司。',
-    categories: ['寿司', '海鮮', '和食'],
-    dishes: ['穴子寿司'],
-    tabelog: { url: LISTING_URL, score: 3.62 },
-    reservation: { policy: 'not_reservable', label: '予約不可' },
-    openingHours: '月・火・水 11:00 - 20:00',
-    scheduleSourceUrl: LISTING_URL,
-  };
-  const payload = toPayload(draft, at);
-  assert.equal(
-    (payload.reservation as Record<string, unknown>).mode,
-    'unavailable',
-    '0.1 can still read the record',
-  );
-  const restaurant = toRestaurant(row(payload))!;
-  assert.deepEqual(restaurant.tags, ['寿司', '海鮮', '穴子寿司']);
-  assert.deepEqual(restaurant.cuisines, ['japanese.sushi', 'international.seafood']);
-  assert.equal(restaurant.openingHours?.value, '月〜水 11:00–20:00');
-  assert.deepEqual(restaurant.reservation, { policy: 'not_reservable', label: '予約不可' });
 });

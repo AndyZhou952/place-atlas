@@ -1,20 +1,20 @@
 # Status
 
-Version 0.2 narrows the project to restaurants in Japan.
+Version 0.2 narrows the project to restaurants in Japan and reorganizes the code; the Add and Recommend agent harness is carried over unchanged.
 
 ## Implemented
 
 - Map, Table and Journal views; filters by visit status, favorites, cuisine and prefecture; sorting by added date, score, ratings and last visit.
 - Owner login; ratings, favorites, visited state, comments and title/description edits.
 - Visits with notes, photos and videos, captions and a photo viewer; retry-safe uploads.
-- Add from Tabelog (search or pasted URL) with an editable preview, duplicate detection and model-extracted signature dishes.
-- Recommend from saved restaurants with an optional geocoded starting point.
-- Optional Google Places matching and Owner-only Google ratings.
-- External Add API with a dedicated Bearer token.
+- Add: Google Maps–verified match (or Tabelog search / pasted listing), Nominatim coordinates, research agent with sourced Tabelog score, reservation rule, hours and links, editable preview, duplicate detection and confirm-once publication.
+- Recommend from saved restaurants with clarifying questions, straight-line distance and optional walking/transit evidence from the route sidecar.
+- Owner-only Google ratings; external Add Agent API with a dedicated Bearer token.
 - Reads all records written by 0.1 without migration.
 
 ## Not included
 
 - Events, architecture and restaurants outside Japan (existing event/architecture records are kept but hidden).
-- Verified walking or transit times (Recommend shows straight-line distance and a directions link).
+- In-browser (WebMCP) agent tools.
+- Recommend recognizes ramen, sushi, curry, yakitori, beef tongue and coffee as food terms; other cuisines are not filtered yet.
 - Messaging/chat integrations and a native app.

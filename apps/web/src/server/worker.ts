@@ -1,10 +1,13 @@
 import { normalizeRating } from '../shared/text.ts';
 import type { RestaurantPatch, VisitInput } from '../shared/types.ts';
-import { type AddSources, discover, parseDraft, preview, findDuplicates } from './agent/add.ts';
-import { recommend } from './agent/recommend.ts';
-import { isOwner, login, logout, requireOwner, requireOwnerOrAddAgent } from './auth.ts';
+import { cleanupAddState } from './agent/add/compose.ts';
+import { fetchGoogleRating, previewGoogleRating } from './agent/add/google-rating.ts';
+import { AGENT_CAPABILITIES, agentAddResponse, ownerAddResponse } from './agent/add/http.ts';
+import { createRecommendHarness } from './agent/recommend/compose.ts';
+import { parseRecommendConversationInput } from '../shared/recommend-conversation.ts';
+import { isOwner, login, logout, ownerWebConversationId, requireOwner } from './auth.ts';
 import * as db from './db.ts';
-import { type Env, googleKey } from './env.ts';
+import type { Env } from './env.ts';
 import {
   HttpError,
   errorResponse,
@@ -15,13 +18,10 @@ import {
   requiredString,
   uuid,
 } from './http.ts';
-import { toPayload } from './record.ts';
-import { modelConfig, removeSettings, saveSettings, settingsStatus } from './settings.ts';
-import { geocodeJapan } from './sources/geocode.ts';
-import { getGoogleRating } from './sources/google.ts';
+import { removeSettings, saveSettings, settingsStatus } from './settings.ts';
 
 type Handler = (request: Request, env: Env, params: string[]) => Promise<Response>;
-type Access = 'public' | 'owner' | 'add';
+type Access = 'public' | 'owner' | 'self';
 
 // [method, path pattern, access, handler]. `:id` segments become params.
 const routes: [string, string, Access, Handler][] = [
@@ -148,12 +148,10 @@ const routes: [string, string, Access, Handler][] = [
     '/api/restaurants/:id/google-rating',
     'owner',
     async (_request, env, [id]) => {
-      const key = googleKey(env);
       const { googlePlaceId } = await db.getRestaurant(env.DB, id);
-      if (!key || !googlePlaceId)
-        throw new HttpError(409, 'Google ratings need a Google Places key and a matched place.');
-      const rating = await getGoogleRating(key, googlePlaceId);
-      if (!rating) throw new HttpError(502, 'Google returned no rating for this place.');
+      if (!googlePlaceId) throw new HttpError(409, 'This place has no matched Google place.');
+      const rating = await fetchGoogleRating(env, googlePlaceId);
+      if (!rating) throw new HttpError(503, 'Google ratings are unavailable right now.');
       await db.saveGoogleRating(env.DB, id, googlePlaceId, rating);
       return json(rating);
     },
@@ -173,89 +171,54 @@ const routes: [string, string, Access, Handler][] = [
     async (_request, env) => json(await removeSettings(env)),
   ],
 
+  // Add harness (see src/server/agent/add/http.ts for the contract).
+  ...(['discover', 'select', 'confirm', 'cancel'] as const).map(
+    (operation): [string, string, Access, Handler] => [
+      'POST',
+      `/api/catalog-intake/${operation}`,
+      'owner',
+      (request, env) => ownerAddResponse(request, env, operation),
+    ],
+  ),
   [
-    'POST',
-    '/api/add/search',
-    'add',
+    'GET',
+    '/api/catalog-intake/google-rating',
+    'owner',
     async (request, env) => {
-      const body = await readJson(request);
-      return json(
-        await discover(
-          requiredString(body.query, 'Query', 500),
-          optionalString(body.area, 'Area', 200),
-          await addSources(env),
-        ),
-      );
+      const sessionId = new URL(request.url).searchParams.get('sessionId') ?? '';
+      if (!/^[A-Za-z0-9_-]{10,128}$/u.test(sessionId)) throw new HttpError(400, 'Invalid session.');
+      const conversationId = await ownerWebConversationId(request, env);
+      const rating = await previewGoogleRating(env, sessionId, conversationId);
+      if (rating === 'not_found') throw new HttpError(404, 'Preview not found.');
+      return rating ? json(rating) : new Response(null, { status: 204 });
     },
   ],
-  [
-    'POST',
-    '/api/add/preview',
-    'add',
-    async (request, env) => {
-      const body = await readJson(request);
-      const candidate = {
-        source: requiredString(body.source, 'Source', 20),
-        ref: requiredString(body.ref, 'Reference', 500),
-      };
-      return json(
-        await preview(candidate, await db.listRestaurants(env.DB), await addSources(env)),
-      );
-    },
-  ],
-  [
-    'POST',
-    '/api/add/save',
-    'add',
-    async (request, env) => {
-      const draft = parseDraft((await readJson(request)).draft);
-      const same = findDuplicates(draft, await db.listRestaurants(env.DB)).find(
-        (entry) => entry.match === 'same' && entry.id !== draft.id,
-      );
-      if (same) throw new HttpError(409, `${same.title} is already saved.`);
-      const now = new Date().toISOString();
-      await db.insertRestaurant(env.DB, draft.id, toPayload(draft, now), now);
-      return json({ id: draft.id }, 201);
-    },
-  ],
-  ['GET', '/api/add', 'public', async () => json(ADD_API_DESCRIPTION)],
+  ['POST', '/api/agent/catalog-intake', 'self', agentAddResponse],
+  ['GET', '/api/agent/capabilities', 'public', async () => json(AGENT_CAPABILITIES)],
 
+  // Recommend harness.
   [
     'POST',
     '/api/recommend',
     'owner',
     async (request, env) => {
-      const query = requiredString((await readJson(request)).query, 'Request', 1000);
-      const contact = env.ATLAS_PUBLIC_URL;
-      return json(
-        await recommend(query, await db.listRestaurants(env.DB), {
-          model: await modelConfig(env),
-          geocode: (text) => geocodeJapan(text, contact),
-        }),
-      );
+      const input = parseRecommendConversationInput(await readJson(request, 8192));
+      if (!input) throw new HttpError(400, 'Valid query and replies are required.');
+      try {
+        return json(await createRecommendHarness(env).ask(input));
+      } catch {
+        return json(
+          {
+            status: 'unavailable',
+            message: 'Recommendations are temporarily unavailable. Please retry.',
+            retryable: true,
+          },
+          503,
+        );
+      }
     },
   ],
 ];
-
-const ADD_API_DESCRIPTION = {
-  description:
-    'Add a restaurant in Japan. Authenticate with `Authorization: Bearer <ATLAS_ADD_AGENT_TOKEN>`.',
-  steps: [
-    'POST /api/add/search {query, area?} → candidates [{source, ref, name, address, score?}]',
-    'POST /api/add/preview {source, ref} → {draft, duplicates, notes}; show the draft to a human for review',
-    'POST /api/add/save {draft} → {id}; repeat with the same draft.id to retry safely',
-  ],
-};
-
-async function addSources(env: Env): Promise<AddSources> {
-  return {
-    searchKey: env.SEARCH_API_KEY,
-    firecrawl: env.RESTAURANT_SOURCE_READER === 'firecrawl',
-    firecrawlKey: env.FIRECRAWL_API_KEY,
-    googleKey: googleKey(env),
-    model: await modelConfig(env).catch(() => undefined),
-  };
-}
 
 function parsePatch(body: Record<string, unknown>): RestaurantPatch {
   const flag = (value: unknown, field: string) => {
@@ -311,7 +274,6 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   if (!route) return json({ error: 'Not found.' }, matches.length ? 405 : 404);
   try {
     if (route.access === 'owner') await requireOwner(request, env);
-    if (route.access === 'add') await requireOwnerOrAddAgent(request, env);
     const params = (route.regex.exec(path) ?? []).slice(1).map(decodeURIComponent);
     return await route.handler(request, env, params);
   } catch (error) {
@@ -323,5 +285,9 @@ export default {
   fetch(request: Request, env: Env): Promise<Response> | Response {
     if (new URL(request.url).pathname.startsWith('/api/')) return handleApi(request, env);
     return env.ASSETS?.fetch(request) ?? new Response('Not found', { status: 404 });
+  },
+  // Daily cleanup of expired Add sessions and the geocoder cache.
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    await cleanupAddState(env.DB, new Date(controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;

@@ -1,7 +1,5 @@
-# Application database migrations
+# Database migrations
 
-Apply this directory in order with Wrangler D1 migrations. Complete setup commands are in the root README.
+Apply in order with `wrangler d1 migrations apply DB`. The chain is append-only: never edit or remove an applied file, because existing databases record them by name.
 
-The additive chain retains historical table names for compatibility with existing databases. Do not remove applied migrations while cleaning up integrations. Export an existing database before upgrades. Fresh databases can apply the chain directly; no export from another account is needed.
-
-Historical migrations may initialize demonstration records. After migration, verify the catalog, authenticated writes, Add confirmation visibility, independent ratings, visits, and photo loading. Preserve newer user data during rollback.
+Several tables (Add sessions, receipts, provider usage, maintenance) were used only by 0.1 and are no longer read. They are kept so existing databases and rollbacks stay valid. The application reads `atlas_items`, `atlas_item_overrides`, `atlas_item_tombstones`, `place_assessments`, `visits`, `visit_media`, `atlas_google_rating_references` and `owner_agent_settings`.

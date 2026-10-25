@@ -1,31 +1,18 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "allowImportingTsExtensions": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["node", "@cloudflare/workers-types", "vinext/types"],
-    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "incremental": true,
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "types": ["node", "@cloudflare/workers-types", "vite/client"]
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-  ],
-  "exclude": ["node_modules"]
+  "include": ["src", "test", "vite.config.ts", "../../benchmarks"]
 }

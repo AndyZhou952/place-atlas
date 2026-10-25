@@ -1,85 +1,66 @@
-# Place Atlas
+# Japan Atlas (place-atlas)
 
-Your own map, restaurant collection and visit journal. Self-host on Cloudflare, keep your data and credentials in your account, and use an AI assistant to research restaurants and recommend places from your collection.
+A self-hosted map and journal of the restaurants you care about in Japan. Run it on your own Cloudflare account; your records, photos and keys stay there.
 
-- **Explore:** Map and Table views, search, filters, restaurant details, architecture and events.
-- **Collect:** Review sourced restaurant facts before saving; missing facts remain unknown.
-- **Remember:** Visits, notes, personal ratings, photos and videos.
-- **Recommend:** Find saved restaurants by preferences and location, with optional walking routes.
+- **Map, Table and Journal**: browse saved restaurants with Tabelog scores, your own 0–10 ratings, hours, closing days and reservation rules; filter by cuisine and prefecture.
+- **Add**: search Tabelog by name (or paste a listing URL), review the proposed record, then save. Facts come from the exact listing you choose; missing facts stay empty.
+- **Journal**: record visits with notes, photos and videos.
+- **Recommend**: ask in your own words ("新宿駅の近くでラーメン") and get picks from your saved restaurants.
 
-One Owner manages each deployment; visitors can browse its published records and media. There is no shared-instance registration. Automated research currently focuses on restaurants, with the strongest source support in Japan. Framework and chat integrations are planned. See [development status](docs/status.md) and [architecture](docs/architecture.md).
+Visitors can browse; only the Owner (one password per deployment) can change anything. See [architecture](docs/architecture.md) and [status](docs/status.md).
 
 ## Deploy your own
 
-You need **Node.js 22.13+**, npm, and a Cloudflare account with Workers, D1 and R2 enabled. Model credentials are needed for Add research and Recommend; browsing and recording Visits work without them.
-
-### 1. Install and create resources
+You need Node.js 22.13+ and a Cloudflare account with Workers, D1 and R2.
 
 ```sh
 git clone https://github.com/AndyZhou952/place-atlas.git
 cd place-atlas/apps/web
 npm ci
-cp wrangler.owner-poc.jsonc wrangler.owner-poc.local.jsonc
+cp wrangler.jsonc wrangler.local.jsonc
 npx wrangler login
-npx wrangler d1 create place-atlas
+npx wrangler d1 create place-atlas            # copy the printed database_id into wrangler.local.jsonc
 npx wrangler r2 bucket create place-atlas-media
+npx wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc
+npx wrangler secret put ATLAS_OWNER_PASSWORD --config wrangler.local.jsonc
+npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.local.jsonc   # e.g. `openssl rand -hex 32`
+npm run deploy
 ```
 
-Edit `wrangler.owner-poc.local.jsonc`: replace `d1_databases[0].database_id` with the ID printed by D1 creation. If those names are already in use in your account, choose new names in the creation commands and update the Worker `name`, D1 `database_name` and R2 `bucket_name` in this file. Keep the `DB`/`MEDIA` binding names, migration directory, environment guards and logging settings.
+Open the printed URL, choose **Owner login**, then open **Model settings** to save an OpenAI-compatible key (DeepSeek or OpenAI). The model is optional: without it, Add still saves the listing's facts and Recommend falls back to keyword matching.
 
-The default template needs no Google key, route Worker or browser service. The local configuration is ignored by Git and used automatically when building. **A fresh database starts empty.**
+### Optional settings
 
-### 2. Apply the schema and set Owner credentials
+Set secrets with `npx wrangler secret put NAME --config wrangler.local.jsonc` and plain values under `vars` in `wrangler.local.jsonc`.
 
-```sh
-npx wrangler d1 migrations apply DB --remote --config wrangler.owner-poc.local.jsonc
-npx wrangler secret put ATLAS_OWNER_PASSWORD --config wrangler.owner-poc.local.jsonc
-npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.owner-poc.local.jsonc
-```
+| Name | Purpose |
+| --- | --- |
+| `FIRECRAWL_API_KEY` | Your own quota for reading Tabelog through Firecrawl (`RESTAURANT_SOURCE_READER=firecrawl`, the default). Tabelog often refuses requests from Cloudflare directly. |
+| `SEARCH_API_KEY` | Tavily search instead of the public Yahoo! JAPAN / DuckDuckGo pages. |
+| `GOOGLE_PLACES_API_KEY` | Matches each restaurant to Google Maps and lets the Owner load Google ratings. |
+| `AGENT_API_KEY`, `AGENT_BASE_URL`, `AGENT_MODEL` | Server-managed model instead of the Owner settings form. |
+| `AGENT_SETTINGS_SECRET` | Separate 32+ character key for encrypting saved model keys (defaults to the session secret). |
+| `ATLAS_ADD_AGENT_TOKEN` | 32+ character Bearer token that lets an external agent use the Add API (`GET /api/add` describes it). |
+| `ATLAS_PUBLIC_URL` | Your site URL, sent as contact information to the OpenStreetMap geocoder. |
 
-Enter your chosen password at the first prompt. For the session secret, independently generate a random value of at least 32 characters, for example with `openssl rand -hex 32`. Wrangler may ask to create your named Worker when setting its first secret; accept for your own new deployment.
+### Upgrading from 0.1
 
-### 3. Deploy
-
-```sh
-mkdir -p .wrangler
-npx wrangler secret list --config wrangler.owner-poc.local.jsonc > .wrangler/owner-poc-secret-names.json
-npm run deploy:owner-poc
-```
-
-Open the URL Wrangler prints. Log in through **Owner**, then open **Agent API settings** to test and save your model key, API base URL and model name. The model must support OpenAI-compatible chat completions and tool calls. Settings are encrypted on the server; keys are not saved in browser storage. The web form supports the official DeepSeek and OpenAI endpoints; other compatible endpoints can be configured with deployment settings described in [architecture](docs/architecture.md#deployment-options).
-
-### 4. Try the workflow
-
-Use **Add** to find a restaurant, select the exact branch, review the preview and confirm. Refresh to check the saved record, then add a Visit and a photo. For Japanese restaurants, a full Tabelog main-listing URL can bypass name search. Model and source failures leave unsupported facts unknown.
-
-Search defaults to public providers without a separate key. Japanese listing reads use Firecrawl; an optional `FIRECRAWL_API_KEY` provides your account's quota. Model, reader, storage and optional Google services can incur provider charges.
-
-For deployment-specific address identification, add `ATLAS_PUBLIC_URL` to your local configuration's `vars` using your new URL. Set `NEXT_PUBLIC_SITE_URL` to the same URL when rebuilding for social previews. Refresh the secret-name file after changing secrets.
-
-## Development and benchmarks
-
-From `apps/web`:
-
-```sh
-npm run lint
-npm run typecheck
-npm test
-npm run migration:check
-```
-
-For local development, put `ATLAS_OWNER_PASSWORD` and `ATLAS_OWNER_SESSION_SECRET` in an ignored `.dev.vars` file, apply the same migrations with `--local`, then run `npm run dev`. Add model credentials through Owner settings or local environment configuration when testing research.
-
-Benchmarks live separately in [`benchmarks/`](benchmarks/README.md). Its unified guide covers offline checks, scorer examples, opt-in live runs and adding cases. Live results and catalog captures stay in ignored output directories.
-
-## Optional services and upgrades
-
-Google matching, private walking-route services, alternative search and server-managed model configuration are documented in [deployment options](docs/architecture.md#deployment-options).
-
-Before upgrading an existing installation, export its D1 database and keep the backup outside Git:
+No data migration is needed: 0.2 reads the same D1 tables and both stored record formats, keeps existing sessions and saved model keys valid, and serves the same photo links. Back up first:
 
 ```sh
 npx wrangler d1 export DB --remote --config wrangler.owner-poc.local.jsonc --output atlas-backup.sql
 ```
 
-Then apply pending migrations and redeploy. Existing local resource names and stored records remain yours. The website and internal package names still use the original Japan Atlas naming; renaming the repository does not rename deployed resources.
+Your existing `wrangler.owner-poc.local.jsonc` keeps working (it is picked up automatically; renaming it to `wrangler.local.jsonc` is optional). Its old `main` entry and daily cron are overridden at build time. Event and architecture records are no longer shown but stay in the database. The route sidecar Worker, browser (WebMCP) tools and the operation-based `/api/agent/catalog-intake` endpoint were removed; external agents use `/api/add/*` with the same token.
+
+## Develop
+
+```sh
+cd apps/web
+printf 'ATLAS_OWNER_PASSWORD=dev\nATLAS_OWNER_SESSION_SECRET=%s\n' "$(openssl rand -hex 32)" > .dev.vars
+npx wrangler d1 migrations apply DB --local
+npm run dev            # Vite + the Worker on http://localhost:5173
+npm test               # unit tests
+npm run benchmark      # Add/Recommend benchmark (see benchmarks/README.md)
+npm run lint && npm run typecheck && npm run format:check
+```

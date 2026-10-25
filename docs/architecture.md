@@ -1,114 +1,52 @@
-# Place Atlas application architecture
+# Architecture
 
-Place Atlas covers restaurants, architecture and events across regions. The catalog domain supports all three record types; automated Add research, recommendation and visit workflows currently focus on restaurants. Japanese restaurant sources currently have the strongest support; geographic regions and messaging platforms are not application boundaries. Implemented and planned capabilities are described below and in [development status](status.md).
+Japan Atlas is one Cloudflare Worker that serves a React single-page app and a JSON API. D1 stores records, R2 stores photos and videos. Each deployment has one Owner; visitors can read everything that is published.
 
-Personal place ratings use 0–10, with new entries normalized to one decimal place. The one-time upgrade doubles existing five-point scores and rounds them to the nearest half point; source ratings and media scores keep their own scales. The Map list defaults to newest additions first and offers a concise Score sort.
+## Layout (`apps/web/src`)
 
-The browser reads the published catalog, personal ratings and comments, visits, and their published photo/video display links without login. Adding or changing places and records, and calling Recommend or other metered Agent operations, requires an Owner session. Internal storage keys, credentials, sessions, and audit records are never public. The application owns restaurant research, structured proposals, confirmation, persistence, and the resulting map view. Model providers implement an OpenAI-compatible HTTP interface and are interchangeable configuration choices.
+```
+shared/        Types and pure domain rules used by both sides
+  types.ts       API data shapes (Restaurant, Visit, Media, AddDraft, …)
+  cuisine.ts     Cuisine taxonomy, prefectures, overview text
+  hours.ts       Tabelog opening-hours formatting
+  text.ts        Search normalization, distance, rating and URL rules
+server/        The Worker
+  worker.ts      Route table: HTTP → handlers (the only place that knows about requests)
+  auth.ts        Owner password login, HMAC session cookie, same-origin writes, Add API token
+  db.ts          D1/R2 repository: restaurants, assessments, visits, media, Google references
+  record.ts      Stored payload ⇄ Restaurant; reads both 0.1 record formats
+  settings.ts    Encrypted model settings
+  sources/       External readers: web search, Tabelog listing, Google Places, geocoder
+  agent/         Model-assisted workflows: llm.ts (one JSON chat call), add.ts, recommend.ts
+client/        The browser app (MVVM)
+  api.ts         Model: typed calls to the API
+  viewmodels/    State and actions as hooks (useAtlas, useAdd, useOwner, …) and pure selectors
+  views/         React components that render view-model state and call its actions
+```
 
-Each deployment has one Owner identity and one encrypted model configuration. Independent users deploy separate copies in their own Cloudflare accounts, with their own D1/R2 resources, password and provider credentials; there is no shared-instance registration or per-user collection. `ATLAS_PUBLIC_URL` identifies that deployment in durable address-lookup headers, with the public repository as the default contact. Optional build-time `NEXT_PUBLIC_SITE_URL` sets social-preview URLs. Default branding is generic and contains no original Owner deployment URL.
+Dependencies point one way: `views → viewmodels → api → (HTTP) → worker → agent/sources/db → shared`. Views never fetch; the Worker's agent code never touches HTTP requests or D1 directly.
 
-## Scope and release boundaries
+## Data
 
-The 0.1.0 source tag contains Map, Table and restaurant Journal views, confirmed restaurant Add, saved-restaurant recommendations, visits/media, independent personal/external ratings and per-restaurant private Google references. Architecture and event records are browsable, but their automatic intake has not received equivalent validation. International source paths exist; Japanese source adapters have received the most validation.
+`atlas_items.payload_json` holds each restaurant. New records use a flat shape that the 0.1 code can also read; 0.1 Add records keep their facts under `intakeEvidence`, which `record.ts` projects. Personal data lives beside it: `place_assessments` (rating 0–10, favorite, visited, comment), `visits`, `visit_media` (R2 object key plus an opaque public `pm_…` id). Title/description edits fold any 0.1 override into the payload. Cuisine and prefecture are derived on read from the stored category labels and address.
 
-Restaurant records include verified alternative booking destinations and sourced hours/rest days. Catalog loading waits for the saved collection. The website and scoped external Add API are implemented. Framework packages, messaging adapters, automatic image interpretation, iOS and bulk Google-reference replacement remain planned. Each deployment has one Owner, its own data/media and server-side credentials; shared-instance user accounts are absent.
-
-The repository is now `place-atlas`. Existing `japan-atlas-*` resources, package identifiers, historical migration names and the 0.1 website branding are retained for upgrade compatibility. The repository rename does not recreate a database, bucket or deployed Worker.
+Deleting a restaurant removes its visits, media objects, assessment and references and leaves a tombstone. Migrations in `migrations/owner-poc` are append-only; several 0.1 tables are no longer read but remain for existing databases.
 
 ## Add
 
-1. Accept a short restaurant hint and optional neighborhood.
-2. Search for real identities and resolve the branch. Ask a focused question when multiple branches remain plausible.
-3. Collect search evidence and deterministic location evidence. Let the model extract structured facts from those sources. Search excerpts may be augmented with structured branch identity and aggregate rating from a discovered Tabelog main listing.
-4. Validate the proposal and display a concise preview. Missing optional facts remain unknown; research failure does not erase the session.
-5. On confirmation, persist through the application write service. Return the saved item ID and refresh the map/list.
+1. **Search**: `"<name> <area> site:tabelog.com"` through Tavily (if configured) or Yahoo! JAPAN, then DuckDuckGo. Up to three main-listing URLs are read; a pasted listing URL skips search. With a Google key and no Tabelog result, Google Places text search supplies candidates.
+2. **Preview**: the chosen listing is read again (Firecrawl first when configured, then directly; the final page must be the same listing). Name, aliases, address, coordinates, aggregate score, cuisine labels, reservation row, booking link, official site and hours come from the listing's Restaurant JSON-LD and its own info rows; reviews are never read. A Google place is attached only if it lies within 150 m. The model receives the listing introduction and reservation text and returns signature dishes and a booking note; each must appear verbatim in that text or it is dropped. The Chinese overview is composed by code.
+3. **Save**: the Owner edits the draft and saves. The server validates every field (location must be in Japan), rejects a second record for the same Tabelog listing or Google place, and inserts with the draft's id so a retry cannot duplicate.
 
-The model proposes facts; application code validates and commits them. Source text is untrusted input. A page cannot authorize a write or change the restaurant under investigation. Retries have bounded budgets and confirmation is idempotent.
+External agents use the same three endpoints (`/api/add/search|preview|save`) with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN`; a human should review the draft before saving.
 
-## Storage and views
+## Recommend
 
-Map and Journal retain their existing place and Visit displays. Table is a separate read view of the same catalog, assessments, Visits and media: it combines ratings, description, sources and reservation details with last-Visit sorting and cuisine/geography filtering. Anonymous requests use the published catalog. `GET /api/items?profile=full_merged_catalog` requires Owner authorization and can include historical unpublished candidates; those entries do not request public assessments or appear on Map/Journal. No model call is needed to browse, sort or filter Table.
+One model call receives the request and a one-line summary of each saved restaurant and returns up to five ids with reasons plus an optional starting point. Ids not in the catalog are discarded and names always come from the database. A starting point is geocoded with OpenStreetMap Nominatim and picks are sorted by straight-line distance, shown in km with a Google Maps walking-directions link (never as walking time). Without a model, keyword matching is used.
 
-`product/application/catalog/restaurant-classification.ts` owns a controlled two-level cuisine taxonomy. Each catalog JSON payload stores `classification.cuisines`, `classification.geography` and the address/category basis. Classification reads confirmed category evidence or existing tags, not restaurant names, descriptions or country-based cuisine guesses. Original tags remain unchanged. Geography uses ISO country codes and supported first-subdivision codes for Japan, mainland China and the US; other explicit countries are retained with unknown subdivisions. New Add/collector writes derive the same fields. The maintenance backfill changes only classification with a compare-and-swap payload check; it advances the catalog revision only after an actual update. Table alone renders the additional classifications. It exposes one flat cuisine selector/column using specific child labels; broad families remain internal evidence metadata and are not shown. Public Visit DTOs retain valid creation/update timestamps separately from the visit date, so Journal entry-order sorting and Table entry dates use the real recorded time.
+## Security
 
-Add and Recommend share an Owner-only modal workspace opened from the header. Both tools retain their local drafts while switching or closing the workspace. Add edits the prefilled fields in the original preview; only changed facts become Owner assertions. A dirty preview blocks confirmation until refreshed, and address edits invalidate old coordinates. Evidence, duplicate checks and authoritative version checks remain active.
-
-Cloudflare D1 stores restaurant, architecture and event records, including identity, coordinates, descriptions and sources, plus restaurant assessments, visits and media metadata. R2 stores uploaded images and videos. Personal ratings and external ratings are independent fields. Updating one must preserve the others. A Google Places rating requested for an eligible saved place is read on demand from its persisted Place ID and returned only in a private, no-store response; it is not written by that read path. The closed catalog DTO exposes a validated Google Place ID while keeping raw intake evidence private. The Owner view model shares the current display response between Map and Table, bound to the saved identity and address. Table queries only after an explicit Owner action, with three requests at a time; opening, filtering or sorting Table does not fetch ratings. Live responses are discarded on logout or page reload. A separate Owner-only Google reference is stored in `atlas_google_rating_references`, including score, review count, source URL, observation date, capture date and actual API provenance. Private reads use an Owner-guarded endpoint; explicit saves/replacements use the mutation coordinator and commit their receipt atomically. Loading a newer live response never writes the reference. On Add, the private selected-preview lookup stages its response in the scoped session; successful verified publication commits the reference and place in one D1 transaction. Failed/cancelled Add, wrong branch, duplicate reuse and replay cannot create or replace a reference. Map/Table use the private reference as the Owner display fallback after reload, without a provider query. Mainland China remains excluded; saved Japanese restaurants may display both Tabelog and Google, while Add research still prioritizes Tabelog. Unqueried and unavailable results are distinct. Google Maps attribution and source links accompany scores.
-
-Published media use opaque `pm_` display IDs and can be read anonymously, including supported photos and videos. The internal media ID path remains Owner-only. Public responses expose display metadata and media content, not R2 object keys, original filenames, hashes, receipts, or credentials. An Owner session and same-origin checks guard every browser write. Recommend is Owner-only even though it reads saved public restaurants, because model and route calls can incur provider usage.
-
-Recommend uses a model to interpret the owner's request into bounded origin, cuisine, visit and travel constraints. Application code matches only verified saved food items and selects restaurant IDs with deterministic policy; the model never supplies the final restaurant name or detail target. Before delivery, the application rereads the catalog and requires each selected ID to remain verified with unchanged canonical title and eligibility facts and the detail target to equal that ID. Names and addresses come from this current database read. Route claims require matching fresh provider evidence. Missing or changed identity/evidence returns a retryable unavailable state; a provider failure is not an empty result. Coordinates permit a distance prefilter, but straight-line distance is never presented as walking time.
-When an origin lookup returns multiple places, the UI sends the user's selected candidate ID with the original lookup hint. The server resolves the hint again and uses the candidate only if it uniquely matches the fresh geocoder response; a text-only model interpretation cannot override that selection.
-
-## Module boundaries
-
-- `apps/web/app`: browser routes and HTTP endpoints.
-- `apps/web/components` and `apps/web/features`: interface components.
-- `apps/web/product`: executable domain/application code, not planning documents.
-- `apps/web/adapters`: storage, model, search, and external integrations.
-- `apps/web/agent`: the bounded model/search loop, evidence checks, and live smoke runner.
-- `apps/web/route-sidecar`: optional private route-provider Worker.
-- `benchmarks`: benchmark datasets and scorers.
-
-The application runs its research adapter inside the Worker. External clients can use application interfaces without a required messaging platform. A dedicated Bearer token permits only the four Add operations through `/api/agent/catalog-intake`. The token is checked before request parsing or application creation, and its conversation is separate from browser owner-cookie conversations. The external route calls the same Add coordinator and confirmation service; it does not expose general catalog, personal or media writes. Browser tools use the active website session; they are not a standalone remote MCP service. Framework adapters, channel pairing, bot receivers and conversational Visit/media APIs are proposed next-version work, not existing integrations. The root README contains setup instructions; the integration direction below describes the future boundary. These notes describe ownership boundaries, not a claim that every enrichment field has passed live evaluation.
-
-Search is provider-independent from the model. With no search credential, Japanese/Tabelog queries use Yahoo Japan and other queries use DuckDuckGo, each through a fixed public endpoint. Supplying `SEARCH_API_KEY` selects Tavily. All paths feed source excerpts into the same bounded research loop and evidence validation. HTML changes, rate limits, and challenges can make the no-key path unavailable; they do not authorize challenge bypass or unsupported claims. Requests use manual redirects and reject non-success responses so credentials cannot follow arbitrary redirects; the Workers runtime does not support the `error` redirect mode used by standard Node fetch.
-
-## Design reference and current limits
-
-### Research responsibilities and prompt
-
-The runtime loads `apps/web/agent/research-instructions.ts`, a versioned prompt and search-tool description. It is deliberately a small component rather than a second orchestration framework. The selected branch and user hint are supplied as data; search excerpts are untrusted tool results.
-
-The application resolves identity and owns confirmation/persistence. The model plans targeted searches, interprets source evidence, and proposes structured facts. Tabelog's exact restaurant listing supplies the aggregate rating; individual reviews and ranking pages are not rating sources. Branch-specific official sites or their linked booking pages are preferred for reservation rules, with Tabelog as fallback. Booking availability, queues, and required lead times are separate facts, not deductions from popularity or a booking button.
-
-Only `search_web` is exposed as a model-callable tool. Its description specifies query examples, result shape and budget. The application can augment searches with a discovered Tabelog main listing: fixed HTTPS host/path, no redirects, bounded read, and only the matching Restaurant JSON-LD identity, aggregate rating, address, coordinates and restaurant facts. Individual reviews are discarded. A branch-verified structured listing can still supply its parsed facts if the model response fails; another listing cannot. For an overseas Google selection, the application can read the selected Place ID's request-scoped website hint, then up to four bounded public pages on that HTTPS origin. A contact page may establish the exact unit while a separately titled branch page supplies cuisine or an explicit booking link; cross-page evidence must pass the branch-title check. The model receives bounded extracted text, not unrestricted browsing. Search failures remain explicit outcomes; an exact-branch official source can supply facts even when public search is blocked. The model cannot confirm or write a restaurant. Existing authenticated application APIs perform writes only after owner confirmation.
-
-The restaurant harness separately verifies official websites and actionable TableCheck/Toreta booking destinations for the selected branch. A Tabelog reservation row establishes policy, not an alternative booking endpoint. A booking form does not require an explicit booking window to be retained; timing is optional and needs its own source. Bounded merchant reads preserve required parameters and SPA routes, and allow only a same-merchant TableCheck language redirect. Map and Table show a plain policy label, one Tabelog destination and only distinct official/alternative booking links. Destination validation and generic reader/UI regressions cover policy-only entries, distinct booking destinations, identity conflicts and optional timing. Key progress is tracked in [development status](status.md); incident analysis and live benchmark results stay in chat.
-
-Operating schedules are supplied directly by application readers, independently of model proposals: only the exact Tabelog listing for Japan and the selected Google Maps place elsewhere. Official sites and snippets cannot supply schedule fallback. Source wording, lunch/dinner periods and observation dates are retained. Missing fields remain unavailable; seasonal/calendar closures are separate from regular closing days. Owner edits and sourced facts survive review, refresh, confirmation, storage and public/browser projection. The 0.1.0 snapshot includes these schedule readers.
-
-The first research query is selected by the candidate address region: Tabelog for Japan and official reservation evidence elsewhere. The model prompt guides later searches. Code separately checks quoted evidence, branch anchors (including a complete owner-entered Japanese name for a romanized Google selection), postal identity when available (or a matching distinctive building name when a commercial-building postal code differs), score tokens, main-listing URLs, and the output schema. When a Japanese listing lacks a matching Latin alias, one additional source read may inspect its explicitly linked English version within the existing three-page budget and deadline. The same listing ID, paired header names, exact Japanese address and postal identity must agree before its English name can bridge the selection; facts and coordinates remain sourced to the Japanese listing. English localized JSON-LD with an empty street is identity evidence only. A selected Place ID's website hint narrows an official-source search, but the hint alone does not prove a restaurant fact. A saved or active-preview Google Place ID can drive an owner-only, metered, no-store rating read; mainland China is skipped; Add research prioritizes Tabelog for Japan, while a selected Japanese Google identity may also supply its independent initial Google reference. Live evaluation must establish the quality of the combined system. Track incomplete implementation and validation in `docs/status.md`.
-
-Category claims are checked one by one against the cited source quote, allowing harmless case/spacing differences while dropping unsupported labels. The application then removes generic cuisine labels when a verified specific label exists and composes the Chinese overview itself. On an official overseas site, a narrow prose cuisine fallback can retain an explicitly stated category if a separate contact page identifies the selected street/unit and the fact page title names that restaurant; an adjacent bar page cannot supply restaurant cuisine. Source category labels remain unchanged in tags, while common cuisine names use Chinese wording in the overview. The fallback is bounded and does not convert arbitrary model prose into evidence.
-
-The current loop enriches an already selected identity with Tabelog, official-site and reservation evidence. Google Places is preferred when configured; otherwise a no-key Tabelog discovery adapter exists for Japanese restaurant listings. Discovery and research share `RestaurantSourceReader`. The PoC selects `RESTAURANT_SOURCE_READER=firecrawl`: fresh raw listing HTML, fixed provider endpoint, exact requested/final URL validation, two-MiB body cap, 15-second provider timeout and 20-second client timeout bounded by the parent signal. When that transport fails or returns a verified listing without coordinates, one bounded direct read of the same listing may recover it; the first valid facts survive a failed fallback. `FIRECRAWL_API_KEY` is optional; anonymous service quotas are an operational dependency. Without that selector, ordinary Tabelog reads use the optional Cloudflare Browser Run fallback. Challenge HTML is rejected even when transport reports HTTP 200. The overseas official-site reader is a separate request-scoped path. Broader live benchmark acceptance remains open. Source adapters are in `apps/web/agent/` and `apps/web/adapters/providers/`; progress is tracked in `docs/status.md`.
-
-On confirmation, a newly complete preview can promote an existing review candidate with the same strong identity into the public catalog. The publisher retains the original item ID and identity creation audit, updates evidence snapshots and removes the review candidate in the same D1 batch as the confirmation receipt and revision increment. Existing public items are reused without overwriting their profile or personal data. The preview/revision checks, per-attempt claim and durable receipt protect races and retries.
-
-## Planned agent and chat interfaces
-
-Future clients should call the same application operations used by the website. Frameworks such as Hermes, OpenClaw and Pi may provide conversational execution, while adapters for WhatsApp, WeChat, Telegram, LINE and other channels deliver messages and media. These names describe intended integration targets; no framework package, messaging adapter or complete chat journey is shipped.
-
-The existing external Add route provides discover/select/confirm/cancel operations only. Extending it to Recommend, Visits and media requires scoped Owner authentication, independent conversation identities, bounded uploads, confirmation and replay protection. Provider credentials remain server-side. A channel transports a request; the application continues to validate evidence and control persistence. Automatic interpretation of uploaded images is separate planned work from the existing manual upload/display feature.
-
-Each advertised framework/channel path needs its own live acceptance for clarification, review, confirmed writes, interrupted uploads and retries, alongside independent regression fixtures. The initial conversational scope is restaurant workflows. Architecture/event intake, broader regional research and their chat journeys require separate validation. No framework/channel support should be inferred solely from an external framework capability list.
-
-## Deployment options
-
-The checked-in Worker template is a minimal independent installation: D1 stores records, R2 stores media, and optional Google/browser/route capabilities are disabled. Choose resource names in the ignored local configuration. Deployment preflight verifies that the built artifact uses the same Worker, D1 ID/name, bucket and optional route target as that configuration, retains environment and logging guards, and has the required secret names. It does not copy another deployment's resources. Fresh installations start empty; existing applied migrations and saved records remain intact.
-
-### Model, search and reader configuration
-
-Owner → Agent API settings tests and encrypts a model key, API base URL and model name. The form accepts official DeepSeek and OpenAI endpoints; compatibility requires chat completions and tool calls. An empty key preserves a saved key only while keeping its endpoint. **Use deployment settings** removes the saved override.
-
-For a server-managed OpenAI-compatible endpoint, set `AGENT_API_KEY` with `wrangler secret put` and add `AGENT_BASE_URL` and `AGENT_MODEL` to local Wrangler `vars`. All three are required. Arbitrary compatible endpoints are an operator configuration choice; the web form does not accept them. The application supplies its own search tool.
-
-Stored model credentials use `AGENT_SETTINGS_SECRET`, falling back to `ATLAS_OWNER_SESSION_SECRET`. To rotate encryption independently, configure a random 32+ character `AGENT_SETTINGS_SECRET` before saving model settings. Changing the encryption secret requires re-entering previously saved credentials.
-
-`SEARCH_API_KEY` optionally selects Tavily instead of public search. `FIRECRAWL_API_KEY` optionally authenticates the default Japanese listing reader. Quota errors and challenge pages remain unavailable evidence. Removing `RESTAURANT_SOURCE_READER` selects ordinary reads; an optional `browser: { "binding": "BROWSER" }` enables Cloudflare Browser Run fallback. These providers have independent quotas and billing.
-
-### Google and walking routes
-
-To enable Google matching, set the main Worker's `GOOGLE_PLACES_API_KEY` secret for Places API (New), then set `CATALOG_INTAKE_GOOGLE_PLACES_MODE` to `enabled`. Leaving the mode disabled requires no Google credential. Without Google, Japanese restaurant discovery can use Tabelog; worldwide discovery is not guaranteed.
-
-For verified walking routes, create an ignored local copy of `wrangler.route-sidecar.jsonc`, choose a unique route Worker name, and set that Worker's `GOOGLE_MAPS_API_KEY` secret for Geocoding API and Routes API. Deploy it with Wrangler, then add a main Worker `services` entry with `binding: "ROUTE_SIDECAR"` and its chosen `service` name. The route Worker stays private, with no public routes. Keep its key off the main Worker. Without it, Recommend uses straight-line distance and cannot supply verified walking times.
-
-Refresh `.wrangler/owner-poc-secret-names.json` after changing main Worker secrets, then rebuild and deploy. Runtime keys, `.dev.vars`, local configuration, backups and live captures must remain outside tracked files.
-
-### External Add API
-
-`GET /api/agent/capabilities` describes the Add inputs. A dedicated random 32–128 character URL-safe `ATLAS_ADD_AGENT_TOKEN` main Worker secret enables `POST /api/agent/catalog-intake`. Use bearer authentication and JSON `{ "operation": "catalog.intake.discover", "input": { "query": "restaurant name", "requestToken": "stable retry ID" } }`. Continue with `catalog.intake.select`, `catalog.intake.confirm` or `catalog.intake.cancel`, echoing the returned `x-atlas-agent-conversation-id` header and expected session/preview version.
-
-Present the current preview for human review before confirmation; changed previews require renewed review. The token only grants Add operations, not Visits, media or personal metadata edits. Human corrections use the website. Both entry points share evidence, duplicate, version and idempotency checks. Incomplete location evidence returns `failed_no_write`; historical receipts remain replayable for compatibility.
+- Writes require the Owner cookie (HMAC-SHA256, 30 days, `HttpOnly; Secure; SameSite=Strict`) and a same-origin `Origin` header. Recommend and Google ratings are Owner-only because they spend provider quota.
+- Model keys are encrypted with AES-GCM (key derived by HKDF from a server secret) and never returned to the browser.
+- Outbound requests use fixed endpoints, manual redirects, timeouts and size limits. Source text is passed to the model as data and its output is validated.
+- Uploads are limited to JPEG/PNG/WebP/GIF (8 MB) and MP4/WebM (50 MB) and checked by file signature.

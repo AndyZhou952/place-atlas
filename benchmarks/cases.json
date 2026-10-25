@@ -1,0 +1,124 @@
+{
+  "add": [
+    {
+      "name": "Chain branch by name and area",
+      "query": "一蘭",
+      "area": "渋谷",
+      "expect": {
+        "titleIncludes": "一蘭",
+        "prefecture": "JP-13",
+        "tabelogScore": true,
+        "coordinates": true,
+        "openingHours": true
+      }
+    },
+    {
+      "name": "Tonkatsu restaurant by Japanese name",
+      "query": "とんかつ まい泉 青山本店",
+      "expect": {
+        "titleIncludes": "まい泉",
+        "prefecture": "JP-13",
+        "tabelogScore": true,
+        "coordinates": true,
+        "cuisine": "japanese.tonkatsu"
+      }
+    },
+    {
+      "name": "Restaurant outside Tokyo",
+      "query": "いづう",
+      "area": "京都 祇園",
+      "expect": {
+        "titleIncludes": "いづう",
+        "prefecture": "JP-26",
+        "tabelogScore": true,
+        "coordinates": true,
+        "cuisine": "japanese.sushi"
+      }
+    }
+  ],
+  "recommend": {
+    "catalog": [
+      {
+        "id": "r1",
+        "title": "麺屋 しろ",
+        "area": "新宿",
+        "address": "東京都新宿区西新宿1-1-1",
+        "latitude": 35.6905,
+        "longitude": 139.6995,
+        "tags": ["ラーメン"],
+        "visited": false
+      },
+      {
+        "id": "r2",
+        "title": "らぁ麺 あお",
+        "area": "渋谷",
+        "address": "東京都渋谷区道玄坂1-1-1",
+        "latitude": 35.6585,
+        "longitude": 139.6985,
+        "tags": ["ラーメン"],
+        "visited": true,
+        "rating": 8.5
+      },
+      {
+        "id": "r3",
+        "title": "鮨 みどり",
+        "area": "銀座",
+        "address": "東京都中央区銀座4-1-1",
+        "latitude": 35.6717,
+        "longitude": 139.765,
+        "tags": ["寿司"],
+        "visited": false
+      },
+      {
+        "id": "r4",
+        "title": "カレー くろ",
+        "area": "神保町",
+        "address": "東京都千代田区神田神保町2-1-1",
+        "latitude": 35.6959,
+        "longitude": 139.7577,
+        "tags": ["カレー"],
+        "visited": true,
+        "rating": 9
+      },
+      {
+        "id": "r5",
+        "title": "焼鳥 あか",
+        "area": "新宿",
+        "address": "東京都新宿区新宿3-1-1",
+        "latitude": 35.6909,
+        "longitude": 139.7046,
+        "tags": ["焼き鳥", "居酒屋"],
+        "visited": false
+      },
+      {
+        "id": "r6",
+        "title": "喫茶 きいろ",
+        "area": "京都",
+        "address": "京都府京都市中京区1-1",
+        "latitude": 35.0094,
+        "longitude": 135.7653,
+        "tags": ["喫茶店"],
+        "visited": false
+      }
+    ],
+    "cases": [
+      {
+        "name": "Cuisine near a station",
+        "request": "新宿駅の近くでラーメン",
+        "expect": { "first": "r1", "excludes": ["r3", "r4", "r6"], "origin": true }
+      },
+      {
+        "name": "Not yet visited",
+        "request": "ラーメンでまだ行ってない店",
+        "expect": { "includes": ["r1"], "excludes": ["r2"] }
+      },
+      { "name": "English request", "request": "sushi in Ginza", "expect": { "first": "r3" } },
+      { "name": "Other region", "request": "京都でコーヒー", "expect": { "first": "r6" } },
+      {
+        "name": "Nothing fits",
+        "request": "フレンチのフルコース",
+        "expect": { "excludes": ["r1", "r2", "r3", "r4", "r5", "r6"] }
+      }
+    ]
+  }
+}

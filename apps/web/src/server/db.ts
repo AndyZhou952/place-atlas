@@ -80,6 +80,8 @@ function assessmentUpsert(
   patch: Pick<RestaurantPatch, 'rating' | 'favorite' | 'visited' | 'comment'>,
   manualVisited: boolean,
   now: string,
+  /** Write only if this request just wrote the visit (its created_at or updated_at is `now`). */
+  visit?: { readonly id: string; readonly stamp: 'created_at' | 'updated_at' },
 ) {
   const rating =
     patch.rating === undefined
@@ -92,7 +94,11 @@ function assessmentUpsert(
   return db
     .prepare(
       `INSERT INTO place_assessments (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?6 WHERE ${
+         visit
+           ? `EXISTS (SELECT 1 FROM visits WHERE id = ?7 AND item_id = ?1 AND ${visit.stamp} = ?6)`
+           : 'true'
+       }
        ON CONFLICT(item_id) DO UPDATE SET overall_rating = ?2, is_favorite = ?3, has_visited = ?4,
          summary = ?5, updated_at = ?6`,
     )
@@ -103,6 +109,7 @@ function assessmentUpsert(
       Number(patch.visited ?? manualVisited),
       comment ?? null,
       now,
+      ...(visit ? [visit.id] : []),
     );
 }
 
@@ -199,7 +206,9 @@ const toMedia = (row: MediaRow): Media => ({
   url: `/api/media/${encodeURIComponent(row.display_id)}/content`,
 });
 
+/** Visits and media of published restaurants only (verified, shown, not deleted). */
 export async function listVisits(db: D1Database): Promise<Visit[]> {
+  const published = new Set((await listRestaurants(db)).map(({ id }) => id));
   const [visits, media] = await db.batch<VisitRow | MediaRow>([
     db.prepare(
       'SELECT id, item_id, visited_at, note, created_at, updated_at FROM visits ORDER BY visited_at DESC, created_at DESC',
@@ -212,18 +221,24 @@ export async function listVisits(db: D1Database): Promise<Visit[]> {
     (media.results as MediaRow[]).map(toMedia),
     (entry) => entry.visitId,
   );
-  return (visits.results as VisitRow[]).map((row) => ({
-    id: row.id,
-    restaurantId: row.item_id,
-    visitedOn: row.visited_at,
-    ...(row.note ? { note: row.note } : {}),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    media: mediaByVisit.get(row.id) ?? [],
-  }));
+  return (visits.results as VisitRow[]).flatMap((row) =>
+    published.has(row.item_id)
+      ? [
+          {
+            id: row.id,
+            restaurantId: row.item_id,
+            visitedOn: row.visited_at,
+            ...(row.note ? { note: row.note } : {}),
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            media: mediaByVisit.get(row.id) ?? [],
+          },
+        ]
+      : [],
+  );
 }
 
-/** Creates the visit (idempotent by id) and optionally updates the overall rating. */
+/** Creates the visit (idempotent by id) and, in the same batch, optionally its overall rating. */
 export async function saveVisit(
   db: D1Database,
   id: string,
@@ -258,6 +273,8 @@ export async function saveVisit(
         { rating: input.rating },
         await manualVisited(db, restaurant.id),
         now,
+        // A failed update or a replayed create must not change the current score.
+        { id, stamp: create ? 'created_at' : 'updated_at' },
       ),
     );
   }
@@ -395,11 +412,18 @@ export async function openMedia(
   displayId: string,
 ): Promise<Response> {
   const row = await db
-    .prepare('SELECT object_key, content_type FROM visit_media WHERE display_id = ?')
+    .prepare(
+      `SELECT m.object_key, m.content_type, v.item_id FROM visit_media m
+       JOIN visits v ON v.id = m.visit_id WHERE m.display_id = ?`,
+    )
     .bind(displayId)
-    .first<{ object_key: string; content_type: string }>();
+    .first<{ object_key: string; content_type: string; item_id: string }>();
+  // Media is public only while its restaurant is published.
+  const published = row ? await getRestaurant(db, row.item_id).then(Boolean, () => false) : false;
   const object =
-    row && IMAGE_SIGNATURES[row.content_type] ? await bucket.get(row.object_key) : null;
+    row && published && IMAGE_SIGNATURES[row.content_type]
+      ? await bucket.get(row.object_key)
+      : null;
   if (!row || !object) return new Response('Not found', { status: 404 });
   return new Response(object.body, {
     headers: {

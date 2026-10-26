@@ -33,6 +33,13 @@ export function migratedD1(): { db: D1Database; sqlite: DatabaseSync } {
         return statement;
       },
       async run() {
+        // D1 returns rows for a read inside a batch, too.
+        if (/^\s*SELECT\b/iu.test(sql))
+          return {
+            success: true,
+            results: sqlite.prepare(sql).all(...(values as never[])),
+            meta: { changes: 0 },
+          };
         const result = sqlite.prepare(sql).run(...(values as never[]));
         return { success: true, meta: { changes: Number(result.changes) } };
       },

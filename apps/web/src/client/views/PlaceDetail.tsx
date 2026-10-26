@@ -39,8 +39,11 @@ export function PlaceDetail({
   );
   const busy = atlas.isPending(restaurant.id);
   const google = atlas.googleRatings[restaurant.id];
+  // Forms wait for the saved result so a failed save keeps the draft; toggles fire and forget.
+  const save = (patch: Parameters<AtlasViewModel['updateRestaurant']>[1]) =>
+    atlas.updateRestaurant(restaurant.id, patch);
   const update = (patch: Parameters<AtlasViewModel['updateRestaurant']>[1]) =>
-    atlas.updateRestaurant(restaurant.id, patch).catch(() => undefined);
+    save(patch).catch(() => undefined);
 
   return (
     <article className="detail-card">
@@ -86,7 +89,12 @@ export function PlaceDetail({
           restaurant={restaurant}
           busy={busy}
           onCancel={() => setEditing(false)}
-          onSave={(patch) => update(patch).then(() => setEditing(false))}
+          onSave={(patch) =>
+            save(patch).then(
+              () => setEditing(false),
+              () => undefined,
+            )
+          }
         />
       ) : (
         <>
@@ -154,7 +162,7 @@ export function PlaceDetail({
         restaurant={restaurant}
         owner={owner}
         busy={busy}
-        onSave={(comment) => update({ comment })}
+        onSave={(comment) => save({ comment })}
       />
 
       {owner ? (
@@ -310,7 +318,10 @@ function CommentEditor({
         <form
           onSubmit={(event) => (
             event.preventDefault(),
-            void onSave(draft.trim() || null).then(() => setDraft(undefined))
+            void onSave(draft.trim() || null).then(
+              () => setDraft(undefined),
+              () => undefined,
+            )
           )}
         >
           <textarea

@@ -1,0 +1,582 @@
+// The Recommend conversation: the model only interprets the request; the saved catalog, this
+// code and the route sidecar decide origins, distances, walking times and the answer.
+import type { AtlasItem, CatalogRead } from '../add/stored-item.ts';
+import { itemFoodKeys } from './food.ts';
+import { distanceInKm } from './geo-distance.ts';
+import type { LocationResolver, RouteProvider } from './routes.ts';
+import {
+  parseRecommendConversationInput,
+  type RecommendConversationInput,
+  type RecommendConversationOutput,
+} from '../../../shared/recommend-conversation.ts';
+import {
+  decideRecommend,
+  relevantItems,
+  type RecommendDecisionItem,
+  type RecommendDecisionOrigin,
+  type RecommendRouteObservation,
+} from './decision.ts';
+import {
+  normalizeRecommendIntent,
+  normalizeSearchText,
+  type RecommendOriginOption,
+} from './intent.ts';
+import { materializeRecommendReceipt, type RecommendRouteSource } from './receipt.ts';
+
+export interface RecommendInterpreter {
+  interpret(
+    input: RecommendConversationInput,
+    options: readonly RecommendOriginOption[],
+  ): Promise<unknown>;
+}
+
+export interface RecommendConversationDependencies {
+  readonly catalog: CatalogRead;
+  readonly interpreter: RecommendInterpreter;
+  readonly locationResolver: LocationResolver;
+  readonly routeProvider: RouteProvider;
+  readonly clock: { readonly now: () => Date };
+}
+
+const unavailable = (): RecommendConversationOutput => ({
+  status: 'unavailable',
+  message: 'Recommendations are temporarily unavailable. Please retry.',
+  retryable: true,
+});
+
+const unsupportedJapanTrain = (): RecommendConversationOutput => ({
+  status: 'unavailable',
+  message:
+    'Train route times in Japan are unavailable from the current provider. Try walking or remove the travel-time limit.',
+  retryable: false,
+});
+
+function reportUnavailable(stage: 'catalog' | 'interpreter', error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  const reason =
+    stage === 'interpreter' &&
+    [
+      'Recommend model is not configured',
+      'Recommend model unavailable',
+      'Recommend model response too large',
+      'Recommend model response invalid',
+      'Recommend model response incomplete',
+      'Recommend model answer invalid',
+    ].includes(message)
+      ? message
+      : 'unexpected failure';
+  console.warn('Recommend unavailable', {
+    stage,
+    reason,
+    errorType: error instanceof Error ? error.name : typeof error,
+  });
+}
+
+const normalize = normalizeSearchText;
+
+export function asksForWalkIn(input: RecommendConversationInput): boolean {
+  return [input.query, ...input.replies].some((message) =>
+    /予約(?:なし|無し|不要|せず|しないで)|飛び込み|无需预[约約订訂]|免预[约約订訂]|不用预[约約订訂]|不需要预[约約订訂]|\bwalk-?in\b|\b(?:can|could|may) (?:i|we) walk in\b|\bwithout (?:a )?(?:reservation|booking)\b|\bno (?:reservation|booking)\b/iu.test(
+      message,
+    ),
+  );
+}
+
+function walkInStatus(item: AtlasItem): 'known' | 'unknown' | 'excluded' {
+  const rule = item.reservation;
+  if (
+    !rule.url?.startsWith('https://') ||
+    !rule.label.trim() ||
+    !rule.checkedAt ||
+    !Number.isFinite(Date.parse(rule.checkedAt))
+  )
+    return 'unknown';
+  if (rule.mode === 'walk-in') return 'known';
+  if (rule.mode === 'advance' || rule.mode === 'ticketed') return 'excluded';
+  return 'unknown';
+}
+
+function optionsFromCatalog(items: readonly AtlasItem[]): RecommendOriginOption[] {
+  const options: RecommendOriginOption[] = [];
+  const areas = new Set<string>();
+  for (const item of items) {
+    for (const area of item.area.split(/[·・,/]/u).map((part) => part.trim())) {
+      if (!area || areas.has(area)) continue;
+      areas.add(area);
+      options.push({ id: `area:${area}`, kind: 'area', names: [area] });
+    }
+    options.push({
+      id: `place:${item.id}`,
+      kind: 'place',
+      names: [item.title, ...(item.alternateTitle ? [item.alternateTitle] : [])],
+    });
+  }
+  return options;
+}
+
+function userMessages(input: RecommendConversationInput): string[] {
+  return [input.query, ...input.replies.flatMap((reply) => ['Clarification answer:', reply])];
+}
+
+function addExplicitStationMentions(
+  options: RecommendOriginOption[],
+  input: RecommendConversationInput,
+): void {
+  for (const message of [input.query, ...input.replies]) {
+    const japaneseStations = [
+      ...message.matchAll(
+        /(?:^|[でからの\s、。])([\p{L}\p{N}・ー-]{1,60}駅)(?=$|[かまでのへ\s、。])/gu,
+      ),
+    ].map((match) => match[1]);
+    const englishStations = [
+      ...message.matchAll(/\b(?:from|near|at|around)\s+((?:[\p{L}\p{N}-]+\s+){1,3}Station)\b/giu),
+    ].map((match) => match[1]);
+    if (!englishStations.length) {
+      const bareStation = message.match(/^((?:[\p{L}\p{N}-]+\s+){1,3}Station)(?=$|から|で|へ)/iu);
+      if (bareStation) englishStations.push(bareStation[1]);
+    }
+    for (const station of [...japaneseStations, ...englishStations]) {
+      if (
+        options.some((option) =>
+          option.names.some((name) => normalize(name) === normalize(station)),
+        )
+      )
+        continue;
+      options.push({
+        id: `query:${station}`,
+        kind: 'station',
+        names: [station],
+      });
+    }
+  }
+}
+
+function addExplicitAddressMentions(
+  options: RecommendOriginOption[],
+  input: RecommendConversationInput,
+): void {
+  for (const message of [input.query, ...input.replies]) {
+    let address = message.trim();
+    try {
+      const url = new URL(address);
+      if (
+        !['www.google.com', 'google.com', 'maps.google.com'].includes(url.hostname) ||
+        !url.pathname.startsWith('/maps/')
+      )
+        continue;
+      address =
+        url.searchParams.get('query') ??
+        url.searchParams.get('q') ??
+        decodeURIComponent(url.pathname.replace(/^\/maps\/place\//u, ''));
+    } catch {
+      if (/^https?:\/\//iu.test(address)) continue;
+    }
+    address = address
+      .replace(/^〒?\d{3}-?\d{4}\s*/u, '')
+      .replace(/(?:の近く|から|付近|周辺).*$/u, '')
+      .trim();
+    if (
+      address.length < 10 ||
+      address.length > 180 ||
+      !/^(?:北海道|東京都|大阪府|京都府|[\p{Script=Han}]{2,3}県).+\d/u.test(address) ||
+      options.some((option) => option.names.some((name) => normalize(name) === normalize(address)))
+    )
+      continue;
+    options.push({
+      id: `query:${address}`,
+      kind: 'address',
+      names: [address],
+    });
+  }
+}
+
+function addOriginText(
+  options: RecommendOriginOption[],
+  raw: unknown,
+  input: RecommendConversationInput,
+): void {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+  const value = raw as Record<string, unknown>;
+  if (
+    typeof value.originText !== 'string' ||
+    value.originText.length < 2 ||
+    value.originText.length > 200 ||
+    !['area', 'station', 'address', 'place'].includes(value.originKind as string)
+  )
+    return;
+  const originText = value.originText.trim();
+  const disclosed = [input.query, ...input.replies].some((message) => {
+    if (normalize(message).includes(normalize(originText))) return true;
+    try {
+      const url = new URL(message);
+      if (
+        !['www.google.com', 'google.com', 'maps.google.com'].includes(url.hostname) ||
+        !url.pathname.startsWith('/maps/')
+      )
+        return false;
+      const location =
+        url.searchParams.get('query') ??
+        url.searchParams.get('q') ??
+        (url.pathname.startsWith('/maps/place/')
+          ? decodeURIComponent((url.pathname.split('/')[3] ?? '').replaceAll('+', ' '))
+          : null);
+      return Boolean(location && normalize(location).includes(normalize(originText)));
+    } catch {
+      return false;
+    }
+  });
+  if (!disclosed) return;
+  if (
+    options.some((option) => option.names.some((name) => normalize(name) === normalize(originText)))
+  )
+    return;
+  options.push({
+    id: `query:${originText}`,
+    kind: value.originKind as RecommendOriginOption['kind'],
+    names: [originText],
+  });
+  value.originId = `query:${originText}`;
+}
+
+function currentRoute(
+  route: { readonly status: string; readonly checkedAt?: string },
+  now: Date,
+): boolean {
+  if (route.status !== 'fresh' || !route.checkedAt) return false;
+  return recentTimestamp(route.checkedAt, now);
+}
+
+function recentTimestamp(value: string, now: Date): boolean {
+  const age = now.getTime() - Date.parse(value);
+  return Number.isFinite(age) && age >= -5_000 && age <= 5 * 60 * 1000;
+}
+
+export function createRecommendConversationService(
+  dependencies: RecommendConversationDependencies,
+) {
+  return {
+    async ask(rawInput: unknown): Promise<RecommendConversationOutput> {
+      const input = parseRecommendConversationInput(rawInput);
+      if (!input) throw new Error('Invalid Recommend request');
+      if (
+        input.originChoice &&
+        ![input.query, ...input.replies.slice(0, -1)].some((message) =>
+          normalize(message).includes(normalize(input.originChoice!.hint)),
+        )
+      )
+        return {
+          status: 'clarify',
+          clarification: 'origin',
+          question: 'What starting point should I use?',
+        };
+      let items: readonly AtlasItem[];
+      try {
+        items = (await dependencies.catalog.list('verified_catalog')).filter(
+          (item) => item.kind === 'food' && item.verificationStatus === 'verified',
+        );
+      } catch (error) {
+        reportUnavailable('catalog', error);
+        return unavailable();
+      }
+      const options = optionsFromCatalog(items);
+      let rawIntent: unknown;
+      try {
+        rawIntent = await dependencies.interpreter.interpret(input, options);
+      } catch (error) {
+        reportUnavailable('interpreter', error);
+        return unavailable();
+      }
+      if (
+        !rawIntent ||
+        typeof rawIntent !== 'object' ||
+        Array.isArray(rawIntent) ||
+        !['recommend', 'clarify', 'unsupported'].includes(
+          (rawIntent as Record<string, unknown>).action as string,
+        ) ||
+        !Array.isArray((rawIntent as Record<string, unknown>).foodTerms)
+      )
+        return unavailable();
+      addExplicitStationMentions(options, input);
+      addExplicitAddressMentions(options, input);
+      addOriginText(options, rawIntent, input);
+      const intent = normalizeRecommendIntent(userMessages(input), options, rawIntent);
+      const askWalkIn = asksForWalkIn(input);
+      if (intent.action === 'unsupported' && intent.reason === 'driving_route_unavailable')
+        return {
+          status: 'unavailable',
+          message:
+            'Driving route times are not available yet. Remove the driving constraint to use straight-line distance.',
+          retryable: false,
+        };
+      if (intent.action === 'unsupported')
+        return {
+          status: 'clarify',
+          clarification: 'full_address_or_link',
+          question: 'Please paste a full Google Maps link or address.',
+        };
+      if (
+        intent.action === 'clarify' &&
+        !(
+          input.originChoice &&
+          ['origin', 'origin_choice', 'exact_origin', 'unresolved_origin'].includes(
+            intent.clarification ?? '',
+          )
+        )
+      )
+        return {
+          status: 'clarify',
+          clarification: intent.clarification as 'origin',
+          question: intent.question ?? 'What starting point should I use?',
+        };
+
+      const selectedOption = options.find((option) => option.id === intent.originId);
+      let origin: RecommendDecisionOrigin = { state: 'none' };
+      let point: { latitude: number; longitude: number } | undefined;
+      if (input.originChoice) {
+        try {
+          const resolution = await dependencies.locationResolver.resolve(input.originChoice.hint);
+          if (resolution.status === 'unresolved')
+            return resolution.reason === 'dependency_failure'
+              ? unavailable()
+              : {
+                  status: 'clarify',
+                  clarification: 'unresolved_origin',
+                  question: 'Could you provide a more precise address or station?',
+                };
+          const candidates =
+            resolution.status === 'ambiguous' ? resolution.candidates : [resolution.location];
+          const matches = candidates.filter(
+            (candidate) => candidate.canonicalAddress === input.originChoice?.id,
+          );
+          if (matches.length > 1)
+            return {
+              status: 'clarify',
+              clarification: 'unresolved_origin',
+              question: 'Could you provide a more precise address or station?',
+            };
+          if (matches.length === 0)
+            return {
+              status: 'clarify',
+              clarification: 'origin_choice',
+              question: 'Which exact location is your starting point?',
+              originHint: input.originChoice.hint,
+              options: candidates.slice(0, 5).map((candidate) => ({
+                id: candidate.canonicalAddress,
+                label: candidate.canonicalAddress,
+              })),
+            };
+          origin = {
+            state: 'resolved',
+            id: `choice:${matches[0].canonicalAddress}`,
+          };
+          point = matches[0].point;
+        } catch {
+          return unavailable();
+        }
+      } else if (selectedOption?.kind === 'area') {
+        origin = {
+          state: 'area',
+          id: selectedOption.id,
+          name: selectedOption.names[0],
+        };
+      } else if (selectedOption?.kind === 'place') {
+        const item = items.find((candidate) => `place:${candidate.id}` === selectedOption.id);
+        if (item) {
+          origin = { state: 'resolved', id: selectedOption.id };
+          point = { latitude: item.latitude, longitude: item.longitude };
+        }
+      }
+      if (selectedOption && !point && selectedOption.kind !== 'area') {
+        try {
+          const resolution = await dependencies.locationResolver.resolve(selectedOption.names[0]);
+          if (resolution.status === 'ambiguous')
+            return {
+              status: 'clarify',
+              clarification: 'origin_choice',
+              question: 'Which exact location is your starting point?',
+              originHint: selectedOption.names[0],
+              options: resolution.candidates.slice(0, 5).map((candidate) => ({
+                id: candidate.canonicalAddress,
+                label: candidate.canonicalAddress,
+              })),
+            };
+          if (resolution.status === 'unresolved')
+            return resolution.reason === 'dependency_failure'
+              ? unavailable()
+              : {
+                  status: 'clarify',
+                  clarification: 'unresolved_origin',
+                  question: 'Could you provide a more precise address or station?',
+                };
+          origin = { state: 'resolved', id: selectedOption.id };
+          point = resolution.location.point;
+        } catch {
+          return unavailable();
+        }
+      }
+      if (intent.travelMode !== 'none' && !point)
+        return {
+          status: 'clarify',
+          clarification: origin.state === 'area' ? 'exact_origin' : 'origin',
+          question: 'Where exactly are you starting from?',
+        };
+
+      const eligibleItems =
+        origin.state === 'area'
+          ? items.filter((item) =>
+              selectedOption?.names.some((name) => normalize(item.area).includes(normalize(name))),
+            )
+          : selectedOption?.kind === 'place'
+            ? items.filter((item) => `place:${item.id}` !== selectedOption.id)
+            : items;
+      const catalog: RecommendDecisionItem[] = eligibleItems.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        verificationStatus: item.verificationStatus,
+        title: item.title,
+        area: origin.state === 'area' ? origin.id : item.area,
+        address: item.address,
+        tags: itemFoodKeys([...item.tags, ...(item.classification?.basis.cuisineLabels ?? [])]),
+        visited: item.hasVisited === true,
+        walkIn: walkInStatus(item),
+      }));
+      const distances = point
+        ? eligibleItems.map((item) => ({
+            itemId: item.id,
+            meters: Math.round(
+              distanceInKm(point, {
+                latitude: item.latitude,
+                longitude: item.longitude,
+              }) * 1000,
+            ),
+          }))
+        : [];
+      const routes: RecommendRouteObservation[] = [];
+      const routeSources = new Map<string, RecommendRouteSource>();
+      let routeState: 'unavailable' | undefined;
+      const relevantIds = new Set(
+        relevantItems(
+          {
+            intent: {
+              foodTerms: intent.foodTerms,
+              excludedFoodTerms: intent.excludedFoodTerms,
+              travelMode: intent.travelMode,
+              visited: intent.visited,
+              askWalkIn,
+            },
+            origin,
+            catalogIds: catalog.map((item) => item.id),
+            routes: [],
+            distances: [],
+          },
+          catalog,
+        ).map((item) => item.id),
+      );
+      const routeItems = eligibleItems.filter((item) => relevantIds.has(item.id));
+      // Google returns no train routes in Japan, so a train time can never be verified.
+      const transitUnsupported =
+        point !== undefined &&
+        routeItems.length > 0 &&
+        (intent.travelMode === 'transit' || intent.travelMode === 'either');
+      if (transitUnsupported && intent.travelMode === 'transit') return unsupportedJapanTrain();
+      if (point && intent.travelMode !== 'none') {
+        if (intent.travelMode === 'walk' || intent.travelMode === 'either') {
+          try {
+            const evidence = dependencies.routeProvider.walkingMany
+              ? await dependencies.routeProvider.walkingMany(
+                  point,
+                  routeItems.map((item) => ({
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                  })),
+                )
+              : await Promise.all(
+                  routeItems.map((item) =>
+                    dependencies.routeProvider.walking(point, {
+                      latitude: item.latitude,
+                      longitude: item.longitude,
+                    }),
+                  ),
+                );
+            evidence.forEach((route, index) => {
+              const fresh =
+                currentRoute(route, dependencies.clock.now()) &&
+                route.status === 'fresh' &&
+                Number.isFinite(route.durationSeconds) &&
+                route.durationSeconds >= 0;
+              if (!fresh) routeState = 'unavailable';
+              routes.push({
+                itemId: routeItems[index].id,
+                mode: 'walk',
+                seconds: route.status === 'fresh' ? route.durationSeconds : null,
+                status: fresh ? 'fresh' : 'unavailable',
+              });
+              if (fresh)
+                routeSources.set(`${routeItems[index].id}:walk`, {
+                  seconds: route.durationSeconds,
+                  checkedAt: route.checkedAt,
+                  source: route.attribution,
+                });
+            });
+            if (evidence.length !== routeItems.length) routeState = 'unavailable';
+          } catch {
+            routeState = 'unavailable';
+          }
+        }
+        if (transitUnsupported) routeState = 'unavailable';
+      }
+      const decision = decideRecommend(
+        {
+          intent: {
+            foodTerms: intent.foodTerms,
+            excludedFoodTerms: intent.excludedFoodTerms,
+            travelMode: intent.travelMode,
+            ...(intent.maxMinutes !== null ? { maxMinutes: intent.maxMinutes } : {}),
+            visited: intent.visited,
+            askWalkIn,
+          },
+          origin,
+          catalogIds: catalog.map((item) => item.id),
+          routes,
+          distances,
+          ...(routeState ? { routeState } : {}),
+        },
+        catalog,
+      );
+      if (decision.action === 'clarify')
+        return {
+          status: 'clarify',
+          clarification: 'origin',
+          question: decision.question ?? 'Which starting point?',
+        };
+      if (decision.action === 'unavailable')
+        return transitUnsupported ? unsupportedJapanTrain() : unavailable();
+      if (decision.action === 'no_results')
+        return {
+          status: 'no_results',
+          message: askWalkIn
+            ? 'No saved restaurants match this walk-in request based on their saved booking rules.'
+            : 'No saved restaurants match this request yet.',
+        };
+      let currentItems: readonly AtlasItem[];
+      try {
+        currentItems = await dependencies.catalog.list('verified_catalog');
+      } catch {
+        return unavailable();
+      }
+      const recommendations = materializeRecommendReceipt(
+        decision.recommendations,
+        eligibleItems,
+        currentItems,
+        routeSources,
+        decision.warnings,
+      );
+      if (!recommendations) return unavailable();
+      return {
+        status: 'recommend',
+        warnings: decision.warnings,
+        recommendations,
+      };
+    },
+  };
+}

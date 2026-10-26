@@ -1,75 +1,41 @@
 {
   "name": "@japan-atlas/web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "wrangler dev --config dist/server/wrangler.json",
-    "build:owner-poc": "vinext build --mode owner-poc",
-    "preflight:owner-poc": "node --experimental-strip-types scripts/owner-poc-deployment-preflight.ts --config wrangler.owner-poc.local.jsonc --built-config dist/server/wrangler.json --secret-list .wrangler/owner-poc-secret-names.json",
-    "deploy:owner-poc": "npm run build:owner-poc && npm run preflight:owner-poc && wrangler deploy --config dist/server/wrangler.json --strict",
-    "test:route-sidecar": "node --experimental-strip-types --test route-sidecar/*.test.mjs scripts/route-sidecar-bundle-preflight.test.mjs scripts/route-sidecar-deployment-preflight.test.mjs",
-    "build:route-sidecar": "wrangler deploy --config wrangler.route-sidecar.jsonc --dry-run --outdir dist/route-sidecar --metafile dist/route-sidecar/bundle-meta.json && node --experimental-strip-types scripts/route-sidecar-bundle-preflight.ts --bundle dist/route-sidecar/worker.js --bundle dist/route-sidecar/worker.js.map",
-    "preflight:route-sidecar": "node --experimental-strip-types scripts/route-sidecar-deployment-preflight.ts --config wrangler.route-sidecar.jsonc --secret-list .wrangler/route-sidecar-secret-names.json",
-    "lint": "cd ../.. && apps/web/node_modules/.bin/oxlint --config apps/web/.oxlintrc.json --disable-nested-config apps/web/adapters apps/web/agent apps/web/app apps/web/components apps/web/features apps/web/lib apps/web/product apps/web/route-sidecar apps/web/scripts benchmarks",
-    "format": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --disable-nested-config apps/web/adapters apps/web/agent apps/web/app apps/web/components apps/web/db apps/web/features apps/web/lib apps/web/product apps/web/route-sidecar apps/web/scripts benchmarks",
-    "format:check": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --disable-nested-config --check apps/web/adapters apps/web/agent apps/web/app apps/web/components apps/web/db apps/web/features apps/web/lib apps/web/product apps/web/route-sidecar apps/web/scripts benchmarks",
+    "dev": "vite dev",
+    "build": "vite build",
+    "deploy": "vite build && wrangler deploy",
+    "deploy:route-sidecar": "wrangler deploy --config wrangler.route-sidecar.jsonc",
+    "lint": "cd ../.. && apps/web/node_modules/.bin/oxlint --config apps/web/.oxlintrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format:check": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --check apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test && npm run test:evals",
-    "test:evals": "npm --prefix ../.. run benchmark",
-    "eval:add-behavior": "npm --prefix ../.. run benchmark:add",
-    "eval:add-live": "npm --prefix ../.. run benchmark:add-live",
-    "eval:place-resolution": "npm --prefix ../.. run benchmark:place-resolution",
-    "eval:place-enrichment": "npm --prefix ../.. run benchmark:place-enrichment",
-    "migration:check": "node --experimental-strip-types scripts/migration-packaging.ts --candidate-site-version 17",
-    "db:generate": "drizzle-kit generate",
-    "maintenance:assessment-reset": "node --experimental-strip-types scripts/assessment-reset-maintenance.ts",
-    "audit:media-integrity": "node scripts/audit-media-integrity.mjs"
+    "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
+    "benchmark": "node --experimental-strip-types --no-warnings ../../benchmarks/run.ts"
   },
   "dependencies": {
-    "@base-ui/react": "1.7.0",
-    "@shadcn/react": "0.3.0",
-    "class-variance-authority": "0.7.1",
-    "clsx": "2.1.1",
-    "drizzle-orm": "0.45.2",
-    "ipaddr.js": "2.5.0",
     "leaflet": "1.9.4",
     "lucide-react": "1.31.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "react-server-dom-webpack": "19.2.8",
-    "shadcn": "4.18.0",
-    "tailwind-merge": "3.6.0",
-    "tw-animate-css": "1.4.0",
-    "vinext": "1.0.0-beta.9"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.54.4",
     "@cloudflare/workers-types": "5.20260905.1",
-    "@tailwindcss/postcss": "4.2.1",
     "@types/leaflet": "1.9.20",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.34",
-    "drizzle-kit": "0.31.10",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
-    "oxlint-tsgolint": "7.0.2001",
-    "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "wrangler": "4.129.0"
-  },
-  "overrides": {
-    "@esbuild-kit/core-utils": {
-      "esbuild": "0.25.4"
-    }
-  },
-  "type": "module"
+  }
 }

@@ -317,7 +317,12 @@ export interface Upload {
   readonly bytes: Uint8Array<ArrayBuffer>;
 }
 
-/** Stores files in R2, then their rows. A retried upload id is skipped, not duplicated. */
+/**
+ * Stores files in R2, then their rows in one batch. An upload id is a retry key: the same bytes for
+ * the same visit return the stored media without writing again, and anything else under that id is
+ * refused before any write. Objects this attempt wrote are removed again if it does not commit,
+ * unless a committed row uses them.
+ */
 export async function addMedia(
   db: D1Database,
   bucket: R2Bucket,
@@ -345,35 +350,90 @@ export async function addMedia(
       );
     }
   }
-  const now = new Date().toISOString();
-  const rows = await Promise.all(
+  const files = await Promise.all(
     uploads.map(async (upload, index) => {
-      const objectKey = `visits/${visitId}/${upload.id}`;
       const digest = await crypto.subtle.digest('SHA-256', upload.bytes);
-      await bucket.put(objectKey, upload.bytes, { httpMetadata: { contentType: upload.type } });
-      return db
-        .prepare(
-          `INSERT INTO visit_media (id, display_id, visit_id, item_id, object_key, original_filename, content_type,
-             byte_size, content_sha256, caption, display_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
-        )
-        .bind(
-          upload.id,
-          `pm_${crypto.randomUUID()}`,
-          visitId,
-          visit.item_id,
-          objectKey,
-          upload.name.slice(0, 200) || 'media',
-          upload.type,
-          upload.bytes.byteLength,
-          [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
-          visit.next_order + index,
-          now,
-          now,
-        );
+      const sha256 = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+      // The digest in the key keeps an overlapping attempt with other bytes from overwriting it.
+      return { upload, index, sha256, objectKey: `visits/${visitId}/${upload.id}/${sha256}` };
     }),
   );
-  await db.batch(rows);
+  const sameFile = (row: StoredUpload | undefined, file: (typeof files)[number]) =>
+    row?.visit_id === visitId &&
+    row.content_sha256 === file.sha256 &&
+    row.content_type === file.upload.type &&
+    row.byte_size === file.upload.bytes.byteLength;
+  const conflict = () =>
+    new HttpError(409, 'This upload id already holds a different file; upload it again.');
+  const stored = await storedUploads(db, uploads);
+  if (
+    files.some((file) => stored.has(file.upload.id) && !sameFile(stored.get(file.upload.id), file))
+  )
+    throw conflict();
+  const fresh = files.filter((file) => !stored.has(file.upload.id));
+
+  const written: string[] = [];
+  const removeUnreferenced = async () => {
+    if (!written.length) return;
+    const { results } = await db
+      .prepare(
+        `SELECT object_key FROM visit_media WHERE object_key IN (${written.map(() => '?').join(',')})`,
+      )
+      .bind(...written)
+      .all<{ object_key: string }>();
+    const referenced = new Set(results.map((row) => row.object_key));
+    await Promise.allSettled(
+      written.filter((key) => !referenced.has(key)).map((key) => bucket.delete(key)),
+    );
+  };
+  const now = new Date().toISOString();
+  try {
+    const puts = await Promise.allSettled(
+      fresh.map(async ({ upload, objectKey }) => {
+        await bucket.put(objectKey, upload.bytes, { httpMetadata: { contentType: upload.type } });
+        written.push(objectKey);
+      }),
+    );
+    const failed = puts.find((put) => put.status === 'rejected');
+    if (failed) throw failed.reason;
+    if (fresh.length)
+      await db.batch(
+        fresh.map(({ upload, index, sha256, objectKey }) =>
+          db
+            .prepare(
+              `INSERT INTO visit_media (id, display_id, visit_id, item_id, object_key, original_filename, content_type,
+                 byte_size, content_sha256, caption, display_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+            )
+            .bind(
+              upload.id,
+              `pm_${crypto.randomUUID()}`,
+              visitId,
+              visit.item_id,
+              objectKey,
+              upload.name.slice(0, 200) || 'media',
+              upload.type,
+              upload.bytes.byteLength,
+              sha256,
+              visit.next_order + index,
+              now,
+              now,
+            ),
+        ),
+      );
+  } catch (error) {
+    await removeUnreferenced();
+    throw error;
+  }
+  // An overlapping attempt with another file can claim an id first; this attempt's object is then
+  // unreferenced and the upload is refused.
+  const committed = await storedUploads(db, uploads);
+  if (fresh.some((file) => committed.get(file.upload.id)?.object_key !== file.objectKey)) {
+    await removeUnreferenced();
+    throw conflict();
+  }
   const placeholders = uploads.map(() => '?').join(',');
   const { results } = await db
     .prepare(
@@ -382,6 +442,26 @@ export async function addMedia(
     .bind(...uploads.map((upload) => upload.id))
     .all<MediaRow>();
   return results.map(toMedia);
+}
+
+interface StoredUpload {
+  readonly id: string;
+  readonly visit_id: string;
+  readonly object_key: string;
+  readonly content_type: string;
+  readonly byte_size: number;
+  readonly content_sha256: string;
+}
+
+async function storedUploads(db: D1Database, uploads: readonly Upload[]) {
+  const { results } = await db
+    .prepare(
+      `SELECT id, visit_id, object_key, content_type, byte_size, content_sha256 FROM visit_media
+       WHERE id IN (${uploads.map(() => '?').join(',')})`,
+    )
+    .bind(...uploads.map((upload) => upload.id))
+    .all<StoredUpload>();
+  return new Map(results.map((row) => [row.id, row]));
 }
 
 export async function updateMediaCaption(

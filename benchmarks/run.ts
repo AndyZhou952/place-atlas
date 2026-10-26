@@ -59,9 +59,17 @@ const record = (
   detail = '',
   cause?: Check['cause'],
 ) => results.push({ suite, name, check, pass, detail, ...(pass || !cause ? {} : { cause }) });
-// Provider warnings go to the Worker log in production; keep the report readable here.
+// Provider warnings go to the Worker log in production. Here the failed provider calls of each Add
+// attempt (provider, its HTTP status, the source page's status, result class) join its report.
+let providerFailures: string[] = [];
 console.info = () => undefined;
-console.warn = () => undefined;
+console.warn = (label: unknown, detail?: Record<string, unknown>) => {
+  if (label !== 'provider_call' || !detail || providerFailures.length >= 8) return;
+  const statuses = [detail.status, detail.sourceStatus && `page ${detail.sourceStatus}`];
+  providerFailures.push(
+    [detail.provider, ...statuses.filter(Boolean), detail.resultClass].join(' '),
+  );
+};
 
 function environment(db: D1Database, routes?: RouteSidecarServiceBinding): Env {
   return {
@@ -97,6 +105,7 @@ async function runAdd(testCase: {
   // The same request the Add panel sends: the name plus the optional area or branch.
   const query = [testCase.query, testCase.area].filter(Boolean).join(' ');
   const started = Date.now();
+  providerFailures = [];
   const harness = createAddHarness(environment(migratedD1().db));
   const scope = { ownerId: 'owner', channel: 'web', conversationId: 'b'.repeat(32) };
   const discovered = await executeCatalogIntake(
@@ -208,7 +217,8 @@ async function runAdd(testCase: {
     name,
     'research',
     true,
-    `listing ${preview.tabelog.status === 'known' ? preview.tabelog.url : 'none'}; ${stage ? researchStages[stage] : 'providers answered'}`,
+    `listing ${preview.tabelog.status === 'known' ? preview.tabelog.url : 'none'}; ${stage ? researchStages[stage] : 'providers answered'}` +
+      (providerFailures.length ? `; failed calls: ${providerFailures.join(', ')}` : ''),
   );
   record('Add', name, `time ${((Date.now() - started) / 1000).toFixed(1)}s`, true);
 }

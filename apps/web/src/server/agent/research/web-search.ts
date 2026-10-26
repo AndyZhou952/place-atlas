@@ -6,6 +6,24 @@ export type SearchOutcome =
       reason: 'blocked' | 'provider_failure' | 'invalid_response';
     };
 
+/**
+ * A provider call that gave no usable answer, logged without its URL or query: the provider's own
+ * HTTP status, the source page's status when a reader reports one, and the result class.
+ */
+export function logProviderFailure(
+  provider: string,
+  resultClass: string,
+  status?: number,
+  sourceStatus?: number,
+): void {
+  console.warn('provider_call', {
+    provider,
+    resultClass,
+    ...(status === undefined ? {} : { status }),
+    ...(sourceStatus === undefined ? {} : { sourceStatus }),
+  });
+}
+
 /** Only fixed public search endpoints are fetched; result URLs are evidence, not fetch targets. */
 export function createWebSearch(options: { apiKey?: string; fetch?: typeof fetch }) {
   const fetcher = options.fetch ?? fetch;
@@ -31,7 +49,10 @@ export function createWebSearch(options: { apiKey?: string; fetch?: typeof fetch
               include_raw_content: false,
             }),
           });
-          if (!response.ok) return { kind: 'unavailable', reason: 'provider_failure' };
+          if (!response.ok) {
+            logProviderFailure('tavily', 'provider_failure', response.status);
+            return { kind: 'unavailable', reason: 'provider_failure' };
+          }
           const result = JSON.parse(await readBoundedText(response, 131_072));
           if (!Array.isArray(result.results))
             return { kind: 'unavailable', reason: 'invalid_response' };
@@ -69,6 +90,7 @@ export function createWebSearch(options: { apiKey?: string; fetch?: typeof fetch
         }
         return searchDuckDuckGo(fetcher, query, signal);
       } catch {
+        logProviderFailure('search', signal.aborted ? 'timeout' : 'transport');
         return { kind: 'unavailable', reason: 'provider_failure' };
       }
     },
@@ -80,19 +102,25 @@ async function searchYahooJapan(
   query: string,
   signal: AbortSignal,
 ): Promise<SearchOutcome> {
+  const limit = AbortSignal.any([signal, AbortSignal.timeout(4000)]);
   try {
     const endpoint = new URL('https://search.yahoo.co.jp/search');
     endpoint.searchParams.set('p', query);
     const response = await fetcher(endpoint.href, {
       redirect: 'manual',
-      signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]),
+      signal: limit,
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
-    if ([202, 403, 429].includes(response.status))
-      return { kind: 'unavailable', reason: 'blocked' };
-    if (!response.ok) return { kind: 'unavailable', reason: 'provider_failure' };
-    return parseYahooJapanHtml(await readBoundedText(response, 262_144));
+    const outcome: SearchOutcome = [202, 403, 429].includes(response.status)
+      ? { kind: 'unavailable', reason: 'blocked' }
+      : response.ok
+        ? parseYahooJapanHtml(await readBoundedText(response, 262_144))
+        : { kind: 'unavailable', reason: 'provider_failure' };
+    if (outcome.kind === 'unavailable')
+      logProviderFailure('yahoo', outcome.reason, response.status);
+    return outcome;
   } catch {
+    logProviderFailure('yahoo', limit.aborted ? 'timeout' : 'transport');
     return { kind: 'unavailable', reason: 'provider_failure' };
   }
 }
@@ -102,20 +130,26 @@ async function searchDuckDuckGo(
   query: string,
   signal: AbortSignal,
 ): Promise<SearchOutcome> {
+  const limit = AbortSignal.any([signal, AbortSignal.timeout(4000)]);
   try {
     const endpoint = new URL('https://html.duckduckgo.com/html');
     endpoint.searchParams.set('q', query);
     endpoint.searchParams.set('kp', '-1');
     const response = await fetcher(endpoint.href, {
       redirect: 'manual',
-      signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]),
+      signal: limit,
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
-    if ([202, 403, 429].includes(response.status))
-      return { kind: 'unavailable', reason: 'blocked' };
-    if (!response.ok) return { kind: 'unavailable', reason: 'provider_failure' };
-    return parseDuckDuckGoHtml(await readBoundedText(response, 262_144));
+    const outcome: SearchOutcome = [202, 403, 429].includes(response.status)
+      ? { kind: 'unavailable', reason: 'blocked' }
+      : response.ok
+        ? parseDuckDuckGoHtml(await readBoundedText(response, 262_144))
+        : { kind: 'unavailable', reason: 'provider_failure' };
+    if (outcome.kind === 'unavailable')
+      logProviderFailure('duckduckgo', outcome.reason, response.status);
+    return outcome;
   } catch {
+    logProviderFailure('duckduckgo', limit.aborted ? 'timeout' : 'transport');
     return { kind: 'unavailable', reason: 'provider_failure' };
   }
 }

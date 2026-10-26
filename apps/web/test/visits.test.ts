@@ -1,5 +1,6 @@
-// Visits through the Worker: only published restaurants' visits and photos are public, and a
-// visit's score change is written only together with that visit.
+// Visits through the Worker: only published restaurants' visits and photos are public, a visit's
+// score change is written only together with that visit, and a photo upload is idempotent and
+// leaves no object behind when it fails.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Env } from '../src/server/env.ts';
@@ -31,12 +32,36 @@ function setup() {
     ['media/published', new Uint8Array([0x89, 0x50, 0x4e, 0x47])],
     ['media/candidate', new Uint8Array([0x89, 0x50, 0x4e, 0x47])],
   ]);
+  const writes = { puts: 0, deletes: 0, failPut: 0, failBatch: false };
   const env: Env = {
-    DB: db,
+    // A database whose next batch can be made to fail.
+    DB: new Proxy(db, {
+      get(target, property) {
+        if (property === 'batch' && writes.failBatch)
+          return async () => {
+            throw new Error('database unavailable');
+          };
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }),
     MEDIA: {
       async get(key: string) {
         const bytes = objects.get(key);
         return bytes ? { body: bytes, httpEtag: '"e"' } : null;
+      },
+      async put(key: string, bytes: Uint8Array<ArrayBuffer>) {
+        writes.puts++;
+        // The nth put of this request fails, after the others have completed.
+        if (writes.failPut && writes.puts === writes.failPut) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          throw new Error('bucket unavailable');
+        }
+        objects.set(key, bytes);
+      },
+      async delete(key: string) {
+        writes.deletes++;
+        objects.delete(key);
       },
     } as unknown as R2Bucket,
     ATLAS_OWNER_PASSWORD: 'owner-pass',
@@ -88,8 +113,28 @@ function setup() {
     if (setCookie) cookie = setCookie.split(';')[0];
     return response;
   };
-  return { call };
+  /** The Owner's upload form: one file per id. */
+  const upload = (visitId: string, files: [id: string, bytes: number[]][]) => {
+    const form = new FormData();
+    for (const [id, bytes] of files) {
+      form.append('files', new File([new Uint8Array(bytes)], 'photo.png', { type: 'image/png' }));
+      form.append('ids', id);
+    }
+    return handleApi(
+      new Request(`${ORIGIN}/api/visits/${visitId}/media`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, cookie },
+        body: form,
+      }),
+      env,
+    );
+  };
+  const rows = () =>
+    sqlite.prepare("SELECT id, content_sha256 FROM visit_media WHERE id LIKE 'upload-%'").all();
+  return { call, upload, objects, writes, rows };
 }
+
+const png = (last: number) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, last];
 
 test('anonymous visits and photos are limited to published restaurants', async () => {
   const { call } = setup();
@@ -131,4 +176,80 @@ test("a visit's score is written only with that visit", async () => {
   });
   assert.equal(missing.status, 404);
   assert.equal(await score(), 9);
+});
+
+test('an upload id is a retry key: the same file is reused, another file is refused unwritten', async () => {
+  const { call, upload, objects, writes, rows } = setup();
+  await call('POST', '/api/session', { password: 'owner-pass' });
+  const first = await upload('visit-published', [['upload-0001', png(1)]]);
+  assert.equal(first.status, 201);
+  const [media] = (await first.json()) as { id: string }[];
+  assert.equal(writes.puts, 1);
+  const stored = [...objects].find(([key]) => key.includes('upload-0001'));
+
+  const retry = await upload('visit-published', [['upload-0001', png(1)]]);
+  assert.equal(retry.status, 201);
+  assert.deepEqual(
+    ((await retry.json()) as { id: string }[]).map(({ id }) => id),
+    [media.id],
+  );
+  assert.equal(writes.puts, 1, 'an identical retry writes nothing');
+
+  for (const [visitId, bytes] of [
+    ['visit-published', png(2)],
+    ['visit-candidate', png(1)],
+  ] as const) {
+    const changed = await upload(visitId, [['upload-0001', bytes]]);
+    assert.equal(changed.status, 409, visitId);
+  }
+  assert.equal(writes.puts, 1, 'a changed file or another visit writes nothing');
+  assert.deepEqual(
+    [...objects].find(([key]) => key.includes('upload-0001')),
+    stored,
+  );
+  assert.equal(rows().length, 1);
+
+  // Two overlapping attempts with different files: one commits, the other is refused and its
+  // object removed, so the stored bytes are the committed row's.
+  const racing = await Promise.all([
+    upload('visit-published', [['upload-0005', png(3)]]),
+    upload('visit-published', [['upload-0005', png(4)]]),
+  ]);
+  assert.deepEqual(racing.map(({ status }) => status).sort(), [201, 409]);
+  const raced = [...objects].filter(([key]) => key.includes('upload-0005'));
+  assert.equal(raced.length, 1);
+  const row = rows().find(({ id }) => id === 'upload-0005');
+  assert.ok(row && raced[0][0].endsWith(String(row.content_sha256)));
+});
+
+test('a failed upload removes the objects it wrote', async () => {
+  const { call, upload, objects, writes, rows } = setup();
+  await call('POST', '/api/session', { password: 'owner-pass' });
+  const uploaded = () => [...objects.keys()].filter((key) => key.includes('upload-'));
+
+  writes.failBatch = true;
+  assert.equal((await upload('visit-published', [['upload-0002', png(1)]])).status, 500);
+  writes.failBatch = false;
+  assert.deepEqual([writes.puts, writes.deletes], [1, 1]);
+  assert.deepEqual(uploaded(), []);
+
+  // One of two writes fails after the other completed.
+  writes.puts = 0;
+  writes.failPut = 2;
+  assert.equal(
+    (
+      await upload('visit-published', [
+        ['upload-0003', png(1)],
+        ['upload-0004', png(2)],
+      ])
+    ).status,
+    500,
+  );
+  writes.failPut = 0;
+  assert.deepEqual(uploaded(), []);
+  assert.equal(rows().length, 0);
+
+  // The retry then succeeds.
+  assert.equal((await upload('visit-published', [['upload-0002', png(1)]])).status, 201);
+  assert.equal(uploaded().length, 1);
 });

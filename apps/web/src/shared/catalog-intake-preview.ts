@@ -3,7 +3,6 @@ import type {
   CatalogIntakeSuspectedDuplicate,
   CatalogIntakeWarning,
 } from './catalog-intake.ts';
-import { researchRegion } from './research-region.ts';
 
 export interface CatalogIntakePreviewFieldPresentation {
   readonly key:
@@ -33,8 +32,6 @@ export interface CatalogIntakePreviewPresentation {
 export function presentCatalogIntakePreview(
   preview: CatalogIntakePreview,
 ): CatalogIntakePreviewPresentation {
-  const addressForRegion = preview.ownerFields.address ?? preview.addressProposal?.value ?? '';
-  const showTabelog = !addressForRegion || researchRegion(addressForRegion) === 'japan';
   const title = preview.ownerFields.title
     ? field('title', 'Name', preview.ownerFields.title, 'Owner asserted')
     : preview.titleProposal
@@ -162,11 +159,11 @@ export function presentCatalogIntakePreview(
       ),
       address,
       coordinates,
-      ...(showTabelog ? [tabelog] : []),
+      tabelog,
       reservation,
     ],
     duplicates: preview.suspectedDuplicates,
-    unknownFields: preview.unknownFields.filter((field) => field !== 'tabelog' || showTabelog),
+    unknownFields: preview.unknownFields,
     warnings: preview.warnings,
   };
 }

@@ -154,7 +154,6 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
   });
   return {
     async research(input) {
-      if (!('selectedSubject' in input)) return unavailable;
       const subject = input.selectedSubject;
       const signal = AbortSignal.timeout(35_000);
       const isSubject = (text: string, address?: string, postalCode?: string, name?: string) =>

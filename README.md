@@ -43,11 +43,11 @@ Set secrets with `npx wrangler secret put NAME --config wrangler.local.jsonc` an
 | `AGENT_SETTINGS_SECRET` | Separate 32+ character key for encrypting saved model keys (defaults to the session secret). |
 | `ATLAS_ADD_AGENT_TOKEN` | 32–128 character URL-safe Bearer token for the external Add Agent API (`GET /api/agent/capabilities` describes it). |
 | `ATLAS_PUBLIC_URL` | Your site URL, sent as contact information to Nominatim. |
-| `ROUTE_SIDECAR` service binding | Recommend from a station or address: geocoding, straight-line distance and walking/transit times through the separate route sidecar Worker (below). Without it, food and area requests still work, but a station or address cannot be resolved. |
+| `ROUTE_SIDECAR` service binding | Recommend from a station or address: geocoding, straight-line distance and walking times through the separate route sidecar Worker (below). Without it, food and area requests still work, but a station or address cannot be resolved. |
 
 #### Route sidecar (optional)
 
-The route sidecar is a separate, private Worker that holds a Google Maps key for geocoding, walking matrices and transit routes:
+The route sidecar is a separate, private Worker that holds a Google Maps key for geocoding and walking matrices:
 
 ```sh
 npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc

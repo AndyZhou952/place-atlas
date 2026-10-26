@@ -94,13 +94,14 @@ function assessmentUpsert(
   return db
     .prepare(
       `INSERT INTO place_assessments (item_id, overall_rating, is_favorite, has_visited, summary, created_at, updated_at)
-       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?6 WHERE ${
+       SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${
          visit
-           ? `EXISTS (SELECT 1 FROM visits WHERE id = ?7 AND item_id = ?1 AND ${visit.stamp} = ?6)`
+           ? `EXISTS (SELECT 1 FROM visits WHERE id = ? AND item_id = ? AND ${visit.stamp} = ?)`
            : 'true'
        }
-       ON CONFLICT(item_id) DO UPDATE SET overall_rating = ?2, is_favorite = ?3, has_visited = ?4,
-         summary = ?5, updated_at = ?6`,
+       ON CONFLICT(item_id) DO UPDATE SET overall_rating = excluded.overall_rating,
+         is_favorite = excluded.is_favorite, has_visited = excluded.has_visited,
+         summary = excluded.summary, updated_at = excluded.updated_at`,
     )
     .bind(
       id,
@@ -109,7 +110,8 @@ function assessmentUpsert(
       Number(patch.visited ?? manualVisited),
       comment ?? null,
       now,
-      ...(visit ? [visit.id] : []),
+      now,
+      ...(visit ? [visit.id, id, now] : []),
     );
 }
 

@@ -367,3 +367,44 @@ export async function readToretaBookingPage(
     return { kind: 'unavailable' };
   }
 }
+
+export type ReservationMode = 'reservable' | 'reservation_required' | 'not_reservable';
+
+/**
+ * The dine-in reservation rule a source states explicitly: one mode, `conflict` when its dine-in
+ * clauses disagree, or undefined when it states none. Clauses about takeaway or delivery are a
+ * different service and never decide the dine-in mode (「予約不可 ※テイクアウトのみ電話予約可」
+ * is not_reservable).
+ */
+export function explicitReservationMode(text: string): ReservationMode | 'conflict' | undefined {
+  const clauses = text
+    .normalize('NFKC')
+    .split(/[※\n。;；/|()（）【】「」]|(?<=[^\d]),|、|\.\s+/u)
+    .filter(
+      (clause) =>
+        !/テイクアウト|持ち帰り|持帰り|デリバリー|出前|take[\s-]?out|take[\s-]?away|to[\s-]?go|delivery/iu.test(
+          clause,
+        ),
+    )
+    .join('\n');
+  const modes = new Set<ReservationMode>();
+  if (
+    /予約不可|予約(?:は|を)?(?:受け付けて|受付して)?(?:おりません|いません)|予約できません|予約を?お断り|no reservations?|reservations? (?:are |is )?not (?:accepted|available|possible)|not reservable/iu.test(
+      clauses,
+    )
+  )
+    modes.add('not_reservable');
+  if (
+    /完全予約制|予約必須|要予約|予約制|reservations? (?:are |is )?required|reservation only|by reservation only/iu.test(
+      clauses,
+    )
+  )
+    modes.add('reservation_required');
+  if (
+    /予約可(?!否)|予約(?:を)?(?:承|受け付け)(?:ります|ております|ています)|reservations? (?:are |is )?(?:accepted|available|possible)|reservable/iu.test(
+      clauses.replace(/予約不可|予約可否/gu, ''),
+    )
+  )
+    modes.add('reservable');
+  return modes.size > 1 ? 'conflict' : [...modes][0];
+}

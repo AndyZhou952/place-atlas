@@ -3,6 +3,7 @@
 //   npm run benchmark                    # offline: Recommend with recorded interpretations
 //   npm run benchmark -- --live          # live Add (Google Places/Tabelog/Nominatim/model) and Recommend
 //   npm run benchmark -- --live --json ../../benchmarks/runs/<name>.json
+//   npm run benchmark -- --live --repeat 3    # every live Add case three times, each attempt reported
 //
 // Live mode reads AGENT_API_KEY, AGENT_BASE_URL and AGENT_MODEL, plus optional SEARCH_API_KEY,
 // FIRECRAWL_API_KEY (with RESTAURANT_SOURCE_READER=firecrawl), GOOGLE_PLACES_API_KEY (with
@@ -37,6 +38,9 @@ const live = process.argv.includes('--live');
 const jsonPath = process.argv.includes('--json')
   ? process.argv[process.argv.indexOf('--json') + 1]
   : undefined;
+const repeat = process.argv.includes('--repeat')
+  ? Math.max(1, Math.min(10, Number(process.argv[process.argv.indexOf('--repeat') + 1]) || 1))
+  : 1;
 const vars = process.env;
 if (live && !(vars.AGENT_API_KEY && vars.AGENT_BASE_URL && vars.AGENT_MODEL))
   throw new Error('Live mode needs AGENT_API_KEY, AGENT_BASE_URL and AGENT_MODEL.');
@@ -165,7 +169,10 @@ async function runAdd(testCase: {
     preview.reservation.status === 'known',
     preview.reservation.status === 'known' ? preview.reservation.label.slice(0, 40) : 'unknown',
   ]);
-  for (const [check, pass, detail] of checks) record('Add', name, check, pass, detail);
+  // A failed check carries the research warning the Owner would see.
+  const warning = preview.warnings.find(({ code }) => code === 'provider_unavailable')?.message;
+  for (const [check, pass, detail] of checks)
+    record('Add', name, check, pass, pass || !warning ? detail : `${detail} — ${warning}`);
   record('Add', name, `time ${((Date.now() - started) / 1000).toFixed(1)}s`, true);
 }
 
@@ -283,7 +290,10 @@ async function runRecommend(testCase: {
   }
 }
 
-if (live) for (const testCase of cases.add) await runAdd(testCase);
+if (live)
+  for (const testCase of cases.add)
+    for (let attempt = 1; attempt <= repeat; attempt++)
+      await runAdd(repeat > 1 ? { ...testCase, name: `${testCase.name} #${attempt}` } : testCase);
 for (const testCase of cases.recommend.cases) await runRecommend(testCase);
 
 const width = (key: keyof Check) =>

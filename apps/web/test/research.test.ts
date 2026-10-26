@@ -1,0 +1,254 @@
+// Research agent boundaries with synthetic sources: branch identity, search recovery within the
+// two-search budget, reported search causes, and reservation meaning.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { researchIssueMessage } from '../src/server/agent/add/workflow.ts';
+import {
+  createPlaceResearchAgent,
+  resolveReservation,
+} from '../src/server/agent/research/agent.ts';
+import { explicitReservationMode } from '../src/server/agent/research/booking.ts';
+import {
+  initialResearchQuery,
+  matchesSelectedBranch,
+  simplerResearchQuery,
+} from '../src/server/agent/research/branch-match.ts';
+import { stubFetch } from './fixtures.ts';
+
+// A short Japanese name at a single-number lot; Google and the listing use neighbouring postcodes.
+const kyoto = {
+  name: '合成',
+  address: '日本、〒605-0001 京都府京都市東山区合成町367',
+  query: '合成 祇園',
+};
+const listed = (overrides: Partial<{ name: string; address: string; postal: string }> = {}) => {
+  const { name = '合成', address = '京都府京都市東山区合成町367', postal = '6050002' } = overrides;
+  return matchesSelectedBranch(
+    `${name} ${address}`,
+    kyoto.name,
+    kyoto.address,
+    kyoto.query,
+    address,
+    postal,
+    name,
+  );
+};
+
+test('a short-name single-lot branch matches only when name, lot, municipality and postcode area agree', () => {
+  assert.equal(listed(), true);
+  // A romanized provider name still matches through the whole word the Owner typed.
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町367',
+      'Gosei',
+      kyoto.address,
+      kyoto.query,
+      '京都府京都市東山区合成町367',
+      '6050002',
+      '合成',
+    ),
+    true,
+  );
+  assert.equal(listed({ address: '京都府京都市東山区合成町368' }), false, 'another lot');
+  assert.equal(listed({ name: '合成食堂' }), false, 'another business at the same lot');
+  assert.equal(listed({ address: '京都府京都市中京区合成町367' }), false, 'another ward');
+  assert.equal(listed({ postal: '1500001' }), false, 'postcodes in different areas');
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町367 2F',
+      kyoto.name,
+      '日本、〒605-0001 京都府京都市東山区合成町367 1F',
+      kyoto.query,
+      '京都府京都市東山区合成町367 2F',
+      '6050001',
+      '合成',
+    ),
+    false,
+    'another floor',
+  );
+  // Without a lot number the identity is ambiguous and stays unmatched.
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町',
+      kyoto.name,
+      '日本、〒605-0001 京都府京都市東山区合成町',
+      kyoto.query,
+      '京都府京都市東山区合成町',
+      '6050001',
+      '合成',
+    ),
+    false,
+  );
+});
+
+test('reservation meaning: takeaway exceptions do not decide the dine-in rule', () => {
+  assert.equal(explicitReservationMode('予約不可 ※テイクアウトのみ電話予約可'), 'not_reservable');
+  assert.equal(explicitReservationMode('完全予約制'), 'reservation_required');
+  assert.equal(explicitReservationMode('予約可否 予約可'), 'reservable');
+  assert.equal(explicitReservationMode('予約可 / 予約不可'), 'conflict');
+  assert.equal(explicitReservationMode('営業時間 11:00〜22:00'), undefined);
+  const known = (mode: string, url: string) => ({ status: 'known', mode, url });
+  const listing = known('not_reservable', 'https://tabelog.com/kyoto/A2601/A260301/26000001/');
+  // A verified official page wins; any other disagreement stays unknown.
+  assert.equal(
+    resolveReservation(
+      known('reservable', 'https://gosei.example/reserve'),
+      listing,
+      'https://gosei.example/',
+    ).mode,
+    'reservable',
+  );
+  assert.equal(
+    resolveReservation(
+      known('reservable', 'https://blog.example/post'),
+      listing,
+      'https://gosei.example/',
+    ).status,
+    'unknown',
+  );
+});
+
+// The selected branch for the agent runs: a dictated query with building text and block numbers.
+const LISTING = 'https://tabelog.com/tokyo/A1317/A131701/13999901/';
+const subject = {
+  ownerQuery: 'ごうせいしょくどう なかめぐろ',
+  providerNamespace: 'google-places',
+  placeId: 'ChIJsyntheticPlace002',
+  transientName: '合成食堂 中目黒',
+  transientAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3 合成ビル 2F',
+};
+const listingContent =
+  '合成食堂 中目黒 東京都目黒区中目黒1-2-3 合成ビル 2F 予約可否 予約不可 ※テイクアウトのみ電話予約可';
+const reader = async (url: string) =>
+  url === LISTING
+    ? {
+        kind: 'read' as const,
+        evidence: {
+          url: LISTING,
+          title: '合成食堂 中目黒 - 食べログ',
+          content: listingContent,
+          restaurant: {
+            name: '合成食堂 中目黒',
+            address: '東京都目黒区中目黒1-2-3 合成ビル 2F',
+            postalCode: '1530061',
+            area: '中目黒',
+            score: 3.51,
+            categories: ['定食'],
+            reservation: '予約不可 ※テイクアウトのみ電話予約可',
+          },
+        },
+      }
+    : { kind: 'unavailable' as const };
+const yahoo = (rows: string) =>
+  new Response(`<html><body><div id="web"><ol>${rows}</ol></div></body></html>`, {
+    headers: { 'content-type': 'text/html' },
+  });
+const listingRow = `<li><a href="${LISTING}">合成食堂 中目黒 - 食べログ</a><div>東京都目黒区中目黒1-2-3</div></li>`;
+
+function agentRun(options: {
+  readonly search: (query: string) => Response;
+  readonly answer: unknown;
+}) {
+  const queries: string[] = [];
+  let modelCalls = 0;
+  const agent = createPlaceResearchAgent({
+    apiKey: 'test-key',
+    baseUrl: 'https://model.test/v1',
+    model: 'test-model',
+    sourceReader: reader,
+    fetch: stubFetch({
+      'https://search.yahoo.co.jp/search': (request) => {
+        const query = new URL(request.url).searchParams.get('p') ?? '';
+        queries.push(query);
+        return options.search(query);
+      },
+      // The public fallback is challenged throughout.
+      'https://html.duckduckgo.com/html': () => new Response('', { status: 202 }),
+      'https://model.test/v1/chat/completions': () => {
+        modelCalls++;
+        return Response.json({
+          choices: [{ message: { content: JSON.stringify(options.answer) } }],
+        });
+      },
+    }),
+  });
+  return {
+    run: () => agent.research({ phase: 'initial', selectedSubject: subject }),
+    queries,
+    modelCalls: () => modelCalls,
+  };
+}
+
+test('a zero-result first search spends the second search on the simpler name and area query', async () => {
+  const first = initialResearchQuery(subject);
+  const simpler = simplerResearchQuery(subject);
+  assert.notEqual(first, simpler);
+  const research = agentRun({
+    search: (query) => (query === simpler ? yahoo(listingRow) : yahoo('')),
+    answer: {
+      subjectMatch: 'matched',
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'unknown' },
+    },
+  });
+  const result = await research.run();
+  assert.deepEqual(research.queries, [first, simpler]);
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(result.sourceAccessIssue, undefined);
+  assert.equal(result.value.tabelog.status === 'known' && result.value.tabelog.score, 3.51);
+  assert.equal(
+    result.value.reservation.status === 'known' && result.value.reservation.mode,
+    'not_reservable',
+  );
+});
+
+test('a model reservation mode that contradicts the quoted dine-in rule is not accepted', async () => {
+  const research = agentRun({
+    search: () => yahoo(listingRow),
+    answer: {
+      subjectMatch: 'matched',
+      tabelog: { status: 'unknown' },
+      reservation: {
+        status: 'known',
+        mode: 'reservation_required',
+        label: '電話予約',
+        url: LISTING,
+      },
+      evidence: {
+        reservation: {
+          url: LISTING,
+          quote: '予約不可 ※テイクアウトのみ電話予約可',
+          identityQuote: '合成食堂 中目黒 東京都目黒区中目黒1-2-3',
+        },
+      },
+    },
+  });
+  const result = await research.run();
+  assert.equal(research.queries.length, 1);
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  // The listing's own explicit rule replaces the contradicted claim.
+  assert.equal(
+    result.value.reservation.status === 'known' && result.value.reservation.mode,
+    'not_reservable',
+  );
+});
+
+test('refused searches are reported as a search failure, not as a missing restaurant', async () => {
+  const research = agentRun({
+    search: () => new Response('', { status: 202 }),
+    answer: { subjectMatch: 'uncertain' },
+  });
+  const result = await research.run();
+  assert.equal(research.queries.length, 2, 'two searches, no hidden third');
+  assert.ok(research.modelCalls() <= 3);
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(result.sourceAccessIssue, 'search_blocked');
+  assert.equal(result.value.tabelog.status, 'unknown');
+  const message = researchIssueMessage('search_blocked', false);
+  assert.match(message, /web search service refused/u);
+  assert.doesNotMatch(message, /Tabelog refused|no rating/u);
+  assert.match(researchIssueMessage('no_listing', false), /no Tabelog listing that matches/u);
+});

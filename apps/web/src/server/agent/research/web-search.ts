@@ -60,7 +60,12 @@ export function createWebSearch(options: { apiKey?: string; fetch?: typeof fetch
             return primary;
           }
           const fallback = await searchDuckDuckGo(fetcher, query, signal);
-          return fallback.kind === 'results' ? fallback : primary;
+          if (fallback.kind === 'results') return fallback;
+          // A valid zero-result answer stays an answer; otherwise keep a refusal visible.
+          if (primary.kind === 'results') return primary;
+          return primary.reason === 'blocked' || fallback.reason === 'blocked'
+            ? { kind: 'unavailable', reason: 'blocked' }
+            : primary;
         }
         return searchDuckDuckGo(fetcher, query, signal);
       } catch {
@@ -118,10 +123,16 @@ async function searchDuckDuckGo(
 export function parseYahooJapanHtml(html: string): SearchOutcome {
   if (/captcha|challenge-form|ロボットではない/iu.test(html))
     return { kind: 'unavailable', reason: 'blocked' };
-  if (/に一致するウェブページは見つかりませんでした/u.test(plainText(html)))
+  if (
+    /(?:に一致する|に関する)(?:ウェブページ|情報|検索結果)は?見つかりませんでした/u.test(
+      plainText(html),
+    )
+  )
     return { kind: 'results', sources: [] };
   const region = html.split(/<div\b[^>]*id=["']web["'][^>]*>/iu)[1];
   if (!region) return { kind: 'unavailable', reason: 'invalid_response' };
+  // A results region without a single entry is a valid zero-result page, not broken markup.
+  if (!/<li\b/iu.test(region)) return { kind: 'results', sources: [] };
   const sources: SearchEvidence[] = [];
   for (const row of region.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/giu)) {
     const link = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/iu.exec(row[1]);

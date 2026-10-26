@@ -1,7 +1,6 @@
 // Is this page about the selected branch? Chains share names, and Google, Tabelog and official
 // sites format the same Japanese address differently, so identity rests on the name plus street
 // numbers, postal code and ward, never on a name alone.
-import { prefectureOf } from '../../../shared/cuisine.ts';
 import { isTabelogRestaurantListing } from './instructions.ts';
 import type { SearchEvidence } from './web-search.ts';
 
@@ -319,10 +318,9 @@ function streetNumbers(value: string): string[] {
  * hyphenated block), and Google and Tabelog can file it under neighbouring postcodes. Such a
  * listing is the selected branch only when every independent anchor agrees: the listing's exact
  * name is the provider name or a whole word the Owner typed, the single lot is the same, the
- * postcodes share their area prefix, no floor differs, and the municipality is the same. A
- * romanized provider address cannot be read against Japanese municipality names, so there the
- * prefecture, both postcodes (same area) and any mapped ward stand in for it. Anything less stays
- * unknown.
+ * postcodes share their area prefix, no floor differs, and the provider's Japanese municipality
+ * and town both appear in the listing. A romanized provider address cannot be read against
+ * Japanese town names, and a prefecture or postal area is no substitute, so it stays unknown.
  */
 function matchesSingleLotBranch(
   name: string,
@@ -369,27 +367,22 @@ function matchesSingleLotBranch(
   const sourceLots = lots(sourceAddress);
   if (selectedLots.length !== 1 || sourceLots.length !== 1 || selectedLots[0] !== sourceLots[0])
     return false;
-  // The municipality (city, ward, town) must agree in Japanese script; romanized-only addresses
-  // cannot be corroborated this way.
-  const municipalities = (value: string) =>
-    (
-      value
-        .normalize('NFKC')
-        .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
-        .match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+?[市区町村郡]/gu) ?? []
-    ).map(key);
-  const selected = municipalities(address);
+  // The municipality (city, ward) and the town before the lot must agree in Japanese script.
+  const japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+  const local = address
+    .normalize('NFKC')
+    .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+    .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '');
+  const beforeLot = local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '';
+  const municipalities =
+    beforeLot.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]+?[市区郡]/gu) ?? [];
+  const town = key(beforeLot.replace(/^.*[市区郡]/u, ''));
   const source = key(sourceAddress);
-  if (selected.length) return selected.every((part) => source.includes(part));
-  const latin = address.normalize('NFKD').replace(/\p{M}/gu, '');
-  const prefecture = prefectureOf(latin);
-  const ward = latin.toLowerCase().match(/\b([a-z]+)[\s-](?:city|ward|ku)\b/u)?.[1];
-  return Boolean(
-    selectedPostalCode &&
-    sourceCode &&
-    prefecture &&
-    prefecture === prefectureOf(sourceAddress) &&
-    (!ward || !japaneseLocalities[ward] || sourceAddress.includes(japaneseLocalities[ward])),
+  return (
+    municipalities.length > 0 &&
+    town.length >= 2 &&
+    japanese.test(town) &&
+    [...municipalities.map(key), town].every((part) => source.includes(part))
   );
 }
 

@@ -12,7 +12,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createAddHarness } from '../apps/web/src/server/agent/add/compose.ts';
-import { executeCatalogIntake } from '../apps/web/src/server/agent/add/workflow.ts';
+import {
+  executeCatalogIntake,
+  researchIssueMessage,
+} from '../apps/web/src/server/agent/add/workflow.ts';
 import { createRecommendHarness } from '../apps/web/src/server/agent/recommend/compose.ts';
 import type { RouteSidecarServiceBinding } from '../apps/web/src/server/agent/recommend/routes.ts';
 import type { Env } from '../apps/web/src/server/env.ts';
@@ -31,6 +34,8 @@ interface Check {
   readonly check: string;
   readonly pass: boolean;
   readonly detail: string;
+  /** For a failed live check: a provider was unavailable, or the harness itself got it wrong. */
+  readonly cause?: 'provider' | 'behavior';
 }
 
 const cases = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8'));
@@ -46,8 +51,14 @@ if (live && !(vars.AGENT_API_KEY && vars.AGENT_BASE_URL && vars.AGENT_MODEL))
   throw new Error('Live mode needs AGENT_API_KEY, AGENT_BASE_URL and AGENT_MODEL.');
 
 const results: Check[] = [];
-const record = (suite: string, name: string, check: string, pass: boolean, detail = '') =>
-  results.push({ suite, name, check, pass, detail });
+const record = (
+  suite: string,
+  name: string,
+  check: string,
+  pass: boolean,
+  detail = '',
+  cause?: Check['cause'],
+) => results.push({ suite, name, check, pass, detail, ...(pass || !cause ? {} : { cause }) });
 // Provider warnings go to the Worker log in production; keep the report readable here.
 console.info = () => undefined;
 console.warn = () => undefined;
@@ -105,6 +116,7 @@ async function runAdd(testCase: {
       : discovered.ok
         ? ''
         : discovered.error.message,
+    discovered.ok ? 'behavior' : 'provider',
   );
   if (!candidates?.candidates.length) return;
   const selected = await executeCatalogIntake(
@@ -126,6 +138,7 @@ async function runAdd(testCase: {
       'builds a preview',
       false,
       selected.ok ? output?.status : selected.error.message,
+      selected.ok ? 'behavior' : 'provider',
     );
     return;
   }
@@ -164,17 +177,47 @@ async function runAdd(testCase: {
       classifyCuisines(categories).includes(String(expect.cuisine)),
       categories.join(', '),
     ]);
+  const reservation = preview.reservation;
   checks.push([
     'reservation known',
-    preview.reservation.status === 'known',
-    preview.reservation.status === 'known' ? preview.reservation.label.slice(0, 40) : 'unknown',
+    reservation.status === 'known',
+    reservation.status === 'known'
+      ? `${reservation.mode}: ${reservation.label.slice(0, 40)}`
+      : 'unknown',
   ]);
-  // A failed check carries the research warning the Owner would see.
-  const warning = preview.warnings.find(({ code }) => code === 'provider_unavailable')?.message;
+  // The provider stage that left research incomplete, read from the warning the Owner sees. Only
+  // research-backed checks can blame it; any other failure is the harness's own behavior.
+  const stage = (Object.keys(researchStages) as (keyof typeof researchStages)[]).find((issue) =>
+    preview.warnings.some(({ message }) => message === researchIssueMessage(issue, false)),
+  );
   for (const [check, pass, detail] of checks)
-    record('Add', name, check, pass, pass || !warning ? detail : `${detail} — ${warning}`);
+    record(
+      'Add',
+      name,
+      check,
+      pass,
+      pass || !stage ? detail : `${detail} — ${researchStages[stage]}`,
+      stage && !['title', 'prefecture'].includes(check) ? 'provider' : 'behavior',
+    );
+  // Which listing identity the research accepted, and what the providers did, per attempt.
+  record(
+    'Add',
+    name,
+    'research',
+    true,
+    `listing ${preview.tabelog.status === 'known' ? preview.tabelog.url : 'none'}; ${stage ? researchStages[stage] : 'providers answered'}`,
+  );
   record('Add', name, `time ${((Date.now() - started) / 1000).toFixed(1)}s`, true);
 }
+
+const researchStages = {
+  search_blocked: 'search refused',
+  search_unavailable: 'search failed',
+  blocked: 'listing read refused',
+  unavailable: 'listing read failed',
+  no_listing: 'no listing matched the branch',
+  timed_out: 'research timed out',
+} as const;
 
 // Recommend: a small fictional catalog; offline, a fixed place table stands in for geocoding.
 
@@ -307,8 +350,14 @@ for (const r of results)
   );
 for (const suite of ['Add', 'Recommend']) {
   const own = results.filter((r) => r.suite === suite);
-  if (own.length)
-    console.log(`\n${suite}: ${own.filter((r) => r.pass).length}/${own.length} checks passed`);
+  if (!own.length) continue;
+  const failed = (cause: Check['cause']) => own.filter((r) => r.cause === cause).length;
+  console.log(
+    `\n${suite}: ${own.filter((r) => r.pass).length}/${own.length} checks passed` +
+      (live && failed('provider')
+        ? ` (${failed('provider')} failed on provider availability)`
+        : ''),
+  );
 }
 if (jsonPath) {
   mkdirSync(dirname(jsonPath), { recursive: true });

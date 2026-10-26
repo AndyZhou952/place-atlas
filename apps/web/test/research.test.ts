@@ -34,7 +34,7 @@ const listed = (overrides: Partial<{ name: string; address: string; postal: stri
   );
 };
 
-test('a short-name single-lot branch matches only when name, lot, municipality and postcode area agree', () => {
+test('a short-name single-lot branch matches only when name, lot, ward, town and postcode area agree', () => {
   assert.equal(listed(), true);
   // A romanized provider name still matches through the whole word the Owner typed.
   assert.equal(
@@ -52,6 +52,22 @@ test('a short-name single-lot branch matches only when name, lot, municipality a
   assert.equal(listed({ address: '京都府京都市東山区合成町368' }), false, 'another lot');
   assert.equal(listed({ name: '合成食堂' }), false, 'another business at the same lot');
   assert.equal(listed({ address: '京都府京都市中京区合成町367' }), false, 'another ward');
+  assert.equal(listed({ address: '京都府京都市東山区別町367' }), false, 'another town, same ward');
+  assert.equal(listed({ address: '京都府京都市山科区別町367' }), false, 'another unmapped ward');
+  assert.equal(listed({ address: '合成町367' }), false, 'no municipality on the listing');
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町367',
+      kyoto.name,
+      '日本、〒605-0001 京都府京都市東山区367',
+      kyoto.query,
+      '京都府京都市東山区合成町367',
+      '6050002',
+      '合成',
+    ),
+    false,
+    'no town on the provider address',
+  );
   assert.equal(listed({ postal: '1500001' }), false, 'postcodes in different areas');
   assert.equal(
     matchesSelectedBranch(
@@ -81,61 +97,22 @@ test('a short-name single-lot branch matches only when name, lot, municipality a
   );
 });
 
-// The provider's address can be fully romanized while the listing and the Owner's name are Japanese.
-const romanized = '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan';
-const fromRomanized = (
-  overrides: Partial<{ name: string; address: string; postal: string; selected: string }> = {},
-) => {
-  const {
-    name = '合成',
-    address = '京都府京都市東山区合成町367',
-    postal = '6050002',
-    selected = romanized,
-  } = overrides;
-  return matchesSelectedBranch(
-    `${name} ${address}`,
-    'Gosei',
-    selected,
-    '合成',
-    address,
-    postal,
-    name,
-  );
-};
-
-test('a romanized provider address matches only with the same name, lot, prefecture and postal area', () => {
-  assert.equal(fromRomanized(), true);
-  assert.equal(fromRomanized({ name: '合成食堂' }), false, 'another business at the same lot');
-  assert.equal(fromRomanized({ address: '京都府京都市東山区合成町368' }), false, 'another lot');
-  assert.equal(
-    fromRomanized({ address: '大阪府大阪市北区合成町367', postal: '5300001' }),
-    false,
-    'another municipality',
-  );
-  assert.equal(fromRomanized({ postal: '6000001' }), false, 'postcodes in different areas');
-  assert.equal(
-    fromRomanized({ selected: '367 Goseicho, Higashiyama Ward, Kyoto, Japan' }),
-    false,
-    'no provider postcode to corroborate the area',
-  );
-  assert.equal(
-    fromRomanized({
-      selected: '367 Goseicho 2F, Higashiyama Ward, Kyoto, 605-0001, Japan',
-      address: '京都府京都市東山区合成町367 1F',
-    }),
-    false,
-    'another floor',
-  );
-  // A mapped Tokyo ward must agree, not only the postal area.
-  assert.equal(
-    fromRomanized({
-      selected: '367 Goseicho, Shibuya City, Tokyo 150-0001, Japan',
-      address: '東京都新宿区合成町367',
-      postal: '1500002',
-    }),
-    false,
-    'another ward',
-  );
+// A romanized provider address names its town in Latin script, which cannot be compared with the
+// listing's kanji town; with only a prefecture, postal area, name and lot it stays unknown.
+test('a romanized provider address never matches a single-lot listing on name, lot and area alone', () => {
+  const fromRomanized = (address: string) =>
+    matchesSelectedBranch(
+      `合成 ${address}`,
+      'Gosei',
+      '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan',
+      '合成 京都',
+      address,
+      '6050002',
+      '合成',
+    );
+  assert.equal(fromRomanized('京都府京都市東山区別町367'), false, 'another town');
+  assert.equal(fromRomanized('京都府京都市山科区別町367'), false, 'another ward');
+  assert.equal(fromRomanized('京都府京都市東山区合成町367'), false, 'uncorroborated town');
 });
 
 test('reservation meaning: takeaway exceptions do not decide the dine-in rule', () => {
@@ -186,23 +163,30 @@ const subject = {
   transientAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3 合成ビル 2F',
 };
 const takeawayOnly = '予約不可 ※テイクアウトのみ電話予約可';
-const reader = (policy: string) => async (url: string) =>
+const listingAt = (
+  address: string,
+  postalCode: string,
+  policy: string,
+  name = '合成食堂 中目黒',
+) => ({
+  name,
+  address,
+  postalCode,
+  area: '',
+  score: 3.51,
+  categories: ['定食'],
+  reservation: policy,
+  coordinates: { latitude: 35.0, longitude: 135.77 },
+});
+const reader = (restaurant: ReturnType<typeof listingAt>) => async (url: string) =>
   url === LISTING
     ? {
         kind: 'read' as const,
         evidence: {
           url: LISTING,
-          title: '合成食堂 中目黒 - 食べログ',
-          content: `合成食堂 中目黒 東京都目黒区中目黒1-2-3 合成ビル 2F 予約可否 ${policy}`,
-          restaurant: {
-            name: '合成食堂 中目黒',
-            address: '東京都目黒区中目黒1-2-3 合成ビル 2F',
-            postalCode: '1530061',
-            area: '中目黒',
-            score: 3.51,
-            categories: ['定食'],
-            reservation: policy,
-          },
+          title: `${restaurant.name} - 食べログ`,
+          content: `${restaurant.name} ${restaurant.address} 予約可否 ${restaurant.reservation}`,
+          restaurant,
         },
       }
     : { kind: 'unavailable' as const };
@@ -216,6 +200,8 @@ function agentRun(options: {
   readonly search: (query: string) => Response;
   readonly answer: unknown;
   readonly policy?: string;
+  readonly subject?: typeof subject;
+  readonly listing?: ReturnType<typeof listingAt>;
 }) {
   const queries: string[] = [];
   let modelCalls = 0;
@@ -223,7 +209,10 @@ function agentRun(options: {
     apiKey: 'test-key',
     baseUrl: 'https://model.test/v1',
     model: 'test-model',
-    sourceReader: reader(options.policy ?? takeawayOnly),
+    sourceReader: reader(
+      options.listing ??
+        listingAt('東京都目黒区中目黒1-2-3 合成ビル 2F', '1530061', options.policy ?? takeawayOnly),
+    ),
     fetch: stubFetch({
       'https://search.yahoo.co.jp/search': (request) => {
         const query = new URL(request.url).searchParams.get('p') ?? '';
@@ -241,7 +230,7 @@ function agentRun(options: {
     }),
   });
   return {
-    run: () => agent.research({ phase: 'initial', selectedSubject: subject }),
+    run: () => agent.research({ phase: 'initial', selectedSubject: options.subject ?? subject }),
     queries,
     modelCalls: () => modelCalls,
   };
@@ -346,4 +335,36 @@ test('a sourced refusal with a quoted takeaway item stays known as not reservabl
     result.value.reservation.status === 'known' && result.value.reservation.mode,
     'not_reservable',
   );
+});
+
+test('a listing at another town contributes no rating, address, coordinates or reservation', async () => {
+  const address = '京都府京都市山科区別町367';
+  const research = agentRun({
+    subject: {
+      ...subject,
+      ownerQuery: '合成 京都',
+      transientName: 'Gosei',
+      transientAddress: '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan',
+    },
+    listing: listingAt(address, '6050002', '予約可', '合成'),
+    search: () => yahoo(`<li><a href="${LISTING}">合成 - 食べログ</a><div>${address}</div></li>`),
+    answer: {
+      subjectMatch: 'uncertain',
+      tabelog: { status: 'known', score: 3.51, url: LISTING },
+      reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
+      profile: { address },
+      evidence: {
+        tabelog: { url: LISTING, quote: '3.51', identityQuote: `合成 ${address}` },
+        reservation: { url: LISTING, quote: '予約可否 予約可', identityQuote: `合成 ${address}` },
+        address: { url: LISTING, quote: address, identityQuote: `合成 ${address}` },
+      },
+    },
+  });
+  const result = await research.run();
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(result.value.tabelog.status, 'unknown');
+  assert.equal(result.value.reservation.status, 'unknown');
+  assert.equal(result.value.profile?.address, undefined);
+  assert.equal(result.value.profile?.coordinates, undefined);
 });

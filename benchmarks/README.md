@@ -14,7 +14,7 @@ RESTAURANT_SOURCE_READER=firecrawl FIRECRAWL_API_KEY=… npm run benchmark -- --
 npm run benchmark -- --live --json ../../benchmarks/runs/2026-10-25.json
 ```
 
-Each line of the report is one check: `PASS|FAIL  suite  case  check  observed value`, followed by a pass count per suite.
+Each line of the report is one check: `PASS|FAIL  suite  case  check  observed value`, followed by a pass count per suite. Each Add attempt also reports the listing research accepted and which provider stage (search, listing read, branch match, timeout) left it incomplete; a failed research-backed check names that stage, and the JSON marks each failure `provider` (availability) or `behavior` (the harness's own result). The deterministic identity, search-recovery and reservation-meaning rules are covered offline by `npm test`.
 
 Offline, each Recommend case's `interpretation` stands in for the model and `places` stands in for geocoding, so the run checks the deterministic rules that turn an interpretation into recommendations. Live mode measures the real model, search, Tabelog, Google and Nominatim, all of which change over time; set `GOOGLE_MAPS_API_KEY` to include route checks. Keep live results in the ignored `benchmarks/runs/` directory, not in the repository.
 

@@ -139,16 +139,18 @@ test('the external Add Agent uses its Bearer token and cannot assert Owner field
       }),
       agentEnv,
     );
+  // The wire names are the 0.1 ones; the harness's short names are not part of the API.
   const discover = {
-    operation: 'discover',
+    operation: 'catalog.intake.discover',
     input: { query: '合成食堂', requestToken: 'agent-0001' },
   };
   assert.equal((await send(`Bearer ${'b'.repeat(40)}`, discover)).status, 401);
+  assert.equal((await send(`Bearer ${token}`, { ...discover, operation: 'discover' })).status, 400);
   const accepted = await send(`Bearer ${token}`, discover);
   assert.equal(accepted.status, 200);
   assert.match(accepted.headers.get('x-atlas-agent-conversation-id') ?? '', /^[a-f0-9]{32}$/u);
   const ownerFields = await send(`Bearer ${token}`, {
-    operation: 'select',
+    operation: 'catalog.intake.select',
     input: { sessionId: 's', expectedSessionVersion: 1, ordinal: 1, ownerFields: {} },
   });
   assert.equal(ownerFields.status, 400);

@@ -55,7 +55,7 @@ Deleting a restaurant removes its visits, media objects, assessment and referenc
 2. **Select** (`select {sessionId, expectedSessionVersion, ordinal, requestResearch}`): the chosen place is geocoded with Nominatim and the research agent gathers the Tabelog score, reservation rule, hours, categories, dishes and official links. Research runs once per session, on the first selection. Every fact needs a source URL and quote from the same branch, or it stays unknown. The Owner can edit fields and select again with the current session version to refresh the preview; Owner edits are sent as explicit assertions.
 3. **Confirm** (`confirm {sessionId, expectedPreviewVersion}`): the place identity and geocoded coordinates are checked again and the researched Tabelog and booking pages are re-read (once per preview version). A changed preview is returned for review instead of being saved; a place without a name, address and coordinates is never saved; otherwise the restaurant is published once (a retry returns the same receipt), with the staged Google rating as a dated reference.
 
-The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake` with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN` (never with a cookie) and may not assert Owner-only fields.
+The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake` with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN` (never with a cookie). `operation` is one of the 0.1 names `catalog.intake.discover`, `catalog.intake.select`, `catalog.intake.confirm` or `catalog.intake.cancel`, and the agent may not assert Owner-only fields.
 
 ## Recommend
 

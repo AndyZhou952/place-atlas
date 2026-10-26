@@ -75,9 +75,12 @@ function environment(db: D1Database, routes?: RouteSidecarServiceBinding): Env {
 async function runAdd(testCase: {
   name: string;
   query: string;
+  area?: string;
   expect: Record<string, string | boolean>;
 }) {
-  const { name, query, expect } = testCase;
+  const { name, expect } = testCase;
+  // The same request the Add panel sends: the name plus the optional area or branch.
+  const query = [testCase.query, testCase.area].filter(Boolean).join(' ');
   const started = Date.now();
   const harness = createAddHarness(environment(migratedD1().db));
   const scope = { ownerId: 'owner', channel: 'web', conversationId: 'b'.repeat(32) };
@@ -308,4 +311,5 @@ if (jsonPath) {
     ),
   );
 }
-if (!live && results.some((r) => !r.pass)) process.exitCode = 1;
+// Any failed check fails the run, offline or live.
+if (results.some((r) => !r.pass)) process.exitCode = 1;

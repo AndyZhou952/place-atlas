@@ -15,6 +15,13 @@ import {
 export const WEB_CONVERSATION_HEADER = 'x-atlas-web-conversation-id';
 export const AGENT_CONVERSATION_HEADER = 'x-atlas-agent-conversation-id';
 const OPERATIONS = new Set<CatalogIntakeOperation>(['discover', 'select', 'confirm', 'cancel']);
+/** The external Add Agent's operation names on the wire (unchanged from 0.1). */
+const AGENT_OPERATIONS: Readonly<Record<string, CatalogIntakeOperation>> = {
+  'catalog.intake.discover': 'discover',
+  'catalog.intake.select': 'select',
+  'catalog.intake.confirm': 'confirm',
+  'catalog.intake.cancel': 'cancel',
+};
 const MAX_BODY_BYTES = 64 * 1024;
 
 const STATUS: Readonly<Record<AddErrorCode, number>> = {
@@ -122,25 +129,21 @@ export async function ownerAddResponse(
 export async function agentAddResponse(request: Request, env: Env): Promise<Response> {
   const conversationId = await addAgentConversationId(request, env);
   const body = await readBody(request);
-  const { operation, input } = body;
+  const { input } = body;
+  const operation =
+    typeof body.operation === 'string' && Object.hasOwn(AGENT_OPERATIONS, body.operation)
+      ? AGENT_OPERATIONS[body.operation]
+      : undefined;
   if (
     Object.keys(body).some((key) => key !== 'input' && key !== 'operation') ||
-    typeof operation !== 'string' ||
-    !OPERATIONS.has(operation as CatalogIntakeOperation) ||
+    !operation ||
     (operation === 'select' &&
       input &&
       typeof input === 'object' &&
       ['ownerFields', 'tabelog', 'reservation'].some((key) => Object.hasOwn(input, key)))
   )
     throw new HttpError(400, 'The Add Agent request body is invalid.');
-  return run(
-    env,
-    request,
-    operation as CatalogIntakeOperation,
-    input,
-    'external_agent',
-    conversationId,
-  );
+  return run(env, request, operation, input, 'external_agent', conversationId);
 }
 
 export const AGENT_CAPABILITIES = {
@@ -155,9 +158,9 @@ export const AGENT_CAPABILITIES = {
       'Send {operation,input} with the dedicated Add Agent token. Echo the conversation header from discover on select, confirm and cancel. Confirm only after reviewing the current preview and version.',
   },
   operations: [
-    { operation: 'discover', input: { query: 'string', requestToken: 'string' } },
+    { operation: 'catalog.intake.discover', input: { query: 'string', requestToken: 'string' } },
     {
-      operation: 'select',
+      operation: 'catalog.intake.select',
       input: {
         sessionId: 'string',
         expectedSessionVersion: 'number',
@@ -165,7 +168,13 @@ export const AGENT_CAPABILITIES = {
         requestResearch: 'boolean?',
       },
     },
-    { operation: 'confirm', input: { sessionId: 'string', expectedPreviewVersion: 'number' } },
-    { operation: 'cancel', input: { sessionId: 'string', expectedSessionVersion: 'number' } },
+    {
+      operation: 'catalog.intake.confirm',
+      input: { sessionId: 'string', expectedPreviewVersion: 'number' },
+    },
+    {
+      operation: 'catalog.intake.cancel',
+      input: { sessionId: 'string', expectedSessionVersion: 'number' },
+    },
   ],
 } as const;

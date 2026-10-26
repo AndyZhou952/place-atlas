@@ -14,7 +14,7 @@ RESTAURANT_SOURCE_READER=firecrawl FIRECRAWL_API_KEY=… npm run benchmark -- --
 npm run benchmark -- --live --json ../../benchmarks/runs/2026-10-25.json
 ```
 
-Each line of the report is one check: `PASS|FAIL|GAP  suite  case  check  observed value`, followed by a pass count per suite. `GAP` marks a documented limitation (the case's `knownGap`); it is reported but does not fail the run.
+Each line of the report is one check: `PASS|FAIL  suite  case  check  observed value`, followed by a pass count per suite.
 
 Offline, each Recommend case's `interpretation` stands in for the model and `places` stands in for geocoding, so the run checks the deterministic rules that turn an interpretation into recommendations. Live mode measures the real model, search, Tabelog, Google and Nominatim, all of which change over time; set `GOOGLE_MAPS_API_KEY` to include route checks. Keep live results in the ignored `benchmarks/runs/` directory, not in the repository.
 

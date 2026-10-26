@@ -1,3 +1,4 @@
+import { foodKey } from './food.ts';
 import { normalizeSearchText } from './search-policy.ts';
 
 export interface RecommendOriginOption {
@@ -19,15 +20,6 @@ export interface RecommendIntent {
   readonly reason?: string;
 }
 
-const foodAliases: Readonly<Record<string, readonly string[]>> = {
-  ramen: ['ramen', 'ラーメン', 'らーめん', '拉面', '拉麵'],
-  sushi: ['sushi', '寿司', '壽司', 'すし'],
-  curry: ['curry', 'カレー', '咖喱', '咖哩'],
-  yakitori: ['yakitori', '焼き鳥', '焼鳥', 'やきとり', '烧鸟'],
-  beef_tongue: ['beef_tongue', 'beef tongue', '牛タン', '牛たん', '牛舌'],
-  coffee: ['coffee', 'コーヒー', '咖啡', 'cafe', 'café', 'カフェ', '喫茶店'],
-};
-
 function normalized(value: string): string {
   return normalizeSearchText(value.replace(/\bstation\b/giu, '駅'))
     .replaceAll('银', '銀')
@@ -36,22 +28,19 @@ function normalized(value: string): string {
     .replace(/[丁目番地]/gu, '');
 }
 
-export function normalizeRecommendFoodTerm(term: string): string | undefined {
-  const value = normalized(term);
-  return Object.entries(foodAliases).find(([, aliases]) =>
-    aliases.some((alias) => normalized(alias) === value),
-  )?.[0];
-}
-
 function foodList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [
     ...new Set(
-      value.flatMap((term) =>
-        typeof term === 'string' ? [normalizeRecommendFoodTerm(term)].filter(Boolean) : [],
-      ),
+      value
+        .filter(
+          (term): term is string =>
+            typeof term === 'string' && term.trim().length > 0 && term.length <= 60,
+        )
+        .slice(0, 6)
+        .map(foodKey),
     ),
-  ] as string[];
+  ];
 }
 
 function queryText(messages: readonly string[]): string {

@@ -1,5 +1,6 @@
 import type { AtlasItem } from '../add/stored-item.ts';
 import type { CatalogRead } from '../add/stored-item.ts';
+import { itemFoodKeys } from './food.ts';
 import { distanceInKm } from './geo-distance.ts';
 import type { LocationResolver, RouteProvider, TransitRouteProvider } from './route-ports.ts';
 import {
@@ -14,11 +15,7 @@ import {
   type RecommendDecisionOrigin,
   type RecommendRouteObservation,
 } from './decision.ts';
-import {
-  normalizeRecommendFoodTerm,
-  normalizeRecommendIntent,
-  type RecommendOriginOption,
-} from './intent.ts';
+import { normalizeRecommendIntent, type RecommendOriginOption } from './intent.ts';
 import { normalizeSearchText } from './search-policy.ts';
 import { materializeRecommendReceipt, type RecommendRouteSource } from './receipt.ts';
 
@@ -436,15 +433,7 @@ export function createRecommendConversationService(
         title: item.title,
         area: origin.state === 'area' ? origin.id : item.area,
         address: item.address,
-        tags: [
-          ...new Set(
-            item.tags.flatMap((tag) =>
-              [tag, normalizeRecommendFoodTerm(tag)].filter((value): value is string =>
-                Boolean(value),
-              ),
-            ),
-          ),
-        ],
+        tags: itemFoodKeys([...item.tags, ...(item.classification?.basis.cuisineLabels ?? [])]),
         visited: item.hasVisited === true,
         walkIn: walkInStatus(item),
       }));

@@ -2,6 +2,7 @@
 // candidates come from the saved catalog, so an invented restaurant can never be recommended.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { foodKey, itemFoodKeys } from '../src/server/agent/recommend/food.ts';
 import type { Env } from '../src/server/env.ts';
 import { handleApi } from '../src/server/worker.ts';
 import { migratedD1, stubFetch } from './fixtures.ts';
@@ -97,4 +98,13 @@ test('a timed route without a starting point asks for one instead of guessing', 
     '歩いて10分以内のラーメン',
   );
   assert.equal(body.status, 'clarify');
+});
+
+test('cuisines beyond the six dish terms match saved labels; unknown cuisines match nothing', () => {
+  assert.equal(foodKey('カレー'), 'curry');
+  assert.equal(foodKey('French'), 'french');
+  assert.equal(foodKey('pizza'), 'italian.pizza');
+  assert.ok(itemFoodKeys(['フレンチビストロ']).includes('french'));
+  assert.ok(itemFoodKeys(['ピザ']).includes('italian.pizza'));
+  assert.ok(!itemFoodKeys(['ラーメン', '居酒屋']).includes(foodKey('Vietnamese')));
 });

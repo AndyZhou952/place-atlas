@@ -40,7 +40,7 @@ Dependencies point one way: `views → viewmodels → api → (HTTP) → worker 
 | Quotas | `discovery/provider-usage.ts`, `discovery/bounded-json-http.ts` | Monthly per-SKU request and cost caps in D1; bounded provider responses |
 | Research agent | `research/place-research.ts`, `research/research-instructions.ts` | Tool-calling loop (at most two `search_web` calls, three model turns, 35 s) that returns sourced facts with exact quotes; the coordinator rejects unsupported claims |
 | Research readers | `research/tabelog-listing.ts`, `research/web-search.ts`, `research/firecrawl-source-reader.ts`, `research/tabelog-source-fallback.ts`, `research/browser-source-reader.ts`, `research/official-site-reader.ts`, `research/tablecheck-booking.ts`, `research/toreta-booking.ts`, `research/reservation-timing.ts` | Tabelog listing parsing, search, official site and booking-page readers, booking-window extraction |
-| Recommend | `recommend/compose.ts`, `recommend/conversation-service.ts`, `recommend/interpreter.ts`, `recommend/intent.ts`, `recommend/decision.ts`, `recommend/receipt.ts`, `recommend/search-policy.ts`, `recommend/geo-distance.ts` | The model only interprets the request; deterministic rules normalize it, choose candidates from the saved catalog and write the reasons |
+| Recommend | `recommend/compose.ts`, `recommend/conversation-service.ts`, `recommend/interpreter.ts`, `recommend/intent.ts`, `recommend/food.ts`, `recommend/decision.ts`, `recommend/receipt.ts`, `recommend/search-policy.ts`, `recommend/geo-distance.ts` | The model only interprets the request; deterministic rules normalize it, choose candidates from the saved catalog and write the reasons |
 | Routes | `recommend/route-sidecar-client.ts`, `recommend/route-sidecar-adapter.ts`, `recommend/route-ports.ts`, `route-sidecar/*` | Metered calls to the route sidecar for geocoding, walking and transit evidence |
 
 ## Data
@@ -59,7 +59,7 @@ The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake`
 
 ## Recommend
 
-`POST /api/recommend {query, replies}`. The model receives the request, earlier answers and the saved areas and place names, and returns a structured interpretation (food terms, origin, travel mode, visited preference). Code normalizes it against the request text, so the model cannot invent origins, restaurants or routes. Candidates come only from saved restaurants. A station or address is geocoded by the route sidecar; distances are straight-line unless the sidecar returned walking or transit evidence, which is shown with its source and time. Unclear starting points and timed routes without a start produce a clarifying question.
+`POST /api/recommend {query, replies}`. The model receives the request, earlier answers and the saved areas and place names, and returns a structured interpretation (food terms, origin, travel mode, visited preference). Code normalizes it against the request text, so the model cannot invent origins, restaurants or routes. Food terms and each saved restaurant's labels reduce to the same keys (`recommend/food.ts`: six dish terms, the cuisine taxonomy and national cuisines such as French), so a cuisine with no saved match returns no results. Candidates come only from saved restaurants. A station or address is geocoded by the route sidecar; distances are straight-line unless the sidecar returned walking or transit evidence, which is shown with its source and time. Unclear starting points and timed routes without a start produce a clarifying question.
 
 ## Security
 

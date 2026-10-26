@@ -30,8 +30,6 @@ interface Check {
   readonly check: string;
   readonly pass: boolean;
   readonly detail: string;
-  /** A documented limitation: reported, but not a regression. */
-  readonly knownGap?: string;
 }
 
 const cases = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8'));
@@ -44,9 +42,8 @@ if (live && !(vars.AGENT_API_KEY && vars.AGENT_BASE_URL && vars.AGENT_MODEL))
   throw new Error('Live mode needs AGENT_API_KEY, AGENT_BASE_URL and AGENT_MODEL.');
 
 const results: Check[] = [];
-let knownGap: string | undefined;
 const record = (suite: string, name: string, check: string, pass: boolean, detail = '') =>
-  results.push({ suite, name, check, pass, detail, ...(knownGap ? { knownGap } : {}) });
+  results.push({ suite, name, check, pass, detail });
 // Provider diagnostics go to the Worker log in production; keep the report readable here.
 console.info = () => undefined;
 
@@ -235,10 +232,8 @@ async function runRecommend(testCase: {
   request: string;
   interpretation: unknown;
   expect: { status?: string; first?: string; includes?: string[]; excludes?: string[] };
-  knownGap?: string;
 }) {
   const { name, request, interpretation, expect } = testCase;
-  knownGap = testCase.knownGap;
   const { db, sqlite } = migratedD1();
   seedCatalog(sqlite);
   const routes =
@@ -297,15 +292,13 @@ console.log(
 );
 for (const r of results)
   console.log(
-    `${r.pass ? 'PASS' : r.knownGap ? 'GAP ' : 'FAIL'}  ${r.suite.padEnd(9)} ${r.name.padEnd(width('name'))} ${r.check.padEnd(width('check'))} ${r.detail}`,
+    `${r.pass ? 'PASS' : 'FAIL'}  ${r.suite.padEnd(9)} ${r.name.padEnd(width('name'))} ${r.check.padEnd(width('check'))} ${r.detail}`,
   );
 for (const suite of ['Add', 'Recommend']) {
   const own = results.filter((r) => r.suite === suite);
   if (own.length)
     console.log(`\n${suite}: ${own.filter((r) => r.pass).length}/${own.length} checks passed`);
 }
-for (const gap of new Set(results.filter((r) => !r.pass && r.knownGap).map((r) => r.knownGap)))
-  console.log(`Known gap: ${gap}`);
 if (jsonPath) {
   mkdirSync(dirname(jsonPath), { recursive: true });
   writeFileSync(
@@ -317,4 +310,4 @@ if (jsonPath) {
     ),
   );
 }
-if (!live && results.some((r) => !r.pass && !r.knownGap)) process.exitCode = 1;
+if (!live && results.some((r) => !r.pass)) process.exitCode = 1;

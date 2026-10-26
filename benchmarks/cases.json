@@ -99,6 +99,16 @@
         "longitude": 135.7653,
         "tags": ["喫茶店"],
         "visited": false
+      },
+      {
+        "id": "r7",
+        "title": "ビストロ あお",
+        "area": "銀座",
+        "address": "東京都中央区銀座5-1-1",
+        "latitude": 35.6705,
+        "longitude": 139.7635,
+        "tags": ["フレンチ", "ビストロ"],
+        "visited": false
       }
     ],
     "cases": [
@@ -119,7 +129,7 @@
         "expect": {
           "status": "recommend",
           "first": "r1",
-          "excludes": ["r3", "r4", "r6"]
+          "excludes": ["r3", "r4", "r6", "r7"]
         }
       },
       {
@@ -181,6 +191,26 @@
         }
       },
       {
+        "name": "Cuisine outside the dish list",
+        "request": "銀座でフレンチ",
+        "interpretation": {
+          "action": "recommend",
+          "originId": "area:銀座",
+          "originText": null,
+          "originKind": null,
+          "foodTerms": ["French"],
+          "excludedFoodTerms": [],
+          "travelMode": "none",
+          "maxMinutes": null,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "recommend",
+          "first": "r7",
+          "excludes": ["r3"]
+        }
+      },
+      {
         "name": "Timed walk needs a start",
         "request": "歩いて10分以内のラーメン",
         "interpretation": {
@@ -200,23 +230,21 @@
       },
       {
         "name": "Nothing fits",
-        "request": "フレンチのフルコース",
+        "request": "ベトナム料理が食べたい",
         "interpretation": {
-          "action": "unsupported",
+          "action": "recommend",
           "originId": null,
           "originText": null,
           "originKind": null,
-          "foodTerms": [],
+          "foodTerms": ["Vietnamese"],
           "excludedFoodTerms": [],
           "travelMode": "none",
           "maxMinutes": null,
-          "visited": "prefer_unvisited",
-          "reason": "French is not a saved cuisine."
+          "visited": "prefer_unvisited"
         },
         "expect": {
-          "excludes": ["r1", "r2", "r3", "r4", "r5", "r6"]
-        },
-        "knownGap": "Only ramen, sushi, curry, yakitori, beef tongue and coffee are recognized food terms; other cuisines match everything."
+          "status": "no_results"
+        }
       }
     ],
     "places": {

@@ -16,12 +16,13 @@ import {
 } from '../discovery/nominatim.ts';
 import { D1ProviderUsage } from '../discovery/quota.ts';
 import { createTabelogPlaceDiscoveryPort } from '../discovery/tabelog-search.ts';
-import { createRestaurantSourceReader } from '../research/browser-source-reader.ts';
-import { createFirecrawlRestaurantReader } from '../research/firecrawl-source-reader.ts';
-import { createConfiguredPlaceResearchAgent } from '../research/place-research.ts';
-import { recordCatalogResearchDiagnostic } from '../research/research-diagnostic.ts';
+import {
+  createFirecrawlRestaurantReader,
+  createRestaurantSourceReader,
+  withSameListingFallback,
+} from '../research/page-reader.ts';
+import { createConfiguredPlaceResearchAgent } from '../research/agent.ts';
 import { readTabelogListingResult } from '../research/tabelog-listing.ts';
-import { withSameListingFallback } from '../research/tabelog-source-fallback.ts';
 import { createCatalogIntakeModule, type CatalogIntakeModule } from './coordinator.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-publisher.ts';
 import { D1CatalogIntakeState } from './d1-session-state.ts';
@@ -45,7 +46,6 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
       ? withSameListingFallback(
           createFirecrawlRestaurantReader({ apiKey: env.FIRECRAWL_API_KEY, fetch: options.fetch }),
           (url, signal) => readTabelogListingResult(url, options.fetch ?? fetch, signal),
-          recordCatalogResearchDiagnostic,
         )
       : env.BROWSER
         ? createRestaurantSourceReader(env.BROWSER, options.fetch)
@@ -80,7 +80,6 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
     ...(env.SEARCH_API_KEY ? { searchApiKey: env.SEARCH_API_KEY } : {}),
     ...(sourceReader ? { sourceReader } : {}),
     ...fetcher,
-    onDiagnostic: recordCatalogResearchDiagnostic,
   };
   // Model settings are resolved per research call so Owner-saved credentials apply immediately.
   const canResolveSettings = Boolean(env.AGENT_SETTINGS_SECRET ?? env.ATLAS_OWNER_SESSION_SECRET);

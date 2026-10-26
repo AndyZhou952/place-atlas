@@ -1,4 +1,4 @@
-import { isTabelogRestaurantListing } from './research-instructions.ts';
+import { isTabelogRestaurantListing } from './instructions.ts';
 import { readBoundedText, type SearchEvidence } from './web-search.ts';
 
 export interface TabelogEvidence extends SearchEvidence {

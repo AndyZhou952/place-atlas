@@ -1,4 +1,4 @@
-import type { BrowserContentBinding } from './agent/research/browser-source-reader.ts';
+import type { BrowserContentBinding } from './agent/research/page-reader.ts';
 import type { RouteSidecarServiceBinding } from './agent/recommend/route-sidecar-client.ts';
 
 export interface Env {

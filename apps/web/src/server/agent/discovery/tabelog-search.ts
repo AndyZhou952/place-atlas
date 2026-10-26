@@ -1,7 +1,7 @@
 import { createWebSearch } from '../research/web-search.ts';
-import { isTabelogRestaurantListing } from '../research/research-instructions.ts';
+import { isTabelogRestaurantListing } from '../research/instructions.ts';
 import { readTabelogListing } from '../research/tabelog-listing.ts';
-import type { RestaurantSourceReader } from '../research/browser-source-reader.ts';
+import type { RestaurantSourceReader } from '../research/page-reader.ts';
 import type {
   GooglePlaceDiscoveryCandidate,
   GooglePlaceDiscoveryPort,

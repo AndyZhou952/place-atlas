@@ -1,6 +1,7 @@
 // Is this page about the selected branch? Chains share names, and Google, Tabelog and official
 // sites format the same Japanese address differently, so identity rests on the name plus street
 // numbers, postal code and ward, never on a name alone.
+import { prefectureOf } from '../../../shared/cuisine.ts';
 import { isTabelogRestaurantListing } from './instructions.ts';
 import type { SearchEvidence } from './web-search.ts';
 
@@ -318,8 +319,10 @@ function streetNumbers(value: string): string[] {
  * hyphenated block), and Google and Tabelog can file it under neighbouring postcodes. Such a
  * listing is the selected branch only when every independent anchor agrees: the listing's exact
  * name is the provider name or a whole word the Owner typed, the single lot is the same, the
- * Japanese municipality is the same, the postcodes share their area prefix and no floor differs.
- * Anything less stays unknown.
+ * postcodes share their area prefix, no floor differs, and the municipality is the same. A
+ * romanized provider address cannot be read against Japanese municipality names, so there the
+ * prefecture, both postcodes (same area) and any mapped ward stand in for it. Anything less stays
+ * unknown.
  */
 function matchesSingleLotBranch(
   name: string,
@@ -377,7 +380,17 @@ function matchesSingleLotBranch(
     ).map(key);
   const selected = municipalities(address);
   const source = key(sourceAddress);
-  return selected.length > 0 && selected.every((part) => source.includes(part));
+  if (selected.length) return selected.every((part) => source.includes(part));
+  const latin = address.normalize('NFKD').replace(/\p{M}/gu, '');
+  const prefecture = prefectureOf(latin);
+  const ward = latin.toLowerCase().match(/\b([a-z]+)[\s-](?:city|ward|ku)\b/u)?.[1];
+  return Boolean(
+    selectedPostalCode &&
+    sourceCode &&
+    prefecture &&
+    prefecture === prefectureOf(sourceAddress) &&
+    (!ward || !japaneseLocalities[ward] || sourceAddress.includes(japaneseLocalities[ward])),
+  );
 }
 
 export function matchesSelectedBranch(

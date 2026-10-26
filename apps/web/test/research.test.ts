@@ -81,7 +81,75 @@ test('a short-name single-lot branch matches only when name, lot, municipality a
   );
 });
 
+// The provider's address can be fully romanized while the listing and the Owner's name are Japanese.
+const romanized = '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan';
+const fromRomanized = (
+  overrides: Partial<{ name: string; address: string; postal: string; selected: string }> = {},
+) => {
+  const {
+    name = '合成',
+    address = '京都府京都市東山区合成町367',
+    postal = '6050002',
+    selected = romanized,
+  } = overrides;
+  return matchesSelectedBranch(
+    `${name} ${address}`,
+    'Gosei',
+    selected,
+    '合成',
+    address,
+    postal,
+    name,
+  );
+};
+
+test('a romanized provider address matches only with the same name, lot, prefecture and postal area', () => {
+  assert.equal(fromRomanized(), true);
+  assert.equal(fromRomanized({ name: '合成食堂' }), false, 'another business at the same lot');
+  assert.equal(fromRomanized({ address: '京都府京都市東山区合成町368' }), false, 'another lot');
+  assert.equal(
+    fromRomanized({ address: '大阪府大阪市北区合成町367', postal: '5300001' }),
+    false,
+    'another municipality',
+  );
+  assert.equal(fromRomanized({ postal: '6000001' }), false, 'postcodes in different areas');
+  assert.equal(
+    fromRomanized({ selected: '367 Goseicho, Higashiyama Ward, Kyoto, Japan' }),
+    false,
+    'no provider postcode to corroborate the area',
+  );
+  assert.equal(
+    fromRomanized({
+      selected: '367 Goseicho 2F, Higashiyama Ward, Kyoto, 605-0001, Japan',
+      address: '京都府京都市東山区合成町367 1F',
+    }),
+    false,
+    'another floor',
+  );
+  // A mapped Tokyo ward must agree, not only the postal area.
+  assert.equal(
+    fromRomanized({
+      selected: '367 Goseicho, Shibuya City, Tokyo 150-0001, Japan',
+      address: '東京都新宿区合成町367',
+      postal: '1500002',
+    }),
+    false,
+    'another ward',
+  );
+});
+
 test('reservation meaning: takeaway exceptions do not decide the dine-in rule', () => {
+  assert.equal(
+    explicitReservationMode('予約不可 ※テイクアウトの「合成弁当」のみ電話予約可。朝8時より。'),
+    'not_reservable',
+  );
+  for (const refusal of [
+    'not reservable',
+    'No reservations accepted',
+    'Reservations are not accepted',
+  ])
+    assert.equal(explicitReservationMode(refusal), 'not_reservable', refusal);
+  assert.equal(explicitReservationMode('Reservations accepted'), 'reservable');
   assert.equal(explicitReservationMode('予約不可 ※テイクアウトのみ電話予約可'), 'not_reservable');
   assert.equal(explicitReservationMode('完全予約制'), 'reservation_required');
   assert.equal(explicitReservationMode('予約可否 予約可'), 'reservable');
@@ -117,16 +185,15 @@ const subject = {
   transientName: '合成食堂 中目黒',
   transientAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3 合成ビル 2F',
 };
-const listingContent =
-  '合成食堂 中目黒 東京都目黒区中目黒1-2-3 合成ビル 2F 予約可否 予約不可 ※テイクアウトのみ電話予約可';
-const reader = async (url: string) =>
+const takeawayOnly = '予約不可 ※テイクアウトのみ電話予約可';
+const reader = (policy: string) => async (url: string) =>
   url === LISTING
     ? {
         kind: 'read' as const,
         evidence: {
           url: LISTING,
           title: '合成食堂 中目黒 - 食べログ',
-          content: listingContent,
+          content: `合成食堂 中目黒 東京都目黒区中目黒1-2-3 合成ビル 2F 予約可否 ${policy}`,
           restaurant: {
             name: '合成食堂 中目黒',
             address: '東京都目黒区中目黒1-2-3 合成ビル 2F',
@@ -134,7 +201,7 @@ const reader = async (url: string) =>
             area: '中目黒',
             score: 3.51,
             categories: ['定食'],
-            reservation: '予約不可 ※テイクアウトのみ電話予約可',
+            reservation: policy,
           },
         },
       }
@@ -148,6 +215,7 @@ const listingRow = `<li><a href="${LISTING}">合成食堂 中目黒 - 食べロ�
 function agentRun(options: {
   readonly search: (query: string) => Response;
   readonly answer: unknown;
+  readonly policy?: string;
 }) {
   const queries: string[] = [];
   let modelCalls = 0;
@@ -155,7 +223,7 @@ function agentRun(options: {
     apiKey: 'test-key',
     baseUrl: 'https://model.test/v1',
     model: 'test-model',
-    sourceReader: reader,
+    sourceReader: reader(options.policy ?? takeawayOnly),
     fetch: stubFetch({
       'https://search.yahoo.co.jp/search': (request) => {
         const query = new URL(request.url).searchParams.get('p') ?? '';
@@ -251,4 +319,31 @@ test('refused searches are reported as a search failure, not as a missing restau
   assert.match(message, /web search service refused/u);
   assert.doesNotMatch(message, /Tabelog refused|no rating/u);
   assert.match(researchIssueMessage('no_listing', false), /no Tabelog listing that matches/u);
+});
+
+test('a sourced refusal with a quoted takeaway item stays known as not reservable', async () => {
+  const policy = '予約不可 ※テイクアウトの「合成弁当」のみ電話予約可。朝8時より。';
+  const research = agentRun({
+    search: () => yahoo(listingRow),
+    policy,
+    answer: {
+      subjectMatch: 'matched',
+      tabelog: { status: 'unknown' },
+      reservation: { status: 'known', mode: 'not_reservable', label: '予約不可', url: LISTING },
+      evidence: {
+        reservation: {
+          url: LISTING,
+          quote: policy,
+          identityQuote: '合成食堂 中目黒 東京都目黒区中目黒1-2-3',
+        },
+      },
+    },
+  });
+  const result = await research.run();
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(
+    result.value.reservation.status === 'known' && result.value.reservation.mode,
+    'not_reservable',
+  );
 });

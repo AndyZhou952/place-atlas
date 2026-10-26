@@ -54,8 +54,6 @@ export interface GooglePlaceDiscoveryPort {
 
 export interface DurableGeocoderPort {
   propose(input: {
-    readonly trigger: 'owner_intake_select' | 'owner_intake_confirm';
-    readonly dataClassification: 'public_place_query';
     readonly ownerQuery: string;
     readonly ownerDraft: CatalogIntakeOwnerFields;
     readonly selectedSubject: CatalogIntakeSelectedSubject;
@@ -491,8 +489,6 @@ export function createCatalogIntakeModule(options: {
         let geocoderUnavailable = !options.durableGeocoderPort;
         if (!ownerFields.coordinates && options.durableGeocoderPort) {
           const proposed = await options.durableGeocoderPort.propose({
-            trigger: 'owner_intake_select',
-            dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
             ownerDraft: locationOwnerFields(ownerFields),
             selectedSubject,
@@ -935,8 +931,6 @@ export function createCatalogIntakeModule(options: {
             session.preview.locationEvidence.provenance === 'durable_geocoder_observed')
         ) {
           const geocoderRefresh = await options.durableGeocoderPort.propose({
-            trigger: 'owner_intake_confirm',
-            dataClassification: 'public_place_query',
             ownerQuery: session.ownerQuery,
             ownerDraft: locationOwnerFields(session.preview.ownerFields),
             selectedSubject: {

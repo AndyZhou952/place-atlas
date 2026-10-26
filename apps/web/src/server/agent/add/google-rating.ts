@@ -3,8 +3,8 @@
 import type { GoogleRating } from '../../../shared/types.ts';
 import type { Env } from '../../env.ts';
 import { googleKey } from '../../env.ts';
-import { createGooglePlaceRatingClient } from '../discovery/google-places-client.ts';
-import { D1ProviderUsage } from '../discovery/provider-usage.ts';
+import { createGooglePlaceRatingClient } from '../discovery/google-places.ts';
+import { D1ProviderUsage } from '../discovery/quota.ts';
 import type { CatalogIntakePreviewSession } from './coordinator.ts';
 import { D1CatalogIntakeState } from './d1-session-state.ts';
 

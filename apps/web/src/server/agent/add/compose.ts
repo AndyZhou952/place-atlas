@@ -4,16 +4,18 @@
 import type { Env } from '../../env.ts';
 import { listCatalogItems } from '../../db.ts';
 import { completeSettings, resolveAgentSettings } from '../../settings.ts';
-import { createGooglePlaceDiscoveryAdapter } from '../discovery/google-place-discovery.ts';
 import {
-  createGooglePlaceRatingClient,
+  createGooglePlaceDiscoveryAdapter,
   createGooglePlacesNewClient,
-} from '../discovery/google-places-client.ts';
-import { createNominatimDurableGeocoderAdapter } from '../discovery/nominatim-geocoder.ts';
-import { D1NominatimPolicyState } from '../discovery/nominatim-policy-state.ts';
-import { createNominatimFixedEndpointTransport } from '../discovery/nominatim-transport.ts';
-import { D1ProviderUsage } from '../discovery/provider-usage.ts';
-import { createTabelogPlaceDiscoveryPort } from '../discovery/tabelog-place-discovery.ts';
+} from '../discovery/google-places.ts';
+import {
+  createNominatimDurableGeocoderAdapter,
+  createNominatimFixedEndpointTransport,
+  D1NominatimPolicyState,
+  nominatimIdentity,
+} from '../discovery/nominatim.ts';
+import { D1ProviderUsage } from '../discovery/quota.ts';
+import { createTabelogPlaceDiscoveryPort } from '../discovery/tabelog-search.ts';
 import { createRestaurantSourceReader } from '../research/browser-source-reader.ts';
 import { createFirecrawlRestaurantReader } from '../research/firecrawl-source-reader.ts';
 import { createConfiguredPlaceResearchAgent } from '../research/place-research.ts';
@@ -23,36 +25,6 @@ import { withSameListingFallback } from '../research/tabelog-source-fallback.ts'
 import { createCatalogIntakeModule, type CatalogIntakeModule } from './coordinator.ts';
 import { D1AtlasCatalogIntakePublisher } from './d1-publisher.ts';
 import { D1CatalogIntakeState } from './d1-session-state.ts';
-
-const NOMINATIM = {
-  endpoint: 'https://nominatim.openstreetmap.org/search',
-  identifyingUserAgent: 'JapanAtlas/0.1.0 (+https://github.com/AndyZhou952/place-atlas)',
-  referer: 'https://github.com/AndyZhou952/place-atlas',
-} as const;
-
-/** Nominatim asks for an identifying contact; a clean https origin of this deployment is used. */
-export function nominatimIdentity(publicUrl?: string) {
-  try {
-    const url = new URL(publicUrl ?? '');
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      url.port ||
-      url.pathname !== '/'
-    )
-      return NOMINATIM;
-    return {
-      endpoint: NOMINATIM.endpoint,
-      identifyingUserAgent: `JapanAtlas/0.1.0 (+${url.origin}/terms)`,
-      referer: `${url.origin}/`,
-    };
-  } catch {
-    return NOMINATIM;
-  }
-}
 
 export interface AddOptions {
   readonly fetch?: typeof fetch;
@@ -104,26 +76,11 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
         })
       : undefined;
 
-  const googleDetails = googleKey
-    ? createGooglePlaceRatingClient({ apiKey: googleKey, usage, ...fetcher })
-    : undefined;
   const researchOptions = {
     ...(env.SEARCH_API_KEY ? { searchApiKey: env.SEARCH_API_KEY } : {}),
     ...(sourceReader ? { sourceReader } : {}),
     ...fetcher,
     onDiagnostic: recordCatalogResearchDiagnostic,
-    ...(googleDetails
-      ? {
-          officialWebsiteForPlaceId: async (placeId: string) => {
-            const result = await googleDetails.getWebsiteUri(placeId);
-            return result.ok ? result.value : undefined;
-          },
-          operatingScheduleForPlaceId: async (placeId: string) => {
-            const result = await googleDetails.getOperatingSchedule(placeId);
-            return result.ok ? result.value : undefined;
-          },
-        }
-      : {}),
   };
   // Model settings are resolved per research call so Owner-saved credentials apply immediately.
   const canResolveSettings = Boolean(env.AGENT_SETTINGS_SECRET ?? env.ATLAS_OWNER_SESSION_SECRET);

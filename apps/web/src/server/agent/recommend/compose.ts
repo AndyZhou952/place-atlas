@@ -5,7 +5,7 @@ import { createOperationalNearbyDiagnosticRecorder } from '../../../../route-sid
 import type { Env } from '../../env.ts';
 import { listCatalogItems } from '../../db.ts';
 import { completeSettings, resolveAgentSettings } from '../../settings.ts';
-import { D1ProviderUsage } from '../discovery/provider-usage.ts';
+import { D1ProviderUsage } from '../discovery/quota.ts';
 import { createRecommendConversationService } from './conversation-service.ts';
 import { createRecommendInterpreter } from './interpreter.ts';
 import { createRouteSidecarNearbyAdapter } from './route-sidecar-adapter.ts';

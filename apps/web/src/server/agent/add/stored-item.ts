@@ -1,3 +1,14 @@
+import type {
+  CatalogIntakeSourcedValue,
+  CatalogIntakeEnrichedProfile,
+  CatalogIntakeAddressProposal,
+  CatalogIntakeLocationEvidence,
+  CatalogIntakeOwnerFields,
+  CatalogIntakeReservationSnapshot,
+  CatalogIntakeTabelogSnapshot,
+  CatalogIntakeTitleProposal,
+  CatalogIntakeWarning,
+} from './workflow.ts';
 export type AtlasItemKind = 'food' | 'event' | 'architecture';
 export type PersonalState = 'candidate' | 'saved' | 'planned' | 'visited';
 export type VerificationStatus = 'verified' | 'needs_review';
@@ -93,54 +104,6 @@ export interface AtlasItem {
   readonly updatedAt?: string;
 }
 
-export interface AtlasReviewCandidate {
-  readonly recordType: 'review_candidate';
-  readonly id: string;
-  readonly kind: 'food';
-  readonly title: string;
-  readonly area?: string;
-  readonly description: string;
-  readonly verificationStatus: 'needs_review';
-  readonly personalState: PersonalState;
-  readonly personalRating?: number;
-  readonly isFavorite?: boolean;
-  readonly hasVisited?: boolean;
-  readonly tags: readonly string[];
-  readonly classification?: RestaurantClassification;
-  readonly reviewEvidence: AtlasIntakeEvidence;
-  readonly updatedAt: string;
-}
-
-export type AtlasCatalogEntry = AtlasItem | AtlasReviewCandidate;
-
-export interface AtlasItemEdit {
-  readonly title: string;
-  readonly description: string;
-  readonly personalState: PersonalState;
-}
-
-export type CatalogProfile = 'verified_catalog' | 'full_merged_catalog';
-
-export interface NearbyAtlasItem {
-  readonly id: string;
-  readonly title: string;
-  readonly kind: AtlasItemKind;
-  readonly area: string;
-  readonly distanceKm: number;
-  readonly tabelogScore?: number;
-  readonly reservation: ReservationSnapshot;
-}
-import type {
-  CatalogIntakeSourcedValue,
-  CatalogIntakeEnrichedProfile,
-  CatalogIntakeAddressProposal,
-  CatalogIntakeLocationEvidence,
-  CatalogIntakeOwnerFields,
-  CatalogIntakeReservationSnapshot,
-  CatalogIntakeTabelogSnapshot,
-  CatalogIntakeTitleProposal,
-  CatalogIntakeWarning,
-} from './coordinator.ts';
 export interface RestaurantClassification {
   readonly cuisines: readonly { readonly familyId: string; readonly categoryId?: string }[];
   readonly geography: {

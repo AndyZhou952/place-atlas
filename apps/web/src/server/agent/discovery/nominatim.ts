@@ -1,8 +1,8 @@
 // OpenStreetMap Nominatim confirms coordinates for an Add preview. Its usage policy asks for an
 // identifying User-Agent, at most one request per second and caching, so requests share one D1
 // rate gate and a 30-day D1 cache.
-import type { DurableGeocoderPort, DurableGeocoderProposal } from '../add/coordinator.ts';
-import { validateDurableGeocoderProposal } from '../add/coordinator.ts';
+import type { DurableGeocoderPort, DurableGeocoderProposal } from '../add/workflow.ts';
+import { validateDurableGeocoderProposal } from '../add/workflow.ts';
 import { failure, type Result } from '../../../shared/result.ts';
 import { fetchBoundedJson } from './quota.ts';
 

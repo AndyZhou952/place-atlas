@@ -25,37 +25,6 @@ export interface CatalogIntakeAttribution {
   readonly url: string;
 }
 
-export interface CatalogIntakeDurableIdentity {
-  readonly providerNamespace: string;
-  readonly placeId: string;
-  readonly ordinal: number;
-}
-
-export interface CatalogIntakeTransientPresentation {
-  readonly name: string;
-  readonly address: string;
-  readonly attribution: CatalogIntakeAttribution;
-}
-
-export interface GooglePlaceDiscoveryCandidate {
-  readonly durableIdentity: CatalogIntakeDurableIdentity;
-  readonly transientPresentation: CatalogIntakeTransientPresentation;
-}
-
-export type DurableGeocoderProposal =
-  | {
-      readonly status: 'resolved';
-      readonly normalizedAddress: string;
-      readonly latitude: number;
-      readonly longitude: number;
-      readonly provider: string;
-      readonly sourceUrl: string;
-      readonly license: string;
-      readonly checkedAt: string;
-    }
-  | { readonly status: 'ambiguous' }
-  | { readonly status: 'no_match' };
-
 export interface CatalogIntakeSourcedValue<T> {
   readonly value: T;
   readonly sourceUrl: string;
@@ -82,70 +51,6 @@ export interface CatalogIntakeEnrichedProfile {
     readonly score: number;
     readonly reviewCount?: number;
   }>;
-}
-
-export type WebResearchOutcome =
-  | {
-      readonly kind: 'observed';
-      readonly sourceAccessIssue?: 'blocked' | 'unavailable';
-      readonly value: {
-        readonly tabelog: CatalogIntakeTabelogSnapshot;
-        readonly reservation: CatalogIntakeReservationSnapshot;
-        readonly profile?: CatalogIntakeEnrichedProfile;
-      };
-    }
-  | {
-      readonly kind: 'unavailable' | 'response_lost' | 'already_spent' | 'expired' | 'conflict';
-      readonly reason?: 'timed_out';
-    };
-
-type WebResearchInputBase = {
-  readonly scope: CatalogIntakeScope;
-  readonly sessionId: string;
-  readonly expectedSessionVersion: number;
-  readonly queryOrUrlsDigest: string;
-};
-
-export interface CatalogIntakeSelectedSubject {
-  readonly ownerQuery: string;
-  readonly providerNamespace: string;
-  readonly placeId: string;
-  readonly transientName: string;
-  readonly transientAddress: string;
-}
-
-export type WebResearchInput =
-  | (WebResearchInputBase & {
-      readonly phase: 'initial';
-      readonly selectedSubject: CatalogIntakeSelectedSubject;
-    })
-  | (WebResearchInputBase & {
-      readonly phase: 'initial';
-      /** Compatibility for already-issued query allowances. */
-      readonly normalizedOwnerQuery: string;
-    })
-  | (WebResearchInputBase & {
-      readonly phase: 'confirm';
-      readonly canonicalUrls: readonly string[];
-      readonly preview: CatalogIntakePreview;
-      readonly selectedSubject: CatalogIntakeSelectedSubject;
-    });
-
-export type CatalogIntakeResearchPhase = 'initial' | 'confirm';
-
-export interface CatalogIntakeResearchAllowance {
-  readonly sessionId: string;
-  readonly phase: CatalogIntakeResearchPhase;
-  readonly queryOrUrlsDigest: string;
-  readonly maxCounts: {
-    readonly searchQueries: number;
-    readonly pageRequests: number;
-  };
-  readonly maxDurationMs: number;
-  readonly requestTimeoutMs: 15_000;
-  readonly maxRedirects: 3;
-  readonly deadline: string;
-  readonly requestId: string;
 }
 
 export interface CatalogIntakeScope {
@@ -332,32 +237,6 @@ export interface CatalogIntakeWarning {
   readonly code: CatalogIntakeWarningCode;
   readonly message: string;
 }
-
-type CatalogIntakeSourceRole = 'identity' | 'location' | 'tabelog' | 'reservation';
-
-export type CatalogIntakeSource =
-  | {
-      readonly role: CatalogIntakeSourceRole;
-      readonly label: string;
-      readonly url?: string;
-      readonly provenance: 'owner_asserted';
-      readonly assertedAt: string;
-    }
-  | {
-      readonly role: CatalogIntakeSourceRole;
-      readonly label: string;
-      readonly url: string;
-      readonly provenance: 'agent_observed';
-      readonly observedAt: string;
-    }
-  | {
-      readonly role: 'location';
-      readonly label: string;
-      readonly url: string;
-      readonly provenance: 'durable_geocoder_observed';
-      readonly checkedAt: string;
-      readonly license: string;
-    };
 
 export interface CatalogIntakePreview {
   readonly profile?: CatalogIntakeEnrichedProfile;

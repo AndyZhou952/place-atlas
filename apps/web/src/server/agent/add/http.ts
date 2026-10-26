@@ -10,7 +10,7 @@ import {
   type AddErrorCode,
   type CatalogIntakeOperation,
   executeCatalogIntake,
-} from './coordinator.ts';
+} from './workflow.ts';
 
 export const WEB_CONVERSATION_HEADER = 'x-atlas-web-conversation-id';
 export const AGENT_CONVERSATION_HEADER = 'x-atlas-agent-conversation-id';

@@ -11,7 +11,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createAddHarness } from '../apps/web/src/server/agent/add/compose.ts';
-import { executeCatalogIntake } from '../apps/web/src/server/agent/add/coordinator.ts';
+import { executeCatalogIntake } from '../apps/web/src/server/agent/add/workflow.ts';
 import { createRecommendHarness } from '../apps/web/src/server/agent/recommend/compose.ts';
 import type { RouteSidecarServiceBinding } from '../apps/web/src/server/agent/recommend/route-sidecar-client.ts';
 import type { Env } from '../apps/web/src/server/env.ts';

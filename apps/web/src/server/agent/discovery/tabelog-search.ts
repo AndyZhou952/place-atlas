@@ -2,10 +2,7 @@ import { createWebSearch } from '../research/web-search.ts';
 import { isTabelogRestaurantListing } from '../research/instructions.ts';
 import { readTabelogListing } from '../research/tabelog-listing.ts';
 import type { RestaurantSourceReader } from '../research/page-reader.ts';
-import type {
-  GooglePlaceDiscoveryCandidate,
-  GooglePlaceDiscoveryPort,
-} from '../add/coordinator.ts';
+import type { GooglePlaceDiscoveryCandidate, GooglePlaceDiscoveryPort } from '../add/workflow.ts';
 import { failure } from '../../../shared/result.ts';
 
 /** Japan-only discovery without a search or Maps key. Never derive identity from snippets. */

@@ -5,8 +5,8 @@ import type { Env } from '../../env.ts';
 import { googleKey } from '../../env.ts';
 import { createGooglePlaceRatingClient } from '../discovery/google-places.ts';
 import { D1ProviderUsage } from '../discovery/quota.ts';
-import type { CatalogIntakePreviewSession } from './coordinator.ts';
-import { D1CatalogIntakeState } from './d1-session-state.ts';
+import type { CatalogIntakePreviewSession } from './workflow.ts';
+import { D1CatalogIntakeState } from './store.ts';
 
 const PLACE_ID = /^[A-Za-z0-9_-]{10,500}$/u;
 

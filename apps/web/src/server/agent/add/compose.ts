@@ -23,9 +23,9 @@ import {
 } from '../research/page-reader.ts';
 import { createConfiguredPlaceResearchAgent } from '../research/agent.ts';
 import { readTabelogListingResult } from '../research/tabelog-listing.ts';
-import { createCatalogIntakeModule, type CatalogIntakeModule } from './coordinator.ts';
-import { D1AtlasCatalogIntakePublisher } from './d1-publisher.ts';
-import { D1CatalogIntakeState } from './d1-session-state.ts';
+import { createCatalogIntakeModule, type CatalogIntakeModule } from './workflow.ts';
+import { D1AtlasCatalogIntakePublisher } from './store.ts';
+import { D1CatalogIntakeState } from './store.ts';
 
 export interface AddOptions {
   readonly fetch?: typeof fetch;

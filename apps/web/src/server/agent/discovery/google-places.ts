@@ -1,10 +1,7 @@
 // Google Places (New): verifies the typed name as a real place in Japan, re-reads it on select and
 // confirm, and fetches the rating. Only the place ID is ever stored; names, addresses and ratings
 // are request scoped. Every call is metered against monthly caps.
-import type {
-  GooglePlaceDiscoveryCandidate,
-  GooglePlaceDiscoveryPort,
-} from '../add/coordinator.ts';
+import type { GooglePlaceDiscoveryCandidate, GooglePlaceDiscoveryPort } from '../add/workflow.ts';
 import { prefectureOf } from '../../../shared/cuisine.ts';
 import { failure, type Result } from '../../../shared/result.ts';
 import { fetchBoundedJson, type UsageReservation } from './quota.ts';

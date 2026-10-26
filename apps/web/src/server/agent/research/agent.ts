@@ -8,7 +8,7 @@ import {
   validateEnrichedProfile,
   validateWebResearchOutput,
   type WebResearchPort,
-} from '../add/coordinator.ts';
+} from '../add/workflow.ts';
 import { formatOpeningHours } from '../../../shared/hours.ts';
 import {
   compactRestaurantCategories,

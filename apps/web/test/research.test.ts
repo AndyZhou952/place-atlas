@@ -53,6 +53,9 @@ test('a short-name single-lot branch matches only when name, lot, ward, town and
   assert.equal(listed({ name: '合成食堂' }), false, 'another business at the same lot');
   assert.equal(listed({ address: '京都府京都市中京区合成町367' }), false, 'another ward');
   assert.equal(listed({ address: '京都府京都市東山区別町367' }), false, 'another town, same ward');
+  assert.equal(listed({ address: '京都府京都市東山区西合成町367' }), false, 'a prefixed town');
+  assert.equal(listed({ address: '京都府京都市東山区新合成町367' }), false, 'a prefixed town');
+  assert.equal(listed({ address: '〒605-0002 京都府 京都市東山区 合成町367' }), true, 'spacing');
   assert.equal(listed({ address: '京都府京都市山科区別町367' }), false, 'another unmapped ward');
   assert.equal(listed({ address: '合成町367' }), false, 'no municipality on the listing');
   assert.equal(
@@ -338,33 +341,42 @@ test('a sourced refusal with a quoted takeaway item stays known as not reservabl
 });
 
 test('a listing at another town contributes no rating, address, coordinates or reservation', async () => {
-  const address = '京都府京都市山科区別町367';
-  const research = agentRun({
-    subject: {
-      ...subject,
-      ownerQuery: '合成 京都',
-      transientName: 'Gosei',
-      transientAddress: '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan',
-    },
-    listing: listingAt(address, '6050002', '予約可', '合成'),
-    search: () => yahoo(`<li><a href="${LISTING}">合成 - 食べログ</a><div>${address}</div></li>`),
-    answer: {
-      subjectMatch: 'uncertain',
-      tabelog: { status: 'known', score: 3.51, url: LISTING },
-      reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
-      profile: { address },
-      evidence: {
-        tabelog: { url: LISTING, quote: '3.51', identityQuote: `合成 ${address}` },
-        reservation: { url: LISTING, quote: '予約可否 予約可', identityQuote: `合成 ${address}` },
-        address: { url: LISTING, quote: address, identityQuote: `合成 ${address}` },
+  const romanized = '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan';
+  const japanese = '日本、〒605-0001 京都府京都市東山区合成町367';
+  for (const [selected, address, known] of [
+    [romanized, '京都府京都市山科区別町367', false],
+    [japanese, '京都府京都市東山区西合成町367', false],
+    [japanese, '京都府京都市東山区合成町367', true],
+  ] as const) {
+    const research = agentRun({
+      subject: {
+        ...subject,
+        ownerQuery: '合成 京都',
+        transientName: '合成',
+        transientAddress: selected,
       },
-    },
-  });
-  const result = await research.run();
-  assert.equal(result.kind, 'observed');
-  if (result.kind !== 'observed') return;
-  assert.equal(result.value.tabelog.status, 'unknown');
-  assert.equal(result.value.reservation.status, 'unknown');
-  assert.equal(result.value.profile?.address, undefined);
-  assert.equal(result.value.profile?.coordinates, undefined);
+      listing: listingAt(address, '6050002', '予約可', '合成'),
+      search: () => yahoo(`<li><a href="${LISTING}">合成 - 食べログ</a><div>${address}</div></li>`),
+      answer: {
+        subjectMatch: 'uncertain',
+        tabelog: { status: 'known', score: 3.51, url: LISTING },
+        reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
+        profile: { address },
+        evidence: {
+          tabelog: { url: LISTING, quote: '3.51', identityQuote: `合成 ${address}` },
+          reservation: { url: LISTING, quote: '予約可否 予約可', identityQuote: `合成 ${address}` },
+          address: { url: LISTING, quote: address, identityQuote: `合成 ${address}` },
+        },
+      },
+    });
+    const result = await research.run();
+    assert.equal(result.kind, 'observed');
+    if (result.kind !== 'observed') return;
+    // The exact same-town listing is the control: the same claims are accepted there.
+    assert.equal(result.value.tabelog.status, known ? 'known' : 'unknown', address);
+    if (known) continue;
+    assert.equal(result.value.reservation.status, 'unknown', address);
+    assert.equal(result.value.profile?.address, undefined, address);
+    assert.equal(result.value.profile?.coordinates, undefined, address);
+  }
 });

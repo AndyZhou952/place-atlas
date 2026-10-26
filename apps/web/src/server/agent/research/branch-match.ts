@@ -367,22 +367,23 @@ function matchesSingleLotBranch(
   const sourceLots = lots(sourceAddress);
   if (selectedLots.length !== 1 || sourceLots.length !== 1 || selectedLots[0] !== sourceLots[0])
     return false;
-  // The municipality (city, ward) and the town before the lot must agree in Japanese script.
-  const japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
-  const local = address
-    .normalize('NFKC')
-    .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
-    .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '');
-  const beforeLot = local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '';
-  const municipalities =
-    beforeLot.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]+?[市区郡]/gu) ?? [];
-  const town = key(beforeLot.replace(/^.*[市区郡]/u, ''));
-  const source = key(sourceAddress);
+  // The whole locality before the lot (city, ward and town) must be the same in Japanese script:
+  // 西合成町 is another town than 合成町, not a spelling of it.
+  const locality = (value: string) => {
+    const local = value
+      .normalize('NFKC')
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+      .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
+      .replace(/\s/gu, '');
+    return key(local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '');
+  };
+  const selected = locality(address);
+  const town = selected.replace(/^.*[市区郡]/u, '');
   return (
-    municipalities.length > 0 &&
+    /[市区郡]/u.test(selected) &&
     town.length >= 2 &&
-    japanese.test(town) &&
-    [...municipalities.map(key), town].every((part) => source.includes(part))
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(town) &&
+    selected === locality(sourceAddress)
   );
 }
 

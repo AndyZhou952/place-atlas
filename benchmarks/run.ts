@@ -185,8 +185,9 @@ async function runAdd(testCase: {
       ? `${reservation.mode}: ${reservation.label.slice(0, 40)}`
       : 'unknown',
   ]);
-  // The provider stage that left research incomplete, read from the warning the Owner sees. Only
-  // research-backed checks can blame it; any other failure is the harness's own behavior.
+  // The stage that left research incomplete, read from the warning the Owner sees. Only a refused
+  // or failed provider call on a research-backed check counts as availability; a listing the
+  // harness rejected, and every other failure, is the harness's own behavior.
   const stage = (Object.keys(researchStages) as (keyof typeof researchStages)[]).find((issue) =>
     preview.warnings.some(({ message }) => message === researchIssueMessage(issue, false)),
   );
@@ -197,7 +198,9 @@ async function runAdd(testCase: {
       check,
       pass,
       pass || !stage ? detail : `${detail} — ${researchStages[stage]}`,
-      stage && !['title', 'prefecture'].includes(check) ? 'provider' : 'behavior',
+      stage && stage !== 'no_listing' && !['title', 'prefecture'].includes(check)
+        ? 'provider'
+        : 'behavior',
     );
   // Which listing identity the research accepted, and what the providers did, per attempt.
   record(

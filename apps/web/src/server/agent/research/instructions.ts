@@ -1,6 +1,4 @@
-/** Versioned instructions, loaded by the runtime rather than a separate agent platform. */
-export const researchInstructionsVersion = 'restaurant-research-v18';
-
+/** The research agent's instructions, loaded by the runtime rather than a separate agent platform. */
 export const restaurantResearchPrompt = `You research the exact restaurant branch already selected by the user.
 
 BOUNDARY

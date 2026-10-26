@@ -63,16 +63,6 @@ export async function listCatalogItems(db: D1Database): Promise<AtlasItem[]> {
   });
 }
 
-export async function insertRestaurant(db: D1Database, id: string, payload: unknown, now: string) {
-  await db
-    .prepare(
-      `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
-       VALUES (?, ?, 'verified', ?, ?) ON CONFLICT(id) DO NOTHING`,
-    )
-    .bind(id, JSON.stringify(payload), now, now)
-    .run();
-}
-
 function assessmentUpsert(
   db: D1Database,
   id: string,

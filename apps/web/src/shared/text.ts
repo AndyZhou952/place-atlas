@@ -15,19 +15,6 @@ export function matchesQuery(fields: readonly (string | undefined)[], query: str
     .every((token) => !token || haystack.some((field) => field.includes(token)));
 }
 
-export function distanceKm(
-  a: { readonly latitude: number; readonly longitude: number },
-  b: { readonly latitude: number; readonly longitude: number },
-): number {
-  const rad = Math.PI / 180;
-  const h =
-    Math.sin(((b.latitude - a.latitude) * rad) / 2) ** 2 +
-    Math.cos(a.latitude * rad) *
-      Math.cos(b.latitude * rad) *
-      Math.sin(((b.longitude - a.longitude) * rad) / 2) ** 2;
-  return 12_742 * Math.asin(Math.sqrt(h));
-}
-
 /** Personal ratings are 0–10 with one decimal place. */
 export function normalizeRating(value: number): number {
   if (!Number.isFinite(value) || value < 0 || value > 10) {

@@ -191,6 +191,7 @@ const listingAt = (
   postalCode: string,
   policy: string,
   name = '合成食堂 中目黒',
+  coordinates = { latitude: 35.0, longitude: 135.77 },
 ) => ({
   name,
   address,
@@ -199,7 +200,7 @@ const listingAt = (
   score: 3.51,
   categories: ['定食'],
   reservation: policy,
-  coordinates: { latitude: 35.0, longitude: 135.77 },
+  coordinates,
 });
 const reader = (restaurant: ReturnType<typeof listingAt>) => async (url: string) =>
   url === LISTING
@@ -228,6 +229,63 @@ test('a Japanese provider address may omit the building lot only with ward, post
   assert.equal(matches('東京都港区銀座4-1 合成ビルディング 3F'), false, 'another ward');
   assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 3F', '1040062'), false, 'postcode');
   assert.equal(matches('東京都中央区銀座4-1 別館ビルディング 3F'), false, 'another building');
+  assert.equal(matches('東京都中央区別町4-1 合成ビルディング 3F'), false, 'another town');
+  assert.equal(matches('東京都中央区西銀座4-1 合成ビルディング 3F'), false, 'a prefixed town');
+});
+
+// A listing can write a district before the provider's town (…東山区新地合成町). Only both map pins
+// tell that from another town, and a one-character prefix is another town even beside the pin.
+test('a listing that adds a district before the town matches only when both map pins agree', () => {
+  const pin = { latitude: 35.0, longitude: 135.77 };
+  const near = { latitude: 35.0003, longitude: 135.7702 }; // about 40 m
+  const far = { latitude: 35.003, longitude: 135.77 }; // about 330 m
+  const matches = (address: string, points: { selected?: typeof pin; source?: typeof pin }) =>
+    matchesSelectedBranch(
+      `合成 ${address}`,
+      kyoto.name,
+      kyoto.address,
+      kyoto.query,
+      address,
+      '6050002',
+      '合成',
+      points,
+    );
+  assert.equal(matches('京都府京都市東山区新地合成町367', { selected: near, source: pin }), true);
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { selected: far, source: pin }),
+    false,
+    'pins apart',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { source: pin }),
+    false,
+    'no provider pin',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { selected: near }),
+    false,
+    'no listing pin',
+  );
+  assert.equal(
+    matches('京都府京都市東山区西合成町367', { selected: near, source: pin }),
+    false,
+    'a prefixed town',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地別町367', { selected: near, source: pin }),
+    false,
+    'another town',
+  );
+  assert.equal(
+    matches('京都府京都市中京区新地合成町367', { selected: near, source: pin }),
+    false,
+    'another ward',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町368', { selected: near, source: pin }),
+    false,
+    'another lot',
+  );
 });
 
 const listingRow = `<li><a href="${LISTING}">合成食堂 中目黒 - 食べログ</a><div>東京都目黒区中目黒1-2-3</div></li>`;
@@ -381,38 +439,72 @@ test('a sourced refusal with a quoted takeaway item stays known as not reservabl
 });
 
 test('a listing at another town contributes no rating, address, coordinates or reservation', async () => {
-  const romanized = '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan';
-  const japanese = '日本、〒605-0001 京都府京都市東山区合成町367';
-  for (const [selected, address, known] of [
-    [romanized, '京都府京都市山科区別町367', false],
-    [japanese, '京都府京都市東山区西合成町367', false],
-    [japanese, '京都府京都市東山区合成町367', true],
-  ] as const) {
+  const kyotoPin = { latitude: 35.0, longitude: 135.77 };
+  const ginza = {
+    name: '合成食堂 銀座店',
+    selected: '日本、〒104-0061 東京都中央区銀座4丁目1-1 合成ビルディング 3F',
+    postal: '1040061',
+  };
+  const kyotoCase = { name: '合成', selected: kyoto.address, postal: '6050002' };
+  const cases = [
+    {
+      ...kyotoCase,
+      selected: '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan',
+      address: '京都府京都市山科区別町367',
+      known: false,
+    },
+    { ...kyotoCase, address: '京都府京都市東山区西合成町367', known: false },
+    { ...kyotoCase, address: '京都府京都市東山区合成町367', known: true },
+    {
+      ...kyotoCase,
+      address: '京都府京都市東山区新地合成町367',
+      point: { latitude: 35.0003, longitude: 135.7702 },
+      known: true,
+    },
+    {
+      ...kyotoCase,
+      address: '京都府京都市東山区新地合成町367',
+      point: { latitude: 35.003, longitude: 135.77 },
+      known: false,
+    },
+    { ...kyotoCase, address: '京都府京都市東山区西合成町367', point: kyotoPin, known: false },
+    { ...ginza, address: '東京都中央区銀座4-1 合成ビルディング 3F', known: true },
+    { ...ginza, address: '東京都中央区別町4-1 合成ビルディング 3F', known: false },
+    { ...ginza, address: '東京都中央区西銀座4-1 合成ビルディング 3F', known: false },
+  ];
+  for (const { name, selected, address, postal, known, ...rest } of cases) {
+    const point = 'point' in rest ? rest.point : undefined;
     const research = agentRun({
       subject: {
         ...subject,
-        ownerQuery: '合成 京都',
-        transientName: '合成',
+        ownerQuery: `${name} 京都`,
+        transientName: name,
         transientAddress: selected,
+        ...(point ? { transientPoint: point } : {}),
       },
-      listing: listingAt(address, '6050002', '予約可', '合成'),
-      search: () => yahoo(`<li><a href="${LISTING}">合成 - 食べログ</a><div>${address}</div></li>`),
+      listing: listingAt(address, postal, '予約可', name, kyotoPin),
+      search: () =>
+        yahoo(`<li><a href="${LISTING}">${name} - 食べログ</a><div>${address}</div></li>`),
       answer: {
         subjectMatch: 'uncertain',
         tabelog: { status: 'known', score: 3.51, url: LISTING },
         reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
         profile: { address },
         evidence: {
-          tabelog: { url: LISTING, quote: '3.51', identityQuote: `合成 ${address}` },
-          reservation: { url: LISTING, quote: '予約可否 予約可', identityQuote: `合成 ${address}` },
-          address: { url: LISTING, quote: address, identityQuote: `合成 ${address}` },
+          tabelog: { url: LISTING, quote: '3.51', identityQuote: `${name} ${address}` },
+          reservation: {
+            url: LISTING,
+            quote: '予約可否 予約可',
+            identityQuote: `${name} ${address}`,
+          },
+          address: { url: LISTING, quote: address, identityQuote: `${name} ${address}` },
         },
       },
     });
     const result = await research.run();
     assert.equal(result.kind, 'observed');
     if (result.kind !== 'observed') return;
-    // The exact same-town listing is the control: the same claims are accepted there.
+    // The same-branch listings are the controls: the same claims are accepted there.
     assert.equal(result.value.tabelog.status, known ? 'known' : 'unknown', address);
     if (known) continue;
     assert.equal(result.value.reservation.status, 'unknown', address);

@@ -129,7 +129,19 @@ export function validateDiscoveryResult(value: unknown):
         'placeId',
         'ordinal',
       ]) ||
-      !isRecordWithExactKeys(candidate.transientPresentation, ['name', 'address', 'attribution']) ||
+      !(
+        isRecordWithExactKeys(candidate.transientPresentation, [
+          'name',
+          'address',
+          'attribution',
+        ]) ||
+        isRecordWithExactKeys(candidate.transientPresentation, [
+          'name',
+          'address',
+          'attribution',
+          'point',
+        ])
+      ) ||
       !isRecordWithExactKeys(candidate.transientPresentation.attribution, ['label', 'url'])
     ) {
       return undefined;
@@ -145,6 +157,10 @@ export function validateDiscoveryResult(value: unknown):
     const address = normalizeBoundedText(candidate.transientPresentation.address, 1, 500);
     const label = normalizeBoundedText(candidate.transientPresentation.attribution.label, 1, 120);
     const url = candidate.transientPresentation.attribution.url;
+    const point =
+      'point' in candidate.transientPresentation
+        ? validateCoordinates(candidate.transientPresentation.point)
+        : undefined;
     if (
       !providerNamespace ||
       !placeId ||
@@ -154,7 +170,8 @@ export function validateDiscoveryResult(value: unknown):
       !name ||
       !address ||
       !label ||
-      !isCanonicalHttpsUrl(url)
+      !isCanonicalHttpsUrl(url) ||
+      ('point' in candidate.transientPresentation && !point)
     ) {
       return undefined;
     }
@@ -162,7 +179,12 @@ export function validateDiscoveryResult(value: unknown):
     identities.add(`${providerNamespace}\u0000${placeId}`);
     candidates.push({
       durableIdentity: { providerNamespace, placeId, ordinal },
-      transientPresentation: { name, address, attribution: { label, url } },
+      transientPresentation: {
+        name,
+        address,
+        attribution: { label, url },
+        ...(point ? { point } : {}),
+      },
     });
   }
   return { candidates, hasMore: value.hasMore };

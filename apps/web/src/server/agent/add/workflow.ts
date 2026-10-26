@@ -74,6 +74,8 @@ export interface GooglePlaceDiscoveryCandidate {
     readonly name: string;
     readonly address: string;
     readonly attribution: CatalogIntakeAttribution;
+    /** The provider's map location, from a refetch only: an identity check, never stored. */
+    readonly point?: { readonly latitude: number; readonly longitude: number };
   };
 }
 
@@ -119,6 +121,7 @@ export interface CatalogIntakeSelectedSubject {
   readonly placeId: string;
   readonly transientName: string;
   readonly transientAddress: string;
+  readonly transientPoint?: { readonly latitude: number; readonly longitude: number };
 }
 
 export type WebResearchInput =
@@ -1032,6 +1035,9 @@ function subjectOf(
     placeId: place.durableIdentity.placeId,
     transientName: place.transientPresentation.name,
     transientAddress: place.transientPresentation.address,
+    ...(place.transientPresentation.point
+      ? { transientPoint: place.transientPresentation.point }
+      : {}),
   };
 }
 

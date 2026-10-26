@@ -13,7 +13,7 @@ function setup(
   overrides: Partial<Env> = {},
   routes: Record<string, (request: Request) => Response> = {},
 ) {
-  const { db } = migratedD1();
+  const { db, sqlite } = migratedD1();
   const env: Env = {
     DB: db,
     MEDIA: {} as R2Bucket,
@@ -28,6 +28,8 @@ function setup(
     id: PLACE_ID,
     displayName: { text: '合成食堂 中目黒' },
     formattedAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3',
+    // Google's own pin, distinct from Nominatim's, so a stored copy would show.
+    location: { latitude: 35.1111, longitude: 139.2222 },
   };
   const calls: string[] = [];
   const urls: string[] = [];
@@ -79,11 +81,19 @@ function setup(
     const body: any = response.status === 204 ? null : await response.json();
     return { status: response.status, body };
   };
-  return { env, call, calls, urls };
+  /** Every stored row, to check what was never written. */
+  const storedText = () =>
+    JSON.stringify(
+      sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all()
+        .map(({ name }) => sqlite.prepare(`SELECT * FROM "${String(name)}"`).all()),
+    );
+  return { env, call, calls, urls, storedText };
 }
 
 test('Owner Add: Google-verified discover → select → confirm publishes a verified restaurant', async () => {
-  const { call, calls, urls } = setup();
+  const { call, calls, urls, storedText } = setup();
   assert.equal((await call('POST', '/api/session', { password: 'owner-pass' })).status, 200);
 
   const discovered = await call('POST', '/api/catalog-intake/discover', {
@@ -113,6 +123,8 @@ test('Owner Add: Google-verified discover → select → confirm publishes a ver
   assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
   assert.equal(confirmed.body.status, 'committed_verified');
   assert.deepEqual([...new Set(calls)], ['google:search', 'google:details', 'nominatim']);
+  // Google's map pin only corroborates identity during the request; it is stored nowhere.
+  assert.doesNotMatch(storedText(), /139\.2222/u);
   // The selected place is re-read in Japanese, like its Tabelog listing; search is not.
   for (const url of urls)
     assert.equal(

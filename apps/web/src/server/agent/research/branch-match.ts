@@ -5,6 +5,26 @@ import { isTabelogRestaurantListing } from './instructions.ts';
 import type { SearchEvidence } from './web-search.ts';
 
 type Evidence = SearchEvidence;
+type Point = { readonly latitude: number; readonly longitude: number };
+
+/** Map pins of the selected place and of the source, when both are known. */
+export interface IdentityPoints {
+  readonly selected?: Point;
+  readonly source?: Point;
+}
+
+/** Within 100 m, by an equirectangular approximation that is exact enough at this scale. */
+function pinsAgree(points: IdentityPoints | undefined): boolean {
+  const { selected, source } = points ?? {};
+  if (!selected || !source) return false;
+  const radians = Math.PI / 180;
+  const x =
+    (source.longitude - selected.longitude) *
+    radians *
+    Math.cos(((source.latitude + selected.latitude) / 2) * radians);
+  const y = (source.latitude - selected.latitude) * radians;
+  return Math.hypot(x, y) * 6_371_000 <= 100;
+}
 
 export function supported(value: unknown, sources: Evidence[]): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -240,6 +260,16 @@ function matchesOmittedBuildingLot(
     (city && /\bTokyo\b/iu.test(selectedAddress) ? japaneseLocalities[city] : undefined);
   // Restrict the exception to a corroborated Tokyo ward, not numbers alone.
   if (!ward?.endsWith('区') || !sourceAddress.includes(`東京都${ward}`)) return false;
+  // A Japanese provider address also names its town (銀座 in 銀座4丁目1-1): the listing's must be the
+  // same town, not 西銀座 or another town sharing the postcode and building name.
+  const town = (value: string) =>
+    value
+      .normalize('NFKC')
+      .replace(/\s/gu, '')
+      .match(new RegExp(`東京都${ward}([^\\d]*?)\\d`, 'u'))?.[1];
+  const selectedTown = town(selectedAddress);
+  if (/東京都/u.test(selectedAddress) && (!selectedTown || selectedTown !== town(sourceAddress)))
+    return false;
   const building = (value: string) => {
     const address = value.normalize('NFKC').replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ');
     const suffix = address.match(
@@ -316,9 +346,10 @@ function streetNumbers(value: string): string[] {
  * hyphenated block), and Google and Tabelog can file it under neighbouring postcodes. Such a
  * listing is the selected branch only when every independent anchor agrees: the listing's exact
  * name is the provider name or a whole word the Owner typed, the single lot is the same, the
- * postcodes share their area prefix, no floor differs, and the provider's Japanese municipality
- * and town both appear in the listing. A romanized provider address cannot be read against
- * Japanese town names, and a prefecture or postal area is no substitute, so it stays unknown.
+ * postcodes share their area prefix, no floor differs, and the provider's Japanese locality (city,
+ * ward and town) is the listing's, or the listing adds a district before that town and both map pins
+ * agree. A romanized provider address cannot be read against Japanese town names, and a prefecture
+ * or postal area is no substitute, so it stays unknown.
  */
 function matchesSingleLotBranch(
   name: string,
@@ -327,6 +358,7 @@ function matchesSingleLotBranch(
   sourceAddress: string,
   sourcePostalCode: string | undefined,
   sourceName: string,
+  points: IdentityPoints | undefined,
 ): boolean {
   const key = (value: string) =>
     value
@@ -376,12 +408,23 @@ function matchesSingleLotBranch(
     return key(local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '');
   };
   const selected = locality(address);
-  const town = selected.replace(/^.*[市区郡]/u, '');
+  const source = locality(sourceAddress);
+  const municipality = selected.match(/^.*[市区郡]/u)?.[0] ?? '';
+  const town = selected.slice(municipality.length);
+  if (
+    !municipality ||
+    town.length < 2 ||
+    !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(town)
+  )
+    return false;
+  if (selected === source) return true;
+  // A listing can put a district before the same town (…区<district><town>). A one-character prefix
+  // names another town (西合成町); a longer district still needs both map pins within 100 m.
   return (
-    /[市区郡]/u.test(selected) &&
-    town.length >= 2 &&
-    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(town) &&
-    selected === locality(sourceAddress)
+    source.length >= selected.length + 2 &&
+    source.startsWith(municipality) &&
+    source.endsWith(town) &&
+    pinsAgree(points)
   );
 }
 
@@ -393,6 +436,7 @@ export function matchesSelectedBranch(
   sourceAddress?: string,
   sourcePostalCode?: string,
   sourceName?: string,
+  points?: IdentityPoints,
 ): boolean {
   const normalize = (value: string) =>
     normalizeJapaneseBlockNumerals(value)
@@ -411,7 +455,15 @@ export function matchesSelectedBranch(
   if (
     sourceAddress &&
     sourceName &&
-    matchesSingleLotBranch(name, address, ownerQuery, sourceAddress, sourcePostalCode, sourceName)
+    matchesSingleLotBranch(
+      name,
+      address,
+      ownerQuery,
+      sourceAddress,
+      sourcePostalCode,
+      sourceName,
+      points,
+    )
   )
     return true;
   const text = normalize(quote);

@@ -17,6 +17,7 @@ import {
   type RecommendRouteObservation,
 } from './decision.ts';
 import {
+  exactOriginReply,
   normalizeRecommendIntent,
   normalizeSearchText,
   type RecommendOriginOption,
@@ -136,9 +137,12 @@ function addExplicitStationMentions(
       if (bareStation) englishStations.push(bareStation[1]);
     }
     for (const station of [...japaneseStations, ...englishStations]) {
+      // A catalog area of the same name stays an area too; the intent decides which one applies.
       if (
-        options.some((option) =>
-          option.names.some((name) => normalize(name) === normalize(station)),
+        options.some(
+          (option) =>
+            option.kind !== 'area' &&
+            option.names.some((name) => normalize(name) === normalize(station)),
         )
       )
         continue;
@@ -299,6 +303,9 @@ export function createRecommendConversationService(
       addExplicitStationMentions(options, input);
       addExplicitAddressMentions(options, input);
       addOriginText(options, rawIntent, input);
+      const exactOrigin = exactOriginReply(userMessages(input), options);
+      if (exactOrigin && !options.some((option) => option.id === exactOrigin.id))
+        options.push(exactOrigin);
       const intent = normalizeRecommendIntent(userMessages(input), options, rawIntent);
       const askWalkIn = asksForWalkIn(input);
       if (intent.action === 'unsupported' && intent.reason === 'driving_route_unavailable')

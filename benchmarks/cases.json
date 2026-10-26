@@ -230,7 +230,7 @@
       },
       {
         "name": "Train time limit in Japan",
-        "request": "新宿駅から電車15分以内のラーメン",
+        "request": "新宿駅から電車で15分以内のラーメン",
         "interpretation": {
           "action": "recommend",
           "originId": null,
@@ -243,7 +243,8 @@
           "visited": "prefer_unvisited"
         },
         "expect": {
-          "status": "unavailable"
+          "status": "unavailable",
+          "message": "Train route times in Japan"
         }
       },
       {

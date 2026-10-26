@@ -987,8 +987,14 @@ tbody small {
   .system-strip {
     padding-inline: 1rem;
   }
+  /* Hidden on narrow screens but still the button's accessible name. */
   .wide-only {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .map-layout,
   .map-layout:not(.list-open) {

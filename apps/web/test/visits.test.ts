@@ -33,13 +33,16 @@ function setup() {
     ['media/candidate', new Uint8Array([0x89, 0x50, 0x4e, 0x47])],
   ]);
   const writes = { puts: 0, deletes: 0, failPut: 0, failBatch: false };
+  // Steps run before the next batches, in order: a step can pause a commit or make it fail.
+  const batchSteps: (() => Promise<void>)[] = [];
   const env: Env = {
-    // A database whose next batch can be made to fail.
     DB: new Proxy(db, {
       get(target, property) {
-        if (property === 'batch' && writes.failBatch)
-          return async () => {
-            throw new Error('database unavailable');
+        if (property === 'batch')
+          return async (statements: D1PreparedStatement[]) => {
+            if (writes.failBatch) throw new Error('database unavailable');
+            await batchSteps.shift()?.();
+            return target.batch(statements);
           };
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
@@ -130,8 +133,10 @@ function setup() {
     );
   };
   const rows = () =>
-    sqlite.prepare("SELECT id, content_sha256 FROM visit_media WHERE id LIKE 'upload-%'").all();
-  return { call, upload, objects, writes, rows };
+    sqlite
+      .prepare("SELECT id, object_key, display_id FROM visit_media WHERE id LIKE 'upload-%'")
+      .all() as { id: string; object_key: string; display_id: string }[];
+  return { call, upload, objects, writes, batchSteps, rows };
 }
 
 const png = (last: number) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, last];
@@ -216,10 +221,8 @@ test('an upload id is a retry key: the same file is reused, another file is refu
     upload('visit-published', [['upload-0005', png(4)]]),
   ]);
   assert.deepEqual(racing.map(({ status }) => status).sort(), [201, 409]);
-  const raced = [...objects].filter(([key]) => key.includes('upload-0005'));
-  assert.equal(raced.length, 1);
-  const row = rows().find(({ id }) => id === 'upload-0005');
-  assert.ok(row && raced[0][0].endsWith(String(row.content_sha256)));
+  const raced = [...objects.keys()].filter((key) => key.includes('upload-0005'));
+  assert.deepEqual(raced, [rows().find(({ id }) => id === 'upload-0005')?.object_key]);
 });
 
 test('a failed upload removes the objects it wrote', async () => {
@@ -252,4 +255,77 @@ test('a failed upload removes the objects it wrote', async () => {
   // The retry then succeeds.
   assert.equal((await upload('visit-published', [['upload-0002', png(1)]])).status, 201);
   assert.equal(uploaded().length, 1);
+});
+
+test('an identical upload in flight never loses its object to a failing retry', async () => {
+  const { call, upload, objects, batchSteps, rows } = setup();
+  await call('POST', '/api/session', { password: 'owner-pass' });
+  const deferred = () => {
+    let resolve = () => {};
+    const promise = new Promise<void>((done) => (resolve = done));
+    return { promise, resolve };
+  };
+  const opened = async (id: string) => {
+    const row = rows().find((media) => media.id === id);
+    return (await call('GET', `/api/media/${row?.display_id}/content`)).status;
+  };
+
+  // A writes its object and pauses before its commit; the identical retry B fails its commit and
+  // cleans up; then A commits.
+  const paused = deferred();
+  const resume = deferred();
+  batchSteps.push(
+    async () => {
+      paused.resolve();
+      await resume.promise;
+    },
+    async () => {
+      throw new Error('database unavailable');
+    },
+  );
+  const first = upload('visit-published', [['upload-0006', png(1)]]);
+  await paused.promise;
+  assert.equal((await upload('visit-published', [['upload-0006', png(1)]])).status, 500);
+  resume.resolve();
+  assert.equal((await first).status, 201);
+  assert.equal(await opened('upload-0006'), 200);
+
+  // B writes before A commits; A then commits, and only afterwards does B's commit fail.
+  const aWaiting = deferred();
+  const bWritten = deferred();
+  const aDone = deferred();
+  batchSteps.push(
+    async () => {
+      aWaiting.resolve();
+      await bWritten.promise;
+    },
+    async () => {
+      bWritten.resolve();
+      await aDone.promise;
+      throw new Error('database unavailable');
+    },
+  );
+  const a = upload('visit-published', [['upload-0007', png(2)]]);
+  await aWaiting.promise;
+  const b = upload('visit-published', [['upload-0007', png(2)]]);
+  assert.equal((await a).status, 201);
+  aDone.resolve();
+  assert.equal((await b).status, 500);
+  assert.equal(await opened('upload-0007'), 200);
+
+  // Both identical attempts commit: the later one reuses the first row and drops its own copy.
+  const [one, two] = await Promise.all([
+    upload('visit-published', [['upload-0008', png(3)]]),
+    upload('visit-published', [['upload-0008', png(3)]]),
+  ]);
+  assert.deepEqual([one.status, two.status], [201, 201]);
+  assert.deepEqual(
+    ((await one.json()) as { id: string }[]).map(({ id }) => id),
+    ((await two.json()) as { id: string }[]).map(({ id }) => id),
+  );
+  assert.deepEqual(
+    [...objects.keys()].filter((key) => key.includes('upload-0008')),
+    [rows().find(({ id }) => id === 'upload-0008')?.object_key],
+  );
+  assert.equal(await opened('upload-0008'), 200);
 });

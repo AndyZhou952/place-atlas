@@ -320,8 +320,8 @@ export interface Upload {
 /**
  * Stores files in R2, then their rows in one batch. An upload id is a retry key: the same bytes for
  * the same visit return the stored media without writing again, and anything else under that id is
- * refused before any write. Objects this attempt wrote are removed again if it does not commit,
- * unless a committed row uses them.
+ * refused before any write. Each attempt writes objects under its own keys, so it only ever removes
+ * its own objects: when it does not commit, or when an overlapping attempt committed that id first.
  */
 export async function addMedia(
   db: D1Database,
@@ -356,8 +356,9 @@ export async function addMedia(
       const sha256 = [...new Uint8Array(digest)]
         .map((byte) => byte.toString(16).padStart(2, '0'))
         .join('');
-      // The digest in the key keeps an overlapping attempt with other bytes from overwriting it.
-      return { upload, index, sha256, objectKey: `visits/${visitId}/${upload.id}/${sha256}` };
+      // A key per attempt: no other request ever writes, or removes, this object.
+      const objectKey = `visits/${visitId}/${upload.id}/${crypto.randomUUID()}`;
+      return { upload, index, sha256, objectKey };
     }),
   );
   const sameFile = (row: StoredUpload | undefined, file: (typeof files)[number]) =>
@@ -427,12 +428,13 @@ export async function addMedia(
     await removeUnreferenced();
     throw error;
   }
-  // An overlapping attempt with another file can claim an id first; this attempt's object is then
-  // unreferenced and the upload is refused.
+  // An overlapping attempt can commit an id first. This attempt's object is then unreferenced; the
+  // same file reuses that row, and another file is refused.
   const committed = await storedUploads(db, uploads);
-  if (fresh.some((file) => committed.get(file.upload.id)?.object_key !== file.objectKey)) {
+  const lost = fresh.filter((file) => committed.get(file.upload.id)?.object_key !== file.objectKey);
+  if (lost.length) {
     await removeUnreferenced();
-    throw conflict();
+    if (lost.some((file) => !sameFile(committed.get(file.upload.id), file))) throw conflict();
   }
   const placeholders = uploads.map(() => '?').join(',');
   const { results } = await db

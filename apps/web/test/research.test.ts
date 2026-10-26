@@ -9,13 +9,17 @@ import {
 } from '../src/server/agent/research/agent.ts';
 import { explicitReservationMode } from '../src/server/agent/research/booking.ts';
 import {
+  createFirecrawlRestaurantReader,
+  type RestaurantSourceReader,
+  withSameListingFallback,
+} from '../src/server/agent/research/page-reader.ts';
+import { readTabelogListingResult } from '../src/server/agent/research/tabelog-listing.ts';
+import {
   initialResearchQuery,
   matchesSelectedBranch,
   simplerResearchQuery,
 } from '../src/server/agent/research/branch-match.ts';
 import { stubFetch } from './fixtures.ts';
-import { createFirecrawlRestaurantReader } from '../src/server/agent/research/page-reader.ts';
-import { readTabelogListingResult } from '../src/server/agent/research/tabelog-listing.ts';
 
 // A short Japanese name at a single-number lot; Google and the listing use neighbouring postcodes.
 const kyoto = {
@@ -74,6 +78,20 @@ test('a short-name single-lot branch matches only when name, lot, ward, town and
     'no town on the provider address',
   );
   assert.equal(listed({ postal: '1500001' }), false, 'postcodes in different areas');
+  // Google's Japanese name and address for the selected place match even when the Owner typed Latin.
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町367',
+      kyoto.name,
+      kyoto.address,
+      'Gosei Kyoto',
+      '京都府京都市東山区合成町367',
+      '6050002',
+      '合成',
+    ),
+    true,
+    'a Latin Owner query',
+  );
   assert.equal(
     matchesSelectedBranch(
       '合成 京都府京都市東山区合成町367 2F',
@@ -209,6 +227,7 @@ const listingAt = (
   postalCode: string,
   policy: string,
   name = '合成食堂 中目黒',
+  coordinates = { latitude: 35.0, longitude: 135.77 },
 ) => ({
   name,
   address,
@@ -217,7 +236,7 @@ const listingAt = (
   score: 3.51,
   categories: ['定食'],
   reservation: policy,
-  coordinates: { latitude: 35.0, longitude: 135.77 },
+  coordinates,
 });
 const reader = (restaurant: ReturnType<typeof listingAt>) => async (url: string) =>
   url === LISTING
@@ -235,6 +254,76 @@ const yahoo = (rows: string) =>
   new Response(`<html><body><div id="web"><ol>${rows}</ol></div></body></html>`, {
     headers: { 'content-type': 'text/html' },
   });
+// Google often writes a building's lot as 4丁目1-1 where the listing has 4-1.
+test('a Japanese provider address may omit the building lot only with ward, postcode, building and floor', () => {
+  const name = '合成食堂 銀座店';
+  const selected = '日本、〒104-0061 東京都中央区銀座4丁目1-1 合成ビルディング 3F';
+  const matches = (address: string, postal = '1040061') =>
+    matchesSelectedBranch(`${name} ${address}`, name, selected, '合成食堂', address, postal, name);
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 3F'), true);
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 4F'), false, 'another floor');
+  assert.equal(matches('東京都港区銀座4-1 合成ビルディング 3F'), false, 'another ward');
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 3F', '1040062'), false, 'postcode');
+  assert.equal(matches('東京都中央区銀座4-1 別館ビルディング 3F'), false, 'another building');
+  assert.equal(matches('東京都中央区別町4-1 合成ビルディング 3F'), false, 'another town');
+  assert.equal(matches('東京都中央区西銀座4-1 合成ビルディング 3F'), false, 'a prefixed town');
+});
+
+// A listing can write a district before the provider's town (…東山区新地合成町). Only both map pins
+// tell that from another town, and a one-character prefix is another town even beside the pin.
+test('a listing that adds a district before the town matches only when both map pins agree', () => {
+  const pin = { latitude: 35.0, longitude: 135.77 };
+  const near = { latitude: 35.0003, longitude: 135.7702 }; // about 40 m
+  const far = { latitude: 35.003, longitude: 135.77 }; // about 330 m
+  const matches = (address: string, points: { selected?: typeof pin; source?: typeof pin }) =>
+    matchesSelectedBranch(
+      `合成 ${address}`,
+      kyoto.name,
+      kyoto.address,
+      kyoto.query,
+      address,
+      '6050002',
+      '合成',
+      points,
+    );
+  assert.equal(matches('京都府京都市東山区新地合成町367', { selected: near, source: pin }), true);
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { selected: far, source: pin }),
+    false,
+    'pins apart',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { source: pin }),
+    false,
+    'no provider pin',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町367', { selected: near }),
+    false,
+    'no listing pin',
+  );
+  assert.equal(
+    matches('京都府京都市東山区西合成町367', { selected: near, source: pin }),
+    false,
+    'a prefixed town',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地別町367', { selected: near, source: pin }),
+    false,
+    'another town',
+  );
+  assert.equal(
+    matches('京都府京都市中京区新地合成町367', { selected: near, source: pin }),
+    false,
+    'another ward',
+  );
+  assert.equal(
+    matches('京都府京都市東山区新地合成町368', { selected: near, source: pin }),
+    false,
+    'another lot',
+  );
+});
+
 const listingRow = `<li><a href="${LISTING}">合成食堂 中目黒 - 食べログ</a><div>東京都目黒区中目黒1-2-3</div></li>`;
 
 function agentRun(options: {
@@ -243,6 +332,7 @@ function agentRun(options: {
   readonly policy?: string;
   readonly subject?: typeof subject;
   readonly listing?: ReturnType<typeof listingAt>;
+  readonly sourceReader?: RestaurantSourceReader;
 }) {
   const queries: string[] = [];
   let modelCalls = 0;
@@ -250,10 +340,16 @@ function agentRun(options: {
     apiKey: 'test-key',
     baseUrl: 'https://model.test/v1',
     model: 'test-model',
-    sourceReader: reader(
-      options.listing ??
-        listingAt('東京都目黒区中目黒1-2-3 合成ビル 2F', '1530061', options.policy ?? takeawayOnly),
-    ),
+    sourceReader:
+      options.sourceReader ??
+      reader(
+        options.listing ??
+          listingAt(
+            '東京都目黒区中目黒1-2-3 合成ビル 2F',
+            '1530061',
+            options.policy ?? takeawayOnly,
+          ),
+      ),
     fetch: stubFetch({
       'https://search.yahoo.co.jp/search': (request) => {
         const query = new URL(request.url).searchParams.get('p') ?? '';
@@ -379,42 +475,131 @@ test('a sourced refusal with a quoted takeaway item stays known as not reservabl
 });
 
 test('a listing at another town contributes no rating, address, coordinates or reservation', async () => {
-  const romanized = '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan';
-  const japanese = '日本、〒605-0001 京都府京都市東山区合成町367';
-  for (const [selected, address, known] of [
-    [romanized, '京都府京都市山科区別町367', false],
-    [japanese, '京都府京都市東山区西合成町367', false],
-    [japanese, '京都府京都市東山区合成町367', true],
-  ] as const) {
+  const kyotoPin = { latitude: 35.0, longitude: 135.77 };
+  const ginza = {
+    name: '合成食堂 銀座店',
+    selected: '日本、〒104-0061 東京都中央区銀座4丁目1-1 合成ビルディング 3F',
+    postal: '1040061',
+  };
+  const kyotoCase = { name: '合成', selected: kyoto.address, postal: '6050002' };
+  const cases = [
+    {
+      ...kyotoCase,
+      selected: '367 Goseicho, Higashiyama Ward, Kyoto, 605-0001, Japan',
+      address: '京都府京都市山科区別町367',
+      known: false,
+    },
+    { ...kyotoCase, address: '京都府京都市東山区西合成町367', known: false },
+    { ...kyotoCase, address: '京都府京都市東山区合成町367', known: true },
+    {
+      ...kyotoCase,
+      address: '京都府京都市東山区新地合成町367',
+      point: { latitude: 35.0003, longitude: 135.7702 },
+      known: true,
+    },
+    {
+      ...kyotoCase,
+      address: '京都府京都市東山区新地合成町367',
+      point: { latitude: 35.003, longitude: 135.77 },
+      known: false,
+    },
+    { ...kyotoCase, address: '京都府京都市東山区西合成町367', point: kyotoPin, known: false },
+    { ...ginza, address: '東京都中央区銀座4-1 合成ビルディング 3F', known: true },
+    { ...ginza, address: '東京都中央区別町4-1 合成ビルディング 3F', known: false },
+    { ...ginza, address: '東京都中央区西銀座4-1 合成ビルディング 3F', known: false },
+  ];
+  for (const { name, selected, address, postal, known, ...rest } of cases) {
+    const point = 'point' in rest ? rest.point : undefined;
     const research = agentRun({
       subject: {
         ...subject,
-        ownerQuery: '合成 京都',
-        transientName: '合成',
+        ownerQuery: `${name} 京都`,
+        transientName: name,
         transientAddress: selected,
+        ...(point ? { transientPoint: point } : {}),
       },
-      listing: listingAt(address, '6050002', '予約可', '合成'),
-      search: () => yahoo(`<li><a href="${LISTING}">合成 - 食べログ</a><div>${address}</div></li>`),
+      listing: listingAt(address, postal, '予約可', name, kyotoPin),
+      search: () =>
+        yahoo(`<li><a href="${LISTING}">${name} - 食べログ</a><div>${address}</div></li>`),
       answer: {
         subjectMatch: 'uncertain',
         tabelog: { status: 'known', score: 3.51, url: LISTING },
         reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
         profile: { address },
         evidence: {
-          tabelog: { url: LISTING, quote: '3.51', identityQuote: `合成 ${address}` },
-          reservation: { url: LISTING, quote: '予約可否 予約可', identityQuote: `合成 ${address}` },
-          address: { url: LISTING, quote: address, identityQuote: `合成 ${address}` },
+          tabelog: { url: LISTING, quote: '3.51', identityQuote: `${name} ${address}` },
+          reservation: {
+            url: LISTING,
+            quote: '予約可否 予約可',
+            identityQuote: `${name} ${address}`,
+          },
+          address: { url: LISTING, quote: address, identityQuote: `${name} ${address}` },
         },
       },
     });
     const result = await research.run();
     assert.equal(result.kind, 'observed');
     if (result.kind !== 'observed') return;
-    // The exact same-town listing is the control: the same claims are accepted there.
+    // The same-branch listings are the controls: the same claims are accepted there.
     assert.equal(result.value.tabelog.status, known ? 'known' : 'unknown', address);
     if (known) continue;
     assert.equal(result.value.reservation.status, 'unknown', address);
     assert.equal(result.value.profile?.address, undefined, address);
     assert.equal(result.value.profile?.coordinates, undefined, address);
   }
+});
+
+test('a listing the reader times out on and Tabelog refuses leaves research honestly incomplete', async () => {
+  let reads = 0;
+  // The production reader pair: the scraping service times out, then the direct read is refused.
+  const sourceReader = withSameListingFallback(
+    createFirecrawlRestaurantReader({
+      apiKey: 'test-key',
+      fetch: stubFetch({
+        'https://api.firecrawl.dev/v2/scrape': () => {
+          reads++;
+          return new Response('', { status: 408 });
+        },
+      }),
+    }),
+    (url, signal) =>
+      readTabelogListingResult(
+        url,
+        stubFetch({ 'https://tabelog.com/': () => new Response('', { status: 403 }) }),
+        signal,
+      ),
+  );
+  const research = agentRun({
+    sourceReader,
+    search: () => yahoo(listingRow),
+    // A model that still claims facts from the unread listing.
+    answer: {
+      subjectMatch: 'matched',
+      tabelog: { status: 'known', score: 3.51, url: LISTING },
+      reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
+      evidence: {
+        tabelog: {
+          url: LISTING,
+          quote: '3.51',
+          identityQuote: '合成食堂 中目黒 東京都目黒区中目黒1-2-3',
+        },
+      },
+    },
+  });
+  const result = await research.run();
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(result.sourceAccessIssue, 'blocked');
+  assert.match(
+    researchIssueMessage('blocked', false),
+    /does not mean the restaurant has no rating/u,
+  );
+  assert.equal(result.value.tabelog.status, 'unknown');
+  assert.equal(result.value.reservation.status, 'unknown');
+  assert.equal(result.value.profile?.address, undefined);
+  assert.equal(result.value.profile?.coordinates, undefined);
+  // Bounded: the listing is tried once, the refusal spends no hidden search, and the turn cap holds.
+  assert.equal(reads, 1);
+  assert.ok(research.queries.length <= 2);
+  assert.ok(research.modelCalls() <= 3);
 });

@@ -20,6 +20,8 @@ export interface GooglePlacesTransientPlace {
   readonly relevance: number;
   readonly name: string;
   readonly address: string;
+  /** Only the selected place's details carry Google's map location, for identity checks. */
+  readonly point?: { readonly latitude: number; readonly longitude: number };
 }
 
 export interface GooglePlacesTransientClient {
@@ -102,11 +104,14 @@ export function createGooglePlacesNewClient(options: ClientOptions): GooglePlace
     },
     async getPlace({ placeId }) {
       if (!validText(placeId, 1, 500)) return unavailable();
+      // The selected place is re-read in Japanese, the language of its Tabelog listing, so research
+      // and geocoding compare names and addresses in one script. Search keeps Google's default
+      // language: the Owner's Latin words must still anchor its candidates.
       const value = await call(
         options,
         'places.details.requests',
-        `${placesUrl}/${encodeURIComponent(placeId)}`,
-        'id,displayName,formattedAddress',
+        `${placesUrl}/${encodeURIComponent(placeId)}?languageCode=ja&regionCode=JP`,
+        'id,displayName,formattedAddress,location',
       );
       const place = mapPlace(value, 1);
       return place && place.placeId === placeId ? { ok: true, value: place } : unavailable();
@@ -242,6 +247,7 @@ function toCandidate(
       name,
       address,
       attribution: { label: 'Google Maps', url: mapsUrl.href },
+      ...(place.point ? { point: place.point } : {}),
     },
   };
 }
@@ -253,7 +259,17 @@ function mapPlace(value: unknown, relevance: number): GooglePlacesTransientPlace
   const placeId = text(value.id);
   const name = text(value.displayName.text);
   const address = text(value.formattedAddress);
-  return placeId && name && address ? { placeId, relevance, name, address } : undefined;
+  const location = isRecord(value.location) ? value.location : undefined;
+  const point =
+    typeof location?.latitude === 'number' &&
+    typeof location.longitude === 'number' &&
+    Math.abs(location.latitude) <= 90 &&
+    Math.abs(location.longitude) <= 180
+      ? { latitude: location.latitude, longitude: location.longitude }
+      : undefined;
+  return placeId && name && address
+    ? { placeId, relevance, name, address, ...(point ? { point } : {}) }
+    : undefined;
 }
 
 function isGoogleMapsLink(value: string): boolean {

@@ -171,7 +171,13 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
     async research(input) {
       const subject = input.selectedSubject;
       const signal = AbortSignal.timeout(35_000);
-      const isSubject = (text: string, address?: string, postalCode?: string, name?: string) =>
+      const isSubject = (
+        text: string,
+        address?: string,
+        postalCode?: string,
+        name?: string,
+        point?: Listing['coordinates'],
+      ) =>
         matchesSelectedBranch(
           text,
           subject.transientName,
@@ -180,6 +186,7 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
           address,
           postalCode,
           name,
+          { selected: subject.transientPoint, source: point },
         );
       /** Does a parsed listing describe the selected branch (its aliases count as names)? */
       const isSubjectListing = (listing: Listing, withAliases = true) =>
@@ -190,6 +197,7 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
           listing.address,
           listing.postalCode,
           listing.name,
+          listing.coordinates,
         );
       const evidence: TabelogEvidence[] = [];
       let officialPageBudget = 4;
@@ -287,6 +295,7 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
               details.address,
               details.postalCode,
               details.name,
+              details.coordinates,
             )
           )
             return {

@@ -7,6 +7,7 @@
 import {
   validateEnrichedProfile,
   validateWebResearchOutput,
+  type ResearchSourceIssue,
   type WebResearchPort,
 } from '../add/workflow.ts';
 import { formatOpeningHours } from '../../../shared/hours.ts';
@@ -17,6 +18,7 @@ import {
 import {
   canonicalTableCheckBookingUrl,
   canonicalToretaBookingUrl,
+  explicitReservationMode,
   explicitReservationTiming,
   readTableCheckBookingPage,
   readToretaBookingPage,
@@ -27,6 +29,7 @@ import {
   escapePattern,
   initialResearchQuery,
   isGoogleMapsRatingUrl,
+  simplerResearchQuery,
   matchesSelectedBranch,
   numericToken,
   sameOrigin,
@@ -41,7 +44,7 @@ import {
 import { readOfficialSite } from './official-site.ts';
 import type { RestaurantSourceReader } from './page-reader.ts';
 import { readTabelogListingResult, type TabelogEvidence } from './tabelog-listing.ts';
-import { createWebSearch, type SearchEvidence } from './web-search.ts';
+import { createWebSearch, type SearchEvidence, type SearchOutcome } from './web-search.ts';
 
 export interface AgentConfiguration {
   apiKey: string;
@@ -84,16 +87,10 @@ export function createConfiguredPlaceResearchAgent(options: {
   }
 }
 
-/** Tabelog's reservation row as a reservation rule; absence of a rule stays unknown. */
+/** Tabelog's reservation row as a reservation rule; absent or self-contradicting stays unknown. */
 function listingReservation(policy: string | undefined, url: string, observedAt: string) {
-  const mode = /予約不可/u.test(policy ?? '')
-    ? 'not_reservable'
-    : /完全予約制|予約必須|要予約/u.test(policy ?? '')
-      ? 'reservation_required'
-      : /予約可/u.test(policy ?? '')
-        ? 'reservable'
-        : undefined;
-  return policy && mode
+  const mode = policy ? explicitReservationMode(policy) : undefined;
+  return policy && mode && mode !== 'conflict'
     ? {
         status: 'known' as const,
         mode,
@@ -104,6 +101,24 @@ function listingReservation(policy: string | undefined, url: string, observedAt:
         observedAt,
         freshness: 'fresh' as const,
       }
+    : unknown;
+}
+
+/**
+ * The model's quoted rule against the listing's own row. A verified official page of the branch
+ * wins over the directory; any other disagreement leaves the rule unknown rather than guessed.
+ */
+export function resolveReservation(
+  proposed: Record<string, unknown>,
+  listed: Record<string, unknown>,
+  officialWebsite: string | undefined,
+): Record<string, unknown> {
+  if (proposed.status !== 'known') return listed;
+  if (listed.status !== 'known' || listed.mode === proposed.mode) return proposed;
+  return officialWebsite &&
+    typeof proposed.url === 'string' &&
+    sameOrigin(proposed.url, officialWebsite)
+    ? proposed
     : unknown;
 }
 
@@ -190,7 +205,24 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
       const readUrls = new Set<string>();
       const usedCallIds = new Set<string>();
       let sourceAccessIssue: 'blocked' | 'unavailable' | undefined;
+      let searchIssue: 'search_blocked' | 'search_unavailable' | undefined;
       let nameBridgeRead = false;
+      /** A search the application or model ran; failures are kept for the Owner's message. */
+      const search = async (query: string) => {
+        searches++;
+        const result = await searchProvider.search(query, signal);
+        if (result.kind === 'results') successfulSearches++;
+        else if (result.reason === 'blocked') searchIssue = 'search_blocked';
+        else searchIssue ??= 'search_unavailable';
+        return result;
+      };
+      /** Why research is incomplete: a refused listing read, then (when Tabelog stayed unknown)
+       * a refused or failed search, or searches that found no listing for the branch. */
+      const researchIssue = (tabelogKnown = false): ResearchSourceIssue | undefined =>
+        sourceAccessIssue ??
+        (tabelogKnown || matchedListing() || searches === 0
+          ? undefined
+          : (searchIssue ?? 'no_listing'));
 
       /** The selected branch's listing: the pasted one, or the first listing that matches. */
       const matchedListing = () =>
@@ -458,11 +490,12 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
           tabelog: unknown,
           reservation: unknown,
         });
+        const issue = researchIssue(checked?.tabelog.status === 'known');
         return checked
           ? {
               kind: 'observed' as const,
               value: checked,
-              ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
+              ...(issue ? { sourceAccessIssue: issue } : {}),
             }
           : unavailable;
       };
@@ -470,7 +503,9 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
       /** Facts from the verified listing alone, when the model run fails. */
       const verifiedListingFallback = () => {
         const listing = matchedListing();
-        if (!listing?.restaurant) return unavailable;
+        // Without a listing, a refused or failed search is still a cause worth reporting.
+        if (!listing?.restaurant)
+          return searchIssue ? observed({ tabelog: unknown, reservation: unknown }) : unavailable;
         const observedAt = new Date().toISOString();
         const profile: Record<string, unknown> = {};
         copyListingFacts(profile, listing, observedAt);
@@ -527,21 +562,33 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
         // Anchor discovery in the provider's selected name before the model can mistranslate a
         // neighborhood. This spends one of the same two searches, never an extra hidden one.
         if (!selectedListing && successfulSearches === 0 && readPages) {
-          searches++;
           const query = initialResearchQuery(subject);
-          const result = await searchProvider.search(query, signal);
-          if (result.kind === 'results') {
-            successfulSearches++;
-            await readSearchResults(result.sources);
+          const result = await search(query);
+          if (result.kind === 'results') await readSearchResults(result.sources);
+          // A long query (dictation, building and block numbers) can match nothing. Spend the
+          // second of the same two searches on the selected name and area alone; the selected
+          // branch stays the one that must match. A listing that was found but could not be read
+          // is a source problem, not a query problem, so the model keeps that search.
+          const simpler = simplerResearchQuery(subject);
+          let retry: { query: string; result: SearchOutcome } | undefined;
+          if (!matchedListing() && !sourceAccessIssue && simpler !== query) {
+            retry = { query: simpler, result: await search(simpler) };
+            if (retry.result.kind === 'results') await readSearchResults(retry.result.sources);
           }
           messages.push({
             role: 'user',
             content: JSON.stringify({
               applicationSearch: query,
               sources: result.kind === 'results' ? result.sources : result,
-              remainingSearchCalls: 1,
-              instruction:
-                'Use these source facts only if their branch matches the selected address. One search remains for missing details or a corrected branch. Do not invent translations of the selected name or address. Apply the selected country’s rating policy.',
+              ...(retry
+                ? {
+                    simplerApplicationSearch: retry.query,
+                    simplerSources:
+                      retry.result.kind === 'results' ? retry.result.sources : retry.result,
+                  }
+                : {}),
+              remainingSearchCalls: 2 - searches,
+              instruction: `Use these source facts only if their branch matches the selected address. ${2 - searches === 1 ? 'One search remains' : 'No searches remain'} for missing details or a corrected branch. Do not invent translations of the selected name or address. Apply the selected country’s rating policy.`,
             }),
           });
         }
@@ -555,11 +602,12 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
           (source) =>
             source.restaurant &&
             (source.restaurant.bookingProviderHint ||
-              /予約可|完全予約制|予約必須|要予約/u.test(source.restaurant.reservation ?? '')) &&
+              ['reservable', 'reservation_required'].includes(
+                explicitReservationMode(source.restaurant.reservation ?? '') ?? '',
+              )) &&
             isSubjectListing(source.restaurant),
         )?.restaurant;
         if (bookingSearchListing && !bookingEvidence && searches < 2) {
-          searches++;
           // The listing already fixed the branch; its long address would crowd the merchant page
           // out of a three-result search.
           const hint = bookingSearchListing.bookingProviderHint;
@@ -569,11 +617,8 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
               : hint === 'toreta'
                 ? `${bookingSearchListing.name} Toreta site:yoyaku.toreta.in 予約`
                 : `${bookingSearchListing.name} ${bookingSearchListing.area} reservation 公式 予約`;
-          const result = await searchProvider.search(query, signal);
-          if (result.kind === 'results') {
-            successfulSearches++;
-            await readSearchResults(result.sources, false);
-          }
+          const result = await search(query);
+          if (result.kind === 'results') await readSearchResults(result.sources, false);
           messages.push({
             role: 'user',
             content: JSON.stringify({
@@ -650,12 +695,8 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
             });
             for (const call of batch) {
               usedCallIds.add(call.id);
-              searches++;
-              const result = await searchProvider.search(call.query, signal);
-              if (result.kind === 'results') {
-                successfulSearches++;
-                await readSearchResults(result.sources);
-              }
+              const result = await search(call.query);
+              if (result.kind === 'results') await readSearchResults(result.sources);
               messages.push({
                 role: 'tool',
                 tool_call_id: call.id,
@@ -670,7 +711,7 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
         }
       } catch {
         const recovered = recoverVerifiedListing();
-        return recovered.kind === 'unavailable' && signal.aborted
+        return signal.aborted && !matchedListing()
           ? { kind: 'unavailable', reason: 'timed_out' }
           : recovered;
       }
@@ -682,12 +723,14 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
         const listing = matchedListing();
         // The parsed main listing has its own branch check; do not discard its facts because the
         // model is uncertain.
-        if (proposal.subjectMatch !== 'matched' && !listing && !bookingEvidence)
+        if (proposal.subjectMatch !== 'matched' && !listing && !bookingEvidence) {
+          const issue = researchIssue();
           return {
             kind: 'observed' as const,
             value: { tabelog: unknown, reservation: unknown },
-            ...(sourceAccessIssue ? { sourceAccessIssue } : {}),
+            ...(issue ? { sourceAccessIssue: issue } : {}),
           };
+        }
         const observedAt = new Date().toISOString();
         // oxlint-disable-next-line typescript/no-explicit-any -- untrusted model JSON
         const identityOf = (proof: any) =>
@@ -711,10 +754,9 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
             !supported(quote, evidence)
           )
             return unknown;
-          if (
-            field === 'reservation' &&
-            !['reservable', 'reservation_required', 'not_reservable'].includes(value.mode)
-          )
+          // The mode must be the dine-in rule the quote states; a valid enum next to a quote that
+          // says otherwise (or says nothing) is not evidence.
+          if (field === 'reservation' && explicitReservationMode(quote.quote) !== value.mode)
             return unknown;
           if (
             field === 'tabelog' &&
@@ -857,12 +899,11 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
           const listed = tabelogFact(listing.restaurant, listing.url, observedAt);
           if (listed.status === 'known') tabelog = listed;
           // Absence of a policy is unknown. A refusal is a policy but says nothing about seats.
-          if (reservation.status === 'unknown')
-            reservation = listingReservation(
-              listing.restaurant.reservation,
-              listing.url,
-              observedAt,
-            );
+          reservation = resolveReservation(
+            reservation,
+            listingReservation(listing.restaurant.reservation, listing.url, observedAt),
+            listing.restaurant.officialWebsite,
+          );
         }
         addBookingLink(profile, observedAt);
         if (bookingEvidence)

@@ -133,10 +133,22 @@ export type WebResearchInput =
       readonly selectedSubject: CatalogIntakeSelectedSubject;
     };
 
+/**
+ * Why research came back incomplete: Tabelog refused (`blocked`) or failed (`unavailable`) the
+ * listing read, the search provider refused or failed, or searches found no listing for the
+ * selected branch.
+ */
+export type ResearchSourceIssue =
+  | 'blocked'
+  | 'unavailable'
+  | 'search_blocked'
+  | 'search_unavailable'
+  | 'no_listing';
+
 export type WebResearchOutcome =
   | {
       readonly kind: 'observed';
-      readonly sourceAccessIssue?: 'blocked' | 'unavailable';
+      readonly sourceAccessIssue?: ResearchSourceIssue;
       readonly value: {
         readonly tabelog: CatalogIntakeTabelogSnapshot;
         readonly reservation: CatalogIntakeReservationSnapshot;
@@ -516,7 +528,7 @@ export function createCatalogIntakeModule(options: CatalogIntakeOptions): Catalo
       readonly reservation: CatalogIntakeReservationSnapshot;
     } = { tabelog: { status: 'unknown' }, reservation: { status: 'unknown' } };
     // Why research is incomplete, which picks the warning the Owner sees.
-    let researchIssue: 'timed_out' | 'blocked' | 'source_unavailable' | 'failed' | undefined;
+    let researchIssue: ResearchSourceIssue | 'timed_out' | 'failed' | undefined;
     if (
       (options.enrichmentPolicy === 'enrich_if_available' ||
         (options.enrichmentPolicy === undefined && input.requestResearch === true)) &&
@@ -537,10 +549,7 @@ export function createCatalogIntakeModule(options: CatalogIntakeOptions): Catalo
         if (!normalized)
           return addFailure('dependency_failure', 'Web research returned an invalid response.');
         researched = normalized;
-        researchIssue =
-          research.sourceAccessIssue === 'unavailable'
-            ? 'source_unavailable'
-            : research.sourceAccessIssue;
+        researchIssue = research.sourceAccessIssue;
       }
     }
     const profile = mergeEnrichedProfile(
@@ -573,16 +582,7 @@ export function createCatalogIntakeModule(options: CatalogIntakeOptions): Catalo
         : ownerReservation;
 
     // 4. The preview the Owner reviews.
-    const unavailableMessage =
-      researchIssue === 'timed_out'
-        ? 'Restaurant research timed out. Your selected branch is retained. Retry the lookup, or paste its full Tabelog listing URL to read that exact branch.'
-        : researchIssue === 'blocked'
-          ? 'Tabelog refused the server request. Automatic research is incomplete; this does not mean the restaurant has no rating or reservation information. Your selected restaurant is retained.'
-          : researchIssue === 'source_unavailable'
-            ? 'The restaurant source could not be read. Automatic research is incomplete; missing fields are not evidence that the information does not exist.'
-            : geocoderUnavailable
-              ? 'Durable location lookup is unavailable; review the owner-provided details.'
-              : 'Web research is unavailable; review the owner-provided details.';
+    const unavailableMessage = researchIssueMessage(researchIssue, geocoderUnavailable);
     const preview = await withDigest({
       sessionId: session.sessionId,
       previewVersion: prior ? prior.previewVersion + 1 : 1,
@@ -780,7 +780,11 @@ export function createCatalogIntakeModule(options: CatalogIntakeOptions): Catalo
             prior.warnings,
             hasStaleAgentEvidence(tabelog, reservation),
           )
-        : withoutRefreshFailureWarnings(prior.warnings);
+        : // A select-time research gap stays until research actually runs again.
+          withoutRefreshFailureWarnings(
+            prior.warnings,
+            researchAttempted ? undefined : isResearchIssueMessage,
+          );
 
     // 4. Anything that changed goes back to the Owner as a new preview.
     if (
@@ -1076,6 +1080,48 @@ async function withDigest(
   preview: Omit<CatalogIntakePreview, 'evidenceDigest'>,
 ): Promise<CatalogIntakePreview> {
   return { ...preview, evidenceDigest: await digestCanonical(preview) };
+}
+
+const researchIssues = [
+  'timed_out',
+  'blocked',
+  'unavailable',
+  'search_blocked',
+  'search_unavailable',
+  'no_listing',
+] as const;
+
+/** Is this warning one of the select-time research causes below? */
+export function isResearchIssueMessage(message: string): boolean {
+  return researchIssues.some((issue) => researchIssueMessage(issue, false) === message);
+}
+
+/** The Owner's warning for incomplete research. It names only the source that was tried. */
+export function researchIssueMessage(
+  issue: ResearchSourceIssue | 'timed_out' | 'failed' | undefined,
+  geocoderUnavailable: boolean,
+): string {
+  const incomplete =
+    'Automatic research is incomplete; missing fields are not evidence that the information does not exist.';
+  const pasteListing = 'paste its full Tabelog listing URL to read that exact branch.';
+  switch (issue) {
+    case 'timed_out':
+      return `Restaurant research timed out. Your selected branch is retained. Retry the lookup, or ${pasteListing}`;
+    case 'blocked':
+      return 'Tabelog refused the server request. Automatic research is incomplete; this does not mean the restaurant has no rating or reservation information. Your selected restaurant is retained.';
+    case 'unavailable':
+      return `The restaurant source could not be read. ${incomplete}`;
+    case 'search_blocked':
+      return `The web search service refused the server request, so no Tabelog listing was read. ${incomplete} Your selected restaurant is retained; retry later, or ${pasteListing}`;
+    case 'search_unavailable':
+      return `Web search returned no usable results, so no Tabelog listing was read. ${incomplete} Your selected restaurant is retained; retry later, or ${pasteListing}`;
+    case 'no_listing':
+      return `Search found no Tabelog listing that matches the selected branch. ${incomplete} Your selected restaurant is retained; ${pasteListing}`;
+    default:
+      return geocoderUnavailable
+        ? 'Durable location lookup is unavailable; review the owner-provided details.'
+        : 'Web research is unavailable; review the owner-provided details.';
+  }
 }
 
 /** A publishable place has a title, an address and known coordinates, and no open conflict. */

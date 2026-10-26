@@ -139,6 +139,25 @@ export function initialResearchQuery(subject: {
   return `${parts.join(' ')} site:tabelog.com`;
 }
 
+/**
+ * The selected name and its city or ward only. It survives what can sink the first query
+ * (dictation, building names, block numbers); the selected branch still has to match.
+ */
+export function simplerResearchQuery(subject: {
+  readonly transientName: string;
+  readonly transientAddress: string;
+}): string {
+  const address = subject.transientAddress.normalize('NFKC');
+  const area =
+    address
+      .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
+      .match(
+        /[\p{Script=Han}\p{Script=Katakana}ー]+?市(?:[\p{Script=Han}\p{Script=Katakana}ー]+?区)?|[\p{Script=Han}\p{Script=Katakana}ー]+?区/u,
+      )?.[0] ?? address.match(/\b([A-Za-z]+)[\s-](?:City|Ward|ku)\b/u)?.[1];
+  const name = subject.transientName.slice(0, 200).trim();
+  return `${[name, area].filter(Boolean).join(' ')} site:tabelog.com`;
+}
+
 export function isGoogleMapsRatingUrl(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   try {
@@ -294,6 +313,80 @@ function streetNumbers(value: string): string[] {
   );
 }
 
+/**
+ * Outside central Tokyo a branch is often a short Japanese name at a single lot number (no
+ * hyphenated block), and Google and Tabelog can file it under neighbouring postcodes. Such a
+ * listing is the selected branch only when every independent anchor agrees: the listing's exact
+ * name is the provider name or a whole word the Owner typed, the single lot is the same, the
+ * postcodes share their area prefix, no floor differs, and the provider's Japanese municipality
+ * and town both appear in the listing. A romanized provider address cannot be read against
+ * Japanese town names, and a prefecture or postal area is no substitute, so it stays unknown.
+ */
+function matchesSingleLotBranch(
+  name: string,
+  address: string,
+  ownerQuery: string,
+  sourceAddress: string,
+  sourcePostalCode: string | undefined,
+  sourceName: string,
+): boolean {
+  const key = (value: string) =>
+    value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[\p{P}\p{Z}\s]/gu, '');
+  const listed = key(sourceName);
+  const ownerWords = ownerQuery.split(/\s+/u).map(key);
+  if (
+    listed.length < 2 ||
+    !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(listed) ||
+    (key(name) !== listed && !ownerWords.includes(listed))
+  )
+    return false;
+  const postalCode = (value: string) =>
+    value
+      .normalize('NFKC')
+      .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
+      ?.replace(/\D/gu, '');
+  const selectedPostalCode = postalCode(address);
+  const sourceCode = sourcePostalCode ?? postalCode(sourceAddress);
+  if (selectedPostalCode && sourceCode && selectedPostalCode.slice(0, 3) !== sourceCode.slice(0, 3))
+    return false;
+  // A floor only one side states is not a conflict; two different floors are.
+  const selectedFloor = floorNumber(address);
+  const sourceFloor = floorNumber(sourceAddress);
+  if (selectedFloor !== undefined && sourceFloor !== undefined && selectedFloor !== sourceFloor)
+    return false;
+  const lots = (value: string) =>
+    value
+      .normalize('NFKC')
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+      .replace(/(?:地下\s*\d+\s*階|\b(?:b\s*)?\d+\s*f\b|\d+\s*階)/giu, ' ')
+      .match(/\d+/gu) ?? [];
+  const selectedLots = lots(address);
+  const sourceLots = lots(sourceAddress);
+  if (selectedLots.length !== 1 || sourceLots.length !== 1 || selectedLots[0] !== sourceLots[0])
+    return false;
+  // The whole locality before the lot (city, ward and town) must be the same in Japanese script:
+  // 西合成町 is another town than 合成町, not a spelling of it.
+  const locality = (value: string) => {
+    const local = value
+      .normalize('NFKC')
+      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+      .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
+      .replace(/\s/gu, '');
+    return key(local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '');
+  };
+  const selected = locality(address);
+  const town = selected.replace(/^.*[市区郡]/u, '');
+  return (
+    /[市区郡]/u.test(selected) &&
+    town.length >= 2 &&
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(town) &&
+    selected === locality(sourceAddress)
+  );
+}
+
 export function matchesSelectedBranch(
   quote: string,
   name: string,
@@ -317,6 +410,12 @@ export function matchesSelectedBranch(
       .replace(/\bst\b/gu, 'street')
       .replace(/\bave\b/gu, 'avenue')
       .replace(/[\p{P}\p{Z}\s]/gu, '');
+  if (
+    sourceAddress &&
+    sourceName &&
+    matchesSingleLotBranch(name, address, ownerQuery, sourceAddress, sourcePostalCode, sourceName)
+  )
+    return true;
   const text = normalize(quote);
   const selectedName = normalize(name);
   const selectedAddress = normalize(address);

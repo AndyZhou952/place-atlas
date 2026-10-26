@@ -367,3 +367,40 @@ export async function readToretaBookingPage(
     return { kind: 'unavailable' };
   }
 }
+
+export type ReservationMode = 'reservable' | 'reservation_required' | 'not_reservable';
+
+/**
+ * The dine-in reservation rule a source states explicitly: one mode, `conflict` when its dine-in
+ * statements disagree, or undefined when it states none. A takeaway or delivery statement is a
+ * different service and is set aside up to the end of its sentence or parenthesis, across any
+ * quoted item names (「予約不可 ※テイクアウトの「弁当」のみ電話予約可」 is not_reservable).
+ */
+export function explicitReservationMode(text: string): ReservationMode | 'conflict' | undefined {
+  const dineIn = text
+    .normalize('NFKC')
+    .replace(
+      /(?:テイクアウト|持ち帰り|持帰り|デリバリー|出前|take[\s-]?out|take[\s-]?away|to[\s-]?go|delivery)[\s\S]*?(?=[。\n※);；]|\.\s|$)/giu,
+      ' ',
+    );
+  // A refusal is taken out before the positive and required rules are read, so "not reservable"
+  // or "No reservations accepted" is never also read as an acceptance.
+  const refusal =
+    /予約不可|予約(?:は|を)?(?:受け付けて|受付して)?(?:おりません|いません)|予約できません|予約を?お断り|no reservations?(?: (?:are |is )?(?:accepted|taken|available))?|reservations? (?:are |is )?not (?:accepted|available|possible|taken)|not reservable/giu;
+  const rest = dineIn.replace(refusal, ' ').replace(/予約可否/gu, ' ');
+  const modes = new Set<ReservationMode>();
+  if (dineIn.search(refusal) >= 0) modes.add('not_reservable');
+  if (
+    /完全予約制|予約必須|要予約|予約制|reservations? (?:are |is )?required|(?:by )?reservations? only/iu.test(
+      rest,
+    )
+  )
+    modes.add('reservation_required');
+  if (
+    /予約可|予約(?:を)?(?:承|受け付け)(?:ります|ております|ています)|reservations? (?:are |is )?(?:accepted|available|possible)|reservable/iu.test(
+      rest,
+    )
+  )
+    modes.add('reservable');
+  return modes.size > 1 ? 'conflict' : [...modes][0];
+}

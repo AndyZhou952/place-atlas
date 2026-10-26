@@ -787,9 +787,13 @@ export function hasStaleAgentEvidence(
 
 export function withoutRefreshFailureWarnings(
   warnings: readonly CatalogIntakeWarning[],
+  keep?: (message: string) => boolean,
 ): readonly CatalogIntakeWarning[] {
   return canonicalizeCatalogIntakeWarnings(
-    warnings.filter(({ code }) => code !== 'stale_evidence' && code !== 'provider_unavailable'),
+    warnings.filter(
+      ({ code, message }) =>
+        code !== 'stale_evidence' && (code !== 'provider_unavailable' || keep?.(message)),
+    ),
   );
 }
 

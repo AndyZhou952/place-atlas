@@ -8,7 +8,7 @@ import {
   readTabelogListingResult,
   type TabelogReadResult,
 } from './tabelog-listing.ts';
-import { readBoundedText } from './web-search.ts';
+import { logProviderFailure, readBoundedText } from './web-search.ts';
 
 /** Narrow adapter contract for Cloudflare Browser Run's native binding. */
 export interface BrowserContentBinding {
@@ -125,24 +125,34 @@ export function createFirecrawlRestaurantReader(
       if (!response.ok) {
         await response.body?.cancel();
         // This is a reader-service failure/quota, not proof that Tabelog refused access.
+        logProviderFailure('firecrawl', 'unavailable', response.status);
         return { kind: 'unavailable' };
       }
       const payload: unknown = JSON.parse(await readBoundedText(response, 2_097_152));
       signal.throwIfAborted();
-      if (!isRecord(payload) || payload.success !== true || !isRecord(payload.data))
+      if (!isRecord(payload) || payload.success !== true || !isRecord(payload.data)) {
+        logProviderFailure('firecrawl', 'unavailable', response.status);
         return { kind: 'unavailable' };
+      }
       const { rawHtml, metadata } = payload.data;
-      if (!isRecord(metadata)) return { kind: 'invalid_source' };
-      if ([401, 403, 429].includes(Number(metadata.statusCode))) return { kind: 'blocked' };
-      if (metadata.statusCode !== 200 || typeof rawHtml !== 'string')
-        return { kind: 'unavailable' };
-      // The requested sourceURL alone is insufficient: validate the resulting page URL too.
-      if (!sameListing(metadata.url, target) || !sameListing(metadata.sourceURL, target))
-        return { kind: 'invalid_source' };
-      if (isTabelogAccessChallenge(rawHtml)) return { kind: 'blocked' };
-      const evidence = parseTabelogListing(rawHtml, target.href);
-      return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
+      const sourceStatus = isRecord(metadata) ? Number(metadata.statusCode) : undefined;
+      const result = ((): TabelogReadResult => {
+        if (!isRecord(metadata)) return { kind: 'invalid_source' };
+        if ([401, 403, 429].includes(Number(metadata.statusCode))) return { kind: 'blocked' };
+        if (metadata.statusCode !== 200 || typeof rawHtml !== 'string')
+          return { kind: 'unavailable' };
+        // The requested sourceURL alone is insufficient: validate the resulting page URL too.
+        if (!sameListing(metadata.url, target) || !sameListing(metadata.sourceURL, target))
+          return { kind: 'invalid_source' };
+        if (isTabelogAccessChallenge(rawHtml)) return { kind: 'blocked' };
+        const evidence = parseTabelogListing(rawHtml, target.href);
+        return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
+      })();
+      if (result.kind !== 'read')
+        logProviderFailure('firecrawl', result.kind, response.status, sourceStatus);
+      return result;
     } catch {
+      logProviderFailure('firecrawl', signal.aborted ? 'timeout' : 'transport');
       return { kind: 'unavailable' };
     }
   };

@@ -1,5 +1,5 @@
 import { isTabelogRestaurantListing } from './instructions.ts';
-import { readBoundedText, type SearchEvidence } from './web-search.ts';
+import { logProviderFailure, readBoundedText, type SearchEvidence } from './web-search.ts';
 
 export interface TabelogEvidence extends SearchEvidence {
   englishListingUrl?: string;
@@ -51,25 +51,32 @@ export async function readTabelogListingResult(
   const target = new URL(url);
   target.search = '';
   target.hash = '';
+  const limit = AbortSignal.any([parentSignal, AbortSignal.timeout(5000)]);
   try {
     const response = await fetcher(target.href, {
       redirect: 'manual',
-      signal: AbortSignal.any([parentSignal, AbortSignal.timeout(5000)]),
+      signal: limit,
       headers: { Accept: 'text/html', 'User-Agent': 'JapanAtlas/1.0' },
     });
-    if ([401, 403, 429].includes(response.status)) {
-      await response.body?.cancel();
-      return { kind: 'blocked' };
-    }
-    if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) {
-      await response.body?.cancel();
-      return { kind: 'unavailable' };
-    }
-    const html = await readBoundedText(response, 1_048_576);
-    if (isTabelogAccessChallenge(html)) return { kind: 'blocked' };
-    const evidence = parseTabelogListing(html, url);
-    return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
+    const result = await (async (): Promise<TabelogReadResult> => {
+      if ([401, 403, 429].includes(response.status)) {
+        await response.body?.cancel();
+        return { kind: 'blocked' };
+      }
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) {
+        await response.body?.cancel();
+        return { kind: 'unavailable' };
+      }
+      const html = await readBoundedText(response, 1_048_576);
+      if (isTabelogAccessChallenge(html)) return { kind: 'blocked' };
+      const evidence = parseTabelogListing(html, url);
+      return evidence ? { kind: 'read', evidence } : { kind: 'invalid_source' };
+    })();
+    if (result.kind !== 'read')
+      logProviderFailure('tabelog', result.kind, undefined, response.status);
+    return result;
   } catch {
+    logProviderFailure('tabelog', limit.aborted ? 'timeout' : 'transport');
     return { kind: 'unavailable' };
   }
 }

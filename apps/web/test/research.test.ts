@@ -20,6 +20,8 @@ import {
   simplerResearchQuery,
 } from '../src/server/agent/research/branch-match.ts';
 import { stubFetch } from './fixtures.ts';
+import { createFirecrawlRestaurantReader } from '../src/server/agent/research/page-reader.ts';
+import { readTabelogListingResult } from '../src/server/agent/research/tabelog-listing.ts';
 
 // A short Japanese name at a single-number lot; Google and the listing use neighbouring postcodes.
 const kyoto = {
@@ -136,6 +138,42 @@ test('a romanized provider address never matches a single-lot listing on name, l
   assert.equal(fromRomanized('京都府京都市東山区別町367'), false, 'another town');
   assert.equal(fromRomanized('京都府京都市山科区別町367'), false, 'another ward');
   assert.equal(fromRomanized('京都府京都市東山区合成町367'), false, 'uncorroborated town');
+});
+
+test('failed reads log the reader status apart from the page status, without the URL', async () => {
+  const url = 'https://tabelog.com/tokyo/A1317/A131701/13999901/';
+  const logged: unknown[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => logged.push(args);
+  try {
+    await createFirecrawlRestaurantReader({
+      apiKey: 'test-key',
+      fetch: stubFetch({ 'https://api.firecrawl.dev/': () => new Response('', { status: 521 }) }),
+    })(url, AbortSignal.timeout(1000));
+    await createFirecrawlRestaurantReader({
+      apiKey: 'test-key',
+      fetch: stubFetch({
+        'https://api.firecrawl.dev/': () =>
+          Response.json({ success: true, data: { rawHtml: '', metadata: { statusCode: 403 } } }),
+      }),
+    })(url, AbortSignal.timeout(1000));
+    await readTabelogListingResult(
+      url,
+      stubFetch({ 'https://tabelog.com/': () => new Response('', { status: 403 }) }),
+      AbortSignal.timeout(1000),
+    );
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(logged, [
+    ['provider_call', { provider: 'firecrawl', resultClass: 'unavailable', status: 521 }],
+    [
+      'provider_call',
+      { provider: 'firecrawl', resultClass: 'blocked', status: 200, sourceStatus: 403 },
+    ],
+    ['provider_call', { provider: 'tabelog', resultClass: 'blocked', sourceStatus: 403 }],
+  ]);
+  assert.doesNotMatch(JSON.stringify(logged), /tabelog\.com/u);
 });
 
 test('reservation meaning: takeaway exceptions do not decide the dine-in rule', () => {

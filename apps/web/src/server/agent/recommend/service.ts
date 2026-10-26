@@ -1,8 +1,9 @@
-import type { AtlasItem } from '../add/stored-item.ts';
-import type { CatalogRead } from '../add/stored-item.ts';
+// The Recommend conversation: the model only interprets the request; the saved catalog, this
+// code and the route sidecar decide origins, distances, walking times and the answer.
+import type { AtlasItem, CatalogRead } from '../add/stored-item.ts';
 import { itemFoodKeys } from './food.ts';
 import { distanceInKm } from './geo-distance.ts';
-import type { LocationResolver, RouteProvider, TransitRouteProvider } from './route-ports.ts';
+import type { LocationResolver, RouteProvider } from './routes.ts';
 import {
   parseRecommendConversationInput,
   type RecommendConversationInput,
@@ -15,8 +16,11 @@ import {
   type RecommendDecisionOrigin,
   type RecommendRouteObservation,
 } from './decision.ts';
-import { normalizeRecommendIntent, type RecommendOriginOption } from './intent.ts';
-import { normalizeSearchText } from './search-policy.ts';
+import {
+  normalizeRecommendIntent,
+  normalizeSearchText,
+  type RecommendOriginOption,
+} from './intent.ts';
 import { materializeRecommendReceipt, type RecommendRouteSource } from './receipt.ts';
 
 export interface RecommendInterpreter {
@@ -31,7 +35,6 @@ export interface RecommendConversationDependencies {
   readonly interpreter: RecommendInterpreter;
   readonly locationResolver: LocationResolver;
   readonly routeProvider: RouteProvider;
-  readonly transitRouteProvider?: TransitRouteProvider;
   readonly clock: { readonly now: () => Date };
 }
 
@@ -470,11 +473,11 @@ export function createRecommendConversationService(
         ).map((item) => item.id),
       );
       const routeItems = eligibleItems.filter((item) => relevantIds.has(item.id));
+      // Google returns no train routes in Japan, so a train time can never be verified.
       const transitUnsupported =
         point !== undefined &&
         routeItems.length > 0 &&
-        (intent.travelMode === 'transit' || intent.travelMode === 'either') &&
-        dependencies.transitRouteProvider?.coverage?.(point) === 'unsupported_region';
+        (intent.travelMode === 'transit' || intent.travelMode === 'either');
       if (transitUnsupported && intent.travelMode === 'transit') return unsupportedJapanTrain();
       if (point && intent.travelMode !== 'none') {
         if (intent.travelMode === 'walk' || intent.travelMode === 'either') {
@@ -520,81 +523,7 @@ export function createRecommendConversationService(
             routeState = 'unavailable';
           }
         }
-        if (intent.travelMode === 'transit' || intent.travelMode === 'either') {
-          if (transitUnsupported || !dependencies.transitRouteProvider) routeState = 'unavailable';
-          else {
-            const transitLimitMinutes = intent.maxMinutes ?? 20;
-            const shortlist = routeItems
-              .map((item) => ({
-                item,
-                meters:
-                  distances.find((distance) => distance.itemId === item.id)?.meters ?? Infinity,
-              }))
-              .filter(({ meters }) => meters <= transitLimitMinutes * 6_000 + 2_000)
-              .sort(
-                (a, b) =>
-                  (intent.visited === 'prefer_unvisited' && a.item.hasVisited ? 1 : 0) -
-                    (intent.visited === 'prefer_unvisited' && b.item.hasVisited ? 1 : 0) ||
-                  a.meters - b.meters,
-              );
-            let foundDirectRoute = false;
-            for (
-              let offset = 0;
-              offset < Math.min(shortlist.length, 10) && !foundDirectRoute;
-              offset += 5
-            ) {
-              const batch = shortlist.slice(offset, offset + 5);
-              const batchMatches = await Promise.all(
-                batch.map(async ({ item }) => {
-                  try {
-                    const route = await dependencies.transitRouteProvider!.transit(point, {
-                      latitude: item.latitude,
-                      longitude: item.longitude,
-                    });
-                    const fresh =
-                      currentRoute(route, dependencies.clock.now()) &&
-                      route.status === 'fresh' &&
-                      Number.isFinite(route.durationSeconds) &&
-                      route.durationSeconds >= 0;
-                    if (
-                      route.status === 'unavailable' ||
-                      route.status === 'stale' ||
-                      (route.status === 'no_direct_route' &&
-                        !recentTimestamp(route.checkedAt, dependencies.clock.now()))
-                    )
-                      routeState = 'unavailable';
-                    routes.push({
-                      itemId: item.id,
-                      mode: 'transit',
-                      seconds: route.status === 'fresh' ? route.durationSeconds : null,
-                      status: fresh ? 'fresh' : 'unavailable',
-                      transfers: route.status === 'fresh' ? route.transferCount : undefined,
-                      doorToDoor: route.status === 'fresh' && route.boardingCount >= 1,
-                    });
-                    if (fresh)
-                      routeSources.set(`${item.id}:transit`, {
-                        seconds: route.durationSeconds,
-                        checkedAt: route.checkedAt,
-                        source: route.attribution,
-                      });
-                    return (
-                      fresh &&
-                      route.status === 'fresh' &&
-                      route.transferCount === 0 &&
-                      route.boardingCount === 1 &&
-                      route.durationSeconds <= transitLimitMinutes * 60
-                    );
-                  } catch {
-                    routeState = 'unavailable';
-                    return false;
-                  }
-                }),
-              );
-              foundDirectRoute = batchMatches.some(Boolean);
-            }
-            if (!foundDirectRoute && shortlist.length > 10) routeState = 'unavailable';
-          }
-        }
+        if (transitUnsupported) routeState = 'unavailable';
       }
       const decision = decideRecommend(
         {

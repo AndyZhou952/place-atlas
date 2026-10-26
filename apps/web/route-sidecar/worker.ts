@@ -1,15 +1,14 @@
+// The route sidecar Worker: the only place the Google Maps key lives. The main Worker reaches it
+// through the ROUTE_SIDECAR service binding and meters every call before making it.
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
-import {
-  type RouteSidecarGeocodeRequest,
-  type RouteSidecarGeocodeResult,
-  type RouteSidecarWalkingMatrixRequest,
-  type RouteSidecarWalkingMatrixResult,
-  type RouteSidecarTransitRequest,
-  type RouteSidecarTransitResult,
-} from './route-sidecar-contract.ts';
-import { createGoogleRouteSidecarService } from './route-sidecar-service.ts';
-import { createOperationalNearbyDiagnosticRecorder } from './nearby-diagnostic-recorder.ts';
+import type {
+  RouteSidecarGeocodeRequest,
+  RouteSidecarGeocodeResult,
+  RouteSidecarWalkingMatrixRequest,
+  RouteSidecarWalkingMatrixResult,
+} from './contract.ts';
+import { createGoogleRouteSidecarService } from './google.ts';
 
 // The raw secret is deliberately absent from Wrangler config. Keep its runtime
 // surface narrow here instead of committing a path-sensitive generated Env.
@@ -30,16 +29,11 @@ export default class RouteSidecarWorker extends WorkerEntrypoint<RouteSidecarEnv
     return this.#service().walkingMatrix(request);
   }
 
-  transit(request: RouteSidecarTransitRequest): Promise<RouteSidecarTransitResult> {
-    return this.#service().transit(request);
-  }
-
   #service() {
     return createGoogleRouteSidecarService({
       apiKey: this.env.GOOGLE_MAPS_API_KEY,
       clock: () => new Date(),
       fetch: (url, init) => fetch(url, init),
-      diagnosticRecorder: createOperationalNearbyDiagnosticRecorder(),
     });
   }
 }

@@ -1,3 +1,5 @@
+// The RPC contract between the main Worker and the route sidecar Worker, which alone holds the
+// Google Maps key. Requests are checked on both sides of the binding.
 export const GOOGLE_ROUTE_SIDECAR_PROVIDER_ID = 'google-maps-platform' as const;
 
 export const GOOGLE_ROUTE_SIDECAR_ATTRIBUTION = {
@@ -16,82 +18,46 @@ export interface RouteSidecarGeocodeRequest {
   readonly locationHint: string;
 }
 
-export interface RouteSidecarGeocodeEvidence {
-  readonly candidates: readonly {
-    readonly formattedAddress: string;
-    readonly point: RouteSidecarPoint;
-  }[];
-  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
-  readonly source: {
-    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
-    readonly endpoint: string;
-  };
-  readonly checkedAt: string;
-}
-
 export interface RouteSidecarWalkingMatrixRequest {
   readonly origin: RouteSidecarPoint;
   readonly destinations: readonly RouteSidecarPoint[];
 }
 
-export interface RouteSidecarWalkingMatrixEvidence {
+interface RouteSidecarEvidenceBase {
+  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
+  readonly source: {
+    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
+    readonly endpoint: string;
+  };
+  readonly checkedAt: string;
+}
+
+export interface RouteSidecarGeocodeEvidence extends RouteSidecarEvidenceBase {
+  readonly candidates: readonly {
+    readonly formattedAddress: string;
+    readonly point: RouteSidecarPoint;
+  }[];
+}
+
+export interface RouteSidecarWalkingMatrixEvidence extends RouteSidecarEvidenceBase {
   readonly routes: readonly {
     readonly destinationIndex: number;
     readonly durationSeconds: number | null;
     readonly distanceMeters: number | null;
   }[];
-  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
-  readonly source: {
-    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
-    readonly endpoint: string;
-  };
-  readonly checkedAt: string;
-}
-
-export interface RouteSidecarTransitRequest {
-  readonly origin: RouteSidecarPoint;
-  readonly destination: RouteSidecarPoint;
-}
-
-export interface RouteSidecarTransitEvidence {
-  readonly directRoute: {
-    readonly durationSeconds: number;
-    readonly lineIdentity: string;
-  } | null;
-  readonly attribution: typeof GOOGLE_ROUTE_SIDECAR_ATTRIBUTION;
-  readonly source: {
-    readonly providerId: typeof GOOGLE_ROUTE_SIDECAR_PROVIDER_ID;
-    readonly endpoint: string;
-  };
-  readonly checkedAt: string;
 }
 
 export type RouteSidecarFailure = {
   readonly ok: false;
-  readonly error:
-    | 'invalid_request'
-    | 'not_configured'
-    | 'unsupported_region'
-    | 'dependency_failure'
-    | 'quota_exceeded';
+  readonly error: 'invalid_request' | 'not_configured' | 'dependency_failure' | 'quota_exceeded';
 };
 
 export type RouteSidecarGeocodeResult =
-  | {
-      readonly ok: true;
-      readonly evidence: RouteSidecarGeocodeEvidence;
-    }
+  | { readonly ok: true; readonly evidence: RouteSidecarGeocodeEvidence }
   | RouteSidecarFailure;
 
 export type RouteSidecarWalkingMatrixResult =
-  | {
-      readonly ok: true;
-      readonly evidence: RouteSidecarWalkingMatrixEvidence;
-    }
-  | RouteSidecarFailure;
-
-export type RouteSidecarTransitResult =
-  | { readonly ok: true; readonly evidence: RouteSidecarTransitEvidence }
+  | { readonly ok: true; readonly evidence: RouteSidecarWalkingMatrixEvidence }
   | RouteSidecarFailure;
 
 export interface GoogleRouteSidecarPort {
@@ -99,16 +65,6 @@ export interface GoogleRouteSidecarPort {
   walkingMatrix(
     request: RouteSidecarWalkingMatrixRequest,
   ): Promise<RouteSidecarWalkingMatrixResult>;
-  transit(request: RouteSidecarTransitRequest): Promise<RouteSidecarTransitResult>;
-}
-
-export function isRouteSidecarTransitRequest(value: unknown): value is RouteSidecarTransitRequest {
-  return (
-    isRecord(value) &&
-    hasExactKeys(value, ['origin', 'destination']) &&
-    isRouteSidecarPoint(value.origin) &&
-    isRouteSidecarPoint(value.destination)
-  );
 }
 
 export function isRouteSidecarGeocodeRequest(value: unknown): value is RouteSidecarGeocodeRequest {
@@ -155,6 +111,6 @@ function hasExactKeys(value: Readonly<Record<string, unknown>>, keys: readonly s
   return actual.length === keys.length && keys.every((key) => actual.includes(key));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

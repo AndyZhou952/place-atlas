@@ -1,5 +1,5 @@
 import type { BrowserContentBinding } from './agent/research/page-reader.ts';
-import type { RouteSidecarServiceBinding } from './agent/recommend/route-sidecar-client.ts';
+import type { RouteSidecarServiceBinding } from './agent/recommend/routes.ts';
 
 export interface Env {
   readonly DB: D1Database;

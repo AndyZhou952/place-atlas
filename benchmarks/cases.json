@@ -229,6 +229,24 @@
         }
       },
       {
+        "name": "Train time limit in Japan",
+        "request": "新宿駅から電車15分以内のラーメン",
+        "interpretation": {
+          "action": "recommend",
+          "originId": null,
+          "originText": "新宿駅",
+          "originKind": "station",
+          "foodTerms": ["ramen"],
+          "excludedFoodTerms": [],
+          "travelMode": "transit",
+          "maxMinutes": 15,
+          "visited": "prefer_unvisited"
+        },
+        "expect": {
+          "status": "unavailable"
+        }
+      },
+      {
         "name": "Nothing fits",
         "request": "ベトナム料理が食べたい",
         "interpretation": {

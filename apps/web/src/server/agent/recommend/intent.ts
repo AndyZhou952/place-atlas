@@ -1,5 +1,4 @@
 import { foodKey } from './food.ts';
-import { normalizeSearchText } from './search-policy.ts';
 
 export interface RecommendOriginOption {
   readonly id: string;
@@ -268,4 +267,12 @@ export function normalizeRecommendIntent(
     return clarify(kind, questions[kind]);
   }
   return { action: 'recommend', ...common };
+}
+
+/** Folds width, case, punctuation and spaces so names compare as typed. */
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu, '');
 }

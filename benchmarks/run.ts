@@ -13,10 +13,10 @@ import { dirname } from 'node:path';
 import { createAddHarness } from '../apps/web/src/server/agent/add/compose.ts';
 import { executeCatalogIntake } from '../apps/web/src/server/agent/add/workflow.ts';
 import { createRecommendHarness } from '../apps/web/src/server/agent/recommend/compose.ts';
-import type { RouteSidecarServiceBinding } from '../apps/web/src/server/agent/recommend/route-sidecar-client.ts';
+import type { RouteSidecarServiceBinding } from '../apps/web/src/server/agent/recommend/routes.ts';
 import type { Env } from '../apps/web/src/server/env.ts';
-import { createGoogleRouteSidecarService } from '../apps/web/route-sidecar/route-sidecar-service.ts';
-import { GOOGLE_ROUTE_SIDECAR_ATTRIBUTION } from '../apps/web/route-sidecar/route-sidecar-contract.ts';
+import { createGoogleRouteSidecarService } from '../apps/web/route-sidecar/google.ts';
+import { GOOGLE_ROUTE_SIDECAR_ATTRIBUTION } from '../apps/web/route-sidecar/contract.ts';
 import type {
   CatalogIntakeDiscoverOutput,
   CatalogIntakeSelectOutput,
@@ -44,8 +44,9 @@ if (live && !(vars.AGENT_API_KEY && vars.AGENT_BASE_URL && vars.AGENT_MODEL))
 const results: Check[] = [];
 const record = (suite: string, name: string, check: string, pass: boolean, detail = '') =>
   results.push({ suite, name, check, pass, detail });
-// Provider diagnostics go to the Worker log in production; keep the report readable here.
+// Provider warnings go to the Worker log in production; keep the report readable here.
 console.info = () => undefined;
+console.warn = () => undefined;
 
 function environment(db: D1Database, routes?: RouteSidecarServiceBinding): Env {
   return {
@@ -191,9 +192,6 @@ function fixedRoutes(places: Record<string, [number, number]>): RouteSidecarServ
         : { ok: false, error: 'dependency_failure' };
     },
     async walkingMatrix() {
-      return { ok: false, error: 'not_configured' };
-    },
-    async transit() {
       return { ok: false, error: 'not_configured' };
     },
   };

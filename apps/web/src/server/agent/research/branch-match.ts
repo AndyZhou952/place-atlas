@@ -234,14 +234,12 @@ function matchesOmittedBuildingLot(
     .replace(/\p{M}/gu, '')
     .toLowerCase()
     .match(/\b([a-z]+) city\b/u)?.[1];
-  const ward = city ? japaneseLocalities[city] : undefined;
+  // The ward as Google writes it in Japanese (東京都中央区) or in English (Chuo City, Tokyo).
+  const ward =
+    selectedAddress.normalize('NFKC').match(/東京都(\p{Script=Han}+?区)/u)?.[1] ??
+    (city && /\bTokyo\b/iu.test(selectedAddress) ? japaneseLocalities[city] : undefined);
   // Restrict the exception to a corroborated Tokyo ward, not numbers alone.
-  if (
-    !ward?.endsWith('区') ||
-    !/\bTokyo\b/iu.test(selectedAddress) ||
-    !sourceAddress.includes(`東京都${ward}`)
-  )
-    return false;
+  if (!ward?.endsWith('区') || !sourceAddress.includes(`東京都${ward}`)) return false;
   const building = (value: string) => {
     const address = value.normalize('NFKC').replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ');
     const suffix = address.match(

@@ -9,7 +9,10 @@ import { migratedD1, stubFetch } from './fixtures.ts';
 const ORIGIN = 'https://atlas.test';
 const PLACE_ID = 'ChIJsyntheticPlace001';
 
-function setup() {
+function setup(
+  overrides: Partial<Env> = {},
+  routes: Record<string, (request: Request) => Response> = {},
+) {
   const { db } = migratedD1();
   const env: Env = {
     DB: db,
@@ -19,6 +22,7 @@ function setup() {
     GOOGLE_PLACES_API_KEY: 'google-test-key',
     CATALOG_INTAKE_GOOGLE_PLACES_MODE: 'enabled',
     CATALOG_INTAKE_DURABLE_GEOCODER_MODE: 'enabled',
+    ...overrides,
   };
   const place = {
     id: PLACE_ID,
@@ -26,13 +30,17 @@ function setup() {
     formattedAddress: '日本、〒153-0061 東京都目黒区中目黒1-2-3',
   };
   const calls: string[] = [];
+  const urls: string[] = [];
   globalThis.fetch = stubFetch({
-    'https://places.googleapis.com/v1/places:searchText': () => {
+    ...routes,
+    'https://places.googleapis.com/v1/places:searchText': (request) => {
       calls.push('google:search');
+      urls.push(request.url);
       return Response.json({ places: [place] });
     },
-    'https://places.googleapis.com/v1/places/': () => {
+    'https://places.googleapis.com/v1/places/': (request) => {
       calls.push('google:details');
+      urls.push(request.url);
       return Response.json(place);
     },
     'https://nominatim.openstreetmap.org/': () => {
@@ -71,11 +79,11 @@ function setup() {
     const body: any = response.status === 204 ? null : await response.json();
     return { status: response.status, body };
   };
-  return { env, call, calls };
+  return { env, call, calls, urls };
 }
 
 test('Owner Add: Google-verified discover → select → confirm publishes a verified restaurant', async () => {
-  const { call, calls } = setup();
+  const { call, calls, urls } = setup();
   assert.equal((await call('POST', '/api/session', { password: 'owner-pass' })).status, 200);
 
   const discovered = await call('POST', '/api/catalog-intake/discover', {
@@ -105,12 +113,93 @@ test('Owner Add: Google-verified discover → select → confirm publishes a ver
   assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
   assert.equal(confirmed.body.status, 'committed_verified');
   assert.deepEqual([...new Set(calls)], ['google:search', 'google:details', 'nominatim']);
+  // The selected place is re-read in Japanese, like its Tabelog listing; search is not.
+  for (const url of urls)
+    assert.equal(
+      new URL(url).searchParams.get('languageCode'),
+      url.includes(':searchText') ? null : 'ja',
+    );
 
   const saved = (await call('GET', '/api/restaurants')).body.find(
     (restaurant: { title: string }) => restaurant.title === '合成食堂 中目黒',
   );
   assert.equal(saved.googlePlaceId, PLACE_ID);
   assert.equal(saved.prefecture, 'JP-13');
+});
+
+test('a pasted Tabelog URL is read once per Add request, not again for research', async () => {
+  const listing = 'https://tabelog.com/tokyo/A1317/A131701/13999901/';
+  const restaurant = {
+    '@type': 'Restaurant',
+    '@id': listing,
+    name: '合成食堂',
+    address: {
+      addressRegion: '東京都',
+      addressLocality: '目黒区',
+      streetAddress: '中目黒1-2-3',
+      postalCode: '1530061',
+    },
+    geo: { latitude: 35.6441, longitude: 139.6988 },
+    aggregateRating: { '@type': 'AggregateRating', ratingValue: '3.51' },
+  };
+  let reads = 0;
+  const { call } = setup(
+    {
+      CATALOG_INTAKE_GOOGLE_PLACES_MODE: undefined,
+      AGENT_API_KEY: 'test-key',
+      AGENT_BASE_URL: 'https://model.test/v1',
+      AGENT_MODEL: 'test-model',
+    },
+    {
+      [listing]: () => {
+        reads++;
+        return new Response(
+          `<script type="application/ld+json">${JSON.stringify(restaurant)}</script>`,
+          { headers: { 'content-type': 'text/html' } },
+        );
+      },
+      'https://model.test/v1/chat/completions': () =>
+        Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  subjectMatch: 'matched',
+                  tabelog: { status: 'unknown' },
+                  reservation: { status: 'unknown' },
+                }),
+              },
+            },
+          ],
+        }),
+    },
+  );
+  await call('POST', '/api/session', { password: 'owner-pass' });
+  const discovered = await call('POST', '/api/catalog-intake/discover', {
+    input: { query: listing, requestToken: 'request-0003' },
+  });
+  assert.equal(discovered.status, 200, JSON.stringify(discovered.body));
+  assert.equal(discovered.body.candidates[0].transientName, '合成食堂');
+  assert.equal(reads, 1);
+  const selected = await call('POST', '/api/catalog-intake/select', {
+    input: {
+      sessionId: discovered.body.sessionId,
+      expectedSessionVersion: discovered.body.sessionVersion,
+      ordinal: 1,
+    },
+  });
+  assert.equal(selected.status, 200, JSON.stringify(selected.body));
+  assert.equal(selected.body.preview.tabelog.score, 3.51);
+  assert.equal(reads, 2, 'the identity refetch and research share one read');
+  const confirmed = await call('POST', '/api/catalog-intake/confirm', {
+    input: {
+      sessionId: discovered.body.sessionId,
+      expectedPreviewVersion: selected.body.preview.previewVersion,
+    },
+  });
+  assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+  assert.equal(confirmed.body.status, 'committed_verified', JSON.stringify(confirmed.body));
+  assert.equal(reads, 3, 'the confirm refetch and re-research share one read');
 });
 
 test('Add steps after discover must echo the conversation, and need the Owner session', async () => {

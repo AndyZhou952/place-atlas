@@ -1,6 +1,6 @@
 import { createWebSearch } from '../research/web-search.ts';
 import { isTabelogRestaurantListing } from '../research/instructions.ts';
-import { readTabelogListing } from '../research/tabelog-listing.ts';
+import { readTabelogListingResult } from '../research/tabelog-listing.ts';
 import type { RestaurantSourceReader } from '../research/page-reader.ts';
 import type { GooglePlaceDiscoveryCandidate, GooglePlaceDiscoveryPort } from '../add/workflow.ts';
 import { failure } from '../../../shared/result.ts';
@@ -21,15 +21,19 @@ export function createTabelogPlaceDiscoveryPort(
   });
 
   async function read(placeId: string, ordinal: number, signal: AbortSignal) {
-    const result = options.sourceReader ? await options.sourceReader(placeId, signal) : undefined;
-    const listing = options.sourceReader
-      ? result?.kind === 'read'
-        ? result.evidence
-        : undefined
-      : await readTabelogListing(placeId, fetcher, signal);
-    const restaurant = listing?.restaurant;
-    if (!restaurant || !boundedText(restaurant.name) || !boundedText(restaurant.address))
+    const result = options.sourceReader
+      ? await options.sourceReader(placeId, signal)
+      : await readTabelogListingResult(placeId, fetcher, signal);
+    const restaurant = result.kind === 'read' ? result.evidence.restaurant : undefined;
+    if (!restaurant || !boundedText(restaurant.name) || !boundedText(restaurant.address)) {
+      // Which read failed, without the URL: a refused page, an unavailable reader, or a page that
+      // is not a parsable listing.
+      console.warn('tabelog_listing_read', {
+        resultClass: result.kind === 'read' ? 'no_listing_record' : result.kind,
+        timedOut: signal.aborted,
+      });
       return undefined;
+    }
     return {
       durableIdentity: { providerNamespace: 'tabelog', placeId, ordinal },
       transientPresentation: {
@@ -98,7 +102,8 @@ export function createTabelogPlaceDiscoveryPort(
       if (providerNamespace !== 'tabelog' || canonicalListing(placeId) !== placeId) {
         return failure('invalid_input', 'The restaurant listing identity is not supported.');
       }
-      const candidate = await read(placeId, 1, AbortSignal.timeout(6000));
+      // The same cap as the source reader's own: a shorter one cut slow reads off mid-request.
+      const candidate = await read(placeId, 1, AbortSignal.timeout(20_000));
       if (!candidate)
         return failure(
           'dependency_failure',

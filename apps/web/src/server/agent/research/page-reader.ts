@@ -181,3 +181,19 @@ export function withSameListingFallback(
     return first.kind === 'invalid_source' ? first : second;
   };
 }
+
+/**
+ * One Add request reads a listing for the identity check and again for research. Reuse the first
+ * successful read within that request instead of asking Tabelog twice; a failed read is not kept.
+ */
+export function reusingListingReads(reader: RestaurantSourceReader): RestaurantSourceReader {
+  const reads = new Map<string, TabelogReadResult>();
+  return async (url, signal) => {
+    const key = url.replace(/\/$/u, '');
+    const known = reads.get(key);
+    if (known) return known;
+    const result = await reader(url, signal);
+    if (result.kind === 'read') reads.set(key, result);
+    return result;
+  };
+}

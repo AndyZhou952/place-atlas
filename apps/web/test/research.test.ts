@@ -9,6 +9,12 @@ import {
 } from '../src/server/agent/research/agent.ts';
 import { explicitReservationMode } from '../src/server/agent/research/booking.ts';
 import {
+  createFirecrawlRestaurantReader,
+  type RestaurantSourceReader,
+  withSameListingFallback,
+} from '../src/server/agent/research/page-reader.ts';
+import { readTabelogListingResult } from '../src/server/agent/research/tabelog-listing.ts';
+import {
   initialResearchQuery,
   matchesSelectedBranch,
   simplerResearchQuery,
@@ -72,6 +78,20 @@ test('a short-name single-lot branch matches only when name, lot, ward, town and
     'no town on the provider address',
   );
   assert.equal(listed({ postal: '1500001' }), false, 'postcodes in different areas');
+  // Google's Japanese name and address for the selected place match even when the Owner typed Latin.
+  assert.equal(
+    matchesSelectedBranch(
+      '合成 京都府京都市東山区合成町367',
+      kyoto.name,
+      kyoto.address,
+      'Gosei Kyoto',
+      '京都府京都市東山区合成町367',
+      '6050002',
+      '合成',
+    ),
+    true,
+    'a Latin Owner query',
+  );
   assert.equal(
     matchesSelectedBranch(
       '合成 京都府京都市東山区合成町367 2F',
@@ -197,6 +217,19 @@ const yahoo = (rows: string) =>
   new Response(`<html><body><div id="web"><ol>${rows}</ol></div></body></html>`, {
     headers: { 'content-type': 'text/html' },
   });
+// Google often writes a building's lot as 4丁目1-1 where the listing has 4-1.
+test('a Japanese provider address may omit the building lot only with ward, postcode, building and floor', () => {
+  const name = '合成食堂 銀座店';
+  const selected = '日本、〒104-0061 東京都中央区銀座4丁目1-1 合成ビルディング 3F';
+  const matches = (address: string, postal = '1040061') =>
+    matchesSelectedBranch(`${name} ${address}`, name, selected, '合成食堂', address, postal, name);
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 3F'), true);
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 4F'), false, 'another floor');
+  assert.equal(matches('東京都港区銀座4-1 合成ビルディング 3F'), false, 'another ward');
+  assert.equal(matches('東京都中央区銀座4-1 合成ビルディング 3F', '1040062'), false, 'postcode');
+  assert.equal(matches('東京都中央区銀座4-1 別館ビルディング 3F'), false, 'another building');
+});
+
 const listingRow = `<li><a href="${LISTING}">合成食堂 中目黒 - 食べログ</a><div>東京都目黒区中目黒1-2-3</div></li>`;
 
 function agentRun(options: {
@@ -205,6 +238,7 @@ function agentRun(options: {
   readonly policy?: string;
   readonly subject?: typeof subject;
   readonly listing?: ReturnType<typeof listingAt>;
+  readonly sourceReader?: RestaurantSourceReader;
 }) {
   const queries: string[] = [];
   let modelCalls = 0;
@@ -212,10 +246,16 @@ function agentRun(options: {
     apiKey: 'test-key',
     baseUrl: 'https://model.test/v1',
     model: 'test-model',
-    sourceReader: reader(
-      options.listing ??
-        listingAt('東京都目黒区中目黒1-2-3 合成ビル 2F', '1530061', options.policy ?? takeawayOnly),
-    ),
+    sourceReader:
+      options.sourceReader ??
+      reader(
+        options.listing ??
+          listingAt(
+            '東京都目黒区中目黒1-2-3 合成ビル 2F',
+            '1530061',
+            options.policy ?? takeawayOnly,
+          ),
+      ),
     fetch: stubFetch({
       'https://search.yahoo.co.jp/search': (request) => {
         const query = new URL(request.url).searchParams.get('p') ?? '';
@@ -379,4 +419,59 @@ test('a listing at another town contributes no rating, address, coordinates or r
     assert.equal(result.value.profile?.address, undefined, address);
     assert.equal(result.value.profile?.coordinates, undefined, address);
   }
+});
+
+test('a listing the reader times out on and Tabelog refuses leaves research honestly incomplete', async () => {
+  let reads = 0;
+  // The production reader pair: the scraping service times out, then the direct read is refused.
+  const sourceReader = withSameListingFallback(
+    createFirecrawlRestaurantReader({
+      apiKey: 'test-key',
+      fetch: stubFetch({
+        'https://api.firecrawl.dev/v2/scrape': () => {
+          reads++;
+          return new Response('', { status: 408 });
+        },
+      }),
+    }),
+    (url, signal) =>
+      readTabelogListingResult(
+        url,
+        stubFetch({ 'https://tabelog.com/': () => new Response('', { status: 403 }) }),
+        signal,
+      ),
+  );
+  const research = agentRun({
+    sourceReader,
+    search: () => yahoo(listingRow),
+    // A model that still claims facts from the unread listing.
+    answer: {
+      subjectMatch: 'matched',
+      tabelog: { status: 'known', score: 3.51, url: LISTING },
+      reservation: { status: 'known', mode: 'reservable', label: '予約可', url: LISTING },
+      evidence: {
+        tabelog: {
+          url: LISTING,
+          quote: '3.51',
+          identityQuote: '合成食堂 中目黒 東京都目黒区中目黒1-2-3',
+        },
+      },
+    },
+  });
+  const result = await research.run();
+  assert.equal(result.kind, 'observed');
+  if (result.kind !== 'observed') return;
+  assert.equal(result.sourceAccessIssue, 'blocked');
+  assert.match(
+    researchIssueMessage('blocked', false),
+    /does not mean the restaurant has no rating/u,
+  );
+  assert.equal(result.value.tabelog.status, 'unknown');
+  assert.equal(result.value.reservation.status, 'unknown');
+  assert.equal(result.value.profile?.address, undefined);
+  assert.equal(result.value.profile?.coordinates, undefined);
+  // Bounded: the listing is tried once, the refusal spends no hidden search, and the turn cap holds.
+  assert.equal(reads, 1);
+  assert.ok(research.queries.length <= 2);
+  assert.ok(research.modelCalls() <= 3);
 });

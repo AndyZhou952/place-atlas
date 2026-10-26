@@ -29,16 +29,6 @@ export interface TabelogEvidence extends SearchEvidence {
   };
 }
 
-/** Only a discovered main listing on a fixed public host, never arbitrary model URLs. */
-export async function readTabelogListing(
-  url: string,
-  fetcher: typeof fetch,
-  parentSignal: AbortSignal,
-): Promise<TabelogEvidence | undefined> {
-  const result = await readTabelogListingResult(url, fetcher, parentSignal);
-  return result.kind === 'read' ? result.evidence : undefined;
-}
-
 export type TabelogReadResult =
   | { kind: 'read'; evidence: TabelogEvidence }
   | { kind: 'blocked' | 'unavailable' | 'invalid_source' };
@@ -48,7 +38,10 @@ export function isTabelogAccessChallenge(html: string): boolean {
   return /<title[^>]*>\s*(?:Just a moment|現在アクセスが集中)|cf-chl-|cf_chl_/iu.test(html);
 }
 
-/** Keep access failures distinct from a successfully read page with missing facts. */
+/**
+ * Only a discovered main listing on a fixed public host, never arbitrary model URLs. Keep access
+ * failures distinct from a successfully read page with missing facts.
+ */
 export async function readTabelogListingResult(
   url: string,
   fetcher: typeof fetch,

@@ -19,6 +19,7 @@ import { createTabelogPlaceDiscoveryPort } from '../discovery/tabelog-search.ts'
 import {
   createFirecrawlRestaurantReader,
   createRestaurantSourceReader,
+  reusingListingReads,
   withSameListingFallback,
 } from '../research/page-reader.ts';
 import { createConfiguredPlaceResearchAgent } from '../research/agent.ts';
@@ -41,7 +42,7 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
   const googleKey = googleEnabled ? env.GOOGLE_PLACES_API_KEY : undefined;
   const usage = new D1ProviderUsage(database, () => clock.now());
 
-  const sourceReader =
+  const sourceReader = reusingListingReads(
     env.RESTAURANT_SOURCE_READER === 'firecrawl'
       ? withSameListingFallback(
           createFirecrawlRestaurantReader({ apiKey: env.FIRECRAWL_API_KEY, fetch: options.fetch }),
@@ -49,7 +50,8 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
         )
       : env.BROWSER
         ? createRestaurantSourceReader(env.BROWSER, options.fetch)
-        : undefined;
+        : (url, signal) => readTabelogListingResult(url, options.fetch ?? fetch, signal),
+  );
 
   const discovery = createTabelogPlaceDiscoveryPort({
     ...(googleKey
@@ -59,7 +61,7 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
           ),
         }
       : {}),
-    ...(sourceReader ? { sourceReader } : {}),
+    sourceReader,
     ...fetcher,
     ...(env.SEARCH_API_KEY ? { searchApiKey: env.SEARCH_API_KEY } : {}),
   });
@@ -78,7 +80,7 @@ export function createAddHarness(env: Env, options: AddOptions = {}): CatalogInt
 
   const researchOptions = {
     ...(env.SEARCH_API_KEY ? { searchApiKey: env.SEARCH_API_KEY } : {}),
-    ...(sourceReader ? { sourceReader } : {}),
+    sourceReader,
     ...fetcher,
   };
   // Model settings are resolved per research call so Owner-saved credentials apply immediately.

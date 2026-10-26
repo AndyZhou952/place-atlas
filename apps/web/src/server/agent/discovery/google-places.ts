@@ -102,10 +102,13 @@ export function createGooglePlacesNewClient(options: ClientOptions): GooglePlace
     },
     async getPlace({ placeId }) {
       if (!validText(placeId, 1, 500)) return unavailable();
+      // The selected place is re-read in Japanese, the language of its Tabelog listing, so research
+      // and geocoding compare names and addresses in one script. Search keeps Google's default
+      // language: the Owner's Latin words must still anchor its candidates.
       const value = await call(
         options,
         'places.details.requests',
-        `${placesUrl}/${encodeURIComponent(placeId)}`,
+        `${placesUrl}/${encodeURIComponent(placeId)}?languageCode=ja&regionCode=JP`,
         'id,displayName,formattedAddress',
       );
       const place = mapPlace(value, 1);

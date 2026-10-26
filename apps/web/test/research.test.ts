@@ -20,8 +20,6 @@ import {
   simplerResearchQuery,
 } from '../src/server/agent/research/branch-match.ts';
 import { stubFetch } from './fixtures.ts';
-import { createFirecrawlRestaurantReader } from '../src/server/agent/research/page-reader.ts';
-import { readTabelogListingResult } from '../src/server/agent/research/tabelog-listing.ts';
 
 // A short Japanese name at a single-number lot; Google and the listing use neighbouring postcodes.
 const kyoto = {

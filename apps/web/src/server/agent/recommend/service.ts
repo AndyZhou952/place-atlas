@@ -115,6 +115,31 @@ function optionsFromCatalog(items: readonly AtlasItem[]): RecommendOriginOption[
   return options;
 }
 
+/**
+ * A location choice must refer to a starting point this conversation already named: one the Owner
+ * typed, or one this service composed from a saved area and the Owner's reply (東京駅 + Marunouchi
+ * North Entrance). Any other hint is refused before the model or geocoder runs.
+ */
+function offeredHint(
+  hint: string,
+  input: RecommendConversationInput,
+  options: readonly RecommendOriginOption[],
+): boolean {
+  const earlierReplies = input.replies.slice(0, -1);
+  return (
+    [input.query, ...earlierReplies].some((message) =>
+      normalize(message).includes(normalize(hint)),
+    ) ||
+    options.some(
+      (option) =>
+        option.kind === 'area' &&
+        earlierReplies.some(
+          (reply) => normalize(`${option.names[0]} ${reply}`) === normalize(hint),
+        ),
+    )
+  );
+}
+
 function userMessages(input: RecommendConversationInput): string[] {
   return [input.query, ...input.replies.flatMap((reply) => ['Clarification answer:', reply])];
 }
@@ -262,17 +287,6 @@ export function createRecommendConversationService(
     async ask(rawInput: unknown): Promise<RecommendConversationOutput> {
       const input = parseRecommendConversationInput(rawInput);
       if (!input) throw new Error('Invalid Recommend request');
-      if (
-        input.originChoice &&
-        ![input.query, ...input.replies.slice(0, -1)].some((message) =>
-          normalize(message).includes(normalize(input.originChoice!.hint)),
-        )
-      )
-        return {
-          status: 'clarify',
-          clarification: 'origin',
-          question: 'What starting point should I use?',
-        };
       let items: readonly AtlasItem[];
       try {
         items = (await dependencies.catalog.list('verified_catalog')).filter(
@@ -283,6 +297,12 @@ export function createRecommendConversationService(
         return unavailable();
       }
       const options = optionsFromCatalog(items);
+      if (input.originChoice && !offeredHint(input.originChoice.hint, input, options))
+        return {
+          status: 'clarify',
+          clarification: 'origin',
+          question: 'What starting point should I use?',
+        };
       let rawIntent: unknown;
       try {
         rawIntent = await dependencies.interpreter.interpret(input, options);

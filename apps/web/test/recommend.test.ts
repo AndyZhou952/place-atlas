@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { foodKey, itemFoodKeys } from '../src/server/agent/recommend/food.ts';
 import { normalizeRecommendIntent } from '../src/server/agent/recommend/intent.ts';
+import { appendRecommendChoice } from '../src/shared/recommend-conversation.ts';
 import type { RouteSidecarServiceBinding } from '../src/server/agent/recommend/routes.ts';
 import { GOOGLE_ROUTE_SIDECAR_ATTRIBUTION } from '../route-sidecar/contract.ts';
 import type { Env } from '../src/server/env.ts';
@@ -36,6 +37,7 @@ async function ask(
   query: string,
   replies: string[] = [],
   routes?: RouteSidecarServiceBinding,
+  originChoice?: { hint: string; id: string },
 ) {
   const { db, sqlite } = migratedD1();
   const insert = sqlite.prepare(
@@ -80,7 +82,12 @@ async function ask(
     );
   const login = await request('POST', '/api/session', { password: 'owner-pass' });
   const cookie = login.headers.get('set-cookie')!.split(';')[0];
-  const response = await request('POST', '/api/recommend', { query, replies }, cookie);
+  const response = await request(
+    'POST',
+    '/api/recommend',
+    { query, replies, ...(originChoice ? { originChoice } : {}) },
+    cookie,
+  );
   // oxlint-disable-next-line typescript/no-explicit-any -- assertions inspect the JSON
   const body: any = await response.json();
   return { status: response.status, body };
@@ -122,8 +129,11 @@ test('cuisines beyond the six dish terms match saved labels; unknown cuisines ma
   assert.ok(!itemFoodKeys(['ラーメン', '居酒屋']).includes(foodKey('Vietnamese')));
 });
 
-/** A route sidecar that geocodes any starting point near Tokyo Station and walks 5 minutes. */
-function walkingRoutes(hints: string[]): RouteSidecarServiceBinding {
+/**
+ * A route sidecar that geocodes any starting point near Tokyo Station (as one place, or as two
+ * candidates when `candidates` is 2) and walks 5 minutes.
+ */
+function walkingRoutes(hints: string[], candidates = 1): RouteSidecarServiceBinding {
   const evidence = () => ({
     attribution: GOOGLE_ROUTE_SIDECAR_ATTRIBUTION,
     source: { providerId: 'google-maps-platform' as const, endpoint: 'test' },
@@ -135,9 +145,10 @@ function walkingRoutes(hints: string[]): RouteSidecarServiceBinding {
       return {
         ok: true,
         evidence: {
-          candidates: [
-            { formattedAddress: locationHint, point: { latitude: 35.6812, longitude: 139.7671 } },
-          ],
+          candidates: Array.from({ length: candidates }, (_, index) => ({
+            formattedAddress: candidates > 1 ? `${locationHint} ${index + 1}` : locationHint,
+            point: { latitude: 35.6812 + index * 0.001, longitude: 139.7671 },
+          })),
           ...evidence(),
         },
       };
@@ -201,6 +212,39 @@ test('the exact starting point answers the area question instead of repeating it
   const station = await ask(english, query, ['Tokyo Station'], routes);
   assert.equal(station.body.status, 'recommend', JSON.stringify(station.body));
   assert.deepEqual(hints, ['Tokyo Station']);
+});
+
+test('choosing one of several located exits completes the recommendation', async () => {
+  const hints: string[] = [];
+  const routes = walkingRoutes(hints, 2);
+  const english = { ...walk, originId: 'area:東京駅' };
+  const conversation = {
+    query: '歩いて10分以内のラーメン',
+    replies: ['Tokyo Station area', 'Marunouchi North Entrance'],
+  };
+  const offered = await ask(english, conversation.query, conversation.replies, routes);
+  assert.equal(offered.body.status, 'clarify', JSON.stringify(offered.body));
+  assert.equal(offered.body.clarification, 'origin_choice');
+  assert.equal(offered.body.originHint, '東京駅 Marunouchi North Entrance');
+  // The browser's own request for the first option.
+  const next = appendRecommendChoice(
+    conversation,
+    offered.body.originHint,
+    offered.body.options[0].id,
+  );
+  assert.ok(next?.originChoice);
+  const chosen = await ask(english, next.query, [...next.replies], routes, next.originChoice);
+  assert.equal(chosen.body.status, 'recommend', JSON.stringify(chosen.body));
+  // A hint the conversation never produced is still refused before any lookup.
+  for (const hint of ['東京駅 Yaesu Central Exit', '渋谷 Marunouchi North Entrance']) {
+    const before = hints.length;
+    const forged = await ask(english, next.query, [...next.replies], routes, {
+      hint,
+      id: next.originChoice.id,
+    });
+    assert.equal(forged.body.clarification, 'origin', hint);
+    assert.equal(hints.length, before, hint);
+  }
 });
 
 test('only a car request is a driving request: 電車で and 自転車で are not', async () => {

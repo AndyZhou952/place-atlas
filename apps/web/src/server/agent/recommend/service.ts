@@ -303,7 +303,11 @@ export function createRecommendConversationService(
       addExplicitStationMentions(options, input);
       addExplicitAddressMentions(options, input);
       addOriginText(options, rawIntent, input);
-      const exactOrigin = exactOriginReply(userMessages(input), options);
+      const exactOrigin = exactOriginReply(
+        userMessages(input),
+        options,
+        (rawIntent as Record<string, unknown>).originId,
+      );
       if (exactOrigin && !options.some((option) => option.id === exactOrigin.id))
         options.push(exactOrigin);
       const intent = normalizeRecommendIntent(userMessages(input), options, rawIntent);

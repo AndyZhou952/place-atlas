@@ -286,11 +286,14 @@ export function normalizeRecommendIntent(
 /**
  * The answer to "which exact starting point in this area?": the latest reply, read together with the
  * area it narrows down (東京駅 + 丸の内北口). Matched against catalog areas alone, the reply would
- * resolve to the same area and the question would repeat.
+ * resolve to the same area and the question would repeat. The area is the one the earlier messages
+ * name, or else the model's choice when that is a catalog area (an English answer such as "Tokyo
+ * Station area" for an area saved only as 東京駅).
  */
 export function exactOriginReply(
   messages: readonly string[],
   options: readonly RecommendOriginOption[],
+  modelOriginId?: unknown,
 ): RecommendOriginOption | undefined {
   const latest = messages.length > 2 ? messages.at(-1)?.trim() : undefined;
   const earlier = queryText(messages.slice(0, -2));
@@ -306,9 +309,21 @@ export function exactOriginReply(
     matchedOriginIds(latest, options).some((id) => !id.startsWith('area:'))
   )
     return undefined;
-  const areas = matchedOriginIds(earlier, options).filter((id) => id.startsWith('area:'));
+  const named = matchedOriginIds(earlier, options).filter((id) => id.startsWith('area:'));
+  // The model reads the whole conversation, so its area counts only when it was already given
+  // before this reply: in an earlier reply, or in a request that names a starting point.
+  const areaGivenEarlier =
+    messages.length > 4 ||
+    /\b(?:from|near|around)\b|\barea\b|から|の近く|周辺|付近|辺り|あたり/iu.test(messages[0]);
+  const areas =
+    named.length ||
+    !areaGivenEarlier ||
+    typeof modelOriginId !== 'string' ||
+    !modelOriginId.startsWith('area:')
+      ? named
+      : [modelOriginId];
   const area = options.find((option) => option.id === areas[0]);
-  if (areas.length !== 1 || !area) return undefined;
+  if (areas.length !== 1 || area?.kind !== 'area') return undefined;
   const text = normalized(latest).includes(normalized(area.names[0]))
     ? latest
     : `${area.names[0]} ${latest}`;

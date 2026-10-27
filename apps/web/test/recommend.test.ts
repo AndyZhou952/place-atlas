@@ -47,11 +47,8 @@ async function ask(
     JSON.stringify(restaurant('ramen-a', '合成ラーメン A', ['ラーメン'], 35.69)),
   );
   insert.run('sushi-b', JSON.stringify(restaurant('sushi-b', '合成鮨 B', ['寿司'], 35.6)));
-  // Saved restaurants whose area is a station's name.
-  for (const [id, area] of [
-    ['ramen-c', '東京駅'],
-    ['ramen-d', 'Tokyo Station'],
-  ])
+  // A saved restaurant whose area is a station's Japanese name only.
+  for (const [id, area] of [['ramen-c', '東京駅']])
     insert.run(
       id,
       JSON.stringify(restaurant(id, `合成ラーメン ${id}`, ['ラーメン'], 35.681, area)),
@@ -174,17 +171,34 @@ test('the exact starting point answers the area question instead of repeating it
   const hints: string[] = [];
   const query = '歩いて10分以内のラーメン';
   const routes = walkingRoutes(hints);
-  // An area answer asks for the exact point once...
-  const area = await ask(walk, query, ['Tokyo Station area'], routes);
+  // In English, only the model can tie "Tokyo Station area" to the area saved as 東京駅.
+  const english = { ...walk, originId: 'area:東京駅' };
+  const area = await ask(english, query, ['Tokyo Station area'], routes);
   assert.equal(area.body.status, 'clarify');
   assert.equal(area.body.clarification, 'exact_origin');
-  // ...and the exit then given is resolved within that area.
-  const exact = await ask(walk, query, ['Tokyo Station area', 'Marunouchi North Entrance'], routes);
+  // The exit then given is resolved within that area, in either language.
+  const exact = await ask(
+    english,
+    query,
+    ['Tokyo Station area', 'Marunouchi North Entrance'],
+    routes,
+  );
   assert.equal(exact.body.status, 'recommend', JSON.stringify(exact.body));
-  assert.deepEqual(hints, ['Tokyo Station Marunouchi North Entrance']);
+  const japanese = await ask(walk, query, ['東京駅周辺', '丸の内北口'], routes);
+  assert.equal(japanese.body.status, 'recommend', JSON.stringify(japanese.body));
+  assert.deepEqual(hints, ['東京駅 Marunouchi North Entrance', '東京駅 丸の内北口']);
+  // A request that names the area itself takes the exit as its first reply.
+  const named = await ask(
+    english,
+    'Ramen within a 10 minute walk from the Tokyo Station area',
+    ['Marunouchi North Entrance'],
+    routes,
+  );
+  assert.equal(named.body.status, 'recommend', JSON.stringify(named.body));
+  assert.equal(hints.at(-1), '東京駅 Marunouchi North Entrance');
   // Naming the station itself is already an exact starting point.
   hints.length = 0;
-  const station = await ask(walk, query, ['Tokyo Station'], routes);
+  const station = await ask(english, query, ['Tokyo Station'], routes);
   assert.equal(station.body.status, 'recommend', JSON.stringify(station.body));
   assert.deepEqual(hints, ['Tokyo Station']);
 });

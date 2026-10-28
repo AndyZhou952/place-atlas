@@ -2,13 +2,13 @@
 
 **Japan Atlas 0.1.0** — a quiet, self-hosted map and journal of the restaurants you find, in Japan. You run it on your own Cloudflare account, so your records, photos and keys stay with you.
 
-**Live demo: [japan-demo.japan-atlas-poc.workers.dev](https://japan-demo.japan-atlas-poc.workers.dev/)**. Anyone can browse it. Add and Recommend need the demo's Owner password, which the maintainer shares on request.
+**Live demo: [japan-demo.japan-atlas-poc.workers.dev](https://japan-demo.japan-atlas-poc.workers.dev/)**. Anyone can browse it. Add and Recommend need the demo's Owner password.
 
 ![Map view: saved restaurants on the map, the list with scores, favorites and visited state, and a restaurant's details](docs/images/map.webp)
 
 ## Why
 
-Restaurants turn up everywhere: an Instagram reel, a RED (Xiaohongshu) post, a YouTube video, a friend's message. Collecting them by hand into map lists is tedious, and Google Maps lists cannot be filled in by an AI agent. And writing down what you thought usually means a public review that everyone can read, when what you want is a quiet place for your own comments and a record of every visit.
+Restaurants turn up everywhere: an Instagram reel, a RED post, a YouTube video, a friend's message. Collecting them by hand into map lists is tedious, and Google Maps lists cannot be filled in by an AI agent. And writing down what you thought usually means a public review that everyone can read, when what you want is a quiet place for your own comments and a record of every visit.
 
 Place Atlas is one place that gathers them for you and keeps them private:
 

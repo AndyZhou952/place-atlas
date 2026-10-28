@@ -106,7 +106,9 @@ export function normalizeRecommendIntent(
     raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const original = queryText(messages);
   const nearMe = /near me|附近有啥|附近有什么|近くの/iu.test(original);
-  const explicitDriving = /\bdriv(?:e|ing)\b|\bby car\b|自驾|驾车|开车|開車|車で/iu.test(original);
+  // 車で is by car, but 電車で (train), 自転車で (bicycle), 汽車で and 列車で are not.
+  const explicitDriving =
+    /\bdriv(?:e|ing)\b|\bby car\b|自驾|驾车|开车|開車|(?<![電転汽列])車で/iu.test(original);
   const map = safeMapQuery(original);
   const text = map.text;
   const latest = messages.at(-1) ?? original;
@@ -135,7 +137,7 @@ export function normalizeRecommendIntent(
       : typeof prediction.originId === 'string' && optionById.has(prediction.originId)
         ? prediction.originId
         : null;
-  const originId = nearMe && originIds.length === 0 && !branchReply ? null : proposedOriginId;
+  let originId = nearMe && originIds.length === 0 && !branchReply ? null : proposedOriginId;
   const explicitVisited = /まだ行ってない|没去过|未去过|not\s+visited/iu.test(original)
     ? 'only_unvisited'
     : /去过|行った|only\s+visited/iu.test(original)
@@ -191,6 +193,18 @@ export function normalizeRecommendIntent(
           ? prediction.maxMinutes
           : null;
   if (!explicitTravelMode || distanceReply) travelMode = 'none';
+  // A station the user named is a point a route can start from, even where saved restaurants also
+  // use that station as their area name.
+  const area = originId ? optionById.get(originId) : undefined;
+  if (area?.kind === 'area' && travelMode !== 'none')
+    originId =
+      options.find(
+        (option) =>
+          option.kind === 'station' &&
+          option.names.some((name) =>
+            area.names.some((own) => normalized(own) === normalized(name)),
+          ),
+      )?.id ?? originId;
   const common = {
     originId,
     foodTerms,
@@ -267,6 +281,53 @@ export function normalizeRecommendIntent(
     return clarify(kind, questions[kind]);
   }
   return { action: 'recommend', ...common };
+}
+
+/**
+ * The answer to "which exact starting point in this area?": the latest reply, read together with the
+ * area it narrows down (東京駅 + 丸の内北口). Matched against catalog areas alone, the reply would
+ * resolve to the same area and the question would repeat. The area is the one the earlier messages
+ * name, or else the model's choice when that is a catalog area (an English answer such as "Tokyo
+ * Station area" for an area saved only as 東京駅).
+ */
+export function exactOriginReply(
+  messages: readonly string[],
+  options: readonly RecommendOriginOption[],
+  modelOriginId?: unknown,
+): RecommendOriginOption | undefined {
+  const latest = messages.length > 2 ? messages.at(-1)?.trim() : undefined;
+  const earlier = queryText(messages.slice(0, -2));
+  if (
+    !latest ||
+    latest.length < 2 ||
+    latest.length > 120 ||
+    /https?:\/\//u.test(latest) ||
+    /straight[ -]line|distance only|直線距離|直线距离|距离就好/iu.test(latest) ||
+    !/徒歩|歩いて|歩行|步行|走路|\bwalk(?:ing)?\b(?![ -]?in\b)|電車|电车|\btrain|\btransit/iu.test(
+      earlier,
+    ) ||
+    matchedOriginIds(latest, options).some((id) => !id.startsWith('area:'))
+  )
+    return undefined;
+  const named = matchedOriginIds(earlier, options).filter((id) => id.startsWith('area:'));
+  // The model reads the whole conversation, so its area counts only when it was already given
+  // before this reply: in an earlier reply, or in a request that names a starting point.
+  const areaGivenEarlier =
+    messages.length > 4 ||
+    /\b(?:from|near|around)\b|\barea\b|から|の近く|周辺|付近|辺り|あたり/iu.test(messages[0]);
+  const areas =
+    named.length ||
+    !areaGivenEarlier ||
+    typeof modelOriginId !== 'string' ||
+    !modelOriginId.startsWith('area:')
+      ? named
+      : [modelOriginId];
+  const area = options.find((option) => option.id === areas[0]);
+  if (areas.length !== 1 || area?.kind !== 'area') return undefined;
+  const text = normalized(latest).includes(normalized(area.names[0]))
+    ? latest
+    : `${area.names[0]} ${latest}`;
+  return { id: `query:${text}`, kind: 'place', names: [text, latest] };
 }
 
 /** Folds width, case, punctuation and spaces so names compare as typed. */

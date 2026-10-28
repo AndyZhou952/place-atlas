@@ -295,7 +295,13 @@ async function runRecommend(testCase: {
   name: string;
   request: string;
   interpretation: unknown;
-  expect: { status?: string; first?: string; includes?: string[]; excludes?: string[] };
+  expect: {
+    status?: string;
+    message?: string;
+    first?: string;
+    includes?: string[];
+    excludes?: string[];
+  };
 }) {
   const { name, request, interpretation, expect } = testCase;
   const { db, sqlite } = migratedD1();
@@ -327,6 +333,8 @@ async function runRecommend(testCase: {
         : `${result.status}: ${'question' in result ? result.question : 'message' in result ? result.message : ''}`;
     if (expect.status)
       record('Recommend', name, `answers ${expect.status}`, result.status === expect.status, shown);
+    if (expect.message)
+      record('Recommend', name, 'explains why', shown.includes(expect.message), shown);
     if (expect.first)
       record('Recommend', name, `first pick is ${expect.first}`, ids[0] === expect.first, shown);
     for (const id of expect.includes ?? [])

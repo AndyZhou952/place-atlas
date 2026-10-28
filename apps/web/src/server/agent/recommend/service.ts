@@ -17,6 +17,7 @@ import {
   type RecommendRouteObservation,
 } from './decision.ts';
 import {
+  exactOriginReply,
   normalizeRecommendIntent,
   normalizeSearchText,
   type RecommendOriginOption,
@@ -114,6 +115,31 @@ function optionsFromCatalog(items: readonly AtlasItem[]): RecommendOriginOption[
   return options;
 }
 
+/**
+ * A location choice must refer to a starting point this conversation already named: one the Owner
+ * typed, or one this service composed from a saved area and the Owner's reply (東京駅 + Marunouchi
+ * North Entrance). Any other hint is refused before the model or geocoder runs.
+ */
+function offeredHint(
+  hint: string,
+  input: RecommendConversationInput,
+  options: readonly RecommendOriginOption[],
+): boolean {
+  const earlierReplies = input.replies.slice(0, -1);
+  return (
+    [input.query, ...earlierReplies].some((message) =>
+      normalize(message).includes(normalize(hint)),
+    ) ||
+    options.some(
+      (option) =>
+        option.kind === 'area' &&
+        earlierReplies.some(
+          (reply) => normalize(`${option.names[0]} ${reply}`) === normalize(hint),
+        ),
+    )
+  );
+}
+
 function userMessages(input: RecommendConversationInput): string[] {
   return [input.query, ...input.replies.flatMap((reply) => ['Clarification answer:', reply])];
 }
@@ -136,9 +162,12 @@ function addExplicitStationMentions(
       if (bareStation) englishStations.push(bareStation[1]);
     }
     for (const station of [...japaneseStations, ...englishStations]) {
+      // A catalog area of the same name stays an area too; the intent decides which one applies.
       if (
-        options.some((option) =>
-          option.names.some((name) => normalize(name) === normalize(station)),
+        options.some(
+          (option) =>
+            option.kind !== 'area' &&
+            option.names.some((name) => normalize(name) === normalize(station)),
         )
       )
         continue;
@@ -258,17 +287,6 @@ export function createRecommendConversationService(
     async ask(rawInput: unknown): Promise<RecommendConversationOutput> {
       const input = parseRecommendConversationInput(rawInput);
       if (!input) throw new Error('Invalid Recommend request');
-      if (
-        input.originChoice &&
-        ![input.query, ...input.replies.slice(0, -1)].some((message) =>
-          normalize(message).includes(normalize(input.originChoice!.hint)),
-        )
-      )
-        return {
-          status: 'clarify',
-          clarification: 'origin',
-          question: 'What starting point should I use?',
-        };
       let items: readonly AtlasItem[];
       try {
         items = (await dependencies.catalog.list('verified_catalog')).filter(
@@ -279,6 +297,12 @@ export function createRecommendConversationService(
         return unavailable();
       }
       const options = optionsFromCatalog(items);
+      if (input.originChoice && !offeredHint(input.originChoice.hint, input, options))
+        return {
+          status: 'clarify',
+          clarification: 'origin',
+          question: 'What starting point should I use?',
+        };
       let rawIntent: unknown;
       try {
         rawIntent = await dependencies.interpreter.interpret(input, options);
@@ -299,6 +323,13 @@ export function createRecommendConversationService(
       addExplicitStationMentions(options, input);
       addExplicitAddressMentions(options, input);
       addOriginText(options, rawIntent, input);
+      const exactOrigin = exactOriginReply(
+        userMessages(input),
+        options,
+        (rawIntent as Record<string, unknown>).originId,
+      );
+      if (exactOrigin && !options.some((option) => option.id === exactOrigin.id))
+        options.push(exactOrigin);
       const intent = normalizeRecommendIntent(userMessages(input), options, rawIntent);
       const askWalkIn = asksForWalkIn(input);
       if (intent.action === 'unsupported' && intent.reason === 'driving_route_unavailable')

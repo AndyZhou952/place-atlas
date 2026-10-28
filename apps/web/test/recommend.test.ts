@@ -3,18 +3,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { foodKey, itemFoodKeys } from '../src/server/agent/recommend/food.ts';
+import { normalizeRecommendIntent } from '../src/server/agent/recommend/intent.ts';
+import { appendRecommendChoice } from '../src/shared/recommend-conversation.ts';
+import type { RouteSidecarServiceBinding } from '../src/server/agent/recommend/routes.ts';
+import { GOOGLE_ROUTE_SIDECAR_ATTRIBUTION } from '../route-sidecar/contract.ts';
 import type { Env } from '../src/server/env.ts';
 import { handleApi } from '../src/server/worker.ts';
 import { migratedD1, stubFetch } from './fixtures.ts';
 
 const ORIGIN = 'https://atlas.test';
 
-function restaurant(id: string, title: string, tags: string[], latitude: number) {
+function restaurant(id: string, title: string, tags: string[], latitude: number, area = '新宿') {
   return {
     id,
     kind: 'food',
     title,
-    area: '新宿',
+    area,
     address: '東京都新宿区西新宿1-1-1',
     description: '',
     latitude,
@@ -28,7 +32,13 @@ function restaurant(id: string, title: string, tags: string[], latitude: number)
   };
 }
 
-async function ask(interpretation: unknown, query: string) {
+async function ask(
+  interpretation: unknown,
+  query: string,
+  replies: string[] = [],
+  routes?: RouteSidecarServiceBinding,
+  originChoice?: { hint: string; id: string },
+) {
   const { db, sqlite } = migratedD1();
   const insert = sqlite.prepare(
     `INSERT INTO atlas_items (id, payload_json, verification_status, created_at, updated_at)
@@ -39,8 +49,15 @@ async function ask(interpretation: unknown, query: string) {
     JSON.stringify(restaurant('ramen-a', '合成ラーメン A', ['ラーメン'], 35.69)),
   );
   insert.run('sushi-b', JSON.stringify(restaurant('sushi-b', '合成鮨 B', ['寿司'], 35.6)));
+  // A saved restaurant whose area is a station's Japanese name only.
+  for (const [id, area] of [['ramen-c', '東京駅']])
+    insert.run(
+      id,
+      JSON.stringify(restaurant(id, `合成ラーメン ${id}`, ['ラーメン'], 35.681, area)),
+    );
   const env: Env = {
     DB: db,
+    ...(routes ? { ROUTE_SIDECAR: routes } : {}),
     MEDIA: {} as R2Bucket,
     ATLAS_OWNER_PASSWORD: 'owner-pass',
     ATLAS_OWNER_SESSION_SECRET: 'x'.repeat(40),
@@ -65,7 +82,12 @@ async function ask(interpretation: unknown, query: string) {
     );
   const login = await request('POST', '/api/session', { password: 'owner-pass' });
   const cookie = login.headers.get('set-cookie')!.split(';')[0];
-  const response = await request('POST', '/api/recommend', { query, replies: [] }, cookie);
+  const response = await request(
+    'POST',
+    '/api/recommend',
+    { query, replies, ...(originChoice ? { originChoice } : {}) },
+    cookie,
+  );
   // oxlint-disable-next-line typescript/no-explicit-any -- assertions inspect the JSON
   const body: any = await response.json();
   return { status: response.status, body };
@@ -86,10 +108,8 @@ test('a food-only request recommends only matching saved restaurants', async () 
   const { status, body } = await ask(interpretation, 'ラーメンが食べたい');
   assert.equal(status, 200);
   assert.equal(body.status, 'recommend');
-  assert.deepEqual(
-    body.recommendations.map((item: { itemId: string }) => item.itemId),
-    ['ramen-a'],
-  );
+  const ids = body.recommendations.map((item: { itemId: string }) => item.itemId);
+  assert.ok(ids.includes('ramen-a') && !ids.includes('sushi-b'), ids.join());
 });
 
 test('a timed route without a starting point asks for one instead of guessing', async () => {
@@ -107,4 +127,138 @@ test('cuisines beyond the six dish terms match saved labels; unknown cuisines ma
   assert.ok(itemFoodKeys(['フレンチビストロ']).includes('french'));
   assert.ok(itemFoodKeys(['ピザ']).includes('italian.pizza'));
   assert.ok(!itemFoodKeys(['ラーメン', '居酒屋']).includes(foodKey('Vietnamese')));
+});
+
+/**
+ * A route sidecar that geocodes any starting point near Tokyo Station (as one place, or as two
+ * candidates when `candidates` is 2) and walks 5 minutes.
+ */
+function walkingRoutes(hints: string[], candidates = 1): RouteSidecarServiceBinding {
+  const evidence = () => ({
+    attribution: GOOGLE_ROUTE_SIDECAR_ATTRIBUTION,
+    source: { providerId: 'google-maps-platform' as const, endpoint: 'test' },
+    checkedAt: new Date().toISOString(),
+  });
+  return {
+    async geocode({ locationHint }) {
+      hints.push(locationHint);
+      return {
+        ok: true,
+        evidence: {
+          candidates: Array.from({ length: candidates }, (_, index) => ({
+            formattedAddress: candidates > 1 ? `${locationHint} ${index + 1}` : locationHint,
+            point: { latitude: 35.6812 + index * 0.001, longitude: 139.7671 },
+          })),
+          ...evidence(),
+        },
+      };
+    },
+    async walkingMatrix({ destinations }) {
+      return {
+        ok: true,
+        evidence: {
+          routes: destinations.map((_, destinationIndex) => ({
+            destinationIndex,
+            durationSeconds: 300,
+            distanceMeters: 400,
+          })),
+          ...evidence(),
+        },
+      };
+    },
+  };
+}
+
+const walk = { ...interpretation, travelMode: 'walk', maxMinutes: 10 };
+
+test('a named station starts a walking route even when saved restaurants use it as their area', async () => {
+  const hints: string[] = [];
+  const { body } = await ask(walk, '東京駅から歩いて10分のラーメン', [], walkingRoutes(hints));
+  assert.equal(body.status, 'recommend', JSON.stringify(body));
+  assert.deepEqual(hints, ['東京駅']);
+});
+
+test('the exact starting point answers the area question instead of repeating it', async () => {
+  const hints: string[] = [];
+  const query = '歩いて10分以内のラーメン';
+  const routes = walkingRoutes(hints);
+  // In English, only the model can tie "Tokyo Station area" to the area saved as 東京駅.
+  const english = { ...walk, originId: 'area:東京駅' };
+  const area = await ask(english, query, ['Tokyo Station area'], routes);
+  assert.equal(area.body.status, 'clarify');
+  assert.equal(area.body.clarification, 'exact_origin');
+  // The exit then given is resolved within that area, in either language.
+  const exact = await ask(
+    english,
+    query,
+    ['Tokyo Station area', 'Marunouchi North Entrance'],
+    routes,
+  );
+  assert.equal(exact.body.status, 'recommend', JSON.stringify(exact.body));
+  const japanese = await ask(walk, query, ['東京駅周辺', '丸の内北口'], routes);
+  assert.equal(japanese.body.status, 'recommend', JSON.stringify(japanese.body));
+  assert.deepEqual(hints, ['東京駅 Marunouchi North Entrance', '東京駅 丸の内北口']);
+  // A request that names the area itself takes the exit as its first reply.
+  const named = await ask(
+    english,
+    'Ramen within a 10 minute walk from the Tokyo Station area',
+    ['Marunouchi North Entrance'],
+    routes,
+  );
+  assert.equal(named.body.status, 'recommend', JSON.stringify(named.body));
+  assert.equal(hints.at(-1), '東京駅 Marunouchi North Entrance');
+  // Naming the station itself is already an exact starting point.
+  hints.length = 0;
+  const station = await ask(english, query, ['Tokyo Station'], routes);
+  assert.equal(station.body.status, 'recommend', JSON.stringify(station.body));
+  assert.deepEqual(hints, ['Tokyo Station']);
+});
+
+test('choosing one of several located exits completes the recommendation', async () => {
+  const hints: string[] = [];
+  const routes = walkingRoutes(hints, 2);
+  const english = { ...walk, originId: 'area:東京駅' };
+  const conversation = {
+    query: '歩いて10分以内のラーメン',
+    replies: ['Tokyo Station area', 'Marunouchi North Entrance'],
+  };
+  const offered = await ask(english, conversation.query, conversation.replies, routes);
+  assert.equal(offered.body.status, 'clarify', JSON.stringify(offered.body));
+  assert.equal(offered.body.clarification, 'origin_choice');
+  assert.equal(offered.body.originHint, '東京駅 Marunouchi North Entrance');
+  // The browser's own request for the first option.
+  const next = appendRecommendChoice(
+    conversation,
+    offered.body.originHint,
+    offered.body.options[0].id,
+  );
+  assert.ok(next?.originChoice);
+  const chosen = await ask(english, next.query, [...next.replies], routes, next.originChoice);
+  assert.equal(chosen.body.status, 'recommend', JSON.stringify(chosen.body));
+  // A hint the conversation never produced is still refused before any lookup.
+  for (const hint of ['東京駅 Yaesu Central Exit', '渋谷 Marunouchi North Entrance']) {
+    const before = hints.length;
+    const forged = await ask(english, next.query, [...next.replies], routes, {
+      hint,
+      id: next.originChoice.id,
+    });
+    assert.equal(forged.body.clarification, 'origin', hint);
+    assert.equal(hints.length, before, hint);
+  }
+});
+
+test('only a car request is a driving request: 電車で and 自転車で are not', async () => {
+  const intent = (query: string) =>
+    normalizeRecommendIntent([query], [], { ...interpretation, travelMode: 'transit' });
+  assert.equal(intent('車で10分のラーメン').reason, 'driving_route_unavailable');
+  assert.equal(intent('電車で20分のラーメン').reason, undefined);
+  assert.equal(intent('自転車で10分のラーメン').reason, undefined);
+  const { body } = await ask(
+    { ...interpretation, travelMode: 'transit', maxMinutes: 20 },
+    '東京駅から電車で20分のラーメン',
+    [],
+    walkingRoutes([]),
+  );
+  assert.equal(body.status, 'unavailable');
+  assert.match(body.message, /Train route times in Japan/u);
 });

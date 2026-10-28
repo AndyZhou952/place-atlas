@@ -112,8 +112,10 @@ export async function fetchBoundedJson(
 ): Promise<{ readonly ok: true; readonly value: unknown } | { readonly ok: false }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+  // Called as a plain function: the Workers runtime rejects fetch called as another object's method.
+  const fetcher = options.fetch;
   try {
-    const response = await options.fetch(url, {
+    const response = await fetcher(url, {
       ...init,
       redirect: 'manual',
       signal: controller.signal,

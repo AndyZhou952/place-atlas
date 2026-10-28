@@ -74,9 +74,9 @@ function ModelSettings() {
     <details className="settings">
       <summary>Model settings</summary>
       <p className="muted">
-        The model extracts signature dishes during Add and answers Recommend. Supported endpoints:
-        https://api.deepseek.com and https://api.openai.com/v1. Keys are encrypted on the server and
-        never sent back to the browser.
+        The model powers the Add research agent and reads Recommend requests, and must support tool
+        calls. Supported endpoints: https://api.deepseek.com and https://api.openai.com/v1. Keys are
+        encrypted on the server and never sent back to the browser.
       </p>
       <p>
         {status?.configured

@@ -72,7 +72,7 @@ flowchart LR
 | **Journal** | Record each visit with a date, an optional note and score, and photos or videos. Browse all visits and sort or filter them by restaurant. |
 | **Photos and videos** | JPEG/PNG/WebP/GIF up to 8 MB and MP4/WebM up to 50 MB, checked by file signature. Add a caption to any photo, browse them in a viewer, delete them individually. Uploads are safe to retry: a retry never duplicates or overwrites a file. |
 | **Visitors and Owner** | Anyone with the link can browse published restaurants, visits and photos. Only the Owner (one password per deployment) can add, edit, upload or ask Recommend, which spend your provider quota. |
-| **Your keys** | The Owner saves a model key (DeepSeek, OpenAI or any OpenAI-compatible API) on the site. It is encrypted at rest and never sent back to the browser. Monthly caps protect paid Google calls. |
+| **Your keys** | Every deployment uses its owner's own keys. The Owner saves a DeepSeek or OpenAI key on the site; it is encrypted at rest and never sent back to the browser. Monthly caps protect paid Google calls. |
 
 ## Deploy your own
 
@@ -83,15 +83,29 @@ Place Atlas 0.1.0 runs on **Cloudflare** (Workers, D1 and R2); other hosts are n
 1. **GitHub**: fork or clone this repository.
 2. **Cloudflare**: create an account, then in the dashboard open **R2** and enable it (Cloudflare asks for a payment method even for the free tier).
 3. **Sign in** on your computer with `npx wrangler login` (it opens your browser). On the first deploy, Wrangler may ask you to choose your `workers.dev` subdomain.
-4. **Choose** an Owner password, and get a model API key (for example from DeepSeek or OpenAI). Optional: a Google Maps Platform key and a Firecrawl key (see [Optional settings](#optional-settings)).
+4. **Choose** an Owner password and get your own API keys (see [Keys you provide](#keys-you-provide)). Only you can sign up for these services.
+
+### Keys you provide
+
+Place Atlas has no shared keys: each deployment uses its owner's own accounts.
+
+| Key | Needed for | Where to get it |
+| --- | --- | --- |
+| **Model key**: DeepSeek (tested) or OpenAI | Required for the Add research agent and Recommend. Without it, Add only finds and locates the place. | DeepSeek: [platform.deepseek.com](https://platform.deepseek.com) → API keys (top up a small balance first). OpenAI: [platform.openai.com](https://platform.openai.com/api-keys). Saved in **Model settings** on your site after deploying, not with Wrangler. |
+| **Google Places key** (`GOOGLE_PLACES_API_KEY`) | Recommended. Add checks the name against Google Maps and shows the matching branches; the Owner can load Google ratings. Without it, Add searches Tabelog through web search. | [Google Cloud console](https://console.cloud.google.com): create a project, enable billing, enable **Places API (New)**, then **APIs & Services → Credentials → Create credentials → API key**. Restrict the key to Places API (New). |
+| **Google Maps key for the route sidecar** (`GOOGLE_MAPS_API_KEY`) | Optional. Recommend from a station or address, with walking times. | The same Google Cloud project: enable **Geocoding API** and **Routes API** and create a second key restricted to those two. |
+| **Firecrawl key** (`FIRECRAWL_API_KEY`) | Recommended. Tabelog often refuses requests coming directly from Cloudflare; Firecrawl reads the pages instead. | [firecrawl.dev](https://www.firecrawl.dev) → API keys (the free plan is enough to start). |
+| **Tavily key** (`SEARCH_API_KEY`) | Optional. Web search for the research agent; otherwise public search pages are used. | [tavily.com](https://tavily.com) → API keys. |
+
+Google includes free monthly usage for each of these APIs and bills beyond it; Place Atlas also stops calling Google when its own monthly caps are reached. Keys are stored as Cloudflare secrets or encrypted in your database, never in the repository.
 
 ### With an AI coding agent
 
 Open the repository in a coding agent such as Claude Code and ask:
 
-> Deploy Place Atlas to my Cloudflare account by following "Deploy step by step" in README.md. I have already run `npx wrangler login`. Ask me for the Owner password when you need it.
+> Deploy Place Atlas to my Cloudflare account by following "Deploy step by step" in README.md, including the Google Places, Firecrawl and route sidecar steps for the keys I give you. I have already run `npx wrangler login`. Ask me for the Owner password and each key when you need it.
 
-The agent runs every step below, generates the session secret, writes your database ID into the local configuration, and stops only for the things above. Your password and keys go straight into Cloudflare as secrets; nothing is committed to the repository.
+The agent runs every step below, generates the session secret, writes your database ID into the local configuration, and stops only to ask for your password and keys. They go straight into Cloudflare as secrets; nothing is committed to the repository. The model key is the one thing you paste yourself, in **Model settings** on your site.
 
 ### Deploy step by step
 
@@ -114,13 +128,40 @@ npx wrangler secret put ATLAS_OWNER_PASSWORD --config wrangler.local.jsonc
 openssl rand -hex 32 | npx wrangler secret put ATLAS_OWNER_SESSION_SECRET --config wrangler.local.jsonc
 ```
 
-Open the printed URL, choose **Owner login**, then open **Model settings** and save your model's base URL, model name and key. The model powers the Add research agent and reads Recommend requests. Without it, Add still finds and locates places, and Recommend says it is unavailable.
+Your site now works for browsing. Then:
+
+1. **Google Places** (recommended):
+
+   ```sh
+   npx wrangler secret put GOOGLE_PLACES_API_KEY --config wrangler.local.jsonc
+   ```
+
+   In `wrangler.local.jsonc`, change `"CATALOG_INTAKE_GOOGLE_PLACES_MODE": "disabled"` to `"enabled"`.
+
+2. **Firecrawl** (recommended):
+
+   ```sh
+   npx wrangler secret put FIRECRAWL_API_KEY --config wrangler.local.jsonc
+   ```
+
+3. **Route sidecar** (optional): see [Route sidecar](#route-sidecar-optional).
+4. Run `npm run deploy` again if you changed `wrangler.local.jsonc`. (Secrets take effect without a deploy.)
+5. **Model settings**: open your site, choose **Owner login** with your password, open **Model settings**, paste your key and save. The form is filled in for DeepSeek:
+
+   | Provider | API base URL | Model |
+   | --- | --- | --- |
+   | DeepSeek (tested) | `https://api.deepseek.com` | `deepseek-flash` |
+   | OpenAI | `https://api.openai.com/v1` | an OpenAI model that supports tool calling |
+
+   Saving checks the connection. Other providers are not accepted yet. The model powers the Add research agent and reads Recommend requests. Without it, Add still finds and locates places, and Recommend says it is unavailable.
+
+6. Try it: **Add** a restaurant you know (for example `一蘭 渋谷`), confirm it, then ask **Recommend** for it.
 
 To update later: `git pull`, `npm ci`, apply migrations again (`npx wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc`), then `npm run deploy`.
 
 ### Optional settings
 
-Set secrets with `npx wrangler secret put NAME --config wrangler.local.jsonc` and plain values under `vars` in `wrangler.local.jsonc`, then deploy again.
+Set secrets with `npx wrangler secret put NAME --config wrangler.local.jsonc` and plain values under `vars` in `wrangler.local.jsonc` (then `npm run deploy`).
 
 | Name | Purpose |
 | --- | --- |
@@ -136,14 +177,14 @@ Set secrets with `npx wrangler secret put NAME --config wrangler.local.jsonc` an
 
 #### Route sidecar (optional)
 
-A second, private Worker holds a Google Maps key for geocoding and walking times:
+A second, private Worker (no public URL) holds the Google Maps key for geocoding and walking times:
 
 ```sh
-npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc
 npm run deploy:route-sidecar
+npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.jsonc
 ```
 
-Then add `"services": [{ "binding": "ROUTE_SIDECAR", "service": "japan-atlas-route-sidecar" }]` to `wrangler.local.jsonc` and run `npm run deploy` again.
+Then, in `wrangler.local.jsonc`, uncomment the line `"services": [{ "binding": "ROUTE_SIDECAR", "service": "japan-atlas-route-sidecar" }],` and run `npm run deploy` again.
 
 ### Upgrading from the preview build
 

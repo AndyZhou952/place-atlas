@@ -122,7 +122,7 @@ export async function updateRestaurant(
   const now = new Date().toISOString();
   const statements = [assessmentUpsert(db, id, current, patch, await manualVisited(db, id), now)];
   if (patch.title !== undefined || patch.description !== undefined) {
-    // Fold any 0.1 override into the payload so the record has one source of truth.
+    // Fold any preview-build override into the payload so the record has one source of truth.
     statements.push(
       db
         .prepare(

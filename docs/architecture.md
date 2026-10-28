@@ -16,7 +16,7 @@ src/shared/          Types and pure rules used by both sides
 src/server/          The Worker
   worker.ts            Route table: HTTP → handlers, plus the daily cleanup cron
   auth.ts              Owner login, HMAC session cookie, Add conversation ids, Add Agent token
-  db.ts, record.ts     D1/R2 repository; stored payload ⇄ Restaurant for both 0.1 formats
+  db.ts, record.ts     D1/R2 repository; stored payload ⇄ Restaurant for both stored formats
   settings.ts          Encrypted model settings and the tool-call connection check
   agent/               The agent harness (below)
 src/client/          The browser app (MVVM)
@@ -55,11 +55,11 @@ Deleting a restaurant removes its visits, media objects, assessment and referenc
 2. **Select** (`select {sessionId, expectedSessionVersion, ordinal, requestResearch}`): the chosen place is re-read from its provider (Google in Japanese, like its Tabelog listing; its map pin only corroborates the listing's identity and is not stored) and geocoded with Nominatim and the research agent gathers the Tabelog score, reservation rule, hours, categories, dishes and official links. Research runs once per session, on the first selection. Every fact needs a source URL and quote from the same branch, or it stays unknown. The Owner can edit fields and select again with the current session version to refresh the preview; Owner edits are sent as explicit assertions.
 3. **Confirm** (`confirm {sessionId, expectedPreviewVersion}`): the place identity and geocoded coordinates are checked again and the researched Tabelog and booking pages are re-read (once per preview version). A changed preview is returned for review instead of being saved; a place without a name, address and coordinates is never saved; otherwise the restaurant is published once (a retry returns the same receipt), with the staged Google rating as a dated reference.
 
-The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake` with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN` (never with a cookie). `operation` is one of the 0.1 names `catalog.intake.discover`, `catalog.intake.select`, `catalog.intake.confirm` or `catalog.intake.cancel`, and the agent may not assert Owner-only fields.
+The external Add Agent sends `{operation, input}` to `/api/agent/catalog-intake` with `Authorization: Bearer ATLAS_ADD_AGENT_TOKEN` (never with a cookie). `operation` is one of `catalog.intake.discover`, `catalog.intake.select`, `catalog.intake.confirm` or `catalog.intake.cancel`, and the agent may not assert Owner-only fields.
 
 ## Recommend
 
-`POST /api/recommend {query, replies}`. The model receives the request, earlier answers and the saved areas and place names, and returns a structured interpretation (food terms, origin, travel mode, visited preference). Code normalizes it against the request text, so the model cannot invent origins, restaurants or routes. Food terms and each saved restaurant's labels reduce to the same keys (`recommend/food.ts`: six dish terms, the cuisine taxonomy and national cuisines such as French), so a cuisine with no saved match returns no results. Candidates come only from saved restaurants. A station or address is geocoded by the route sidecar; distances are straight-line unless the sidecar returned walking times, which are shown with their source and time. Google has no train routes in Japan, so a train time limit gets a fixed answer suggesting walking or no time limit. Unclear starting points and timed routes without a start produce a clarifying question.
+`POST /api/recommend {query, replies, originChoice?}`. The model receives the request, earlier answers and the saved areas and place names, and returns a structured interpretation (food terms, origin, travel mode, visited preference). Code normalizes it against the request text, so the model cannot invent origins, restaurants or routes. Food terms and each saved restaurant's labels reduce to the same keys (`recommend/food.ts`: six dish terms, the cuisine taxonomy and national cuisines such as French), so a cuisine with no saved match returns no results. Candidates come only from saved restaurants. A station or address is geocoded by the route sidecar; distances are straight-line unless the sidecar returned walking times, which are shown with their source and time. Google has no train routes in Japan, so a train time limit gets a fixed answer suggesting walking or no time limit. Unclear starting points and timed routes without a start produce a clarifying question.
 
 ## Security
 

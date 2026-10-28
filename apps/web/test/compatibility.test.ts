@@ -27,7 +27,7 @@ function envWith(ciphertext?: string): Env {
   };
 }
 
-test('a session cookie issued by 0.1 is still accepted', async () => {
+test('a session cookie issued by the preview build is still accepted', async () => {
   const issuedAt = Math.floor(Date.now() / 1000) - 60;
   const payload = b64url(
     encoder.encode(
@@ -84,8 +84,8 @@ test('login sets the same cookie; writes need the same origin', async () => {
   );
 });
 
-test('model settings saved by 0.1 still decrypt', async () => {
-  // Reproduces the 0.1 envelope: HKDF(secret) → AES-GCM with the purpose as AAD.
+test('model settings saved by the preview build still decrypt', async () => {
+  // Reproduces the preview build's envelope: HKDF(secret) → AES-GCM with the purpose as AAD.
   const purpose = encoder.encode('japan-atlas/owner-agent-settings/v1');
   const material = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, [
     'deriveKey',

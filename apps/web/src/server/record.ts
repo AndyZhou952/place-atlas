@@ -3,8 +3,8 @@ import { tabelogListingUrl } from '../shared/text.ts';
 import type { Reservation, ReservationPolicy, Restaurant, SourcedText } from '../shared/types.ts';
 
 // Stored `atlas_items.payload_json` has two shapes:
-//  - flat items (0.1 seeds and every record written by this version), and
-//  - 0.1 Add records whose facts live under `intakeEvidence` (tabelog, reservation, profile).
+//  - flat items (preview-build seeds and every record written by this version), and
+//  - preview-build Add records whose facts live under `intakeEvidence` (tabelog, reservation, profile).
 // Both are read here; nothing rewrites existing rows.
 
 type Json = Record<string, unknown>;

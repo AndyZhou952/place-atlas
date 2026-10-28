@@ -1,5 +1,11 @@
 # Repository working rules
 
+## Deploying for the Owner
+
+- Follow "Deploy step by step" in README.md. The Owner creates the Cloudflare account, enables R2 and runs `npx wrangler login`; do everything else.
+- Keep deployment settings in the ignored `wrangler.local.jsonc` (or an existing `wrangler.owner-poc.local.jsonc`). Never commit a database ID, account ID, password, key or token, and never print secret values.
+- Ask the Owner for the Owner password and provider keys and pipe them to `wrangler secret put`; generate `ATLAS_OWNER_SESSION_SECRET` yourself.
+
 ## Public content
 
 - Keep chat transcripts, progress reports, incident narratives and restaurant-specific research or benchmark results in chat, not public repository documentation.

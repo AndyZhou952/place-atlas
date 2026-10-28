@@ -12,7 +12,7 @@ const row = (payload: unknown, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-// The 0.1 Add flow stored facts under intakeEvidence; the public fields were projections.
+// The preview build's Add flow stored facts under intakeEvidence; the public fields were projections.
 const intakeRecord = {
   id: 'r1',
   kind: 'food',
@@ -62,7 +62,7 @@ const intakeRecord = {
   },
 };
 
-test('0.1 Add records are read from their intake evidence', () => {
+test('preview-build Add records are read from their intake evidence', () => {
   const restaurant = toRestaurant(
     row(intakeRecord, {
       overall_rating: 8,

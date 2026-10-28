@@ -76,7 +76,7 @@ function setup() {
        VALUES ('published', ?, 'verified', ?, ?)`,
     )
     .run(JSON.stringify(restaurant('published', 'verified')), at, at);
-  // An unpublished 0.1 review candidate, with a visit and a photo of its own.
+  // An unpublished preview-build review candidate, with a visit and a photo of its own.
   sqlite
     .prepare(
       `INSERT INTO atlas_review_candidates (id, payload_json, created_at, updated_at)

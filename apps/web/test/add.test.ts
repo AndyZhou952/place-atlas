@@ -240,7 +240,7 @@ test('the external Add Agent uses its Bearer token and cannot assert Owner field
       }),
       agentEnv,
     );
-  // The wire names are the 0.1 ones; the harness's short names are not part of the API.
+  // The wire names are the preview build's; the harness's short names are not part of the API.
   const discover = {
     operation: 'catalog.intake.discover',
     input: { query: '合成食堂', requestToken: 'agent-0001' },

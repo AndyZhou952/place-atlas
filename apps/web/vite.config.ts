@@ -3,7 +3,7 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// Prefer the ignored deployment config; wrangler.owner-poc.local.jsonc is the pre-0.2 name.
+// Prefer the ignored deployment config; wrangler.owner-poc.local.jsonc is the preview build's name.
 const configPath =
   ['wrangler.local.jsonc', 'wrangler.owner-poc.local.jsonc'].find((path) => existsSync(path)) ??
   'wrangler.jsonc';

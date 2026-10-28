@@ -15,7 +15,7 @@ import {
 export const WEB_CONVERSATION_HEADER = 'x-atlas-web-conversation-id';
 export const AGENT_CONVERSATION_HEADER = 'x-atlas-agent-conversation-id';
 const OPERATIONS = new Set<CatalogIntakeOperation>(['discover', 'select', 'confirm', 'cancel']);
-/** The external Add Agent's operation names on the wire (unchanged from 0.1). */
+/** The external Add Agent's operation names on the wire (unchanged from the preview build). */
 const AGENT_OPERATIONS: Readonly<Record<string, CatalogIntakeOperation>> = {
   'catalog.intake.discover': 'discover',
   'catalog.intake.select': 'select',

@@ -1,7 +1,7 @@
 import type { Env } from './env.ts';
 import { HttpError, json, readJson } from './http.ts';
 
-// Session cookie format (unchanged since 0.1): base64url(JSON payload) "." base64url(HMAC-SHA256).
+// Session cookie format (unchanged since the preview build): base64url(JSON payload) "." base64url(HMAC-SHA256).
 const COOKIE = '__Host-atlas_owner';
 const LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const encoder = new TextEncoder();

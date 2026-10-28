@@ -2,7 +2,7 @@ import type { ModelSettingsStatus } from '../shared/types.ts';
 import type { Env } from './env.ts';
 import { HttpError, readBoundedText } from './http.ts';
 
-// Owner-saved model credentials. The encrypted envelope is unchanged since 0.1:
+// Owner-saved model credentials. The encrypted envelope is unchanged since the preview build:
 // {version:1, iv, ciphertext} with an AES-GCM key derived by HKDF from AGENT_SETTINGS_SECRET
 // (or the session secret). No restaurant data is ever sent by the connection check.
 

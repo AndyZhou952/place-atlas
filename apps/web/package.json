@@ -1,0 +1,41 @@
+{
+  "name": "@japan-atlas/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "deploy": "vite build && wrangler deploy",
+    "deploy:route-sidecar": "wrangler deploy --config wrangler.route-sidecar.jsonc",
+    "lint": "cd ../.. && apps/web/node_modules/.bin/oxlint --config apps/web/.oxlintrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "format:check": "cd ../.. && apps/web/node_modules/.bin/oxfmt --config apps/web/.oxfmtrc.json --check apps/web/src apps/web/route-sidecar apps/web/test apps/web/vite.config.ts benchmarks",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
+    "benchmark": "node --experimental-strip-types --no-warnings ../../benchmarks/run.ts"
+  },
+  "dependencies": {
+    "leaflet": "1.9.4",
+    "lucide-react": "1.31.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.54.4",
+    "@cloudflare/workers-types": "5.20260905.1",
+    "@types/leaflet": "1.9.20",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "wrangler": "4.129.0"
+  }
+}

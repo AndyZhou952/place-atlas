@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import", "jsx-a11y"],
+  "categories": { "correctness": "error" },
+  "env": { "builtin": true, "browser": true, "node": true },
+  "ignorePatterns": ["**/dist/**"],
+  "rules": {
+    "no-var": "error",
+    "prefer-const": "error",
+    "react/rules-of-hooks": "error",
+    "typescript/no-explicit-any": "error"
+  }
+}

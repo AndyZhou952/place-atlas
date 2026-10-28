@@ -1,0 +1,39 @@
+{
+  // Template for a new deployment. Copy to wrangler.local.jsonc (ignored by Git),
+  // set your D1 database_id and resource names, then run `npm run deploy`.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "place-atlas",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": false,
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "RESTAURANT_SOURCE_READER": "firecrawl",
+    // Set to "enabled" (with the GOOGLE_PLACES_API_KEY secret) to verify Add matches on Google Maps.
+    "CATALOG_INTAKE_GOOGLE_PLACES_MODE": "disabled",
+    "CATALOG_INTAKE_DURABLE_GEOCODER_MODE": "enabled"
+  },
+  // Daily cleanup of expired Add sessions and the geocoder cache.
+  "triggers": { "crons": ["0 3 * * *"] },
+  // Optional: bind the route sidecar Worker (wrangler.route-sidecar.jsonc) for Recommend routes.
+  // "services": [{ "binding": "ROUTE_SIDECAR", "service": "japan-atlas-route-sidecar" }],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.05,
+    "logs": { "enabled": true, "head_sampling_rate": 0.05, "invocation_logs": false }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "place-atlas",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "migrations/owner-poc"
+    }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "place-atlas-media" }]
+}

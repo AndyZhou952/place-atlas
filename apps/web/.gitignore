@@ -1,0 +1,9 @@
+/node_modules
+/dist/
+/.wrangler/
+*.tsbuildinfo
+.env*
+.dev.vars
+.dev.vars.*
+/wrangler.local.jsonc
+/wrangler.owner-poc.local.jsonc

@@ -2,9 +2,13 @@
 
 **Japan Atlas 0.1.0** — a quiet, self-hosted map and journal of the restaurants you find, in Japan. You run it on your own Cloudflare account, so your records, photos and keys stay with you.
 
+**Live demo: [japan-demo.japan-atlas-poc.workers.dev](https://japan-demo.japan-atlas-poc.workers.dev/)**. Anyone can browse it. Add and Recommend need the demo's Owner password, which the maintainer shares on request.
+
+![Map view: saved restaurants on the map, the list with scores, favorites and visited state, and a restaurant's details](docs/images/map.webp)
+
 ## Why
 
-Restaurants turn up everywhere: an Instagram reel, a RED (Xiaohongshu) post, a YouTube video, a friend's message. Collecting them by hand into map lists is tedious, and Google Maps lists cannot be filled in by an AI agent. Writing down what you thought means public reviews that everyone can read.
+Restaurants turn up everywhere: an Instagram reel, a RED (Xiaohongshu) post, a YouTube video, a friend's message. Collecting them by hand into map lists is tedious, and Google Maps lists cannot be filled in by an AI agent. And writing down what you thought usually means a public review that everyone can read, when what you want is a quiet place for your own comments and a record of every visit.
 
 Place Atlas is one place that gathers them for you and keeps them private:
 
@@ -40,6 +44,8 @@ flowchart TD
 | **When something fails** | Each warning names what happened: Google or search refused or unavailable, Tabelog refused the read, no listing matched this branch, or research timed out. Your selection is kept, nothing is invented, and you can retry, paste the Tabelog URL, or complete the fields yourself. Without a model key, Add still finds and locates the place. |
 | **From other tools** | An external agent (for example a chat bot) can add restaurants through the Add Agent API with its own token (`GET /api/agent/capabilities` describes it). It cannot set your personal fields. |
 
+<p align="center"><img src="docs/images/add.webp" width="380" alt="Add preview: the matched branch with cuisine, signature dishes, Google rating and opening hours, each editable before saving"></p>
+
 ### Recommend from your own list
 
 ```mermaid
@@ -61,6 +67,8 @@ flowchart LR
 | **Clarifying questions** | An unclear starting point gets one short question: an exact point within a broad area, which of several matching places, or a choice of located candidates. |
 | **Not supported yet** | Train and driving times (Google has no train routes in Japan; you are told so instead of getting a guess), and conditions on scores such as *Tabelog 3.5 or higher* (planned, see below). |
 
+<p align="center"><img src="docs/images/recommend.webp" width="420" alt="Recommend: 東京駅の近くのラーメン answered with a saved ramen shop and its reason"></p>
+
 ### Browse, journal and keep your own notes
 
 | | What you get |
@@ -73,6 +81,12 @@ flowchart LR
 | **Photos and videos** | JPEG/PNG/WebP/GIF up to 8 MB and MP4/WebM up to 50 MB, checked by file signature. Add a caption to any photo, browse them in a viewer, delete them individually. Uploads are safe to retry: a retry never duplicates or overwrites a file. |
 | **Visitors and Owner** | Anyone with the link can browse published restaurants, visits and photos. Only the Owner (one password per deployment) can add, edit, upload or ask Recommend, which spend your provider quota. |
 | **Your keys** | Every deployment uses its owner's own keys. The Owner saves a DeepSeek or OpenAI key on the site; it is encrypted at rest and never sent back to the browser. Monthly caps protect paid Google calls. |
+
+| Table | Journal |
+| --- | --- |
+| ![Table view with cuisine, prefecture, area, your score, Tabelog score, last visit and reservation rule](docs/images/table.webp) | ![Journal of visits with notes, scores and photos](docs/images/journal.webp) |
+
+<p align="center"><img src="docs/images/photo.webp" width="560" alt="Photo viewer with a caption"></p>
 
 ## Deploy your own
 

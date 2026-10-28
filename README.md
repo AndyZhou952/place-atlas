@@ -82,9 +82,9 @@ flowchart LR
 | **Visitors and Owner** | Anyone with the link can browse published restaurants, visits and photos. Only the Owner (one password per deployment) can add, edit, upload or ask Recommend, which spend your provider quota. |
 | **Your keys** | Every deployment uses its owner's own keys. The Owner saves a DeepSeek or OpenAI key on the site; it is encrypted at rest and never sent back to the browser. Monthly caps protect paid Google calls. |
 
-| Table | Journal |
-| --- | --- |
-| ![Table view with cuisine, prefecture, area, your score, Tabelog score, last visit and reservation rule](docs/images/table.webp) | ![Journal of visits with notes, scores and photos](docs/images/journal.webp) |
+![Table view with cuisine, prefecture, area, your score, Tabelog score, last visit and reservation rule](docs/images/table.webp)
+
+![Journal of visits with notes, scores and photos](docs/images/journal.webp)
 
 <p align="center"><img src="docs/images/photo.webp" width="560" alt="Photo viewer with a caption"></p>
 

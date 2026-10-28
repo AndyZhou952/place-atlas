@@ -52,7 +52,7 @@ const CATEGORIES: readonly (readonly [string, string, string])[] = [
     'カフェ|喫茶店|コーヒー|珈琲|スペシャルティコーヒー|cafe|coffee|coffee shop|咖啡馆',
   ],
   ['cafe-dessert.dessert', 'Dessert / cake', 'ケーキ|スイーツ|cake|dessert|甜品'],
-  ['cafe-dessert.bakery', 'Bakery / sandwiches', 'パン|サンドイッチ|bakery|sandwich|面包'],
+  ['cafe-dessert.bakery', 'Bakery / sandwiches', 'パン|ベーカリー|サンドイッチ|bakery|sandwich|面包'],
 ];
 
 export const CUISINE_OPTIONS = CATEGORIES.map(([id, label]) => ({ id, label }));

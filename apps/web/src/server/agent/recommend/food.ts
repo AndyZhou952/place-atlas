@@ -34,9 +34,15 @@ const canonical = (value: string, contains = false) =>
 const families = (value: string, contains = false) =>
   Object.keys(FAMILIES).filter((family) => matches(FAMILIES[family], value, contains));
 
+const known = (term: string): string | undefined =>
+  canonical(term)[0] ?? classifyCuisines([term])[0] ?? families(term)[0];
+/** "パン屋", "ラーメン専門店" and "sushi restaurant" name the food before the shop word. */
+const SHOP_SUFFIX = /(?:屋さん|専門店|屋|店|\s+(?:shops?|restaurants?|places?|bars?))$/iu;
+
 /** The single key a requested food is matched by. */
 export function foodKey(term: string): string {
-  return canonical(term)[0] ?? classifyCuisines([term])[0] ?? families(term)[0] ?? key(term);
+  const food = term.trim().replace(SHOP_SUFFIX, '');
+  return known(term) ?? (food ? known(food) : undefined) ?? key(term);
 }
 
 /** Every key a saved restaurant's labels (tags and cuisine labels) answer to. */

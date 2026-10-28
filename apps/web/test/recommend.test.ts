@@ -129,6 +129,15 @@ test('cuisines beyond the six dish terms match saved labels; unknown cuisines ma
   assert.ok(!itemFoodKeys(['ラーメン', '居酒屋']).includes(foodKey('Vietnamese')));
 });
 
+test('a food named with its shop word matches the food', () => {
+  assert.equal(foodKey('パン屋'), 'cafe-dessert.bakery');
+  assert.equal(foodKey('ベーカリー'), 'cafe-dessert.bakery');
+  assert.equal(foodKey('ラーメン屋'), 'ramen');
+  assert.equal(foodKey('sushi restaurant'), 'sushi');
+  assert.equal(foodKey('居酒屋'), 'japanese.izakaya');
+  assert.ok(itemFoodKeys(['パン', '洋菓子']).includes(foodKey('パン屋')));
+});
+
 /**
  * A route sidecar that geocodes any starting point near Tokyo Station (as one place, or as two
  * candidates when `candidates` is 2) and walks 5 minutes.

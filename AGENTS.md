@@ -10,7 +10,7 @@
 
 - Keep chat transcripts, progress reports, incident narratives and restaurant-specific research or benchmark results in chat, not public repository documentation.
 - Never commit an Owner catalog export, saved item IDs, personal records, production database/bucket identifiers, credentials or raw live evaluation responses. Temporary private evidence belongs in ignored local output directories.
-- Use README for setup and product usage, `docs/architecture.md` for boundaries and design, and `docs/status.md` for concise implemented/planned status. Do not add project reports or extra documents unless the user explicitly requests them. Existing evaluation READMEs should describe generic protocols, not named production incidents.
+- Use README for a brief overview, screenshots and setup, `docs/features.md` for detailed feature behavior, `docs/architecture.md` for boundaries and design, and `docs/status.md` for concise implemented/planned status and the roadmap. Do not add project reports or extra documents unless the user explicitly requests them. Existing evaluation READMEs should describe generic protocols, not named production incidents.
 - Prefer synthetic, minimal fixtures for general behavior. Preserve multilingual input where it is the behavior under test; do not turn a conversation's restaurant examples into public fixtures or documentation.
 
 - After a history rewrite, base further work on the cleaned branch. Rebase or cherry-pick unfinished changes; merging or pushing an old branch can restore deleted history.

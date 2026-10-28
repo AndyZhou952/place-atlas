@@ -200,22 +200,12 @@ npx wrangler secret put GOOGLE_MAPS_API_KEY --config wrangler.route-sidecar.json
 
 Then, in `wrangler.local.jsonc`, uncomment the line `"services": [{ "binding": "ROUTE_SIDECAR", "service": "japan-atlas-route-sidecar" }],` and run `npm run deploy` again.
 
-### Upgrading from the preview build
-
-Deployments of the October 2026 preview build need no data migration: this version reads the same D1 tables and both stored record formats, keeps sessions and saved model keys valid, and serves the same photo links. Back up first:
-
-```sh
-npx wrangler d1 export DB --remote --config wrangler.owner-poc.local.jsonc --output atlas-backup.sql
-```
-
-Your `wrangler.owner-poc.local.jsonc` keeps working (renaming it to `wrangler.local.jsonc` is optional): its old entry point is replaced at build time, and its variables, secrets, daily cleanup and route sidecar binding are used as before. The Add and Recommend endpoints keep their request and response formats. Event and architecture records are no longer shown but stay in the database, and the in-browser (WebMCP) tools were replaced by the Add Agent API.
-
 ## Next
 
 Planned for the next version:
 
 - **Recommend with conditions on your data.** Requests such as *a place I have never visited near Ginza* or *ramen with a score above 3.5* (in Japan, usually the Tabelog score) become explicit conditions that code checks against each saved restaurant before anything is returned. A model only translates the request, and a benchmark covers these combinations on a realistic catalog.
-- **Chat channels.** Connect the atlas to a WhatsApp or Telegram bot, so you can add a restaurant, ask for a recommendation, or record a visit with photos from your chat app.
+- **Chat channels.** Connect the atlas to a bot in any chat app that supports bots (for example Telegram, WhatsApp, LINE, Slack or Discord), so you can add a restaurant, ask for a recommendation, or record a visit with photos without opening the site.
 
 See [status](docs/status.md) for the current scope and [architecture](docs/architecture.md) for how it is built.
 

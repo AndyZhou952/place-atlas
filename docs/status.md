@@ -10,7 +10,6 @@
 - Add: Google Maps–checked match (or Tabelog search / a pasted listing), Nominatim coordinates, a research agent that keeps only sourced facts about the selected branch (Tabelog score, reservation rule, hours, categories, dishes, links), an editable preview, duplicate detection and confirm-once publication.
 - Recommend from saved restaurants by dish or cuisine, origin, walking time, visited preference and walk-in, with clarifying questions and walking times from the optional route sidecar.
 - Owner-only Google ratings; the external Add Agent API with its own Bearer token.
-- Reads everything written by the preview build without migration.
 
 ## Not included
 
@@ -21,4 +20,4 @@
 ## Next version
 
 - **Recommend with conditions on your data**: an agent translates requests such as *a place I have never visited near Ginza* or *ramen with a score above 3.5* (usually the Tabelog score in Japan) into explicit conditions; code checks each condition against the saved catalog before anything is returned. A benchmark covers these combinations on a realistic catalog.
-- **Chat channels**: a WhatsApp or Telegram bot connected to the atlas, to add restaurants, get recommendations and record visits with photos from a chat app.
+- **Chat channels**: a bot in any chat app that supports bots (for example Telegram, WhatsApp, LINE, Slack or Discord) connected to the atlas, to add restaurants, get recommendations and record visits with photos from a chat app.

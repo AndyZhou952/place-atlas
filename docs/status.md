@@ -1,6 +1,6 @@
 # Status
 
-**0.1.0** — restaurants in Japan. The [README](../README.md#features) lists every feature; this page keeps the scope and the plan.
+**0.1.0** — restaurants in Japan. [Features](features.md) describes each feature; this page keeps the scope and the plan.
 
 ## Implemented
 
@@ -13,7 +13,7 @@
 
 ## Not included
 
-- Events, architecture and places outside Japan (existing event and architecture records are kept but hidden).
+- Places outside Japan.
 - Train and driving times; conditions on scores in Recommend.
 - Hosting outside Cloudflare.
 

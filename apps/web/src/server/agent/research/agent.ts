@@ -225,12 +225,15 @@ export function createPlaceResearchAgent(config: AgentConfiguration): WebResearc
         return result;
       };
       /** Why research is incomplete: a refused listing read, then (when Tabelog stayed unknown)
-       * a refused or failed search, or searches that found no listing for the branch. */
+       * a listing read but rejected as another branch, a refused or failed search, or searches
+       * that found no listing for the branch. */
       const researchIssue = (tabelogKnown = false): ResearchSourceIssue | undefined =>
         sourceAccessIssue ??
         (tabelogKnown || matchedListing() || searches === 0
           ? undefined
-          : (searchIssue ?? 'no_listing'));
+          : evidence.some((source) => source.restaurant)
+            ? 'other_branch'
+            : (searchIssue ?? 'no_listing'));
 
       /** The selected branch's listing: the pasted one, or the first listing that matches. */
       const matchedListing = () =>

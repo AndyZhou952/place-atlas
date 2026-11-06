@@ -138,6 +138,92 @@ test('a romanized provider address never matches a single-lot listing on name, l
   assert.equal(fromRomanized('京都府京都市東山区合成町367'), false, 'uncorroborated town');
 });
 
+// One selected place, read from Google in Japanese, and its listing; only what the Owner typed varies.
+const ebisu = {
+  address: '日本、〒150-0013 東京都渋谷区恵比寿１丁目２−３ テストビル 1F',
+  pin: { latitude: 35.6467, longitude: 139.7101 },
+};
+const typedTexts = [
+  'テスト麺屋',
+  'tesuto menya ebisu',
+  'テスメン',
+  'てすとめんや えびす',
+  'テスト面や 恵比須',
+  'that yuzu ramen place in ebisu',
+  '',
+];
+const ebisuListing = (
+  googleName: string,
+  typed: string,
+  listing: Partial<{ name: string; address: string; postal: string; selected: string }> = {},
+  pin = ebisu.pin,
+) => {
+  const {
+    name = 'テスト麺屋',
+    address = '東京都渋谷区恵比寿1-2-3 テストビル 1F',
+    postal = '1500013',
+    selected = ebisu.address,
+  } = listing;
+  return matchesSelectedBranch(
+    `${name} ${address}`,
+    googleName,
+    selected,
+    typed,
+    address,
+    postal,
+    name,
+    {
+      selected: ebisu.pin,
+      source: pin,
+    },
+  );
+};
+
+test('the selected place matches its listing on address, postcode and pin, whatever the Owner typed', () => {
+  // The listing's own name, a branch word Google adds, and a romanized Google name.
+  for (const googleName of ['テスト麺屋', 'テスト麺屋 恵比寿店', 'Test Menya Ebisu'])
+    for (const typed of typedTexts) {
+      assert.equal(ebisuListing(googleName, typed), true, `${googleName} / ${typed}`);
+      const selected = { transientName: googleName, transientAddress: ebisu.address };
+      assert.equal(
+        initialResearchQuery({ ...selected, ownerQuery: typed }),
+        initialResearchQuery({ ...selected, ownerQuery: '' }),
+        `first search for ${googleName} / ${typed}`,
+      );
+    }
+});
+
+test('a chain name, building or block alone never makes another listing the selected place', () => {
+  const far = { latitude: 35.6581, longitude: 139.7017 };
+  for (const typed of typedTexts) {
+    const rejects = (why: string, ...args: Parameters<typeof ebisuListing>) =>
+      assert.equal(ebisuListing(...args), false, `${why} / ${typed}`);
+    const name = 'テスト麺屋 恵比寿店';
+    rejects(
+      'another branch of the chain',
+      name,
+      typed,
+      { name: 'テスト麺屋 渋谷店', address: '東京都渋谷区渋谷2-3-4 別ビル 2F', postal: '1500002' },
+      far,
+    );
+    rejects('another shop in the same building', name, typed, { name: '合成バル' });
+    rejects('a romanized Google name without every anchor', 'Test Menya Ebisu', typed, {
+      name: '合成バル',
+      postal: '1500014',
+    });
+    rejects('another floor', name, typed, { address: '東京都渋谷区恵比寿1-2-3 テストビル 2F' });
+    rejects('a neighbouring town', name, typed, {
+      address: '東京都渋谷区恵比寿西1-2-3 テストビル 1F',
+      postal: '1500021',
+    });
+    rejects('a two-part number without the postcode', name, typed, {
+      selected: '日本、〒150-0013 東京都渋谷区恵比寿１丁目２ テストビル 1F',
+      address: '東京都渋谷区恵比寿1-2 テストビル 1F',
+      postal: '1500014',
+    });
+  }
+});
+
 test('failed reads log the reader status apart from the page status, without the URL', async () => {
   const url = 'https://tabelog.com/tokyo/A1317/A131701/13999901/';
   const logged: unknown[] = [];
@@ -377,6 +463,15 @@ test('a zero-result first search spends the second search on the simpler name an
   const first = initialResearchQuery(subject);
   const simpler = simplerResearchQuery(subject);
   assert.notEqual(first, simpler);
+  // A romanized selected name falls back on the Owner's Japanese words.
+  assert.equal(
+    simplerResearchQuery({
+      transientName: 'Test Menya Ebisu',
+      transientAddress: ebisu.address,
+      ownerQuery: 'テスト麺屋 恵比寿',
+    }),
+    'テスト麺屋 恵比寿 渋谷区 site:tabelog.com',
+  );
   const research = agentRun({
     search: (query) => (query === simpler ? yahoo(listingRow) : yahoo('')),
     answer: {
@@ -445,6 +540,7 @@ test('refused searches are reported as a search failure, not as a missing restau
   assert.match(message, /web search service refused/u);
   assert.doesNotMatch(message, /Tabelog refused|no rating/u);
   assert.match(researchIssueMessage('no_listing', false), /no Tabelog listing that matches/u);
+  assert.match(researchIssueMessage('other_branch', false), /not the selected branch's/u);
 });
 
 test('a sourced refusal with a quoted takeaway item stays known as not reservable', async () => {
@@ -543,6 +639,7 @@ test('a listing at another town contributes no rating, address, coordinates or r
     // The same-branch listings are the controls: the same claims are accepted there.
     assert.equal(result.value.tabelog.status, known ? 'known' : 'unknown', address);
     if (known) continue;
+    assert.equal(result.sourceAccessIssue, 'other_branch', address);
     assert.equal(result.value.reservation.status, 'unknown', address);
     assert.equal(result.value.profile?.address, undefined, address);
     assert.equal(result.value.profile?.coordinates, undefined, address);

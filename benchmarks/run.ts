@@ -207,7 +207,9 @@ async function runAdd(testCase: {
       check,
       pass,
       pass || !stage ? detail : `${detail} — ${researchStages[stage]}`,
-      stage && stage !== 'no_listing' && !['title', 'prefecture'].includes(check)
+      stage &&
+        !['other_branch', 'no_listing'].includes(stage) &&
+        !['title', 'prefecture'].includes(check)
         ? 'provider'
         : 'behavior',
     );
@@ -228,6 +230,7 @@ const researchStages = {
   search_unavailable: 'search failed',
   blocked: 'listing read refused',
   unavailable: 'listing read failed',
+  other_branch: 'listing rejected as another branch',
   no_listing: 'no listing matched the branch',
   timed_out: 'research timed out',
 } as const;

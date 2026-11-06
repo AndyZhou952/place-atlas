@@ -138,14 +138,15 @@ export type WebResearchInput =
 
 /**
  * Why research came back incomplete: Tabelog refused (`blocked`) or failed (`unavailable`) the
- * listing read, the search provider refused or failed, or searches found no listing for the
- * selected branch.
+ * listing read, the search provider refused or failed, searches found only listings rejected as
+ * another branch (`other_branch`), or no listing at all.
  */
 export type ResearchSourceIssue =
   | 'blocked'
   | 'unavailable'
   | 'search_blocked'
   | 'search_unavailable'
+  | 'other_branch'
   | 'no_listing';
 
 export type WebResearchOutcome =
@@ -1094,6 +1095,7 @@ const researchIssues = [
   'unavailable',
   'search_blocked',
   'search_unavailable',
+  'other_branch',
   'no_listing',
 ] as const;
 
@@ -1121,6 +1123,8 @@ export function researchIssueMessage(
       return `The web search service refused the server request, so no Tabelog listing was read. ${incomplete} Your selected restaurant is retained; retry later, or ${pasteListing}`;
     case 'search_unavailable':
       return `Web search returned no usable results, so no Tabelog listing was read. ${incomplete} Your selected restaurant is retained; retry later, or ${pasteListing}`;
+    case 'other_branch':
+      return `Search found a Tabelog listing, but its address or name is not the selected branch's, so it was not used. ${incomplete} Your selected restaurant is retained; ${pasteListing}`;
     case 'no_listing':
       return `Search found no Tabelog listing that matches the selected branch. ${incomplete} Your selected restaurant is retained; ${pasteListing}`;
     default:

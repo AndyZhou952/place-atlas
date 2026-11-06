@@ -1,6 +1,6 @@
 // Is this page about the selected branch? Chains share names, and Google, Tabelog and official
-// sites format the same Japanese address differently, so identity rests on the name plus street
-// numbers, postal code and ward, never on a name alone.
+// sites format the same Japanese address differently, so identity rests on the selected place's
+// street numbers, postal code, town and map pin, never on a name alone or on what the Owner typed.
 import { isTabelogRestaurantListing } from './instructions.ts';
 import type { SearchEvidence } from './web-search.ts';
 
@@ -138,10 +138,8 @@ export function initialResearchQuery(subject: {
     plainName(name) !== plainName(ownerHint) &&
     comparableName(name) === comparableName(ownerHint);
   const addressHint = streetNumbers(subject.transientAddress)[0];
+  // Only the selected place's own name and address: loose typed text can sink this search.
   const parts = [equivalentOwnerName ? ownerHint : name];
-  if (ownerHint && !equivalentOwnerName && !name.toLowerCase().includes(ownerHint.toLowerCase())) {
-    parts.push(ownerHint);
-  }
   if (!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(name)) {
     const buildingSuffix = subject.transientAddress
       .normalize('NFKC')
@@ -161,11 +159,13 @@ export function initialResearchQuery(subject: {
 
 /**
  * The selected name and its city or ward only. It survives what can sink the first query
- * (dictation, building names, block numbers); the selected branch still has to match.
+ * (building names, block numbers); the selected branch still has to match. A romanized selected
+ * name rarely finds a Japanese listing, so then the Owner's Japanese words are the fallback hint.
  */
 export function simplerResearchQuery(subject: {
   readonly transientName: string;
   readonly transientAddress: string;
+  readonly ownerQuery?: string;
 }): string {
   const address = subject.transientAddress.normalize('NFKC');
   const area =
@@ -174,7 +174,12 @@ export function simplerResearchQuery(subject: {
       .match(
         /[\p{Script=Han}\p{Script=Katakana}ー]+?市(?:[\p{Script=Han}\p{Script=Katakana}ー]+?区)?|[\p{Script=Han}\p{Script=Katakana}ー]+?区/u,
       )?.[0] ?? address.match(/\b([A-Za-z]+)[\s-](?:City|Ward|ku)\b/u)?.[1];
-  const name = subject.transientName.slice(0, 200).trim();
+  const japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+  const ownerHint = subject.ownerQuery?.slice(0, 160).trim() ?? '';
+  const name =
+    !japanese.test(subject.transientName) && japanese.test(ownerHint)
+      ? ownerHint
+      : subject.transientName.slice(0, 200).trim();
   return `${[name, area].filter(Boolean).join(' ')} site:tabelog.com`;
 }
 
@@ -342,6 +347,21 @@ function streetNumbers(value: string): string[] {
 }
 
 /**
+ * The whole locality before the lot (city, ward and town) in Japanese script, without the
+ * prefecture: 西合成町 is another town than 合成町, not a spelling of it.
+ */
+function japaneseLocality(value: string): string {
+  const local = value
+    .normalize('NFKC')
+    .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+    .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
+    .replace(/\s/gu, '');
+  return (local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '')
+    .toLowerCase()
+    .replace(/[\p{P}\p{Z}\s]/gu, '');
+}
+
+/**
  * Outside central Tokyo a branch is often a short Japanese name at a single lot number (no
  * hyphenated block), and Google and Tabelog can file it under neighbouring postcodes. Such a
  * listing is the selected branch only when every independent anchor agrees: the listing's exact
@@ -397,18 +417,8 @@ function matchesSingleLotBranch(
   const sourceLots = lots(sourceAddress);
   if (selectedLots.length !== 1 || sourceLots.length !== 1 || selectedLots[0] !== sourceLots[0])
     return false;
-  // The whole locality before the lot (city, ward and town) must be the same in Japanese script:
-  // 西合成町 is another town than 合成町, not a spelling of it.
-  const locality = (value: string) => {
-    const local = value
-      .normalize('NFKC')
-      .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
-      .replace(/^.*?(?:東京都|北海道|京都府|大阪府|[\p{Script=Han}]{2,3}県)/u, '')
-      .replace(/\s/gu, '');
-    return key(local.slice(0, local.search(/\d/u)).match(/[\p{L}ー]+$/u)?.[0] ?? '');
-  };
-  const selected = locality(address);
-  const source = locality(sourceAddress);
+  const selected = japaneseLocality(address);
+  const source = japaneseLocality(sourceAddress);
   const municipality = selected.match(/^.*[市区郡]/u)?.[0] ?? '';
   const town = selected.slice(municipality.length);
   if (
@@ -426,6 +436,79 @@ function matchesSingleLotBranch(
     source.endsWith(town) &&
     pinsAgree(points)
   );
+}
+
+/**
+ * Is the listed name the selected name with or without a branch word (`same`), in another script
+ * so the two cannot be compared (`unknown`, a romanized Google name beside a Japanese listing), or
+ * another shop's name (`different`)?
+ */
+function nameAffinity(selected: string, listed: string): 'same' | 'unknown' | 'different' {
+  const japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+  const forms = (value: string) => {
+    const words = value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[ァ-ヶ]/gu, (char) => String.fromCharCode(char.charCodeAt(0) - 0x60))
+      .split(/[\p{P}\p{Z}\s]+/u)
+      .filter(Boolean);
+    // 恵比寿店 or 本店 as the last word names the branch, not the shop.
+    const shop = words.length > 1 && words.at(-1)?.endsWith('店') ? words.slice(0, -1) : words;
+    return [words.join(''), shop.join('')];
+  };
+  const contains = (longer: string, shorter: string) =>
+    shorter.length >= (japanese.test(shorter) || longer === shorter ? 2 : 4) &&
+    longer.includes(shorter);
+  const left = forms(selected);
+  const right = forms(listed);
+  if (left.some((a) => right.some((b) => contains(a, b) || contains(b, a)))) return 'same';
+  return japanese.test(left[1]) === japanese.test(right[1]) ? 'different' : 'unknown';
+}
+
+/**
+ * The selected place is anchored on Google's Japanese address and map pin. A listing in the same
+ * town at the same block number, with the same postcode or a pin within 100 m, is that place even
+ * when the names differ by a branch word, and whatever the Owner typed. A block, building or floor
+ * can hold several shops, so the address alone never decides: a listed name in the same script that
+ * is not part of the selected name (or the reverse) is another shop. A name in another script cannot
+ * be compared and needs every anchor: a three-part block number, the postcode and the pin.
+ */
+function matchesAnchoredAddress(
+  name: string,
+  address: string,
+  sourceAddress: string,
+  sourcePostalCode: string | undefined,
+  sourceName: string,
+  points: IdentityPoints | undefined,
+): boolean {
+  const selectedAddress = normalizeJapaneseBlockNumerals(address);
+  const listedAddress = normalizeJapaneseBlockNumerals(sourceAddress);
+  const selectedFloor = floorNumber(selectedAddress);
+  const sourceFloor = floorNumber(listedAddress);
+  if (selectedFloor !== undefined && sourceFloor !== undefined && selectedFloor !== sourceFloor)
+    return false;
+  const sourceNumbers = streetNumbers(listedAddress);
+  const blocks = streetNumbers(selectedAddress).filter((numbers) =>
+    sourceNumbers.includes(numbers),
+  );
+  const town = japaneseLocality(selectedAddress);
+  if (!blocks.length || !/[市区郡]./u.test(town) || town !== japaneseLocality(listedAddress))
+    return false;
+  const postalCode = (value: string) =>
+    value
+      .normalize('NFKC')
+      .match(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/u)?.[0]
+      ?.replace(/\D/gu, '');
+  const selectedPostalCode = postalCode(selectedAddress);
+  const samePostalCode = Boolean(
+    selectedPostalCode && selectedPostalCode === (sourcePostalCode ?? postalCode(listedAddress)),
+  );
+  // A two-part number names a whole block, not a lot: it needs the postcode too.
+  const threePart = blocks.some((numbers) => numbers.split('-').length === 3);
+  if (!threePart && !samePostalCode) return false;
+  const names = nameAffinity(name, sourceName);
+  if (names === 'same') return samePostalCode || pinsAgree(points);
+  return names === 'unknown' && threePart && samePostalCode && pinsAgree(points);
 }
 
 export function matchesSelectedBranch(
@@ -464,6 +547,12 @@ export function matchesSelectedBranch(
       sourceName,
       points,
     )
+  )
+    return true;
+  if (
+    sourceAddress &&
+    sourceName &&
+    matchesAnchoredAddress(name, address, sourceAddress, sourcePostalCode, sourceName, points)
   )
     return true;
   const text = normalize(quote);
@@ -545,9 +634,14 @@ export function matchesSelectedBranch(
     if (selectedPostalCode === sourcePostalCode) return true;
     // Google can report a building's dedicated postal code while a listing
     // uses the neighborhood code. Only override the mismatch when the same
-    // street number, brand, and distinctive Japanese building name agree.
+    // street number, brand, and distinctive Japanese building name agree. The building name
+    // follows the street number; the prefecture, ward and town before it are not one.
     const selectedBuildingNames =
-      address.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{6,}/gu) ?? [];
+      address
+        .normalize('NFKC')
+        .replace(/(?<!\d)\d{3}[\s-]?\d{4}(?!\d)/gu, ' ')
+        .replace(/^\D*/u, '')
+        .match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{6,}/gu) ?? [];
     if (
       !selectedBuildingNames.some((name) =>
         addressText.includes(normalize(name.replace(/[内階]+$/gu, ''))),
